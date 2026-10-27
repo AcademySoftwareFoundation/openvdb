@@ -2543,7 +2543,7 @@ TEST_F(TestNanoVDB, HDDA)
     auto acc = grid->getAccessor();
     CoordT ijk;
     float v0;
-    EXPECT_TRUE(nanovdb::math::ZeroCrossing( ray, acc, ijk, v0 ) );
+    EXPECT_TRUE(nanovdb::math::zeroCrossing( ray, acc, ijk, v0 ) );
     std::cerr << "hit with v0 =" << v0 << " background = " << grid->tree().background() << std::endl;
   }
 #endif

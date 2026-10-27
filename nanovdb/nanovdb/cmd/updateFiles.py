@@ -66,7 +66,6 @@ def update_files(dir_path):
             "Vec3<",
             "Vec4<",
             "BBox<",
-            "ZeroCrossing",
             "TreeMarcher",
             "PointTreeMarcher",
             "BoxStencil<",
@@ -132,6 +131,7 @@ def update_files(dir_path):
         "nanovdb::BBox<nanovdb::Vec3d>": "nanovdb::Vec3dBbox",
         # scope and rename, i.e. list from func2 in updateFiles.sh
         "nanovdb::cudaCreateNodeManager": "nanovdb::cuda::createNodeManager",
+        "nanovdb::ZeroCrossing": "nanovdb::math::zeroCrossing",
         "nanovdb::cudaVoxelsToGrid": "nanovdb::cuda::voxelsToGrid",
         "nanovdb::cudaPointsToGrid": "nanovdb::cuda::pointsToGrid",
         "nanovdb::DitherLUT": "nanovdb::math::DitherLUT",

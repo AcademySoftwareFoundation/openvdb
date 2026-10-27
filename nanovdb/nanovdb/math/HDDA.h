@@ -15,6 +15,8 @@
 
 #include <nanovdb/NanoVDB.h> // only dependency
 
+#include <algorithm> // for std::min
+
 namespace nanovdb::math {
 
 /// @brief A Digital Differential Analyzer specialized for OpenVDB grids
@@ -213,13 +215,6 @@ inline __hostdev__ bool zeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename 
     return false;
 }// zeroCrossing
 
-template<typename RayT, typename AccT>
-[[deprecated("Use zeroCrossing(ray, acc, ijk, v, t)")]]
-inline __hostdev__ bool ZeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename AccT::ValueType& v, float& t)
-{
-    return zeroCrossing(ray, acc, ijk, v,t);
-}
-
 /////////////////////////////////////////// isoCrossing ////////////////////////////////////////////
 
 template<typename RayT, typename AccT>
@@ -412,13 +407,6 @@ inline __hostdev__ bool zeroCrossingNode(RayT& ray, const NodeT& node, float v0,
     }
     return false;
 }// zeroCrossingNode
-
-template<typename RayT, typename NodeT>
-[[deprecated("Use zeroCrossingNode(ray, node, v0, ijk, v, t)")]]
-inline __hostdev__ bool ZeroCrossingNode(RayT& ray, const NodeT& node, float v0, nanovdb::math::Coord& ijk, float& v, float& t)
-{
-    return zeroCrossingNode(ray, node, v0, ijk, v, t);
-}
 
 /////////////////////////////////////////// TreeMarcher ////////////////////////////////////////////
 

@@ -490,23 +490,6 @@ createNanoGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValue
 
 }// namespace tools::cuda  =============================================================
 
-template<typename DstBuildT, typename SrcBuildT, typename BufferT = cuda::DualDeviceBuffer>
-[[deprecated("Use nanovdb::cuda::indexToGrid instead")]]
-typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type
-cudaIndexToGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues, const BufferT &pool = BufferT(), cudaStream_t stream = 0)
-{
-    return tools::cuda::indexToGrid<DstBuildT, SrcBuildT, BufferT>(d_srcGrid, d_srcValues, pool, stream);
-}
-
-
-template<typename DstBuildT, typename SrcBuildT, typename BufferT = cuda::DualDeviceBuffer>
-[[deprecated("Use nanovdb::cuda::indexToGrid instead")]]
-typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type
-cudaCreateNanoGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues, const BufferT &pool = BufferT(), cudaStream_t stream = 0)
-{
-    return tools::cuda::indexToGrid<DstBuildT, SrcBuildT, BufferT>(d_srcGrid, d_srcValues, pool, stream);
-}
-
 }// nanovdb namespace ===================================================================
 
 #endif // NANOVDB_TOOLS_CUDA_INDEXTOGRID_CUH_HAS_BEEN_INCLUDED

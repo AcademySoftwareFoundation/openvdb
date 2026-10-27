@@ -87,30 +87,6 @@ inline void forEach(const ContainerT<T...> &c, size_t grainSize, const FuncT& fu
 
 }// namespace util
 
-/// @brief Simple wrapper for the function defined above
-template <typename FuncT>
-[[deprecated("Use nanovdb::util::forEach instead")]]
-inline void forEach(size_t begin, size_t end, size_t grainSize, const FuncT& func)
-{
-    util::forEach(util::Range1D(begin, end, grainSize), func);
-}
-
-/// @brief Simple wrapper for the function defined above, which works with std::containers
-template <template<typename...> class ContainerT, typename... T, typename FuncT>
-[[deprecated("Use nanovdb::util::forEach instead")]]
-inline void forEach(const ContainerT<T...> &c, const FuncT& func)
-{
-    util::forEach(util::Range1D(0, c.size(), 1), func);
-}
-
-/// @brief Simple wrapper for the function defined above, which works with std::containers
-template <template<typename...> class ContainerT, typename... T, typename FuncT>
-[[deprecated("Use nanovdb::util::forEach instead")]]
-inline void forEach(const ContainerT<T...> &c, size_t grainSize, const FuncT& func)
-{
-    util::forEach(util::Range1D(0, c.size(), grainSize), func);
-}
-
 }// namespace nanovdb
 
 #endif // NANOVDB_UTIL_FOREACH_H_HAS_BEEN_INCLUDED

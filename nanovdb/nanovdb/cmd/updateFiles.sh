@@ -49,7 +49,7 @@ func4 () {
 for file in $(find "$dir" -name '*.h' -or -name '*.cuh' -or -name '*.cc' -or -name '*.cu' -or -name '*.cpp'); do
   if [ -f "$file" ]; then
     echo "Processing file: $file"
-    func1 $file math Ray "DDA<" HDDA "Vec3<" "Vec4<" "BBox<" ZeroCrossing TreeMarcher PointTreeMarcher\
+    func1 $file math Ray "DDA<" HDDA "Vec3<" "Vec4<" "BBox<" TreeMarcher PointTreeMarcher\
                 "BoxStencil<" "CurvatureStencil<" "GradStencil<" "WenoStencil<" AlignUp Min Max Abs Clamp\
                 Sqrt Sign "Maximum<" "Delta<" "RoundDown<" "pi<" "isApproxZero<" "Round<" createSampler "SampleFromVoxels<"
     func1 $file tools createNanoGrid StatsMode createLevelSetSphere\
@@ -62,6 +62,7 @@ for file in $(find "$dir" -name '*.h' -or -name '*.cuh' -or -name '*.cc' -or -na
     func4 $file "nanovdb::BBoxR" "nanovdb::Vec3dBBox"
     func4 $file "nanovdb::BBox<nanovdb::Vec3d>" "nanovdb::Vec3dBbox"
     func2 $file cuda cudaCreateNodeManager createNodeManager
+    func2 $file math ZeroCrossing zeroCrossing
     func2 $file cuda cudaVoxelsToGrid voxelsToGrid
     func2 $file cuda cudaPointsToGrid pointsToGrid
     func2 $file math DitherLUT DitherLUT

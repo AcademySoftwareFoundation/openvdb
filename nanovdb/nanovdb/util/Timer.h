@@ -12,6 +12,8 @@
 
 #include <iostream>
 #include <chrono>
+#include <string>
+#include <type_traits> // for std::is_same
 
 namespace nanovdb {
 
@@ -91,8 +93,6 @@ public:
 };// Timer
 
 }// namespace util
-
-using CpuTimer [[deprecated("Use nanovdb::util::Timer instead")]] = util::Timer;
 
 } // namespace nanovdb
 

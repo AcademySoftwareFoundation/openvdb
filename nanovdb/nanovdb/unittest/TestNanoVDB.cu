@@ -873,20 +873,20 @@ TEST(TestNanoVDBCUDA, mergeSplitGrids)
     EXPECT_EQ( 5u, handles2.size());
     //timer.restart("merging 5 host grids");
     auto mergedHandle = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles2);// merge last 5 grid handles
-    EXPECT_EQ(size2, mergedHandle.size());
+    EXPECT_EQ(size2, mergedHandle.bufferSize());
     EXPECT_FALSE(mergedHandle.isPadded());
     EXPECT_TRUE(mergedHandle.data());
     auto *gridData = mergedHandle.gridData();// first grid
     EXPECT_TRUE(gridData);
     EXPECT_EQ(5u, gridData->mGridCount);
     EXPECT_EQ(0u, gridData->mGridIndex);
-    EXPECT_EQ(handles2[0].size(), gridData->mGridSize);
+    EXPECT_EQ(handles2[0].bufferSize(), gridData->mGridSize);
     //timer.restart("unit-test host grids");
     for (int i=0; i<5; ++i){
         gridData = mergedHandle.gridData(i);
         EXPECT_TRUE(gridData);
         EXPECT_EQ(i, gridData->mGridIndex);
-        EXPECT_EQ(handles2[i].size(), gridData->mGridSize);
+        EXPECT_EQ(handles2[i].bufferSize(), gridData->mGridSize);
         EXPECT_EQ(strcmp(gridNames[i+5].c_str(), gridData->mGridName),0);
     }
 
@@ -896,27 +896,27 @@ TEST(TestNanoVDBCUDA, mergeSplitGrids)
     EXPECT_EQ(6u, handles1.size());
     //timer.restart("merging 10 host grids");
     mergedHandle = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles1);
-    EXPECT_EQ(size1 + size2, mergedHandle.size());
+    EXPECT_EQ(size1 + size2, mergedHandle.bufferSize());
     EXPECT_TRUE(mergedHandle.data());
     gridData = mergedHandle.gridData();// first grid
     EXPECT_TRUE(gridData);
     EXPECT_EQ(10u, gridData->mGridCount);
     EXPECT_EQ( 0u, gridData->mGridIndex);
-    EXPECT_EQ(handles1[0].size(), gridData->mGridSize);
+    EXPECT_EQ(handles1[0].bufferSize(), gridData->mGridSize);
 
     //timer.restart("splitting host grids");
     auto splitHandles = nanovdb::splitGrids(mergedHandle);
     //timer.restart("unit-test split grids");
     EXPECT_EQ(10u, splitHandles.size());
     for (int i=0; i<5; ++i){
-        EXPECT_EQ(handles1[i].size(), splitHandles[i].size());
+        EXPECT_EQ(handles1[i].bufferSize(), splitHandles[i].bufferSize());
         gridData = splitHandles[i].gridData();
         EXPECT_EQ(0u, gridData->mGridIndex);
         EXPECT_EQ(1u, gridData->mGridCount);
         EXPECT_EQ(strcmp(gridNames[i].c_str(), gridData->mGridName),0);
     }
     for (int i=5; i<10; ++i){
-        EXPECT_EQ(handles2[i-5].size(), splitHandles[i].size());
+        EXPECT_EQ(handles2[i-5].bufferSize(), splitHandles[i].bufferSize());
         gridData = splitHandles[i].gridData();
         EXPECT_EQ(0u, gridData->mGridIndex);
         EXPECT_EQ(1u, gridData->mGridCount);
@@ -945,7 +945,7 @@ TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
     EXPECT_EQ(10u, handles.size());
     //timer.restart("merging device grids");
     auto mergedHandle = nanovdb::cuda::mergeGridHandles<BufferT, std::vector>(handles);
-    EXPECT_EQ(size, mergedHandle.size());
+    EXPECT_EQ(size, mergedHandle.bufferSize());
     EXPECT_FALSE(mergedHandle.data());
     EXPECT_TRUE(mergedHandle.deviceData());
     EXPECT_FALSE(mergedHandle.isPadded());
@@ -970,7 +970,7 @@ TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
     //timer.restart("unit-test split grids");
     EXPECT_EQ(10u, splitHandles.size());
     for (uint32_t i=0u; i<10u; ++i) {
-        EXPECT_EQ(handles[i].size(), splitHandles[i].size());
+        EXPECT_EQ(handles[i].bufferSize(), splitHandles[i].bufferSize());
         EXPECT_FALSE(splitHandles[i].isPadded());
         EXPECT_FALSE(splitHandles[i].gridData());
         splitHandles[i].deviceDownload();
@@ -2415,7 +2415,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel8)
 
     //timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
     /////////////////////////////////////////////////////////////////////////
-    //auto handle = nanovdb::cudaPointsToGrid(d_points, pointCount, nanovdb::PointType::Voxel8);
+    //auto handle = nanovdb::tools::cuda::pointsToGrid(d_points, pointCount, 1.0, nanovdb::PointType::Voxel8);
     nanovdb::tools::cuda::PointsToGrid<BuildT> converter(pointGrid->map());
     //converter.setVerbose();
     converter.setPointType(nanovdb::PointType::Voxel8);
@@ -2540,7 +2540,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_PointID)
 
     //timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
     /////////////////////////////////////////////////////////////////////////
-    //auto handle = nanovdb::cudaPointsToGrid(d_points, pointCount, nanovdb::PointType::Voxel8);
+    //auto handle = nanovdb::tools::cuda::pointsToGrid(d_points, pointCount, 1.0, nanovdb::PointType::Voxel8);
     nanovdb::tools::cuda::PointsToGrid<BuildT> converter(pointGrid->map());
     //converter.setVerbose(2);
     converter.setPointType(nanovdb::PointType::PointID);
@@ -3133,7 +3133,7 @@ TEST(TestNanoVDBCUDA, CudaGridChecksum)
         //cpuTimer.start("CPU GridChecksum of level set sphere");
         nanovdb::Checksum cs = nanovdb::tools::evalChecksum(grid, nanovdb::CheckMode::Partial);
         //cs(*grid);
-        //checksum2 = cs.checksum(0);// only check the checksum of grid, tree and root data
+        //checksum2 = cs.head();// only check the checksum of grid, tree and root data
         //cpuTimer.stop();
         //std::cerr << checksum2 << std::endl;
         EXPECT_EQ(checksum, cs.head());
@@ -3482,11 +3482,11 @@ TEST(TestNanoVDBCUDA, cudaIsValid_DeviceBuffer)
     EXPECT_TRUE(d_grid);
     const bool verbose = false;
 
-    EXPECT_TRUE(nanovdb::isValid(grid,        mode, verbose));
+    EXPECT_TRUE(nanovdb::tools::isValid(grid,        mode, verbose));
     EXPECT_TRUE(nanovdb::tools::cuda::isValid(d_grid,  mode, verbose));
 
     grid->mGridType = nanovdb::GridType::Vec3f;
-    EXPECT_FALSE(nanovdb::isValid(grid,       mode, verbose));
+    EXPECT_FALSE(nanovdb::tools::isValid(grid,       mode, verbose));
     handle.deviceUpload();
     EXPECT_FALSE(nanovdb::tools::cuda::isValid(d_grid, mode, verbose));
 }// cudaIsValid_DeviceBuffer
@@ -3514,11 +3514,11 @@ TEST(TestNanoVDBCUDA, cudaIsValid_UnifiedBuffer)
     EXPECT_TRUE(d_grid);
     const bool verbose = false;
 
-    EXPECT_TRUE(nanovdb::isValid(grid,        mode, verbose));
+    EXPECT_TRUE(nanovdb::tools::isValid(grid,        mode, verbose));
     EXPECT_TRUE(nanovdb::tools::cuda::isValid(d_grid,  mode, verbose));
 
     grid->mGridType = nanovdb::GridType::Vec3f;
-    EXPECT_FALSE(nanovdb::isValid(grid,       mode, verbose));
+    EXPECT_FALSE(nanovdb::tools::isValid(grid,       mode, verbose));
     handle.deviceUpload();
     EXPECT_FALSE(nanovdb::tools::cuda::isValid(d_grid, mode, verbose));
 }// cudaIsValid_UnifiedBuffer
@@ -3643,7 +3643,7 @@ TEST(TestNanoVDBCUDA, UnifiedBuffer_IO)
     {// size = capacity
         auto handle = nanovdb::io::readGrid<BufferT>("data/3_spheres.nvdb", 0);
         auto nanoGrid = handle.grid<float>();
-        EXPECT_EQ(handle.size(), handle.buffer().capacity());
+        EXPECT_EQ(handle.bufferSize(), handle.buffer().capacity());
         EXPECT_EQ(handle.buffer().size(), handle.buffer().capacity());
         EXPECT_TRUE(nanoGrid);
         EXPECT_EQ(1u, handle.gridCount());
@@ -3681,7 +3681,7 @@ TEST(TestNanoVDBCUDA, UnifiedBuffer_createLevelSetSphere)
 
     EXPECT_TRUE(handle);
     EXPECT_EQ(1u, handle.gridCount());
-    EXPECT_EQ(handle.size(), handle.buffer().capacity());
+    EXPECT_EQ(handle.bufferSize(), handle.buffer().capacity());
     auto* meta = handle.gridMetaData();
     EXPECT_TRUE(meta);
     EXPECT_EQ(gridName, std::string(meta->shortGridName()));

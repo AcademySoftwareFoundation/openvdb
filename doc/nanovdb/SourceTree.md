@@ -137,43 +137,22 @@ $ tree
 │   ├── TestNanoVDB.cu
 │   └── TestOpenVDB.cc
 └── util
-    ├── CpuTimer.h
-    ├── CreateNanoGrid.h
     ├── cuda
-    │   ├── CudaAddBlindData.cuh
     │   ├── CudaDeviceBuffer.h
-    │   ├── CudaGridChecksum.cuh
-    │   ├── CudaGridHandle.cuh
-    │   ├── CudaGridStats.cuh
-    │   ├── CudaGridValidator.cuh
-    │   ├── CudaIndexToGrid.cuh
-    │   ├── CudaNodeManager.cuh
-    │   ├── CudaPointsToGrid.cuh
-    │   ├── CudaSignedFloodFill.cuh
-    │   ├── CudaUtils.h
-    │   ├── GpuTimer.h
+    │   ├── DeviceGridTraits.cuh
+    │   ├── Injection.cuh
+    │   ├── Morphology.cuh
+    │   ├── MorphologyHelpers.cuh
+    │   ├── Rasterization.cuh
     │   ├── Timer.h
     │   └── Util.h
-    ├── DitherLUT.h
     ├── ForEach.h
-    ├── GridBuilder.h
-    ├── GridChecksum.h
-    ├── GridStats.h
-    ├── GridValidator.h
-    ├── HDDA.h
-    ├── HostBuffer.h
     ├── Invoke.h
-    ├── IO.h
-    ├── NanoToOpenVDB.h
-    ├── NodeManager.h
-    ├── OpenToNanoVDB.h
+    ├── MaskPrefixSum.h
+    ├── MorphologyHelpers.h
     ├── PrefixSum.h
-    ├── Primitives.h
     ├── Range.h
-    ├── Ray.h
     ├── Reduce.h
-    ├── SampleFromVoxels.h
-    ├── Stencils.h
     ├── Timer.h
     └── Util.h
 ```
