@@ -94,7 +94,7 @@ The NanoVDB maintainer role is a scoped sub-variant of the [maintainer](#maintai
 
 All NanoVDB feature work is staged on the `develop/nanovdb` branch with features merged into `master` after some time for testing and stabilization. A pull request targeting `develop/nanovdb` requires an approving review from a NanoVDB maintainer, a [maintainer](#maintainer), or a [TSC member](#technical-steering-committee-tsc-member) before it can be merged.
 
-This role enables the participant to approve, request changes on, and dismiss reviews of pull requests targeting `develop/nanovdb` or sub-feature branches (`develop/nanovdb/*`), and to merge them in the same manner a [maintainer](#maintainer) or a [TSC member](#technical-steering-committee-tsc-member) can. However, the role does not grant these permissions on any other branch, including `master`. It also comes with the obligation to be a responsible leader in the NanoVDB community.
+This role enables the member to approve, request changes on, and dismiss reviews of pull requests targeting `develop/nanovdb` or sub-feature branches (`develop/nanovdb/*`), and to merge them in the same manner a [maintainer](#maintainer) or a [TSC member](#technical-steering-committee-tsc-member) can. However, the role does not grant these permissions on any other branch, including `master`. It also comes with the obligation to be a responsible leader in the NanoVDB community.
 
 ### Process for becoming a NanoVDB maintainer
 
