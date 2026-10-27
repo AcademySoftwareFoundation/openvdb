@@ -435,9 +435,9 @@ inline void Segment::write(std::ostream& os) const
 
 inline bool Segment::read(std::istream& is)
 {
-    is.read(reinterpret_cast<char*>(&header), sizeof(FileHeader));
-    if (is.eof()) {// The EOF flag is only set once a read tries to read past the end of the file
-        is.clear(std::ios_base::eofbit);// clear eof flag so we can rewind and read again
+    if (!is.read(reinterpret_cast<char*>(&header), sizeof(FileHeader))) {
+        if (is.gcount() != 0) throw std::runtime_error("Segment::read: stream ends inside a file header");
+        is.clear();// end of stream: reset its state so callers can rewind and read again
         return false;
     }
     const MagicType magic = toMagic(header.magic);
@@ -549,6 +549,7 @@ GridHandle<BufferT> readGrid(std::istream& is, int n, const BufferT& pool)
                 }// loop over grids in segment
                 is.seekg(skipSize, std::ios_base::cur); // skip forward from the current position
             }// loop over segments
+            if (gridCount == 0) return handle;// the stream holds no grids
             auto buffer = BufferT::create(bufferSize, &pool);
             char *ptr = (char*)buffer.data();
             is.seekg(start);// rewind
