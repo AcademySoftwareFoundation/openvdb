@@ -1,0 +1,6 @@
+NanoVDB:
+
+  Fixes:
+  - The NanoVDB file and raw-stream readers no longer trust sizes and names read from their input. Grids smaller than their headers, grid names without NULL termination, Blosc chunks that claim more bytes than were read, and file or grid sizes that wrap a stream offset or a 64-bit byte count now throw std::runtime_error.
+  - io::readGridMetaData, io::readGrid, nanovdb_print and nanovdb_validate no longer hang on a stream shorter than a grid header (672 bytes), such as an empty or truncated file. An empty stream reads as zero grids, and a partial file header throws std::runtime_error.
+  - Moving a zero-size HostBuffer no longer leaves a dangling pointer in its pool's register.
