@@ -4512,7 +4512,7 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
     for (uint32_t g = 0; g < gridCount; ++g) {
         srcGrids[g] = inputs[g].deviceGrid<BuildT>();
         ASSERT_TRUE(srcGrids[g]);
-        srcTrees[g] = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(srcGrids[g]);
+        srcTrees[g] = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(srcGrids[g], stream);
         leafStart[g + 1] = leafStart[g] + srcTrees[g].mNodeCount[0];
     }
     const uint32_t srcLeafCount = leafStart[gridCount];
