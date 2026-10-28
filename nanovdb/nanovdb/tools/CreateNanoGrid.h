@@ -1277,12 +1277,12 @@ CreateNanoGrid<SrcGridT>::processLeafs()
             if constexpr(BuildTraits<DstBuildT>::is_onindex) {
                 const uint64_t *w = dstLeaf->mValueMask.words();
 #ifdef USE_OLD_VALUE_ON_INDEX
-                int32_t sum = CountOn(*w++);
+                int32_t sum = util::countOn(*w++);
                 uint8_t *p = reinterpret_cast<uint8_t*>(&dstLeaf->mPrefixSum), *q = p + 7;
                 for (int j=0; j<7; ++j) {
                     *p++ = sum & 255u;
                     *q |= (sum >> 8) << j;
-                    sum += CountOn(*w++);
+                    sum += util::countOn(*w++);
                 }
 #else
                 uint64_t &prefixSum = dstLeaf->mPrefixSum, sum = util::countOn(*w++);

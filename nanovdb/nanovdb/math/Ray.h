@@ -549,9 +549,6 @@ private:
 
 } // namespace math =========================================================
 
-template<typename RealT>
-using Ray [[deprecated("Use nanovdb::math::Ray instead")]] = math::Ray<RealT>;
-
 } // namespace nanovdb =======================================================
 
 #endif // NANOVDB_MATH_RAY_HAS_BEEN_INCLUDED

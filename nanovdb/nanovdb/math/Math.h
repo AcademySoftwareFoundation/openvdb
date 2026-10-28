@@ -2817,7 +2817,6 @@ using Vec4i  = Vec4<int>;
 
 }// namespace math ===============================================================
 
-using Rgba8 [[deprecated("Use math::Rgba8 instead.")]] = math::Rgba8;
 using math::Coord;
 
 using Vec3d = math::Vec3<double>;
@@ -2834,7 +2833,6 @@ using Vec4i = math::Vec4<int>;
 
 using CoordBBox = math::BBox<Coord>;
 using Vec3dBBox = math::BBox<Vec3d>;
-using BBoxR [[deprecated("Use Vec3dBBox instead.")]] = math::BBox<Vec3d>;
 
 } // namespace nanovdb ===================================================================
 

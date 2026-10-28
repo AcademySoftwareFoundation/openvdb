@@ -47,13 +47,6 @@ bool isValid(const NanoGrid<ValueT> *d_grid, CheckMode mode, bool verbose = fals
 
 }// namespace tools::cuda
 
-template <typename ValueT>
-[[deprecated("Use cuda::isValid() instead.")]]
-bool cudaIsValid(const NanoGrid<ValueT> *d_grid, CheckMode mode, bool verbose = false, cudaStream_t stream = 0)
-{
-    return tools::cuda::isValid(d_grid, mode, verbose, stream);
-}
-
 } // namespace nanovdb
 
 #endif // NANOVDB_TOOLS_CUDA_GRIDVALIDATOR_CUH_HAS_BEEN_INCLUDED
