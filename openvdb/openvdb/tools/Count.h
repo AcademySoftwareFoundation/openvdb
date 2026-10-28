@@ -64,10 +64,6 @@ template <typename TreeT>
 Index64 memUsage(const TreeT& tree, bool threaded = true);
 
 
-template <typename TreeT>
-OPENVDB_DEPRECATED_MESSAGE("Use tools::memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-Index64 memUsageIfLoaded(const TreeT& tree, bool threaded = true) { return tools::memUsage(tree, threaded); }
-
 
 /// @brief Return the minimum and maximum active values in this tree.
 /// @note  Returns zeroVal<ValueType> for empty trees.

@@ -117,8 +117,6 @@ public:
     static Index64 leafCount() { return 1; }
     /// no-op
     void nodeCount(std::vector<Index64> &) const {}
-    OPENVDB_DEPRECATED_MESSAGE("Use input type std::vector<Index64> for nodeCount.")
-    void nodeCount(std::vector<Index32> &) const {}
     static Index64 nonLeafCount() { return 0; }
 
     /// Return the number of active voxels.
@@ -145,8 +143,6 @@ public:
 
     /// Return the memory in bytes occupied by this node.
     Index64 memUsage() const;
-    OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    Index64 memUsageIfLoaded() const { return memUsage(); }
 
     /// Expand the given bounding box so that it includes this leaf node's active voxels.
     /// If visitVoxels is false this LeafNode will be approximated as dense, i.e. with all

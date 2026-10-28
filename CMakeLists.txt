@@ -52,8 +52,8 @@ endif()
 
 ###### Version
 
-set(OpenVDB_MAJOR_VERSION 13)
-set(OpenVDB_MINOR_VERSION 2)
+set(OpenVDB_MAJOR_VERSION 14)
+set(OpenVDB_MINOR_VERSION 0)
 set(OpenVDB_PATCH_VERSION 0)
 set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}")
 
@@ -80,10 +80,6 @@ option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library. Turns ON if USE_NANOVDB
 # Global options
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_ENABLE_ASSERTS "Build with asserts in OpenVDB code enabled" OFF)
-option(OPENVDB_ENABLE_VEC_RELATIONAL_OPERATIONS [=[
-Enabled deprecated relational < and > operators on Vector types. This option
-will be switched to OFF and the feature will be subsequently removed in future
-releases.]=] ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
