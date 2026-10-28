@@ -12,6 +12,14 @@ project(NanoVDB LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 
+# Use the standard documentation directory for standalone builds.
+if(NOT DEFINED NANOVDB_INSTALL_DOCDIR)
+  set(NANOVDB_INSTALL_DOCDIR "${CMAKE_INSTALL_DOCDIR}")
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/OpenVDBInstallLicenses.cmake")
+openvdb_install_licenses("${NANOVDB_INSTALL_DOCDIR}")
+
 ###############################################################################
 
 message(STATUS "----------------------------------------------------")
