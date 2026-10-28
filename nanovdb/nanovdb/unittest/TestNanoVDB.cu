@@ -44,6 +44,7 @@
 #include <iomanip> // for std::setw, std::setfill
 #include <thread> // for std::thread
 #include <type_traits>
+#include <utility> // for std::declval
 
 /// @brief Single-space device storage that the GPU builders write into.
 using SingleBufT = nanovdb::cuda::Buffer<std::byte>;
@@ -3176,6 +3177,65 @@ TEST(TestNanoVDBCUDA, GridStats)
     }
 }// GridStats
 
+// A stream argument, in any spelling, selects the default-buffer
+// createNodeManager overload, never the resource-taking one.
+using DefaultNodeManagerHandleT = nanovdb::NodeManagerHandle<nanovdb::cuda::Buffer<std::byte>>;
+static_assert(std::is_same<decltype(nanovdb::cuda::createNodeManager(std::declval<const nanovdb::NanoGrid<float>*>())),
+                           DefaultNodeManagerHandleT>::value, "no stream: default buffer");
+static_assert(std::is_same<decltype(nanovdb::cuda::createNodeManager(std::declval<const nanovdb::NanoGrid<float>*>(), 0)),
+                           DefaultNodeManagerHandleT>::value, "literal 0 is a stream");
+static_assert(std::is_same<decltype(nanovdb::cuda::createNodeManager(std::declval<const nanovdb::NanoGrid<float>*>(), nullptr)),
+                           DefaultNodeManagerHandleT>::value, "nullptr is a stream");
+static_assert(std::is_same<decltype(nanovdb::cuda::createNodeManager(std::declval<const nanovdb::NanoGrid<float>*>(), std::declval<cudaStream_t&>())),
+                           DefaultNodeManagerHandleT>::value, "a cudaStream_t lvalue is a stream");
+static_assert(std::is_same<decltype(nanovdb::cuda::createNodeManager(std::declval<const nanovdb::NanoGrid<float>*>(), std::declval<nanovdb::cuda::DeviceResource&>())),
+                           nanovdb::NodeManagerHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<nanovdb::cuda::DeviceResource>>>>::value,
+              "a resource lvalue is borrowed");
+
+// Stats on a managed grid: the host updates one copy through grid(), the
+// device updates another through deviceGrid(), and each side reads back what
+// the other wrote.
+TEST(TestNanoVDBCUDA, GridStats_ManagedBuffer)
+{
+    using ManagedBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
+    using DataT = nanovdb::NanoRoot<float>::DataType;
+    auto handle = nanovdb::tools::createLevelSetSphere<float>(100, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0),
+                                                              "test", nanovdb::tools::StatsMode::Disable);
+    auto refHandle = handle.copy();
+    auto *ref = refHandle.grid<float>();
+    ASSERT_TRUE(ref);
+    nanovdb::tools::updateGridStats(ref);
+
+    auto hostSide = nanovdb::cuda::copyTo<ManagedBufT>(handle, cudaStream_t(0));
+    auto devSide  = nanovdb::cuda::copyTo<ManagedBufT>(handle, cudaStream_t(0));
+    cudaCheck(cudaDeviceSynchronize());// the host reads and writes the managed grids below
+    auto *hostGrid = hostSide.grid<float>();
+    ASSERT_TRUE(hostGrid);
+    ASSERT_TRUE(devSide.deviceGrid<float>());
+    EXPECT_NE(ref->tree().root().minimum(), hostGrid->tree().root().minimum());// stats start disabled
+
+    nanovdb::tools::updateGridStats(hostGrid);
+    nanovdb::tools::cuda::updateGridStats(devSide.deviceGrid<float>());
+    cudaCheck(cudaDeviceSynchronize());
+
+    auto expectStats = [&](const DataT *data) {
+        EXPECT_EQ(ref->indexBBox(),                 data->mBBox);
+        EXPECT_EQ(ref->tree().root().background(),   data->mBackground);
+        EXPECT_EQ(ref->tree().root().minimum(),      data->mMinimum);
+        EXPECT_EQ(ref->tree().root().maximum(),      data->mMaximum);
+        EXPECT_EQ(ref->tree().root().average(),      data->mAverage);
+        EXPECT_EQ(ref->tree().root().stdDeviation(), data->mStdDevi);
+    };
+    {// the host-side update, read on the device
+        std::unique_ptr<char[]> buffer(new char[sizeof(DataT)]);
+        cudaCheck(cudaMemcpy(buffer.get(), (const char*)hostSide.deviceGrid<float>() + sizeof(nanovdb::GridData) + sizeof(nanovdb::TreeData),
+                              sizeof(DataT), cudaMemcpyDeviceToHost));
+        expectStats(reinterpret_cast<const DataT*>(buffer.get()));
+    }
+    // the device-side update, read on the host
+    expectStats(devSide.grid<float>()->tree().root().data());
+}// GridStats_ManagedBuffer
+
 // make -j && ./unittest/testNanoVDB --gtest_filter="*cudaIsValid*" --gtest_repeat=10
 TEST(TestNanoVDBCUDA, cudaIsValid)
 {
@@ -3520,6 +3580,101 @@ TEST(TestNanoVDBCUDA, NonBlockingStreamSignedFloodFill)
     cudaCheck(cudaStreamDestroy(nb));
     EXPECT_EQ(reference, candidate);
 }// NonBlockingStreamSignedFloodFill
+
+__global__ void bufferFillKernel(unsigned char *p, size_t n, unsigned char v)
+{
+    for (size_t i = blockIdx.x*(size_t)blockDim.x + threadIdx.x; i < n; i += (size_t)gridDim.x*blockDim.x) p[i] = v;
+}
+__global__ void bufferCountKernel(const unsigned char *p, size_t n, unsigned char v, unsigned long long *bad)
+{
+    for (size_t i = blockIdx.x*(size_t)blockDim.x + threadIdx.x; i < n; i += (size_t)gridDim.x*blockDim.x)
+        if (p[i] != v) atomicAdd(bad, 1ull);
+}
+
+// A write through data() on a stream other than the buffer's retained stream
+// is still in flight when the buffer is destroyed. The caller orders the free
+// after it as cuda::Buffer documents: either by making the retained stream wait
+// on the write, or by retargeting the free with set_stream. All streams are
+// non-blocking, so nothing else orders them. If the free is not ordered after
+// the write, the pool recycles the block into the next allocation and the late
+// write corrupts it.
+static void testBufferCrossStreamFreeOrdering(bool retarget)
+{
+    const size_t N = size_t(64) << 20;// large enough that a recycled block is the same address
+    const unsigned char LATE = 0xAA, VICTIM = 0x55;
+    const unsigned long long CYCLES = 400000000ull;// parks 'user' for O(100 ms)
+
+    cudaStream_t user = nullptr, owner = nullptr;
+    cudaCheck(cudaStreamCreateWithFlags(&user, cudaStreamNonBlocking));
+    cudaCheck(cudaStreamCreateWithFlags(&owner, cudaStreamNonBlocking));
+    unsigned long long *bad = nullptr;
+    cudaCheck(cudaMallocManaged(&bad, sizeof(*bad)));
+
+    {// warm-up: on a cold context the first launches serialize, which would hide the race
+        unsigned char *w = nullptr;
+        cudaCheck(cudaMallocAsync((void**)&w, N, owner));
+        streamBusyWaitKernel<<<1,1,0,user>>>(CYCLES/10);
+        bufferFillKernel<<<1024,256,0,owner>>>(w, N, 0);
+        bufferCountKernel<<<1024,256,0,owner>>>(w, N, 0, bad);
+        cudaCheck(cudaFreeAsync(w, owner));
+        cudaCheck(cudaDeviceSynchronize());
+    }
+
+    void *devPtr = nullptr;
+    cudaEvent_t written;
+    cudaCheck(cudaEventCreateWithFlags(&written, cudaEventDisableTiming));
+    {
+        nanovdb::cuda::Buffer<unsigned char> buf(owner, N, nanovdb::cuda::noInit);
+        devPtr = buf.data();
+        EXPECT_TRUE(devPtr);
+        streamBusyWaitKernel<<<1,1,0,user>>>(CYCLES);// park 'user'
+        if (devPtr) bufferFillKernel<<<1024,256,0,user>>>(buf.data(), N, LATE);
+        if (retarget) {
+            buf.set_stream(user);
+        } else {
+            cudaCheck(cudaEventRecord(written, user));
+            cudaCheck(cudaStreamWaitEvent(buf.stream(), written, 0));
+        }
+    }// destroyed here; the free is ordered after the write on 'user'
+
+    unsigned char *victim = nullptr;
+    cudaCheck(cudaMallocAsync((void**)&victim, N, owner));
+    bufferFillKernel<<<1024,256,0,owner>>>(victim, N, VICTIM);
+    cudaCheck(cudaStreamSynchronize(owner));
+
+    // Diagnostics only: with a correctly ordered free the pool cannot hand the
+    // block out again until 'user' has drained.
+    const bool stillPending = (cudaStreamQuery(user) == cudaErrorNotReady);
+    cudaGetLastError();// clear the cudaErrorNotReady left by the query above
+    const bool recycled = (victim == devPtr);
+
+    cudaCheck(cudaStreamSynchronize(user));// let the late write land
+    *bad = 0;
+    bufferCountKernel<<<1024,256,0,owner>>>(victim, N, VICTIM, bad);
+    cudaCheck(cudaStreamSynchronize(owner));
+    const unsigned long long clobbered = *bad;
+
+    cudaCheck(cudaFreeAsync(victim, owner));
+    cudaCheck(cudaStreamSynchronize(owner));
+    cudaCheck(cudaEventDestroy(written));
+    cudaCheck(cudaFree(bad));
+    cudaCheck(cudaStreamDestroy(user));
+    cudaCheck(cudaStreamDestroy(owner));
+
+    EXPECT_EQ(0u, clobbered) << "device memory was freed while another stream still had work in "
+                                "flight (block recycled: " << recycled
+                             << ", work still pending when it was reused: " << stillPending << ")";
+}// testBufferCrossStreamFreeOrdering
+
+TEST(TestNanoVDBCUDA, BufferFreeOrderedByEventWait)
+{
+    testBufferCrossStreamFreeOrdering(/*retarget=*/false);
+}// BufferFreeOrderedByEventWait
+
+TEST(TestNanoVDBCUDA, BufferFreeOrderedBySetStream)
+{
+    testBufferCrossStreamFreeOrdering(/*retarget=*/true);
+}// BufferFreeOrderedBySetStream
 
 // Regression test: the grid-name copy must not over-read the source string.
 // It previously copied a fixed MaxNameSize bytes from the (possibly shorter)

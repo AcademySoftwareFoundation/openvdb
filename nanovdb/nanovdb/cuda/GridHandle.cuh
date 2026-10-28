@@ -19,6 +19,7 @@
 
 #include <nanovdb/cuda/Buffer.h>// for the resource-aware scratch buffers below
 #include <nanovdb/cuda/HandleStorage.h> // cuda::copyTo and the storage helpers live there (host-includable)
+#include <nanovdb/cuda/ManagedResource.h> // for the managed default handle instantiated below
 #include <nanovdb/tools/cuda/GridChecksum.cuh>// for cuda::updateChecksum
 #include <nanovdb/GridHandle.h>
 
@@ -397,6 +398,14 @@ void GridHandle<BufferT>::parseSingleBuffer()
         cuda::detail::parseGridChain(d_data, mBuffer.size_bytes(), count, scratch, mMetaData, stream);
     }
 }// GridHandle::parseSingleBuffer
+
+// Emit the device parse for the GPU tools' default handle types from every CUDA
+// translation unit, so host-only translation units that construct these handles
+// (they see only the declaration) always find the symbol at link time. The
+// definitions are emitted as weak symbols, so the copies in different
+// translation units fold at link time.
+template void GridHandle<cuda::Buffer<std::byte>>::parseSingleBuffer();
+template void GridHandle<cuda::Buffer<std::byte, cuda::ManagedResource>>::parseSingleBuffer();
 
 } // namespace nanovdb
 

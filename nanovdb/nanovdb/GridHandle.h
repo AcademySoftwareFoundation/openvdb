@@ -23,6 +23,8 @@
 #include <string> // for std::to_string
 #include <vector>
 #include <initializer_list>
+#include <cstddef> // for std::byte
+#include <type_traits> // for std::void_t
 #include <utility> // for std::move
 
 #include <nanovdb/NanoVDB.h>// for toGridType
@@ -143,6 +145,15 @@ inline void parseHostGridChain(const GridData* head, uint64_t bytes, std::vector
     }
 }
 
+/// @brief Detects a BufferTraits specialization that still declares the
+///        hasDeviceDual member removed in NanoVDB 14.0, so GridHandle can reject
+///        it instead of parsing the device-only grids as an empty host buffer.
+template<typename BufferT, typename = void>
+struct BufferDeclaresDeviceDual { static constexpr bool value = false; };
+template<typename BufferT>
+struct BufferDeclaresDeviceDual<BufferT, std::void_t<decltype(BufferTraits<BufferT>::hasDeviceDual)>>
+{ static constexpr bool value = true; };
+
 }// namespace detail
 
 /// @brief This class serves to manage a buffer containing one or more NanoVDB Grids.
@@ -154,6 +165,10 @@ class GridHandle
     static_assert(!(BufferHasDeviceSingle<BufferT>::value || BufferHasHostSingle<BufferT>::value)
                       || BufferHasByteElements<BufferT>::value,
                   "GridHandle requires byte-addressed single-space storage, e.g. cuda::Buffer<std::byte, R>");
+    static_assert(!detail::BufferDeclaresDeviceDual<BufferT>::value,
+                  "BufferTraits::hasDeviceDual was removed in NanoVDB 14.0 together with the dual-space buffers: "
+                  "hold device grids in a single-space buffer such as cuda::Buffer<std::byte> and set "
+                  "BufferTraits::hasDeviceSingle for a custom one");
 
     std::vector<GridHandleMetaData> mMetaData;
     BufferT mBuffer;

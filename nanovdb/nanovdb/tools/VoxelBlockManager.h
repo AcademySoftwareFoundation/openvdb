@@ -34,7 +34,10 @@
 #include <nanovdb/util/ForEach.h>
 
 #include <algorithm>
+#include <cstddef> // for std::byte
 #include <cstring>
+#include <type_traits> // for std::is_unsigned_v
+#include <utility> // for std::move, std::exchange
 
 namespace nanovdb {
 
@@ -179,17 +182,18 @@ public:
     /// @brief Returns the last voxel index (linear offset) associated with this VoxelBlockManager
     uint64_t lastOffset() const { return mLastOffset; }
 
-    /// @brief Returns a non-const pointer to the firstLeafID host-side data
-    uint32_t* hostFirstLeafID() { return static_cast<uint32_t*>(mFirstLeafID.data()); }
-
-    /// @brief Returns a const pointer to the firstLeafID host-side data
-    const uint32_t* hostFirstLeafID() const { return static_cast<const uint32_t*>(mFirstLeafID.data()); }
-
-    /// @brief Returns a non-const pointer to the jumpMap host-side data
-    uint64_t* hostJumpMap() { return static_cast<uint64_t*>(mJumpMap.data()); }
-
-    /// @brief Returns a const pointer to the jumpMap host-side data
-    const uint64_t* hostJumpMap() const { return static_cast<const uint64_t*>(mJumpMap.data()); }
+    //@{
+    /// @brief Returns pointers to the host-side firstLeafID and jumpMap data; not
+    ///        available for a single-space device buffer, which has no host-readable bytes.
+    template<typename U = BufferT, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type = 0>
+    uint32_t* hostFirstLeafID() { return reinterpret_cast<uint32_t*>(mFirstLeafID.data()); }
+    template<typename U = BufferT, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type = 0>
+    const uint32_t* hostFirstLeafID() const { return reinterpret_cast<const uint32_t*>(mFirstLeafID.data()); }
+    template<typename U = BufferT, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type = 0>
+    uint64_t* hostJumpMap() { return reinterpret_cast<uint64_t*>(mJumpMap.data()); }
+    template<typename U = BufferT, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type = 0>
+    const uint64_t* hostJumpMap() const { return reinterpret_cast<const uint64_t*>(mJumpMap.data()); }
+    //@}
 
 }; // VoxelBlockManagerHandle
 

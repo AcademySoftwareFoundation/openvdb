@@ -968,6 +968,9 @@ template <typename BuildT, typename ResourceT>
 template <typename PtrT, typename BufferT>
 inline BufferT DistributedPointsToGrid<BuildT, ResourceT>::getBuffer(const PtrT, size_t pointCount, const BufferT &pool)
 {
+    static_assert(BufferHasHostSingle<BufferT>::value && BufferHasDeviceSingle<BufferT>::value,
+                  "DistributedPointsToGrid: every device in the mesh writes the grid, so BufferT must hold "
+                  "host- and device-accessible storage, e.g. cuda::Buffer<std::byte, cuda::ManagedResource>");
     auto sizeofPoint = [&]()->size_t{
         switch (mPointType){
         case PointType::PointID: return sizeof(uint32_t);

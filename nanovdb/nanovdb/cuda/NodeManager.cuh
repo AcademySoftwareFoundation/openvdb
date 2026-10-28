@@ -21,6 +21,8 @@
 #include <nanovdb/cuda/Buffer.h>// for the resource-aware buffers below
 #include <nanovdb/NodeManager.h>
 #include <cstddef> // for std::byte
+#include <stdexcept> // for std::runtime_error
+#include <utility> // for std::move
 
 namespace nanovdb {
 
@@ -41,34 +43,13 @@ inline BufferT makeNodeManagerStorage(cudaStream_t stream, const RefT& ref, uint
     }
 }
 
-}// namespace detail
-
-/// @brief Construct a NodeManager over a single-space device buffer whose
-///        storage allocates through @a resource, which the returned handle
-///        borrows (it must outlive the handle) -- the same ownership contract
-///        as the builders.
-///
-/// @param d_grid device grid pointer whose nodes will be accessed sequentially
-/// @param resource memory resource with device-valid allocations the
-///        handle's storage allocates through: device-resident (e.g.
-///        DeviceResource) or host-and-device-accessible (ManagedResource).
-///        A host-only resource (e.g. PinnedResource) is excluded, since the
-///        result would carry no device NodeManager
-/// @param stream cuda stream
-/// @return Handle over cuda::Buffer<std::byte, ResourceRef<ResourceT>> that
-///         contains a device NodeManager
-template <typename BuildT, typename ResourceT>
-inline typename util::enable_if<(is_resource<ResourceT>::value || is_async_resource<ResourceT>::value)
-                                    && (!is_host_accessible_resource<ResourceT>::value
-                                        || is_device_accessible_resource<ResourceT>::value),
-                                NodeManagerHandle<Buffer<std::byte, ResourceRef<ResourceT>>>>::type
-createNodeManager(const NanoGrid<BuildT> *d_grid,
-                  ResourceT& resource,
-                  cudaStream_t stream = 0)
+/// @brief Shared body of the cuda::createNodeManager overloads: builds a
+///        device NodeManager into a BufferT whose storage allocates through
+///        @c ref, a resource or ResourceRef that BufferT holds by value.
+template <typename BuildT, typename BufferT, typename RefT>
+inline NodeManagerHandle<BufferT> buildNodeManager(const NanoGrid<BuildT> *d_grid, const RefT& ref, cudaStream_t stream)
 {
-    using RefT    = ResourceRef<ResourceT>;
-    using BufferT = Buffer<std::byte, RefT>;
-    RefT ref = detail::borrowInternal(resource);
+    if (!d_grid) throw std::runtime_error("cuda::createNodeManager: null device grid");
     auto buffer = detail::makeNodeManagerStorage<BufferT>(stream, ref, sizeof(NodeManagerData));
     auto *d_data = reinterpret_cast<NodeManagerData*>(buffer.data());
     auto sizeBuf = detail::makeNodeManagerStorage<Buffer<size_t, RefT>>(stream, ref, 1);
@@ -114,7 +95,49 @@ createNodeManager(const NanoGrid<BuildT> *d_grid,
     }
 
     return NodeManagerHandle<BufferT>(toGridType<BuildT>(), std::move(buffer));
-}// cuda::createNodeManager (single-space)
+}// cuda::detail::buildNodeManager
+
+}// namespace detail
+
+/// @brief Construct a NodeManager over a single-space device buffer whose
+///        storage allocates through @a resource, which the returned handle
+///        borrows (it must outlive the handle) -- the same ownership contract
+///        as the builders.
+///
+/// @param d_grid device grid pointer whose nodes will be accessed sequentially
+/// @param resource memory resource with device-valid allocations the
+///        handle's storage allocates through: device-resident (e.g.
+///        DeviceResource) or host-and-device-accessible (ManagedResource).
+///        A host-only resource (e.g. PinnedResource) is excluded, since the
+///        result would carry no device NodeManager
+/// @param stream cuda stream
+/// @return Handle over cuda::Buffer<std::byte, ResourceRef<ResourceT>> that
+///         contains a device NodeManager
+template <typename BuildT, typename ResourceT>
+inline typename util::enable_if<(is_resource<ResourceT>::value || is_async_resource<ResourceT>::value)
+                                    && (!is_host_accessible_resource<ResourceT>::value
+                                        || is_device_accessible_resource<ResourceT>::value),
+                                NodeManagerHandle<Buffer<std::byte, ResourceRef<ResourceT>>>>::type
+createNodeManager(const NanoGrid<BuildT> *d_grid,
+                  ResourceT& resource,
+                  cudaStream_t stream = 0)
+{
+    return detail::buildNodeManager<BuildT, Buffer<std::byte, ResourceRef<ResourceT>>>(
+        d_grid, detail::borrowInternal(resource), stream);
+}// cuda::createNodeManager (borrowed resource)
+
+/// @brief Construct a NodeManager over a cuda::Buffer<std::byte> that owns
+///        its DeviceResource -- the default buffer of the other GPU tools.
+///
+/// @param d_grid device grid pointer whose nodes will be accessed sequentially
+/// @param stream cuda stream
+/// @return Handle over cuda::Buffer<std::byte> that contains a device NodeManager
+template <typename BuildT>
+inline NodeManagerHandle<Buffer<std::byte>>
+createNodeManager(const NanoGrid<BuildT> *d_grid, cudaStream_t stream = 0)
+{
+    return detail::buildNodeManager<BuildT, Buffer<std::byte>>(d_grid, DeviceResource(), stream);
+}// cuda::createNodeManager (default buffer)
 
 }// namespace cuda
 

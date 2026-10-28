@@ -167,7 +167,6 @@ def update_files(dir_path):
         "util/cuda/CudaIndexToGrid.cuh": "tools/cuda/CudaIndexToGrid.cuh",
         "util/cuda/CudaPointsToGrid.cuh": "tools/cuda/PointsToGrid.cuh",
         "util/cuda/CudaSignedFloodFill.cuh": "tools/cuda/CudaSignedFloodFill.cuh",
-        "util/cuda/CudaDeviceBuffer.h": "cuda/DeviceBuffer.h",
         "util/cuda/CudaGridHandle.cuh": "cuda/GridHandle.cuh",
         "util/cuda/CudaUtils.h": "util/cuda/Util.h",
         "util/cuda/GpuTimer.h": "util/cuda/Timer.h",

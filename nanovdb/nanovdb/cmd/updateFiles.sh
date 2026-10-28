@@ -93,7 +93,6 @@ for file in $(find "$dir" -name '*.h' -or -name '*.cuh' -or -name '*.cc' -or -na
     func3 $file "util/cuda/CudaIndexToGrid.cuh" "tools/cuda/CudaIndexToGrid.cuh"
     func3 $file "util/cuda/CudaPointsToGrid.cuh" "tools/cuda/PointsToGrid.cuh"
     func3 $file "util/cuda/CudaSignedFloodFill.cuh" "tools/cuda/CudaSignedFloodFill.cuh"
-    func3 $file "util/cuda/CudaDeviceBuffer.h" "cuda/DeviceBuffer.h"
     func3 $file "util/cuda/CudaGridHandle.cuh" "cuda/GridHandle.cuh"
     func3 $file "util/cuda/CudaUtils.h" "util/cuda/Util.h"
     func3 $file "util/cuda/GpuTimer.h" "util/cuda/Timer.h"
