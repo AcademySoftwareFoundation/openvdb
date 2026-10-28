@@ -37,6 +37,7 @@
 /* Codes for internal flags */
 #define BLOSC_DOSHUFFLE    0x1	/* byte-wise shuffle */
 #define BLOSC_MEMCPYED     0x2	/* plain copy */
+#define BLOSC_DOBITSHUFFLE 0x4	/* bit-wise shuffle, not supported */
 
 /* Code for the only compressor shipped with Blosc */
 #define BLOSC_LZ4       1
@@ -234,6 +235,10 @@ static int validate_decompress_format(const struct blosc_context* context) {
 
   if (compformat != BLOSC_LZ4_FORMAT) {
     return -5; /* signals no decompression support */
+  }
+  if (header_flags & BLOSC_DOBITSHUFFLE) {
+    /* Reject instead of returning data that is still bitshuffled */
+    return -5;
   }
   if (compversion != BLOSC_LZ4_VERSION_FORMAT) {
     return -9;
