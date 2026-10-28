@@ -1,7 +1,325 @@
 OpenVDB Version History
 =======================
 
-Version 13.1.1 - In development
+Version 13.2.0 - October 26, 2026
+
+  Highlights:
+  - Removed support for delayed loading (out-of-core loading) from the core
+    library to improve performance and reduce code complexity. As a result,
+    OpenVDB no longer depends on Boost.
+  - Introduced the openvdb::codecs framework for stream encoding and decoding,
+    along with read-time grid type conversion (for example, reading a FloatGrid
+    as a HalfGrid).
+  - NanoVDB GPU tools can now allocate through injectable memory resources,
+    and the dual-space buffers and related transfer methods are deprecated
+    ahead of their removal in 14.0.
+
+  Security Fixes:
+  - A buffer overflow issue was discovered and fixed in this release.
+    The issue presented itself when summing grid sizes in the NanoVDB
+    readers in nanovdb/io/IO.h.
+    [Reported by Akhil Koul]
+
+  OpenVDB:
+    New features:
+    - Introduced the openvdb::codecs framework and a CodecRegistry for stream
+      encoding and decoding.
+    - Added support for an implicit codec conversion fallback (for example,
+      float to half, or scalar to mask) and ReadDiagnostics.
+    - io::ReadOptions now supports read-time grid type conversion, allowing a
+      grid to be read as a different registered type than the one stored in
+      the file (for example, reading a FloatGrid as a HalfGrid).
+
+    Improvements:
+    - The Fast Sweeping methods, tools::maskSdf and the corresponding
+      FastSweeping::initMask, now only attempt to perform an interior mask
+      operation on floating point level set grids.
+    - points::rasterizeTrilinear now supports integer and arbitrary sized
+      vector and matrix attributes (for collocated transfers).
+    - Vectorized points::rasterizeTrilinear, improving performance upwards of
+      2x on x86 with VCL and 1.5x otherwise.
+    - Large refactor of the I/O classes. Many private and protected member
+      functions have been modified. There is no change in behavior for io::File
+      and io::Stream.
+    - Per-grid StreamMetadata is no longer used for ABI=14+ when Tree I/O is
+      disabled.
+    - An IoError is now thrown when a grid type has no codec for ABI=14+.
+    - Added a forwards-compatible unsupported file check. Any file version
+      above the version supported by a reader now produces an error instead of
+      a warning.
+    - Non-seekable streams now pass -1 as the size of the buffer to the Codec.
+    - Extended the Codec API with beginRead() and finishRead(), which are useful
+      for managing asynchronous compute tasks.
+    - Removed direct testing of Tree I/O methods in favor of indirect testing
+      through Grid I/O.
+    - OpenVDB no longer depends on Boost. The optional boost::iostreams and
+      Boost interprocess dependencies have been removed along with io::TempFile.
+
+    API Changes:
+    - Delayed loading has been removed. The OPENVDB_USE_DELAYED_LOADING CMake
+      option, MappedFile support, DelayedLoadMetadata and TempFile have all been
+      removed.
+    - io::File::open() and the io::Stream constructors that accepted delayed
+      loading parameters are deprecated and now behave as their non-delayed
+      loading equivalents.
+    - Out-of-core tree APIs are deprecated, including LeafBuffer::isOutOfCore(),
+      memUsageIfLoaded() and readNonResidentBuffers(). The latter is now a no-op
+      and memUsageIfLoaded() forwards to memUsage().
+    - Free functions that previously accepted an inCoreOnly parameter are
+      deprecated in favor of overloads without that parameter.
+    - Extracted the Point Data I/O function overloads from PointDataGrid.h into
+      the new header openvdb/points/PointDataIO.h.
+    - Added an optional trailing WriteOptions parameter to io::File::write()
+      and io::Stream::write(). There is no change in behavior.
+    - Added an optional trailing ReadOptions parameter to io::File::getGrids()
+      and io::File::readGrid(). There is no change in behavior.
+    - GridDescriptor::read() is deprecated, use GridDescriptor::readHeader()
+      followed by GridDescriptor::readStreamPos() instead.
+    - Added io::File::readGrids(name, readOptions), which reads all grids whose
+      stored name is exactly the given name. This allows loading duplicate
+      grids that are hidden by a grid literally named with a suffix, such as
+      "density[1]".
+    - TreeBase::readTopology() and TreeBase::writeTopology() are now pure
+      virtual. Classes derived from TreeBase need to read and write int32_t(1)
+      to remain backwards-compatible.
+    - Renamed tools::PolygonPool::trimTrinagles() to trimTriangles(). The old
+      name is deprecated and will be removed.
+      [Contributed by Anika Brown]
+
+    Bug Fixes:
+    - The Clip tool no longer resets the grid class to unknown for level set
+      VDBs when clipping using a frustum.
+    - Fixed a long-standing bug where the stream could be left with a dangling
+      StreamMetadata pointer when a File or Stream was used for multiple reads
+      or writes.
+    - Fixed io::File::readGrid() returning the wrong tree for an instance whose
+      parent grid has the same name as a grid literally named with a suffix.
+    - Fixed io::File::getGrids() sharing a clipped tree between instanced grids
+      with different transforms. Each grid is now clipped independently.
+
+    Build:
+    - Removed the OPENVDB_USE_DELAYED_LOADING CMake option.
+    - OpenVDB no longer requires or links against Boost.
+
+  Houdini:
+    Improvements:
+    - Added Vulkan viewport support for VDB Points primitives and removed
+      support for delayed loading.
+    - The OpenVDB Combine SOP now falls back to composite methods for non
+      floating point grids if the mode is set to a CSG operation. The operation
+      is equivalent (minimum for Union, maximum for Intersection and
+      max(a, -b) for Difference), and is also well defined for vector grids
+      (magnitude based). It skips the level set logic that is otherwise
+      undefined on non floating point grid types.
+
+  NanoVDB:
+    New Features:
+    - Implemented the Half grid type, previously a placeholder, including
+      tools::createNanoGrid conversion. The voxel type is the raw 16-bit
+      storage type, so no particular float conversion is imposed.
+    - The GPU tools (voxelsToGrid, pointsToGrid, indexToGrid, createNanoGrid,
+      addBlindData) gain resource forms beside their prototype-buffer forms,
+      taking (..., stream, resource) for CUDA. One memory resource, held by
+      value and defaulting to default_resource<R>(), allocates both the scratch
+      memory and the output, which is a GridHandle<cuda::Buffer<std::byte, R>>.
+      Pass a cuda::ResourceRef to borrow an instance. A cudaStream_t argument
+      selects the resource form, so existing calls resolve as before.
+    - The builder classes (PointsToGrid, DilateGrid, MergeGrids, PruneGrid,
+      RefineGrid, CoarsenGrid, MeshToGrid, IndexToGrid) gain build() beside
+      getHandle(buffer), and MeshToGrid gains buildWithUDF(). The output
+      allocates through the builder's own resource on its stream, as a handle
+      over cuda::Buffer<std::byte, ResourceRef<R>>.
+    - nanovdb::cuda::mergeGridHandles and splitGridHandles accept single-space
+      device handles, taking (handles, stream, proto). The result allocates
+      through the resource of the prototype and is complete when the call
+      returns. nanovdb::mergeGrids and splitGrids accept host-accessible
+      single-space handles, for example over cuda::PinnedResource.
+    - Added GridHandle::adopt(buffer, metadata) and GridHandle::metaData(), the
+      public way to wrap bytes whose grid layout the caller already knows.
+      adopt validates only the layout arithmetic (contiguous grids aligned to
+      NANOVDB_DATA_ALIGNMENT within the buffer) and trusts the grid types.
+    - Every built-in CUDA memory resource (DeviceResource, MallocResource,
+      PinnedResource, ManagedResource, AsyncFromSync<R>) provides operator==
+      and operator!=, which are equal when memory from one may be freed through
+      the other. The new trait nanovdb::cuda::is_equality_comparable_resource
+      detects it, and ResourceRef<R>::operator== now compares the referenced
+      resources rather than only their addresses.
+    - Added nanovdb::cuda::Buffer::resize(stream, count), with the stream first
+      to match the constructor order.
+
+    Improvements:
+    - Refactored math::Mat and math::Vec onto shared MatBase and VecBase base
+      classes, giving every type a complete operator surface, bounds-checked
+      element access and constexpr evaluation throughout Math.h and the Map API.
+      The cross-template Vec conversion constructors are now explicit, so
+      implicit Vec conversions may need a cast. The scalar-times-Vec and
+      scalar-times-Mat operators are hidden friends, so a fully qualified
+      math::operator*(2.f, v) must be rewritten. Added opt-in over-aligned
+      math::Vec2Aligned, Vec3Aligned and Vec4Aligned. Grid layouts and the file
+      format are unchanged.
+    - The Python nanovdb.DeviceGridHandle is now backed by single-space
+      buffers, ready for the removal of the dual-space buffers in 14.0. Its host
+      memory is pinned on first transfer so async upload and download stay
+      asynchronous, a host-only handle never calls CUDA, and its device side
+      lives on the device where the grids were built or first uploaded. The
+      Python API is otherwise unchanged.
+    - Every public CUDA header now compiles as the first include of a
+      translation unit (for example, nanovdb/cuda/HandleStorage.h or
+      tools/cuda/GridStats.cuh no longer require nanovdb/cuda/GridHandle.cuh
+      first).
+
+    Deprecations:
+    - GridHandle::deviceUpload/deviceDownload/deviceData(int),
+      NodeManagerHandle::deviceUpload/deviceDownload, and the same members of
+      cuda::DualDeviceBuffer and cuda::DualUnifiedBuffer are deprecated, to be
+      removed in 14.0 with the dual-space buffers. In 14.0 the GPU tools build
+      into the device-only GridHandle<cuda::Buffer<std::byte>> by default, so
+      these warnings also reach code that transfers grids through the default
+      buffer type. Use cuda::copyTo to move handles between host and device,
+      cuda::createNodeManager on the device, and
+      cuda::Buffer<std::byte, cuda::ManagedResource> or one handle per GPU for
+      multi-GPU handles. The deviceUpload/deviceDownload methods of the Python
+      DeviceGridHandle are unchanged.
+    - The dual-space overloads of cuda::mergeGridHandles and splitGridHandles,
+      and the older nanovdb::mergeDeviceGrids and splitDeviceGrids, are
+      deprecated. Hold grids in GridHandle<cuda::Buffer<std::byte>> and use the
+      single-space overloads.
+    - Using a CUDA memory resource without operator== is deprecated. 14.0 makes
+      equality part of the resource concepts. A stateless resource can add
+      "friend bool operator==(const R&, const R&) { return true; }".
+    - cuda::Buffer::resize(count, stream) is deprecated in favor of
+      resize(stream, count), to be removed in 14.0.
+    - cuda::detail::HandleFactory is deprecated in favor of GridHandle::adopt
+      and GridHandle::metaData. It previously applied no checks. A layout that
+      adopt rejects, such as a grid at an offset that is not aligned to
+      NANOVDB_DATA_ALIGNMENT, now throws std::runtime_error.
+
+    API Changes:
+    - NanoVDB version is now 32.10.0. The grid ABI and file format are
+      unchanged. The minor version reflects the API changes below.
+    - The Python nanovdb.DeviceBuffer class, which had no constructor or
+      methods, is removed. nanovdb.tools.cuda.createLevelSet* and
+      createFogVolume* take a nanovdb.HostBuffer like their nanovdb.tools
+      counterparts, and nanovdb.io.deviceReadGrid and deviceReadGrids no longer
+      take a buffer.
+    - The GPU tools validate arguments before allocating or launching, throwing
+      std::invalid_argument for a null grid, a null or over-long blind data
+      name, a negative point count, a non-positive voxel size or density target,
+      or a singular or non-finite map. PointsToGrid::setPointType rejects
+      PointType::Disable the same way instead of throwing std::runtime_error
+      after allocation.
+    - cuda::Buffer throws std::runtime_error for an element count whose byte
+      size exceeds PTRDIFF_MAX.
+    - mergeGrids and splitGrids throw if a grid header size disagrees with the
+      handle metadata. cuda::mergeGridHandles throws before allocating if any
+      grid but the last is not a multiple of NANOVDB_DATA_ALIGNMENT.
+
+    Fixes:
+    - tools::cuda::PointsToGrid now pads the point blind data to
+      NANOVDB_DATA_ALIGNMENT when sizing a Point grid. A payload that was not a
+      multiple of 32 bytes (for example PointType::Voxel8 or Voxel16) left the
+      next grid in a merged buffer misaligned, which faulted on the device. Such
+      grids are larger by the padding, so their serialized bytes differ from
+      files written before this fix.
+    - The point-set overloads of tools::cuda::pointsToGrid and voxelsToGrid
+      failed to compile for every buffer type. pointsToGrid(points, pointCount,
+      voxelSize, type, buffer, stream) was declared but never defined, and
+      pointsToGrid with PointType::Default did not accept pointer-to-const
+      coordinates.
+    - A point count of zero no longer exits the process in pointsToGrid,
+      voxelsToGrid, the PointsToGrid builder or DistributedPointsToGrid. They
+      return a valid empty grid.
+    - Empty grids are handled consistently. tools::cuda::updateChecksum
+      (CheckMode::Full) and util::cuda::blockedCRC32 now match the host,
+      tools::isValid and checkGrid no longer fail a debug assertion on a grid
+      with no nodes, and cuda::mergeGridHandles of no grids and cuda::copyTo of
+      an empty handle return an empty handle.
+    - tools::cuda::addBlindData overflowed the host stack for blind data names
+      longer than 256 bytes, and could not be driven by a resource without a
+      default constructor such as a ResourceRef.
+    - Point grids built with PointType::Disable no longer report a blind
+      metadata entry that was never allocated.
+    - A stream wrapper type that converts to cudaStream_t now selects the
+      resource form of the GPU tools instead of failing to compile.
+    - Fixed math::Min and math::Max for 32-bit integers routing through
+      fminf and fmaxf, which lost precision above 2^24 and could overflow near
+      INT_MAX.
+    - Fixed integer division in the Vec and Mat scalar operator/, which computed
+      a reciprocal first (Vec3i(6,8,10) / 2 returned (0,0,0)), and the Vec
+      scalar operator*= when the scalar aliases one of the components of the
+      vector.
+    - Fixed Mat2::inverse returning uninitialized values on singular input (now
+      zero), and Vec2 arithmetic against Coord silently dropping the z
+      component (the overloads now take Coord2).
+    - Fixed math::Round(Vec3<float>) disagreeing with the double overload at
+      half-integers, and Vec2::round() and Vec3::round() moving some floats to
+      the wrong integer. They and the new scalar math::Round(float/double) now
+      round exactly to the nearest integer, with halfway cases going toward
+      positive infinity.
+
+    Python:
+    - bool() of a GridHandle or DeviceGridHandle raised TypeError and is now
+      True when the handle holds grids.
+    - DeviceGridHandle transfers on a handle without grids, CUDA errors, and
+      host access to device-only grids raise RuntimeError instead of exiting the
+      process.
+    - The DeviceGridHandle(cpu_t, cuda_t) constructor raises ValueError for
+      mismatched, empty, misaligned, non-contiguous or invalid arrays, and the
+      per-grid accessors raise IndexError for an index past the last grid.
+
+  Python:
+    New features:
+    - Added openvdb.readGrids(filename, gridname) to the Python module.
+
+  OpenVDB Tool:
+    Improvements:
+    - Marked the 130 out-of-line member, constructor and free function
+      definitions in Tool.h, Geometry.h, Parser.h and Util.h (and the explicit
+      specializations of vectorize<> and Parser::get<>/getVec<>) as inline, so
+      the headers can be included from more than one translation unit without
+      duplicate symbol link errors. Spelled out the deduced return types of
+      Tool::getGrid and Tool::getGeom. There is no change in behavior.
+      [Contributed by Andrew Pearce]
+
+    Fixes:
+    - Preserve rebuilt CSG results when replacing input grids.
+    - Return a failing exit status after action errors and stop immediately on
+      control-flow errors instead of entering invalid scopes.
+    - Report invalid files-loop directories as errors instead of aborting when
+      assertions are enabled, including when advancing to subsequent
+      directories.
+    - Preserve input grids after failed VDB/NanoVDB writes and avoid changing
+      the grid stack or names when voxel kernel variable validation fails.
+    - Preserve modulo expressions and loop counters in configuration files.
+      Inline comments now use '#', and '%' still supports full-line comments.
+      The config version is bumped to 10.9.0 to reflect this change.
+    - Reject truncated or malformed PLY data instead of hanging or reading
+      incomplete records.
+    - Read tab-indented ASCII STL files instead of silently loading empty
+      geometry.
+    - Recover complete binary STL triangles with a warning when the header
+      overstates their count, and continue rejecting partial records and extra
+      data. Accept small STL files.
+    - Support descending loops and reject zero or non-progressing steps. Loop
+      bodies may still move the loop variable backward, for example to retry
+      an iteration.
+    - Write VDB grids with their own half-float setting unless bits=16 or
+      bits=32 is specified, so half grids that are read and written again stay
+      half grids.
+    - "-sdf2udf" now reports failures through the common error handling (a
+      failing exit status) and leaves the grid stack unchanged on failure. Its
+      output now defaults to the name "sdf2udf_<input name>" instead of
+      "sphere".
+    - Record fatal errors in the "-log" file before it is closed.
+    - Reject truncated or malformed OFF data, and ignore CRLF blank lines in
+      OFF and XYZ input read from binary stdin.
+    - Read int32 vertex coordinates in binary PLY files instead of
+      reinterpreting their bits as floats.
+    - Avoid an extra deep copy of the output grid in "-forValues" with
+      keep=true.
+    - Keep binary stdout separate from diagnostic logs in both logging modes.
+    - Use binary stdin and stdout on Windows to prevent piped data corruption,
+      while retaining CRLF support for OFF text input.
 
 
 Version 13.1.0 - September 16, 2026

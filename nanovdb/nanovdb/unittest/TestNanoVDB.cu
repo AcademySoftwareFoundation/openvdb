@@ -2274,7 +2274,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel8)
 
     //timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
     /////////////////////////////////////////////////////////////////////////
-    //auto handle = nanovdb::cudaPointsToGrid(d_points, pointCount, nanovdb::PointType::Voxel8);
+    //auto handle = nanovdb::tools::cuda::pointsToGrid(d_points, pointCount, 1.0, nanovdb::PointType::Voxel8);
     nanovdb::tools::cuda::PointsToGrid<BuildT> converter(pointGrid->map());
     //converter.setVerbose();
     converter.setPointType(nanovdb::PointType::Voxel8);
@@ -2399,7 +2399,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_PointID)
 
     //timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
     /////////////////////////////////////////////////////////////////////////
-    //auto handle = nanovdb::cudaPointsToGrid(d_points, pointCount, nanovdb::PointType::Voxel8);
+    //auto handle = nanovdb::tools::cuda::pointsToGrid(d_points, pointCount, 1.0, nanovdb::PointType::PointID);
     nanovdb::tools::cuda::PointsToGrid<BuildT> converter(pointGrid->map());
     //converter.setVerbose(2);
     converter.setPointType(nanovdb::PointType::PointID);
@@ -2993,7 +2993,7 @@ TEST(TestNanoVDBCUDA, CudaGridChecksum)
         //cpuTimer.start("CPU GridChecksum of level set sphere");
         nanovdb::Checksum cs = nanovdb::tools::evalChecksum(grid, nanovdb::CheckMode::Partial);
         //cs(*grid);
-        //checksum2 = cs.checksum(0);// only check the checksum of grid, tree and root data
+        //checksum2 = cs.head();// only check the checksum of grid, tree and root data
         //cpuTimer.stop();
         //std::cerr << checksum2 << std::endl;
         EXPECT_EQ(checksum, cs.head());

@@ -1,3 +1,0 @@
-OpenVDB:
-  Bug fixes:
-  - Clip tool no longer resets the grid class to unknown for level set VDBs when clipping using a frustum.

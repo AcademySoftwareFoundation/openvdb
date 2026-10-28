@@ -11,6 +11,7 @@
 #define NANOVDB_UTIL_CUDA_TIMER_H_HAS_BEEN_INCLUDED
 
 #include <iostream>// for std::cerr
+#include <string>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 
@@ -155,8 +156,6 @@ public:
 };// Timer
 
 }// namespace util::cuda
-
-using GpuTimer [[deprecated("Use nanovdb::util::cuda::Timer instead")]]= util::cuda::Timer;
 
 } // namespace nanovdb
 

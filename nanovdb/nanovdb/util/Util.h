@@ -761,17 +761,6 @@ __hostdev__ inline uint64_t atomicAnd(uint64_t* target, uint64_t mask)
 
 }// namespace util ==================================================================
 
-[[deprecated("Use nanovdb::util::findLowestOn instead")]]
-__hostdev__ inline uint32_t FindLowestOn(uint32_t v){return util::findLowestOn(v);}
-[[deprecated("Use nanovdb::util::findLowestOn instead")]]
-__hostdev__ inline uint32_t FindLowestOn(uint64_t v){return util::findLowestOn(v);}
-[[deprecated("Use nanovdb::util::findHighestOn instead")]]
-__hostdev__ inline uint32_t FindHighestOn(uint32_t v){return util::findHighestOn(v);}
-[[deprecated("Use nanovdb::util::findHighestOn instead")]]
-__hostdev__ inline uint32_t FindHighestOn(uint64_t v){return util::findHighestOn(v);}
-[[deprecated("Use nanovdb::util::countOn instead")]]
-__hostdev__ inline uint32_t CountOn(uint64_t v){return util::countOn(v);}
-
 } // namespace nanovdb ===================================================================
 
 #endif // end of NANOVDB_UTIL_UTIL_H_HAS_BEEN_INCLUDED

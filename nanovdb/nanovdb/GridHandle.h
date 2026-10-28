@@ -321,7 +321,6 @@ public:
 
     //@{
     /// @brief Returns the size in bytes of the raw memory buffer managed by this GridHandle.
-    [[deprecated("Use GridHandle::bufferSize instead.")]] uint64_t size() const { return mBuffer.size(); }
     uint64_t bufferSize() const { return mBuffer.size(); }
     //@}
 

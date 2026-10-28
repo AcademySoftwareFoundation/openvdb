@@ -265,14 +265,6 @@ signedFloodFill(NanoGrid<BuildT> *d_grid, bool verbose, cudaStream_t stream)
 
 }// namespace tools::cuda
 
-template<typename BuildT>
-[[deprecated("Use nanovdb::tools::cuda::signedFloodFill instead.")]]
-typename util::enable_if<BuildTraits<BuildT>::is_float, void>::type
-cudaSignedFloodFill(NanoGrid<BuildT> *d_grid, bool verbose = false, cudaStream_t stream = 0)
-{
-    return tools::cuda::signedFloodFill<BuildT>(d_grid, verbose, stream);
-}
-
 }// namespace nanovdb
 
 #endif // NANOVDB_TOOLS_CUDA_SIGNEDFLOODFILL_CUH_HAS_BEEN_INCLUDED

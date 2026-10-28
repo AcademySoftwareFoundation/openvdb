@@ -88,7 +88,7 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
 
     GridBlindMetaData metaData{int64_t(sizeof(GridBlindMetaData) + tmp[DATA]), valueCount,
                                sizeof(BlindDataT), semantics, blindClass, toGridType<BlindDataT>()};
-    if (!metaData.isValid()) throw std::runtime_error("cudaAddBlindData: invalid combination of blind meta data");
+    if (!metaData.isValid()) throw std::runtime_error("tools::cuda::addBlindData: invalid combination of blind meta data");
     std::strcpy(metaData.mName, name);
     auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(tmp[GRID] + tmp[META] + sizeof(GridBlindMetaData) + tmp[DATA] + metaData.blindDataSize(),
                                                               &pool, stream);
@@ -196,21 +196,6 @@ addBlindData(const NanoGrid<BuildT> *d_grid,
 }// addBlindData (resource form)
 
 }// namespace tools::cuda
-
-template<typename BuildT, typename BlindDataT, typename BufferT = cuda::Buffer<std::byte>>
-[[deprecated("Use nanovdb::cuda::addBlindData instead")]]
-GridHandle<BufferT>
-cudaAddBlindData(const NanoGrid<BuildT> *d_grid,
-                 const BlindDataT *d_blindData,
-                 uint64_t valueCount,
-                 GridBlindDataClass blindClass   = GridBlindDataClass::Unknown,
-                 GridBlindDataSemantic semantics = GridBlindDataSemantic::Unknown,
-                 const char *name = "",
-                 const BufferT &pool = BufferT(),
-                 cudaStream_t stream = 0)
-{
-    return tools::cuda::addBlindData<BuildT, BlindDataT, BufferT>(d_grid, d_blindData, valueCount, blindClass, semantics, name, pool, stream);
-}
 
 }// namespace nanovdb
 

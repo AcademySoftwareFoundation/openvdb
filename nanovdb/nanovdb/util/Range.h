@@ -149,10 +149,6 @@ public:
 
 }// namespace util
 
-using Range1D [[deprecated("Use nanovdb::util::Range1D instead")]] = util::Range<1, size_t>;
-using Range2D [[deprecated("Use nanovdb::util::Range2D instead")]] = util::Range<2, size_t>;
-using Range3D [[deprecated("Use nanovdb::util::Range3D instead")]] = util::Range<3, size_t>;
-
 }// namespace nanovdb
 
 #endif // NANOVDB_UTIL_RANGE_H_HAS_BEEN_INCLUDED
