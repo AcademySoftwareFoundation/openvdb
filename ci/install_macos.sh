@@ -22,6 +22,7 @@ brew install openexr
 brew install nanobind # also installs the dependent python version
 brew install robin-map # required for nanobind
 brew install zlib
+brew install zstd
 brew install jemalloc
 
 # Use the python version that nanobind depends on

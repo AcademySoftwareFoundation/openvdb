@@ -403,7 +403,7 @@ jobs:
       shell: powershell
       run: |
         vcpkg update
-        vcpkg install tbb gtest
+        vcpkg install tbb gtest zstd
     - name: build
       run: >
         ./ci/build.sh -v
