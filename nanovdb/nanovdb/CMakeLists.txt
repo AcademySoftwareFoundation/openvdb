@@ -306,7 +306,6 @@ set(NANOVDB_INCLUDE_FILES
 # NanoVDB cuda header files
 set(NANOVDB_INCLUDE_CUDA_FILES
   cuda/Buffer.h
-  cuda/DeviceBuffer.h
   cuda/DeviceMesh.h
   cuda/DeviceResource.h
   cuda/DeviceStreamMap.h
@@ -316,7 +315,6 @@ set(NANOVDB_INCLUDE_CUDA_FILES
   cuda/NodeManager.cuh
   cuda/PinnedResource.h
   cuda/TempPool.h
-  cuda/UnifiedBuffer.h
 )
 
 # NanoVDB io header files
@@ -386,7 +384,6 @@ set(NANOVDB_INCLUDE_UTIL_FILES
 # NanoVDB util/cuda header files
 set(NANOVDB_INCLUDE_UTIL_CUDA_FILES
   util/cuda/Timer.h
-  util/cuda/CudaDeviceBuffer.h
   util/cuda/Util.h
   util/cuda/Morphology.cuh
   util/cuda/MorphologyHelpers.cuh
