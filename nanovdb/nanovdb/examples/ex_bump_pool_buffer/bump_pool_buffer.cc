@@ -90,16 +90,6 @@ public:
     const void* data() const { return nanovdb::util::PtrAdd(mState->mPoolSlab.data(), mOffset); }
 };
 
-// we specify this trait to avoid declaring the "device...(...)" convenience methods.
-// By default, "hasDeviceDual" is false for a Buffer, but we are just being overly explicit here.
-namespace nanovdb {
-template<>
-struct BufferTraits<PoolBuffer>
-{
-    static const bool hasDeviceDual = false;
-};
-} // namespace nanovdb
-
 int main()
 {
     PoolBuffer bufferContext;

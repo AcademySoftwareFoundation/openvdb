@@ -9,8 +9,8 @@
     \date January 8, 2020
 
     \brief Defines GridHandle, which manages a memory buffer containing one
-           or more NanoVDB grids: host-resident, dual host/device, or a
-           single-space device-only buffer.
+           or more NanoVDB grids: host-resident, or a single-space buffer
+           such as cuda::Buffer.
 */
 
 #ifndef NANOVDB_GRID_HANDLE_H_HAS_BEEN_INCLUDED
@@ -23,6 +23,8 @@
 #include <string> // for std::to_string
 #include <vector>
 #include <initializer_list>
+#include <cstddef> // for std::byte
+#include <type_traits> // for std::void_t
 #include <utility> // for std::move
 
 #include <nanovdb/NanoVDB.h>// for toGridType
@@ -143,6 +145,15 @@ inline void parseHostGridChain(const GridData* head, uint64_t bytes, std::vector
     }
 }
 
+/// @brief Detects a BufferTraits specialization that still declares the
+///        hasDeviceDual member removed in NanoVDB 14.0, so GridHandle can reject
+///        it instead of parsing the device-only grids as an empty host buffer.
+template<typename BufferT, typename = void>
+struct BufferDeclaresDeviceDual { static constexpr bool value = false; };
+template<typename BufferT>
+struct BufferDeclaresDeviceDual<BufferT, std::void_t<decltype(BufferTraits<BufferT>::hasDeviceDual)>>
+{ static constexpr bool value = true; };
+
 }// namespace detail
 
 /// @brief This class serves to manage a buffer containing one or more NanoVDB Grids.
@@ -151,11 +162,13 @@ inline void parseHostGridChain(const GridData* head, uint64_t bytes, std::vector
 template<typename BufferT = HostBuffer>
 class GridHandle
 {
-    static_assert(!(BufferTraits<BufferT>::hasDeviceDual && BufferHasDeviceSingle<BufferT>::value),
-                  "a buffer cannot be both dual-space and single-space");
     static_assert(!(BufferHasDeviceSingle<BufferT>::value || BufferHasHostSingle<BufferT>::value)
                       || BufferHasByteElements<BufferT>::value,
                   "GridHandle requires byte-addressed single-space storage, e.g. cuda::Buffer<std::byte, R>");
+    static_assert(!detail::BufferDeclaresDeviceDual<BufferT>::value,
+                  "BufferTraits::hasDeviceDual was removed in NanoVDB 14.0 together with the dual-space buffers: "
+                  "hold device grids in a single-space buffer such as cuda::Buffer<std::byte> and set "
+                  "BufferTraits::hasDeviceSingle for a custom one");
 
     std::vector<GridHandleMetaData> mMetaData;
     BufferT mBuffer;
@@ -177,11 +190,8 @@ class GridHandle
         : mMetaData(std::move(meta))
         , mBuffer(std::move(buffer)) {}
 
-    /// @brief Parse the grid metadata of mBuffer, defined in nanovdb/cuda/GridHandle.cuh
-    //@{
-    void parseDualBuffer();
+    /// @brief Parses the grid metadata of a single-space device mBuffer; defined in nanovdb/cuda/GridHandle.cuh
     void parseSingleBuffer();
-    //@}
 
     friend struct detail::LayoutCopy;
 
@@ -211,18 +221,16 @@ public:
     ///        holding a byte-for-byte copy of the grids.
     const std::vector<GridHandleMetaData>& metaData() const { return mMetaData; }
 
-    /// @brief  Move constructor from a buffer of any kind: host, dual host-device or single-space device
+    /// @brief  Move constructor from a host or single-space device buffer
     /// @param buffer buffer containing one or more NanoGrids that will be moved into this GridHandle
     /// @throw Will throw and error with the buffer does not contain a valid NanoGrid!
-    /// @note The device variants are implemented in nanovdb/cuda/GridHandle.cuh since they require CUDA.
+    /// @note The device variant is implemented in nanovdb/cuda/GridHandle.cuh since it requires CUDA.
     ///       This is deliberately not a template: clang >= 17 mangles the dependent type of a SFINAE
     ///       template parameter while g++ does not, which breaks a clang build linked against nvcc with a g++ host compiler.
     GridHandle(BufferT&& buffer)
         : mBuffer(std::move(buffer))
     {
-        if constexpr (BufferTraits<BufferT>::hasDeviceDual) {
-            this->parseDualBuffer();
-        } else if constexpr (BufferHasDeviceSingle<BufferT>::value) {
+        if constexpr (BufferHasDeviceSingle<BufferT>::value) {
             this->parseSingleBuffer();
         } else {
             if (auto *data = reinterpret_cast<const GridData*>(mBuffer.data())) {
@@ -301,23 +309,6 @@ public:
     const void* data() const { return mBuffer.data(); }
     //@}
 
-    template<typename U = BufferT>
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, const void*>::type
-    deviceData() const { return mBuffer.deviceData(); }
-    /// @deprecated Use one single-space device handle per GPU, or a managed cuda::Buffer.
-    template<typename U = BufferT>
-    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: use one device handle per GPU, or a cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/Buffer.h, cuda/ManagedResource.h)")]]
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, const void*>::type
-    deviceData(int device) const { return mBuffer.deviceData(device); }
-    template<typename U = BufferT>
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, void*>::type
-    deviceData() { return mBuffer.deviceData(); }
-    /// @deprecated Use one single-space device handle per GPU, or a managed cuda::Buffer.
-    template<typename U = BufferT>
-    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: use one device handle per GPU, or a cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/Buffer.h, cuda/ManagedResource.h)")]]
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, void*>::type
-    deviceData(int device) { return mBuffer.deviceData(device); }
-
     //@{
     /// @brief For a single-space buffer the device data is the buffer itself.
     template<typename U = BufferT>
@@ -358,24 +349,6 @@ public:
     template<typename ValueT, typename U = BufferT, typename util::disable_if<BufferIsDeviceOnly<U>::value, int>::type = 0>
     NanoGrid<ValueT>* grid(uint32_t n = 0) {return const_cast<NanoGrid<ValueT>*>(static_cast<const GridHandle*>(this)->template grid<ValueT>(n));}
 
-    /// @brief Return a const pointer to the @a n'th grid encoded in this GridHandle on the device, e.g. GPU
-    /// @tparam ValueT Value type of the grid point to be returned
-    /// @param n Index of the (device) grid pointer to be returned
-    /// @warning Note that the return pointer can be NULL if the GridHandle has no device grid, @a n is invalid,
-    ///          or if the template parameter does not match the specified grid.
-    template<typename ValueT, typename U = BufferT>
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, const NanoGrid<ValueT>*>::type
-    deviceGrid(uint32_t n=0) const;
-
-    /// @brief Return a const pointer to the @a n'th grid encoded in this GridHandle on the device, e.g. GPU
-    /// @tparam ValueT Value type of the grid point to be returned
-    /// @param n Index of the grid pointer to be returned
-    /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized, @a n is invalid,
-    ///          or if the template parameter does not match the specified grid.
-    template<typename ValueT, typename U = BufferT>
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, NanoGrid<ValueT>*>::type
-    deviceGrid(uint32_t n=0){return const_cast<NanoGrid<ValueT>*>(static_cast<const GridHandle*>(this)->template deviceGrid<ValueT>(n));}
-
     //@{
     /// @brief Return a pointer to the @a n'th grid of a single-space device buffer
     /// @warning Note that the return pointer can be NULL if the GridHandle is empty, @a n is invalid,
@@ -387,42 +360,6 @@ public:
     typename util::enable_if<BufferHasDeviceSingle<U>::value, NanoGrid<ValueT>*>::type
     deviceGrid(uint32_t n=0){return const_cast<NanoGrid<ValueT>*>(static_cast<const GridHandle*>(this)->template deviceGrid<ValueT>(n));}
     //@}
-
-    /// @brief Upload the grid to the device, e.g. from CPU to GPU
-    /// @note This method is only available if the buffer supports devices
-    /// @deprecated Build a host handle and cuda::copyTo a device handle; for a multi-GPU
-    ///             handle, use cuda::Buffer<std::byte, cuda::ManagedResource>.
-    template<typename U = BufferT>
-    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: build a host handle and cuda::copyTo a device handle (cuda/HandleStorage.h); for a multi-GPU handle, use cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/ManagedResource.h)")]]
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
-    deviceUpload(void* stream, bool sync = true) { NANOVDB_SUPPRESS_DEPRECATION_BEGIN mBuffer.deviceUpload(stream, sync); NANOVDB_SUPPRESS_DEPRECATION_END }
-
-    /// @brief Upload the host buffer to a specific device buffer. If the device buffer doesn't exist it's created first
-    /// @param device Device to upload host data to
-    /// @param stream cuda stream
-    /// @param sync if false the memory copy is asynchronous
-    /// @deprecated Build a host handle and cuda::copyTo a device handle; for a multi-GPU
-    ///             handle, use cuda::Buffer<std::byte, cuda::ManagedResource>.
-    template<typename U = BufferT>
-    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: build a host handle and cuda::copyTo a device handle (cuda/HandleStorage.h); for a multi-GPU handle, use cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/ManagedResource.h)")]]
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
-    deviceUpload(int device = 0, void* stream = nullptr, bool sync = true) { NANOVDB_SUPPRESS_DEPRECATION_BEGIN mBuffer.deviceUpload(device, stream, sync); NANOVDB_SUPPRESS_DEPRECATION_END }
-
-    /// @brief Download the grid to from the device, e.g. from GPU to CPU
-    /// @note This method is only available if the buffer supports devices
-    /// @deprecated cuda::copyTo a host handle to read the grids on the host; for a multi-GPU
-    ///             handle, use cuda::Buffer<std::byte, cuda::ManagedResource>.
-    template<typename U = BufferT>
-    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: cuda::copyTo a host handle to read the grids on the host (cuda/HandleStorage.h); for a multi-GPU handle, use cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/ManagedResource.h)")]]
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
-    deviceDownload(void* stream, bool sync = true) { NANOVDB_SUPPRESS_DEPRECATION_BEGIN mBuffer.deviceDownload(stream, sync); NANOVDB_SUPPRESS_DEPRECATION_END }
-
-    /// @deprecated cuda::copyTo a host handle to read the grids on the host; for a multi-GPU
-    ///             handle, use cuda::Buffer<std::byte, cuda::ManagedResource>.
-    template<typename U = BufferT>
-    [[deprecated("grid storage is moving to cuda::Buffer<std::byte>: cuda::copyTo a host handle to read the grids on the host (cuda/HandleStorage.h); for a multi-GPU handle, use cuda::Buffer<std::byte, cuda::ManagedResource> (cuda/ManagedResource.h)")]]
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
-    deviceDownload(int device = 0, void* stream = nullptr, bool sync = true) { NANOVDB_SUPPRESS_DEPRECATION_BEGIN mBuffer.deviceDownload(device, stream, sync); NANOVDB_SUPPRESS_DEPRECATION_END }
 
     /// @brief Check if the buffer is this handle has any padding, i.e. if the buffer is larger than the combined size of all its grids
     /// @return true is the combined size of all grid is smaller than the buffer size
@@ -646,14 +583,6 @@ inline const NanoGrid<ValueT>* GridHandle<BufferT>::grid(uint32_t n) const
 }// const NanoGrid<ValueT>* GridHandle<BufferT>::grid(uint32_t n) const
 
 template<typename BufferT>
-template<typename ValueT, typename U>
-inline typename util::enable_if<BufferTraits<U>::hasDeviceDual, const NanoGrid<ValueT>*>::type
-GridHandle<BufferT>::deviceGrid(uint32_t n) const
-{
-    return this->template gridAt<ValueT>(mBuffer.deviceData(), n);
-}// GridHandle<BufferT>::deviceGrid(uint32_t n) cons
-
-template<typename BufferT>
 void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
 {
     static_assert(!(BufferIsDeviceOnly<BufferT>::value),
@@ -731,8 +660,8 @@ void GridHandle<BufferT>::read(std::istream& is, const std::string &gridName, co
 // --------------------------> free-standing functions <------------------------------------
 
 /// @brief Split all grids in a single GridHandle into a vector of multiple GridHandles each with a single grid
-/// @tparam BufferT Type of the input and output grid buffers: HostBuffer, a
-///         dual-space buffer, or a host-accessible single-space buffer such as
+/// @tparam BufferT Type of the input and output grid buffers: HostBuffer, or
+///         a host-accessible single-space buffer such as
 ///         cuda::Buffer<std::byte, cuda::PinnedResource>. Device handles use
 ///         cuda::splitGridHandles.
 /// @param handle GridHandle with grids that will be split into individual GridHandles
@@ -768,8 +697,8 @@ splitGrids(const GridHandle<BufferT> &handle, const BufferT* other = nullptr)
 }// splitGrids
 
 /// @brief Combines (or merges) multiple GridHandles into a single GridHandle containing all grids
-/// @tparam BufferT Type of the input and output grid buffers: HostBuffer, a
-///         dual-space buffer, or a host-accessible single-space buffer such as
+/// @tparam BufferT Type of the input and output grid buffers: HostBuffer, or
+///         a host-accessible single-space buffer such as
 ///         cuda::Buffer<std::byte, cuda::PinnedResource>. Device handles use
 ///         cuda::mergeGridHandles.
 /// @param handles Vector of GridHandles to be combined

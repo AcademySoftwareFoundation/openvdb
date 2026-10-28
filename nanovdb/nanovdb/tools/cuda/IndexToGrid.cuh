@@ -19,7 +19,6 @@
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/cuda/Buffer.h>
-#include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
@@ -41,7 +40,7 @@ namespace tools::cuda {// ======================================================
 /// @tparam ResourceT Template type of optional resource used for internal temporary memory
 /// @param d_srcGrid Device pointer to source/input IndexGrid, i.e. SrcBuildT={ValueIndex,ValueOnIndex}
 /// @param d_srcValues Device pointer to an array of values
-/// @param pool Memory pool used to create a buffer for the destination/output Grid
+/// @param pool prototype buffer whose resource allocates the destination/output Grid
 /// @param stream optional CUDA stream (defaults to CUDA stream 0)
 /// @note If d_srcGrid has stats (min,max,avg,std-div), the d_srcValues is also assumed
 ///       to have the same information, all of which are then copied to the destination/output grid.
@@ -49,12 +48,12 @@ namespace tools::cuda {// ======================================================
 ///       NanoRoot<DstBuildT>::FloatType, e.g. if DstBuildT=Vec3f then NanoRoot<DstBuildT>::FloatType=float,
 ///       in which case average and standard-deviation is undefined in the output grid.
 /// @return returns handle to grid that combined IndexGrid and values
-template<typename DstBuildT, typename SrcBuildT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename DstBuildT, typename SrcBuildT, typename BufferT = nanovdb::cuda::Buffer<std::byte>, typename ResourceT = nanovdb::cuda::DeviceResource>
 nanovdb::cuda::detail::PrototypeFormResult<BufferT, typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type>
 indexToGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues, const BufferT &pool = BufferT(), cudaStream_t stream = 0);
 
 
-template<typename DstBuildT, typename SrcBuildT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename DstBuildT, typename SrcBuildT, typename BufferT = nanovdb::cuda::Buffer<std::byte>, typename ResourceT = nanovdb::cuda::DeviceResource>
 nanovdb::cuda::detail::PrototypeFormResult<BufferT, typename util::enable_if<BuildTraits<SrcBuildT>::is_index, GridHandle<BufferT>>::type>
 createNanoGrid(const NanoGrid<SrcBuildT> *d_srcGrid, const typename BuildToValueMap<DstBuildT>::type *d_srcValues, const BufferT &pool = BufferT(), cudaStream_t stream = 0)
 {
@@ -97,9 +96,9 @@ public:
     /// @tparam DstBuildT Template parameter of the destination grid and value type
     /// @tparam BufferT Template parameter of the memory allocator
     /// @param srcValues pointer to values that will be inserted into the output grid
-    /// @param buffer prototype buffer whose resource (or create() pool) allocates the output
+    /// @param buffer prototype buffer whose resource allocates the output
     /// @return A new GridHandle with the grid of type @c DstBuildT
-    template<typename DstBuildT, typename BufferT = nanovdb::cuda::DualDeviceBuffer>
+    template<typename DstBuildT, typename BufferT = nanovdb::cuda::Buffer<std::byte>>
     GridHandle<BufferT> getHandle(const typename BuildToValueMap<DstBuildT>::type *srcValues, const BufferT &buffer = BufferT());
 
     /// @brief Resource form of getHandle: the grid allocates through this
@@ -418,9 +417,7 @@ inline BufferT IndexToGrid<SrcBuildT, ResourceT>::getBuffer(const BufferT &pool)
     mNodeAcc.meta  = mNodeAcc.node[0]  + NanoLeaf<DstBuildT>::DataType::memUsage()*mNodeAcc.nodeCount[0];// leaf nodes end and blind meta data begins
     mNodeAcc.blind = mNodeAcc.meta  + 0*sizeof(GridBlindMetaData); // meta data ends and blind data begins
     mNodeAcc.size  = mNodeAcc.blind;// end of buffer
-    int device = 0;
-    cudaCheck(cudaGetDevice(&device));
-    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(mNodeAcc.size, &pool, device, mStream);
+    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(mNodeAcc.size, &pool, mStream);
     mNodeAcc.d_dstPtr = nanovdb::cuda::detail::deviceStorageData(buffer);
     if (mNodeAcc.d_dstPtr == nullptr) throw std::runtime_error("Failed memory allocation on the device");
     // Zero the non-leaf region: grid, tree, root, root tiles and the internal

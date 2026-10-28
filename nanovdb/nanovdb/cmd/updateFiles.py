@@ -198,7 +198,6 @@ def update_files(dir_path):
         "util/cuda/CudaSignedFloodFill.cuh": "tools/cuda/SignedFloodFill.cuh",
         "util/cuda/CudaAddBlindData.cuh": "tools/cuda/AddBlindData.cuh",
         "util/cuda/CudaNodeManager.cuh": "cuda/NodeManager.cuh",
-        "util/cuda/CudaDeviceBuffer.h": "cuda/DeviceBuffer.h",
         "util/cuda/CudaGridHandle.cuh": "cuda/GridHandle.cuh",
         "util/cuda/CudaUtils.h": "util/cuda/Util.h",
         "util/cuda/GpuTimer.h": "util/cuda/Timer.h",

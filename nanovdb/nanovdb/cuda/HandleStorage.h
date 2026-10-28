@@ -5,11 +5,8 @@
     \file nanovdb/cuda/HandleStorage.h
 
     \brief Allocates the device-resident storage behind a GridHandle or
-           NodeManagerHandle for any buffer family: through the static
-           create() interface for buffers that provide it (the dual-space
-           DeviceBuffer family), and through the buffer's memory resource
-           for a single-space cuda::Buffer. This is the bridge that lets
-           every tool entry point accept either buffer family.
+           NodeManagerHandle through a single-space buffer's memory
+           resource, and transfers handles between address spaces.
 
     \note This header is host-includable: it calls the CUDA runtime but
           launches no kernels, so a plain C++ translation unit (linked
@@ -38,55 +35,43 @@ namespace cuda {
 
 namespace detail {
 
-/// @brief Allocates @c bytes of device-resident storage of buffer type
-///        @c BufferT: single-space buffers allocate through @c pool's
-///        resource -- on @c stream when the resource is stream-ordered --
-///        and every other buffer type goes through its static
-///        create(bytes, pool, device, stream) interface.
+/// @brief Allocates @c bytes of device-resident storage of the single-space
+///        buffer type @c BufferT on the current device through @c proto's
+///        resource -- on @c stream when the resource is stream-ordered.
 /// @param bytes size of the allocation
-/// @param proto prototype buffer or null: passed through as the pool for
-///        create()-style buffers; the source of the resource for
-///        single-space buffers, whose resource is default-constructed when
-///        @c proto is null
-/// @param device device the storage lives on; single-space buffers
-///        allocate on the current device, which every call site has
-///        already made current
+/// @param proto prototype buffer or null: the source of the resource, which
+///        is default-constructed when @c proto is null
 /// @param stream stream the allocation is ordered on where supported
 template<typename BufferT>
-inline BufferT createDeviceStorage(uint64_t bytes, const BufferT* proto, int device, cudaStream_t stream)
+inline BufferT createDeviceStorage(uint64_t bytes, const BufferT* proto, cudaStream_t stream)
 {
-    if constexpr (BufferHasDeviceSingle<BufferT>::value) {
-        using ResourceT = typename BufferT::ResourceType;
-        (void)device;
-        if (!proto) {
-            if constexpr (std::is_default_constructible<ResourceT>::value) {
-                if constexpr (is_async_resource<ResourceT>::value) return BufferT(stream, bytes, noInit);
-                else                                               return BufferT(bytes, noInit);
-            } else {
-                throw std::runtime_error("createDeviceStorage: a buffer over a non-default-constructible "
-                                         "resource requires a prototype buffer to take the resource from");
-            }
-        }
-        if constexpr (is_async_resource<ResourceT>::value) {
-            return BufferT(stream, proto->resource(), bytes, noInit);
+    static_assert(BufferHasDeviceSingle<BufferT>::value,
+                  "device grid storage requires a single-space device buffer, e.g. cuda::Buffer<std::byte>");
+    using ResourceT = typename BufferT::ResourceType;
+    if (!proto) {
+        if constexpr (std::is_default_constructible<ResourceT>::value) {
+            if constexpr (is_async_resource<ResourceT>::value) return BufferT(stream, bytes, noInit);
+            else                                               return BufferT(bytes, noInit);
         } else {
-            (void)stream;
-            return BufferT(proto->resource(), bytes, noInit);
+            throw std::runtime_error("createDeviceStorage: a buffer over a non-default-constructible "
+                                     "resource requires a prototype buffer to take the resource from");
         }
+    }
+    if constexpr (is_async_resource<ResourceT>::value) {
+        return BufferT(stream, proto->resource(), bytes, noInit);
     } else {
-        return BufferT::create(bytes, proto, device, stream);
+        (void)stream;
+        return BufferT(proto->resource(), bytes, noInit);
     }
 }
 
 /// @brief The device address of a storage buffer made by
-///        createDeviceStorage: data() for a single-space buffer, whose one
-///        allocation is the device allocation, and deviceData() for the
-///        dual-space family.
+///        createDeviceStorage: its one allocation is the device allocation.
 template<typename BufferT>
 inline void* deviceStorageData(BufferT& buffer)
 {
-    if constexpr (BufferHasDeviceSingle<BufferT>::value) return buffer.data();
-    else return buffer.deviceData();
+    static_assert(BufferHasDeviceSingle<BufferT>::value, "device grid storage requires a single-space device buffer");
+    return buffer.data();
 }
 
 /// @brief True when @c BufferT is a stream rather than a buffer: cudaStream_t, or
@@ -95,7 +80,7 @@ template<typename BufferT>
 struct IsStreamArgument
 {
     static constexpr bool value = std::is_convertible<BufferT, cudaStream_t>::value && !std::is_null_pointer<BufferT>::value
-                                  && !BufferTraits<BufferT>::hasDeviceDual && !BufferHasDeviceSingle<BufferT>::value
+                                  && !BufferHasDeviceSingle<BufferT>::value
                                   && !BufferHasHostSingle<BufferT>::value;
 };
 /// @brief Return type of a tool's prototype-buffer form: @c T, except when
@@ -114,8 +99,7 @@ using PrototypeFormResult = typename std::enable_if<!IsStreamArgument<BufferT>::
 ///        constructed from bytes still being written on it: a single-space
 ///        buffer over a synchronous resource retains no stream, so the
 ///        constructor's metadata parse (which runs on the default stream) is
-///        not otherwise ordered after the producer. A no-op for dual-space
-///        buffers (their constructor path predates this bridge) and for
+///        not otherwise ordered after the producer. A no-op for
 ///        stream-ordered resources (the buffer retains the stream).
 template<typename BufferT>
 inline void orderBeforeHandleConstruction(cudaStream_t stream)
@@ -160,22 +144,6 @@ inline DstBufferT makeTransferStorage(uint64_t bytes, cudaStream_t stream, const
     }
 }
 
-/// @deprecated Use GridHandle::adopt and GridHandle::metaData.
-struct [[deprecated("use GridHandle::adopt(buffer, meta) and GridHandle::metaData()")]] HandleFactory
-{
-    template<typename BufferT>
-    static GridHandle<BufferT> make(BufferT&& buffer, std::vector<GridHandleMetaData> meta)
-    {
-        return GridHandle<BufferT>::adopt(std::move(buffer), std::move(meta));
-    }
-
-    template<typename BufferT>
-    static const std::vector<GridHandleMetaData>& meta(const GridHandle<BufferT>& handle)
-    {
-        return handle.metaData();
-    }
-};
-
 }// namespace detail
 
 /// @brief Deep-copies a grid handle into a different address space: the
@@ -183,8 +151,7 @@ struct [[deprecated("use GridHandle::adopt(buffer, meta) and GridHandle::metaDat
 ///        handles and host-readable handles (HostBuffer or a host-accessible
 ///        single-space buffer such as a pinned-resource cuda::Buffer).
 /// @tparam DstBufferT destination buffer type (specify explicitly)
-/// @param src the handle to copy; must not use a deprecated dual-space
-///        buffer (build device handles into cuda::Buffer<std::byte> instead)
+/// @param src the handle to copy
 /// @param stream stream the copy is issued on; a device destination buffer
 ///        with a stream-ordered resource retains it
 /// @warning Passing a stream other than the source buffer's retained stream
@@ -224,8 +191,6 @@ inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, cudaStre
 {
     constexpr bool srcDev = BufferHasDeviceSingle<SrcBufferT>::value;
     constexpr bool dstDev = BufferHasDeviceSingle<DstBufferT>::value;
-    static_assert(!BufferTraits<SrcBufferT>::hasDeviceDual && !BufferTraits<DstBufferT>::hasDeviceDual,
-                  "cuda::copyTo does not support the deprecated dual-space buffers: build device handles into cuda::Buffer<std::byte> by passing a cuda::Buffer<std::byte>() prototype to the GPU tool");
     static_assert(srcDev || dstDev,
                   "cuda::copyTo is for cross-space transfers involving a device buffer: use GridHandle::copy for host-to-host");
     const uint64_t bytes = src.bufferSize();
