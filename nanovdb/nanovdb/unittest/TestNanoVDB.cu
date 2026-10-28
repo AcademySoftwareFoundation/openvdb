@@ -3875,6 +3875,159 @@ TEST(TestNanoVDBCUDA, VoxelBlockManager_ValueOnIndex_UnifiedBuffer)
     testVoxelBlockManager<nanovdb::ValueOnIndex,nanovdb::cuda::UnifiedBuffer>();
 }// VoxelBlockManager_ValueOnIndex_UnifiedBuffer
 
+enum class VBMStencilResolver { Box, ForEachBox, BoxCached, ForEachBoxCached, Cross, CrossCached };
+
+// One thread per slot: decode the slot, resolve its stencil with the selected resolver,
+// and write the taps to row (blockID * BlockWidth + slot) of a [nSlots][27] array.
+template<int Log2BlockWidth, VBMStencilResolver Resolver>
+__global__ void testStencilResolverKernel(
+    const nanovdb::NanoGrid<nanovdb::ValueOnIndex> *grid,
+    const uint32_t *firstLeafIDArray,
+    const uint64_t *jumpMapArray,
+    uint64_t *stencilArray)
+{
+    using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
+    const int bID = blockIdx.x, tID = threadIdx.x;
+    const uint32_t firstLeafID = firstLeafIDArray[bID];
+    const uint64_t *jumpMap = jumpMapArray + VBM::JumpMapLength * bID;
+    const uint64_t blockFirstOffset = 1 + uint64_t(bID) * VBM::BlockWidth;
+
+    uint32_t leafIndex;
+    uint16_t voxelOffset;
+    VBM::decodeInverseMap(grid, firstLeafID, jumpMap, blockFirstOffset, tID, leafIndex, voxelOffset);
+
+    uint64_t *stencil = stencilArray + 27 * (uint64_t(bID) * VBM::BlockWidth + tID);
+    if constexpr (Resolver == VBMStencilResolver::Box) {
+        VBM::computeBoxStencil(grid, leafIndex, voxelOffset, stencil);
+    } else if constexpr (Resolver == VBMStencilResolver::ForEachBox) {
+        VBM::forEachBoxStencil(grid, leafIndex, voxelOffset,
+            [stencil](int tap, uint64_t index) { stencil[tap] = index; });
+    } else if constexpr (Resolver == VBMStencilResolver::BoxCached) {
+        VBM::computeBoxStencilCached(grid, firstLeafID, jumpMap, leafIndex, voxelOffset, stencil);
+    } else if constexpr (Resolver == VBMStencilResolver::ForEachBoxCached) {
+        VBM::forEachBoxStencilCached(grid, firstLeafID, jumpMap, leafIndex, voxelOffset,
+            [stencil](int tap, uint64_t index) { stencil[tap] = index; });
+    } else if constexpr (Resolver == VBMStencilResolver::Cross) {
+        VBM::computeCrossStencil(grid, leafIndex, voxelOffset, stencil);
+    } else {
+        VBM::computeCrossStencilCached(grid, firstLeafID, jumpMap, leafIndex, voxelOffset, stencil);
+    }
+}
+
+// Runs one resolver over every slot and checks each tap against the host accessor. The output
+// is pre-filled with ~0, so slots a resolver must not write (non-cross taps of the cross
+// resolvers, and every tap of the tail slots past the last voxel) are checked as untouched.
+template<int Log2BlockWidth, VBMStencilResolver Resolver, class VBMHandleT>
+void checkStencilResolver(
+    const nanovdb::NanoGrid<nanovdb::ValueOnIndex> *deviceGrid,
+    const nanovdb::NanoGrid<nanovdb::ValueOnIndex> *grid,
+    const std::vector<nanovdb::Coord> &voxels,
+    VBMHandleT &vbmHandle,
+    nanovdb::cuda::DeviceBuffer &stencilBuffer)
+{
+    using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
+    constexpr uint64_t Untouched = ~uint64_t(0);
+    constexpr bool IsCross = Resolver == VBMStencilResolver::Cross ||
+                             Resolver == VBMStencilResolver::CrossCached;
+    const uint64_t nBlocks = vbmHandle.blockCount();
+    const uint64_t nSlots = nBlocks * VBM::BlockWidth;
+
+    cudaCheck(cudaMemset(stencilBuffer.deviceData(), 0xFF, nSlots * 27 * sizeof(uint64_t)));
+    testStencilResolverKernel<Log2BlockWidth, Resolver><<<nBlocks, VBM::BlockWidth>>>(
+        deviceGrid, vbmHandle.deviceFirstLeafID(), vbmHandle.deviceJumpMap(),
+        static_cast<uint64_t*>(stencilBuffer.deviceData()));
+    cudaCheck(cudaGetLastError());
+    stencilBuffer.deviceDownload();
+    const auto *stencils = static_cast<const uint64_t*>(stencilBuffer.data());
+
+    int mismatches = 0;
+    auto check = [&](uint64_t slot, int spokeID, uint64_t expected) {
+        const uint64_t actual = stencils[27 * slot + spokeID];
+        if (actual == expected) return;
+        if (mismatches++ < 8)
+            ADD_FAILURE() << "Log2BlockWidth " << Log2BlockWidth << ", resolver " << int(Resolver)
+                          << ": slot " << slot << " spoke " << spokeID
+                          << " expected " << expected << " got " << actual;
+    };
+
+    auto acc = grid->getAccessor();
+    for (const auto &coord : voxels) {
+        const uint64_t slot = acc.getValue(coord) - 1; // the VBM covers sequential indices from 1
+        for (int di = -1; di <= 1; di++)
+        for (int dj = -1; dj <= 1; dj++)
+        for (int dk = -1; dk <= 1; dk++) {
+            const int spokeID = (di + 1) * 9 + (dj + 1) * 3 + dk + 1;
+            const bool isTap = !IsCross || std::abs(di) + std::abs(dj) + std::abs(dk) <= 1;
+            check(slot, spokeID, isTap ? acc.getValue(coord.offsetBy(di, dj, dk)) : Untouched);
+        }
+    }
+    for (uint64_t slot = voxels.size(); slot < nSlots; ++slot)
+        for (int spokeID = 0; spokeID < 27; ++spokeID) check(slot, spokeID, Untouched);
+    EXPECT_EQ(0, mismatches);
+}
+
+template<int Log2BlockWidth>
+void testVoxelBlockManagerStencilResolvers()
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    constexpr int BlockWidth = 1 << Log2BlockWidth;
+
+    // Three disjoint regions, so the blocks cover every case of the cached resolvers' staging:
+    //   - a dense 21^3 box spanning lower nodes: few leaves per block, neighbor leaves present
+    //   - 4^3 clusters straddling leaf corners: 8 voxels per leaf, outer neighbor leaves absent
+    //   - voxel pairs on opposite x faces of each leaf, at negative coordinates: 2 voxels per
+    //     leaf, so every block spans more leaves than the resolvers cache (16)
+    std::vector<nanovdb::Coord> voxels;
+    const auto box = nanovdb::CoordBBox::createCube(125, 145);
+    for (auto it = box.begin(); it; ++it) voxels.push_back(*it);
+    for (int i = 0; i < 4; ++i)
+    for (int j = 0; j < 4; ++j)
+    for (int k = 0; k < 4; ++k) {
+        const nanovdb::Coord corner(1024 + 32 * i, 32 * j, 32 * k);
+        const nanovdb::CoordBBox cluster(corner.offsetBy(-2), corner.offsetBy(1));
+        for (auto it = cluster.begin(); it; ++it) voxels.push_back(*it);
+    }
+    for (int i = 0; i < 16; ++i)
+    for (int j = 0; j < 4; ++j)
+    for (int k = 0; k < 4; ++k) {
+        const nanovdb::Coord origin(-512 + 8 * i, -512 + 8 * j, -512 + 8 * k);
+        voxels.push_back(origin);
+        voxels.push_back(origin.offsetBy(7, 0, 0));
+    }
+    // A partial last block exercises the slots past the last voxel
+    ASSERT_NE(0u, voxels.size() % BlockWidth);
+
+    nanovdb::Coord *deviceVoxels;
+    cudaCheck(cudaMalloc(&deviceVoxels, voxels.size() * sizeof(nanovdb::Coord)));
+    cudaCheck(cudaMemcpy(deviceVoxels, voxels.data(), voxels.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(deviceVoxels, voxels.size());
+    cudaCheck(cudaFree(deviceVoxels));
+    auto *deviceGrid = handle.template deviceGrid<BuildT>();
+    ASSERT_TRUE(deviceGrid);
+    handle.deviceDownload();
+    const auto *grid = handle.template grid<BuildT>();
+    ASSERT_TRUE(grid);
+    ASSERT_EQ(voxels.size(), grid->activeVoxelCount());
+
+    auto vbmHandle = nanovdb::tools::cuda::buildVoxelBlockManager<Log2BlockWidth, nanovdb::cuda::DeviceBuffer>(deviceGrid);
+    auto stencilBuffer = nanovdb::cuda::DeviceBuffer::create(
+        vbmHandle.blockCount() * BlockWidth * 27 * sizeof(uint64_t), nullptr, false);
+
+    checkStencilResolver<Log2BlockWidth, VBMStencilResolver::Box>(deviceGrid, grid, voxels, vbmHandle, stencilBuffer);
+    checkStencilResolver<Log2BlockWidth, VBMStencilResolver::ForEachBox>(deviceGrid, grid, voxels, vbmHandle, stencilBuffer);
+    checkStencilResolver<Log2BlockWidth, VBMStencilResolver::BoxCached>(deviceGrid, grid, voxels, vbmHandle, stencilBuffer);
+    checkStencilResolver<Log2BlockWidth, VBMStencilResolver::ForEachBoxCached>(deviceGrid, grid, voxels, vbmHandle, stencilBuffer);
+    checkStencilResolver<Log2BlockWidth, VBMStencilResolver::Cross>(deviceGrid, grid, voxels, vbmHandle, stencilBuffer);
+    checkStencilResolver<Log2BlockWidth, VBMStencilResolver::CrossCached>(deviceGrid, grid, voxels, vbmHandle, stencilBuffer);
+}
+
+TEST(TestNanoVDBCUDA, VoxelBlockManager_StencilResolvers)
+{
+    testVoxelBlockManagerStencilResolvers<6>(); // JumpMapLength 1
+    testVoxelBlockManagerStencilResolvers<7>();
+    testVoxelBlockManagerStencilResolvers<9>(); // 512 threads per block
+}// VoxelBlockManager_StencilResolvers
+
 TEST(TestNanoVDBCUDA, DilateInjectPrune_ValueOnIndex)
 {
     using BuildT = nanovdb::ValueOnIndex;
