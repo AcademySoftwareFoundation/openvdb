@@ -69,6 +69,13 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../../cmake")
 
 include(OpenVDBUtils)
 
+# Minimum dependency versions. The root CMakeLists includes these for
+# combined builds.
+
+if(NOT DEFINED MINIMUM_CXX_STANDARD)
+  include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/config/OpenVDBVersions.cmake)
+endif()
+
 # The NanoVDB version comes from NanoVDB.h. The major version tracks the ABI
 # and file format.
 
@@ -358,6 +365,7 @@ add_library(NanoVDB::nanovdb ALIAS nanovdb)
 target_include_directories(nanovdb INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
   $<INSTALL_INTERFACE:${NANOVDB_INSTALL_INCLUDEDIR}>)
+target_compile_features(nanovdb INTERFACE cxx_std_17)
 target_compile_options(nanovdb INTERFACE
   "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wno-invalid-offsetof>"
   "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/bigobj>")
