@@ -1,0 +1,84 @@
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: Apache-2.0
+#
+# NanoVDB package configuration.
+#
+# Usage:
+#   find_package(NanoVDB CONFIG REQUIRED)
+#   target_link_libraries(my_target PRIVATE NanoVDB::nanovdb)
+#
+# Imported targets:
+#   NanoVDB::nanovdb         Header-only interface target. Carries the include
+#                            path, the NANOVDB_USE_* definitions NanoVDB was
+#                            configured with, and their link dependencies.
+#
+# Variables:
+#   NanoVDB_VERSION          The major version tracks the ABI and file format,
+#                            so only installs with the requested major version
+#                            are accepted.
+
+@PACKAGE_INIT@
+
+# The installed Find modules (such as FindTBB) live next to this file
+set(_nanovdb_original_module_path ${CMAKE_MODULE_PATH})
+list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
+
+# Like find_dependency, but restores CMAKE_MODULE_PATH before returning
+# when a dependency is missing
+macro(_nanovdb_find_dependency dependency)
+  set(_nanovdb_find_arguments ${ARGN})
+  if(NanoVDB_FIND_QUIETLY)
+    list(APPEND _nanovdb_find_arguments QUIET)
+  endif()
+  if(NanoVDB_FIND_REQUIRED)
+    list(APPEND _nanovdb_find_arguments REQUIRED)
+  endif()
+  find_package(${dependency} ${_nanovdb_find_arguments})
+  if(NOT ${dependency}_FOUND)
+    set(CMAKE_MODULE_PATH ${_nanovdb_original_module_path})
+    set(NanoVDB_NOT_FOUND_MESSAGE
+      "NanoVDB could not be found because dependency ${dependency} could not be found.")
+    set(NanoVDB_FOUND FALSE)
+    return()
+  endif()
+endmacro()
+
+if(UNIX)
+  _nanovdb_find_dependency(Threads)
+endif()
+
+if(@NANOVDB_USE_TBB@)
+  _nanovdb_find_dependency(TBB @MINIMUM_TBB_VERSION@ COMPONENTS tbb)
+endif()
+
+if(@NANOVDB_USE_BLOSC@)
+  _nanovdb_find_dependency(Blosc @MINIMUM_BLOSC_VERSION@)
+endif()
+
+if(@NANOVDB_USE_ZLIB@)
+  _nanovdb_find_dependency(ZLIB @MINIMUM_ZLIB_VERSION@)
+endif()
+
+if(@NANOVDB_USE_CUDA@)
+  _nanovdb_find_dependency(CUDAToolkit)
+  # The CUDA toolkit ships CCCL outside the default search path
+  _nanovdb_find_dependency(CCCL @NANOVDB_CCCL_MAJOR_VERSION@ CONFIG
+    HINTS "${CUDAToolkit_TARGET_DIR}/lib/cmake" "${CUDAToolkit_LIBRARY_DIR}/cmake")
+  if("@NCCL_FOUND@")
+    _nanovdb_find_dependency(NCCL)
+  endif()
+endif()
+
+# OpenVDBConfig defines OpenVDB::openvdb before it looks for NanoVDB, so this
+# check also stops find_package(OpenVDB COMPONENTS nanovdb) from recursing.
+if(@NANOVDB_USE_OPENVDB@ AND NOT TARGET OpenVDB::openvdb)
+  _nanovdb_find_dependency(OpenVDB)
+endif()
+
+set(CMAKE_MODULE_PATH ${_nanovdb_original_module_path})
+unset(_nanovdb_original_module_path)
+unset(_nanovdb_find_arguments)
+
+include("${CMAKE_CURRENT_LIST_DIR}/NanoVDBTargets.cmake")
+
+check_required_components(NanoVDB)

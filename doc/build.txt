@@ -569,6 +569,13 @@ find_package(OpenVDB CONFIG REQUIRED COMPONENTS openvdb openvdb_ax)
 target_link_libraries(myapp OpenVDB::openvdb_ax)
 @endcode
 
+NanoVDB installs its own Config-file. Use it directly, or request the
+`nanovdb` component of OpenVDB, which provides `OpenVDB::nanovdb`:
+
+@code{.cmake}
+find_package(NanoVDB CONFIG REQUIRED)
+target_link_libraries(myapp NanoVDB::nanovdb)
+@endcode
 
 `myapp` in the above is a CMake target, usually created with `add_library()`
 or `add_executable()`. You can optionally provide `CMAKE_PREFIX_PATH` (or
