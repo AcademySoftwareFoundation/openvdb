@@ -50,7 +50,11 @@
 /* Name for the compression library shipped with Blosc */
 #define BLOSC_LZ4_LIBNAME       "LZ4"
 
-/* The code for the compressor format shipped with Blosc */
+/* BloscLZ is read-only, for files written by external producers such as Warp. */
+#define BLOSC_BLOSCLZ_FORMAT 0
+#define BLOSC_BLOSCLZ_VERSION_FORMAT 1
+
+/* The code for the compressor format written by Blosc */
 #define BLOSC_LZ4_FORMAT      BLOSC_LZ4_LIB
 
 /* The version format for the compressor shipped with Blosc (starts at 1) */
@@ -89,6 +93,9 @@
 #define LZ4_PUBLISH_STATIC_FUNCTIONS
 #include "lz4/lz4.h"
 #include "lz4/lz4.c"
+
+/* This decoder also has internal linkage in both private library copies. */
+#include "blosclz.c"
 
 #include <stdint.h>
 
@@ -232,6 +239,9 @@ static int validate_decompress_format(const struct blosc_context* context) {
   int32_t compformat = (header_flags & 0xe0) >> 5;
   int compversion = context->compversion;
 
+  if (compformat == BLOSC_BLOSCLZ_FORMAT) {
+    return compversion == BLOSC_BLOSCLZ_VERSION_FORMAT ? 0 : -9;
+  }
   if (compformat != BLOSC_LZ4_FORMAT) {
     return -5; /* signals no decompression support */
   }
@@ -498,6 +508,7 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize,
                    int32_t src_offset, uint8_t* dest, uint8_t* tmp) {
   int8_t header_flags = *(context->header_flags);
   int dont_split = (header_flags & 0x10) >> 4;
+  int compformat = (header_flags & 0xe0) >> 5;
   int32_t j, neblock, nsplits;
   int32_t nbytes;                /* number of decompressed bytes in split */
   const int32_t compressedsize = context->compressedsize;
@@ -544,7 +555,11 @@ static int blosc_d(struct blosc_context* context, int32_t blocksize,
       nbytes = neblock;
     }
     else {
-      nbytes = lz4_wrap_decompress(src, cbytes, _tmp, neblock);
+      if (compformat == BLOSC_BLOSCLZ_FORMAT) {
+        nbytes = blosclz_decompress(src, cbytes, _tmp, neblock);
+      } else {
+        nbytes = lz4_wrap_decompress(src, cbytes, _tmp, neblock);
+      }
       /* Check that decompressed bytes number is correct */
       if (nbytes != neblock) {
         return -2;
