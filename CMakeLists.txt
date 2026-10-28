@@ -118,6 +118,9 @@ endif()
 option(USE_ZLIB [=[
 Use zlib while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
 openvdb build configuration to decide on zlib support.]=] ON)
+option(USE_ZSTD [=[
+Build the openvdb core library with Zstd support. This is a private dependency of shared builds.
+If OPENVDB_BUILD_CORE is OFF, the setting is read from the installed openvdb version.h instead.]=] ON)
 option(USE_LOG4CPLUS [=[
 Deprecated, has no effect. OpenVDB no longer depends on log4cplus. See openvdb::logging::Sink
 for the replacement API.]=] OFF)
@@ -331,6 +334,7 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
     cmake/FindOpenEXR.cmake
     cmake/FindOpenVDB.cmake
     cmake/FindTBB.cmake
+    cmake/FindZstd.cmake
     cmake/OpenVDBGLFW3Setup.cmake
     cmake/OpenVDBHoudiniSetup.cmake
     cmake/OpenVDBMayaSetup.cmake
@@ -440,6 +444,7 @@ endif()
 if(USE_STATIC_DEPENDENCIES)
   set(OPENEXR_USE_STATIC_LIBS ON)
   set(TBB_USE_STATIC_LIBS ON)
+  set(ZSTD_USE_STATIC_LIBS ON)
   set(JEMALLOC_USE_STATIC_LIBS ON)
   set(GTEST_USE_STATIC_LIBS ON)
   # @todo  glfw needs custom support.

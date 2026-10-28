@@ -135,6 +135,10 @@ if(USE_IMATH_HALF)
   endif()
 endif()
 
+if(USE_ZSTD)
+  find_package(Zstd ${MINIMUM_ZSTD_VERSION} REQUIRED)
+endif()
+
 if(USE_ZLIB)
   if(USE_STATIC_DEPENDENCIES)
     set(_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
@@ -172,7 +176,8 @@ endif()
 
 list(APPEND OPENVDB_CORE_DEPENDENT_LIBS TBB::tbb)
 
-# Zlib is a hidden dependency (not exposed in headers) and is linked privately.
+# Zlib and zstd are hidden dependencies (not exposed in headers) and are linked
+# privately.
 # @warning If building against Houdini these should be picked up from the
 # Houdini installation. If a custom version of EXR is in use, be careful
 # that zlib headers/libs are not also in the same location e.g.
@@ -181,6 +186,10 @@ list(APPEND OPENVDB_CORE_DEPENDENT_LIBS TBB::tbb)
 set(OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS "")
 if(USE_ZLIB)
   list(APPEND OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS ZLIB::ZLIB)
+endif()
+
+if(USE_ZSTD)
+  list(APPEND OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS Zstd::zstd)
 endif()
 
 if(UNIX)
@@ -210,6 +219,9 @@ if(USE_ZLIB)
   set(OPENVDB_USE_ZLIB 1)
 endif()
 set(OPENVDB_USE_BLOSC 1)
+if(USE_ZSTD)
+  set(OPENVDB_USE_ZSTD 1)
+endif()
 if(USE_EXPLICIT_INSTANTIATION)
   set(OPENVDB_USE_EXPLICIT_INSTANTIATION 1)
 endif()
@@ -690,7 +702,7 @@ if(OPENVDB_CORE_SHARED)
     PRIVATE ${OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS}
   )
 
-  # If zlib is linked statically, stop its symbols being
+  # If zlib or zstd are linked statically, stop their symbols being
   # re-exported from the shared library, where they could clash with another
   # copy loaded in the same process. Windows DLLs only export marked symbols.
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")

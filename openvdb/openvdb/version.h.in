@@ -138,6 +138,11 @@
 #cmakedefine OPENVDB_USE_ZLIB
 #endif
 
+/* Denotes whether VDB was built with ZStd support */
+#ifndef OPENVDB_USE_ZSTD
+#cmakedefine OPENVDB_USE_ZSTD
+#endif
+
 /* Denotes whether VDB was built asserts enabled in VDB code */
 #ifndef OPENVDB_ENABLE_ASSERTS
 #cmakedefine OPENVDB_ENABLE_ASSERTS
