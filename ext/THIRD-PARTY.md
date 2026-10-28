@@ -54,8 +54,12 @@ SPDX-License-Identifier: BSD-3-Clause
   Blosc Development Team.
   https://github.com/Blosc/c-blosc
 
-  OpenVDB includes a simplified copy of Blosc (LZ4-only, SSE2 shuffle
-  only, no thread pool) for reading and writing blosc-compressed grid data.
+  OpenVDB includes a simplified copy of Blosc from c-blosc v1.21.6
+  (SSE2 shuffle only, no thread pool). It also includes the BloscLZ 2.5.1
+  decoder from that release. The decoder has internal linkage, uses a
+  scalar loop for general overlapping matches, and checks bounds before
+  forming pointers. The BloscLZ encoder and SIMD match-copy helpers are
+  omitted. BloscLZ retains the upstream FastLZ license reproduced below.
 
 Redistribution and use in source and binary forms, with or without modification,
 are permitted provided that the following conditions are met:
@@ -81,6 +85,35 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
 ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+-------------------------------------------------------------------------
+
+MIT License
+SPDX-License-Identifier: MIT
+
+* FastLZ, Copyright (C) 2005-2020 Ariya Hidayat <ariya.hidayat@gmail.com>.
+  https://github.com/Blosc/c-blosc/blob/v1.21.6/LICENSES/FASTLZ.txt
+
+  The vendored BloscLZ decoder is derived from FastLZ. Its original license
+  is also preserved in blosc/openvdb/ext/blosc/LICENSES/FASTLZ.txt.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 
 -------------------------------------------------------------------------
 
