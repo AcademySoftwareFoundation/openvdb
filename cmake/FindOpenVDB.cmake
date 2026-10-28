@@ -392,7 +392,8 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
   elseif(${COMPONENT} STREQUAL "nanovdb")
     # alias to the result of openvdb which should be handled first
     set(OpenVDB_${COMPONENT}_LIBRARY ${OpenVDB_openvdb_LIBRARY})
-    # IO.h calls into NanoVDB's private copy of Blosc, built as a static archive
+    # Optional, present when NanoVDB was built with NANOVDB_USE_BLOSC. IO.h calls
+    # into this private copy of Blosc, built as a static archive
     find_library(OpenVDB_nanovdb_blosc_LIBRARY nanovdb_blosc
       ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}
       PATHS ${_VDB_COMPONENT_SEARCH_DIRS}
@@ -408,8 +409,8 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
 
   list(APPEND OpenVDB_LIB_COMPONENTS ${OpenVDB_${COMPONENT}_LIBRARY})
   if(${COMPONENT} STREQUAL "nanovdb")
-    # nanovdb is headers-only apart from its static Blosc archive
-    if(OpenVDB_${COMPONENT}_INCLUDE_DIR AND OpenVDB_nanovdb_blosc_LIBRARY)
+    # nanovdb is headers-only apart from its optional static Blosc archive
+    if(OpenVDB_${COMPONENT}_INCLUDE_DIR)
       set(OpenVDB_${COMPONENT}_FOUND TRUE)
     else()
       set(OpenVDB_${COMPONENT}_FOUND FALSE)
@@ -753,20 +754,27 @@ endif()
 
 # OpenVDB::nanovdb
 
-if(OpenVDB_nanovdb_LIBRARY AND OpenVDB_nanovdb_blosc_LIBRARY)
-  if(NOT TARGET OpenVDB::nanovdb_blosc)
-    add_library(OpenVDB::nanovdb_blosc STATIC IMPORTED)
-    set_target_properties(OpenVDB::nanovdb_blosc PROPERTIES
-      IMPORTED_LOCATION "${OpenVDB_nanovdb_blosc_LIBRARY}"
-      IMPORTED_LINK_INTERFACE_LANGUAGES C
-    )
+if(OpenVDB_nanovdb_LIBRARY)
+  set(_OPENVDB_NANOVDB_LINK_LIBRARIES "OpenVDB::openvdb;")
+  set(_OPENVDB_NANOVDB_COMPILE_DEFINITIONS "")
+  if(OpenVDB_nanovdb_blosc_LIBRARY)
+    if(NOT TARGET OpenVDB::nanovdb_blosc)
+      add_library(OpenVDB::nanovdb_blosc STATIC IMPORTED)
+      set_target_properties(OpenVDB::nanovdb_blosc PROPERTIES
+        IMPORTED_LOCATION "${OpenVDB_nanovdb_blosc_LIBRARY}"
+        IMPORTED_LINK_INTERFACE_LANGUAGES C
+      )
+    endif()
+    set(_OPENVDB_NANOVDB_LINK_LIBRARIES "OpenVDB::openvdb;OpenVDB::nanovdb_blosc")
+    set(_OPENVDB_NANOVDB_COMPILE_DEFINITIONS "NANOVDB_USE_BLOSC")
   endif()
   if(NOT TARGET OpenVDB::nanovdb)
     add_library(OpenVDB::nanovdb INTERFACE IMPORTED)
     set_target_properties(OpenVDB::nanovdb PROPERTIES
       IMPORTED_LOCATION "${OpenVDB_nanovdb_LIBRARY}"
       INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_nanovdb_INCLUDE_DIR}"
-      INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;OpenVDB::nanovdb_blosc"
+      INTERFACE_LINK_LIBRARIES "${_OPENVDB_NANOVDB_LINK_LIBRARIES}"
+      INTERFACE_COMPILE_DEFINITIONS "${_OPENVDB_NANOVDB_COMPILE_DEFINITIONS}"
       INTERFACE_COMPILE_FEATURES cxx_std_17
    )
   endif()

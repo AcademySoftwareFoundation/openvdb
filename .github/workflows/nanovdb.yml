@@ -193,7 +193,7 @@ jobs:
           cd nanovdb/nanovdb
           mkdir .build
           cd .build
-          cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF ../
+          cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF -DNANOVDB_USE_BLOSC=OFF ../
           make -j8
           sudo make install
           ctest -V

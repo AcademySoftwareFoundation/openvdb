@@ -12,8 +12,10 @@ OpenVDB:
 
 NanoVDB:
   Build:
-  - Removed the NANOVDB_USE_BLOSC and OPENVDB_TOOL_NANO_USE_BLOSC options. NanoVDB
-    always builds its own copy of the vendored Blosc as the nanovdb_blosc target.
-  - nanovdb_blosc.h is now installed alongside NanoVDB.h, and the static library
-    libnanovdb_blosc.a is installed to the NanoVDB library directory. Code that
-    includes nanovdb/io/IO.h must link it.
+  - NANOVDB_USE_BLOSC and OPENVDB_TOOL_NANO_USE_BLOSC remain and now default to ON.
+    NanoVDB no longer searches for an external Blosc. When enabled, it builds its
+    own copy of the vendored Blosc as the static nanovdb_blosc target.
+  - With NANOVDB_USE_BLOSC enabled, nanovdb_blosc.h is installed alongside
+    NanoVDB.h, and libnanovdb_blosc.a is installed to the NanoVDB library
+    directory. The nanovdb target links it and defines NANOVDB_USE_BLOSC.
+  - FindOpenVDB treats libnanovdb_blosc.a as optional for the nanovdb component.
