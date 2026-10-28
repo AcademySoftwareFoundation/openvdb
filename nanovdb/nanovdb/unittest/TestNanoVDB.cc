@@ -9425,6 +9425,41 @@ TEST_F(TestNanoVDB, mergeSplitRejectMismatchedMetaData)
     EXPECT_THROW((nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles)), std::runtime_error);
 }//  mergeSplitRejectMismatchedMetaData
 
+TEST_F(TestNanoVDB, readWarpBloscLZ)
+{
+    // Produced by Warp's Python writer, independently of the vendored codec.
+    // See data/README.md for provenance and regeneration instructions.
+    const std::string path = "data/warp_blosclz.nvdb";
+#if defined(NANOVDB_USE_BLOSC)
+    auto handle = nanovdb::io::readGrid(path);
+    ASSERT_EQ(1u, handle.gridCount());
+    const auto* grid = handle.grid<float>();
+    ASSERT_NE(nullptr, grid);
+    EXPECT_EQ(nanovdb::GridClass::Unknown, grid->gridClass());
+    EXPECT_STREQ("", grid->gridName());
+    EXPECT_EQ(512u, grid->activeVoxelCount());
+    EXPECT_EQ(nanovdb::CoordBBox(nanovdb::Coord(0), nanovdb::Coord(7)), grid->indexBBox());
+    EXPECT_EQ(nanovdb::Vec3d(0.5), grid->voxelSize());
+    EXPECT_EQ(nanovdb::Vec3d(1.0, 2.0, 3.0), grid->indexToWorld(nanovdb::Vec3d(0.0)));
+    EXPECT_EQ(-1.0f, grid->tree().background());
+    EXPECT_EQ(-1.0f, grid->tree().getValue(nanovdb::Coord(8, 0, 0)));
+    for (int i = 0; i < 8; ++i) {
+        for (int j = 0; j < 8; ++j) {
+            for (int k = 0; k < 8; ++k) {
+                EXPECT_EQ(float(100*i + 10*j + k), grid->tree().getValue(nanovdb::Coord(i, j, k)));
+            }
+        }
+    }
+#else
+    try {
+        auto handle = nanovdb::io::readGrid(path);
+        FAIL() << "Reading a Blosc file must fail when Blosc support is disabled";
+    } catch (const std::runtime_error& error) {
+        EXPECT_STREQ("BLOSC compression codec was disabled during build", error.what());
+    }
+#endif
+}
+
 TEST_F(TestNanoVDB, writeReadGridBuffer)
 {
     const nanovdb::Coord ijk(101,0,0);
