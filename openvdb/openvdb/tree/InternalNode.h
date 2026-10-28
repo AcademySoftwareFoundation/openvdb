@@ -281,8 +281,6 @@ public:
     Index64 leafCount() const;
     Index64 nonLeafCount() const;
     void nodeCount(std::vector<Index64> &vec) const;
-    OPENVDB_DEPRECATED_MESSAGE("Use input type std::vector<Index64> for nodeCount.")
-    void nodeCount(std::vector<Index32> &vec) const;
     Index32 childCount() const;
     Index64 onVoxelCount() const;
     Index64 offVoxelCount() const;
@@ -1135,22 +1133,6 @@ InternalNode<ChildT, Log2Dim>::nodeCount(std::vector<Index64> &vec) const
     const auto count = mChildMask.countOn();
     if (ChildNodeType::LEVEL > 0 && count > 0) {
         for (auto iter = this->cbeginChildOn(); iter; ++iter) iter->nodeCount(vec);
-    }
-    vec[ChildNodeType::LEVEL] += count;
-}
-
-template<typename ChildT, Index Log2Dim>
-inline void
-InternalNode<ChildT, Log2Dim>::nodeCount(std::vector<Index32> &vec) const
-{
-    OPENVDB_ASSERT(vec.size() > ChildNodeType::LEVEL);
-    const auto count = mChildMask.countOn();
-    if (ChildNodeType::LEVEL > 0 && count > 0) {
-        for (auto iter = this->cbeginChildOn(); iter; ++iter) {
-            OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-            iter->nodeCount(vec);
-            OPENVDB_NO_DEPRECATION_WARNING_END
-        }
     }
     vec[ChildNodeType::LEVEL] += count;
 }
