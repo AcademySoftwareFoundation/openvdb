@@ -37,6 +37,7 @@
 /* Codes for internal flags */
 #define BLOSC_DOSHUFFLE    0x1	/* byte-wise shuffle */
 #define BLOSC_MEMCPYED     0x2	/* plain copy */
+#define BLOSC_DOBITSHUFFLE 0x4	/* bit-wise shuffle (unsupported) */
 
 /* Code for the only compressor shipped with Blosc */
 #define BLOSC_LZ4       1
@@ -239,6 +240,10 @@ static int validate_decompress_format(const struct blosc_context* context) {
   int32_t compformat = (header_flags & 0xe0) >> 5;
   int compversion = context->compversion;
 
+  /* Called only for compressed buffers. We cannot reverse bit-shuffle. */
+  if (header_flags & BLOSC_DOBITSHUFFLE) {
+    return -5;
+  }
   if (compformat == BLOSC_BLOSCLZ_FORMAT) {
     return compversion == BLOSC_BLOSCLZ_VERSION_FORMAT ? 0 : -9;
   }
