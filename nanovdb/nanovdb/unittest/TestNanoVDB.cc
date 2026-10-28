@@ -2528,25 +2528,6 @@ TEST_F(TestNanoVDB, HDDA)
             }
         }
     }
-#if 0
-  if (!this->getEnvVar( "VDB_DATA_PATH" ).empty()) {// bug when ray-tracing dragon model
-    const Vec3T eye(1563.350342,-390.161621,697.749023);
-    const Vec3T dir(-0.963871,0.048393,-0.626651);
-    RayT ray( eye, dir );
-    auto srcGrid = this->getSrcGrid();
-    auto handle = nanovdb::openToNanoVDB( *srcGrid );
-    EXPECT_TRUE( handle );
-    auto *grid = handle.grid<float>();
-    EXPECT_TRUE( grid );
-    EXPECT_TRUE( grid->isLevelSet() );
-    //ray = ray.applyMapF( map );
-    auto acc = grid->getAccessor();
-    CoordT ijk;
-    float v0;
-    EXPECT_TRUE(nanovdb::math::zeroCrossing( ray, acc, ijk, v0 ) );
-    std::cerr << "hit with v0 =" << v0 << " background = " << grid->tree().background() << std::endl;
-  }
-#endif
 } // HDDA
 
 TEST_F(TestNanoVDB, GetDimAndActive)

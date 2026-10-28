@@ -13,9 +13,11 @@
 // Comment out to disable this explicit round-off check
 #define ENFORCE_FORWARD_STEPPING
 
-#include <nanovdb/NanoVDB.h> // only dependency
+#include <nanovdb/NanoVDB.h> // only nanovdb dependency
 
-#include <algorithm> // for std::min
+#ifndef __CUDACC_RTC__
+#include <algorithm> // for std::min in the disabled host branch of HDDA::next
+#endif
 
 namespace nanovdb::math {
 

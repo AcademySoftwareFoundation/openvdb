@@ -22,14 +22,24 @@ $ tree
 │   │   └── nanovdb_convert.cc
 │   ├── print
 │   │   └── nanovdb_print.cc
+│   ├── updateFiles.py
 │   ├── updateFiles.sh
 │   └── validate
 │       └── nanovdb_validate.cc
 ├── CNanoVDB.h
 ├── cuda
+│   ├── Buffer.h
 │   ├── DeviceBuffer.h
+│   ├── DeviceMesh.h
+│   ├── DeviceResource.h
+│   ├── DeviceStreamMap.h
 │   ├── GridHandle.cuh
-│   └── NodeManager.cuh
+│   ├── HandleStorage.h
+│   ├── ManagedResource.h
+│   ├── NodeManager.cuh
+│   ├── PinnedResource.h
+│   ├── TempPool.h
+│   └── UnifiedBuffer.h
 ├── docs
 │   ├── CMakeLists.txt
 │   ├── codingstyle.txt
@@ -105,8 +115,10 @@ $ tree
 ├── math
 │   ├── CSampleFromVoxels.h
 │   ├── DitherLUT.h
+│   ├── HalfLite.h
 │   ├── HDDA.h
 │   ├── Math.h
+│   ├── Proximity.h
 │   ├── Ray.h
 │   ├── SampleFromVoxels.h
 │   └── Stencils.h
@@ -119,17 +131,27 @@ $ tree
 │   ├── CreatePrimitives.h
 │   ├── cuda
 │   │   ├── AddBlindData.cuh
+│   │   ├── CoarsenGrid.cuh
+│   │   ├── DilateGrid.cuh
+│   │   ├── DistributedPointsToGrid.cuh
 │   │   ├── GridChecksum.cuh
 │   │   ├── GridStats.cuh
 │   │   ├── GridValidator.cuh
 │   │   ├── IndexToGrid.cuh
+│   │   ├── MergeGrids.cuh
+│   │   ├── MeshToGrid.cuh
 │   │   ├── PointsToGrid.cuh
-│   │   └── SignedFloodFill.cuh
+│   │   ├── PruneGrid.cuh
+│   │   ├── RefineGrid.cuh
+│   │   ├── SignedFloodFill.cuh
+│   │   ├── TopologyBuilder.cuh
+│   │   └── VoxelBlockManager.cuh
 │   ├── GridBuilder.h
 │   ├── GridChecksum.h
 │   ├── GridStats.h
 │   ├── GridValidator.h
-│   └── NanoToOpenVDB.h
+│   ├── NanoToOpenVDB.h
+│   └── VoxelBlockManager.h
 ├── unittest
 │   ├── CMakeLists.txt
 │   ├── pnanovdb_validate_strides.h

@@ -2540,7 +2540,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_PointID)
 
     //timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
     /////////////////////////////////////////////////////////////////////////
-    //auto handle = nanovdb::tools::cuda::pointsToGrid(d_points, pointCount, 1.0, nanovdb::PointType::Voxel8);
+    //auto handle = nanovdb::tools::cuda::pointsToGrid(d_points, pointCount, 1.0, nanovdb::PointType::PointID);
     nanovdb::tools::cuda::PointsToGrid<BuildT> converter(pointGrid->map());
     //converter.setVerbose(2);
     converter.setPointType(nanovdb::PointType::PointID);
