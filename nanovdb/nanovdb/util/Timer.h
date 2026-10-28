@@ -49,7 +49,7 @@ public:
     /// @brief Returns the time in milliseconds since record was called
     float milliseconds() const
     {
-        return std::chrono::duration_cast<std::chrono::milliseconds>(mStop - mStart).count();
+        return static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(mStop - mStart).count());
     }
 
     /// @brief call record and return the elapsed time (since start) in miliseconds

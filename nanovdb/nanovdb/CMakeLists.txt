@@ -294,7 +294,7 @@ set(NANOVDB_INCLUDE_UTIL_CUDA_FILES
 add_library(nanovdb INTERFACE)
 target_include_directories(nanovdb INTERFACE ../)
 target_compile_options(nanovdb INTERFACE
-  "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wno-invalid-offsetof>"
+  "$<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>:-Wno-invalid-offsetof>"
   "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/bigobj>")
 
 if(WIN32)

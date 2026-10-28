@@ -1097,7 +1097,6 @@ public:
             , mParent(parent)
         {
         }
-        Iterator&            operator=(const Iterator&) = default;
         __hostdev__ uint32_t operator*() const { return mPos; }
         __hostdev__ uint32_t pos() const { return mPos; }
         __hostdev__ operator bool() const { return mPos != Mask::SIZE; }
@@ -1125,7 +1124,6 @@ public:
             : mPos(pos)
         {
         }
-        DenseIterator&       operator=(const DenseIterator&) = default;
         __hostdev__ uint32_t operator*() const { return mPos; }
         __hostdev__ uint32_t pos() const { return mPos; }
         __hostdev__ operator bool() const { return mPos != Mask::SIZE; }
@@ -2637,9 +2635,10 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
     __hostdev__ static CoordT KeyToCoord(const KeyT& key)
     {
         static constexpr uint64_t MASK = (1u << 21) - 1; // used to mask out 21 lower bits
-        return CoordT(((key >> 42) & MASK) << ChildT::TOTAL, // x are the upper 21 bits
-                      ((key >> 21) & MASK) << ChildT::TOTAL, // y are the middle 21 bits
-                      ( key        & MASK) << ChildT::TOTAL); // z are the lower 21 bits
+        using CoordValueT = typename CoordT::ValueType;
+        return CoordT(static_cast<CoordValueT>(((key >> 42) & MASK) << ChildT::TOTAL), // x are the upper 21 bits
+                      static_cast<CoordValueT>(((key >> 21) & MASK) << ChildT::TOTAL), // y are the middle 21 bits
+                      static_cast<CoordValueT>(( key        & MASK) << ChildT::TOTAL)); // z are the lower 21 bits
     }
 #else
     using KeyT = CoordT;
@@ -3349,7 +3348,6 @@ public:
             , mParent(parent)
         {
         }
-        ChildIter& operator=(const ChildIter&) = default;
         __hostdev__ NodeT& operator*() const
         {
             NANOVDB_ASSERT(*this);
@@ -3391,7 +3389,6 @@ public:
             , mParent(parent)
         {
         }
-        ValueIterator&        operator=(const ValueIterator&) = default;
         __hostdev__ ValueType operator*() const
         {
             NANOVDB_ASSERT(*this);
@@ -3430,7 +3427,6 @@ public:
             , mParent(parent)
         {
         }
-        ValueOnIterator&      operator=(const ValueOnIterator&) = default;
         __hostdev__ ValueType operator*() const
         {
             NANOVDB_ASSERT(*this);
@@ -3464,7 +3460,6 @@ public:
             , mParent(parent->data())
         {
         }
-        DenseIterator&            operator=(const DenseIterator&) = default;
         __hostdev__ const ChildT* probeChild(ValueType& value) const
         {
             NANOVDB_ASSERT(mParent && bool(*this));
@@ -3977,7 +3972,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<FpN, CoordT, MaskT, LOG2DI
         return 0;
     }
 
-    __hostdev__ uint8_t       bitWidth() const { return 1 << (BaseT::mFlags >> 5); } // 4,8,16,32 = 2^(2,3,4,5)
+    __hostdev__ uint8_t       bitWidth() const { return uint8_t(1 << (BaseT::mFlags >> 5)); } // 4,8,16,32 = 2^(2,3,4,5)
     __hostdev__ size_t        memUsage() const { return sizeof(*this) + this->bitWidth() * 64; }
     __hostdev__ static size_t memUsage(uint32_t bitWidth) { return 96u + bitWidth * 64; }
     __hostdev__ float         getValue(uint32_t i) const
@@ -4326,7 +4321,6 @@ public:
             , mParent(parent)
         {
         }
-        ValueOnIterator&      operator=(const ValueOnIterator&) = default;
         __hostdev__ ValueType operator*() const
         {
             NANOVDB_ASSERT(*this);
@@ -4359,7 +4353,6 @@ public:
             , mParent(parent)
         {
         }
-        ValueOffIterator&     operator=(const ValueOffIterator&) = default;
         __hostdev__ ValueType operator*() const
         {
             NANOVDB_ASSERT(*this);
@@ -4393,7 +4386,6 @@ public:
         {
             NANOVDB_ASSERT(parent);
         }
-        ValueIterator&        operator=(const ValueIterator&) = default;
         __hostdev__ ValueType operator*() const
         {
             NANOVDB_ASSERT(*this);
@@ -5638,7 +5630,8 @@ class GridMetaData
     GridData  mGridData; // 672B
     TreeData  mTreeData; // 64B
     CoordBBox mIndexBBox; // 24B. AABB of active values in index space.
-    uint32_t  mRootTableSize, mPadding{0}; // 8B
+    uint32_t  mRootTableSize; // 4B
+    [[maybe_unused]] uint32_t mPadding{0}; // 4B
 
 public:
     template<typename T>
@@ -6089,7 +6082,7 @@ void writeUncompressedGrid(StreamT& os, const GridData* gridData, bool raw = fal
         FileHeader head{NANOVDB_MAGIC_NUMB, gridData->mVersion, 1u, Codec::NONE};
 #endif
         const char* gridName = gridData->gridName();
-        const uint32_t nameSize = util::strlen(gridName) + 1;// include '\0'
+        const uint32_t nameSize = uint32_t(util::strlen(gridName) + 1);// include '\0'
         const TreeData* treeData = (const TreeData*)(gridData->treePtr());
         NANOVDB_ASSERT(gridData->mBlindMetadataCount <= uint32_t( 1u << 16 ));// due to uint32_t -> uin16_t conversion
         FileMetaData meta{gridData->mGridSize, gridData->mGridSize, 0u, treeData->mVoxelCount,
@@ -6146,7 +6139,7 @@ void writeUncompressedGrid(StreamT& os, const GridData* gridData, const ValueT *
         FileHeader head{NANOVDB_MAGIC_NUMB, gridData->mVersion, 1u/*grid count*/, Codec::NONE};
 #endif
         const char* gridName = gridData->gridName();
-        const uint32_t nameSize = util::strlen(gridName) + 1;// include '\0'
+        const uint32_t nameSize = uint32_t(util::strlen(gridName) + 1);// include '\0'
         const TreeData* treeData = (const TreeData*)(gridData->treePtr());
         FileMetaData meta{gridSize, gridSize, 0u, treeData->mVoxelCount,
                           gridData->mGridType, gridData->mGridClass, gridData->mWorldBBox,
@@ -6495,15 +6488,15 @@ struct GetNodeInfo
     {
         return NodeInfo{3u, NanoUpper<BuildT>::DIM, tile.value, tile.value, static_cast<FloatType>(tile.value), 0, CoordBBox::createCube(tile.origin(), NanoUpper<BuildT>::DIM)};
     }
-    __hostdev__ static Type get(const NanoUpper<BuildT>& node, uint32_t n)
+    __hostdev__ static Type get(const NanoUpper<BuildT>& node, uint32_t)
     {
         return NodeInfo{2u, node.dim(), node.minimum(), node.maximum(), node.average(), node.stdDeviation(), node.bbox()};
     }
-    __hostdev__ static Type get(const NanoLower<BuildT>& node, uint32_t n)
+    __hostdev__ static Type get(const NanoLower<BuildT>& node, uint32_t)
     {
         return NodeInfo{1u, node.dim(), node.minimum(), node.maximum(), node.average(), node.stdDeviation(), node.bbox()};
     }
-    __hostdev__ static Type get(const NanoLeaf<BuildT>& leaf, uint32_t n)
+    __hostdev__ static Type get(const NanoLeaf<BuildT>& leaf, uint32_t)
     {
         return NodeInfo{0u, leaf.dim(), leaf.minimum(), leaf.maximum(), leaf.average(), leaf.stdDeviation(), leaf.bbox()};
     }

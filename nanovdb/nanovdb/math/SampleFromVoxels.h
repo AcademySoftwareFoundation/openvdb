@@ -169,6 +169,29 @@ __hostdev__ typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 0, false
 
 // ------------------------------> TrilinearSampler <--------------------------------------
 
+namespace detail {
+/// @brief Scalar component type of a scalar or vector value type, e.g. float for both float and Vec3<float>
+template<typename...>
+struct MakeVoid { using type = void; };// like std::void_t, which is unavailable under NVRTC
+template<typename T, typename = void>
+struct ScalarOf { using type = T; };
+template<typename T>
+struct ScalarOf<T, typename MakeVoid<typename T::ValueType>::type> { using type = typename T::ValueType; };
+
+/// @brief Return @a v * @a s with the same precision as @c v *= s, i.e. a scalar @a v is
+///        multiplied in the precision of @a s whereas a vector @a v uses its own precision
+template<typename T, typename S>
+__hostdev__ inline T scale(const T& v, S s)
+{
+    using ScalarT = typename ScalarOf<T>::type;
+    if constexpr(util::is_same<ScalarT, T>::value) {
+        return T(v * s);
+    } else {
+        return v * ScalarT(s);
+    }
+}
+}// namespace detail
+
 /// @brief Tri-linear sampler, i.e. first order, interpolator
 template<typename TreeOrAccT>
 class TrilinearSampler
@@ -234,7 +257,8 @@ __hostdev__ typename TreeOrAccT::ValueType TrilinearSampler<TreeOrAccT>::sample(
   auto lerp = [](ValueT a, ValueT b, ValueT w){ return fma(w, b-a, a); };// = w*(b-a) + a
   //auto lerp = [](ValueT a, ValueT b, ValueT w){ return fma(w, b, fma(-w, a, a));};// = (1-w)*a + w*b
 #else
-    auto lerp = [](ValueT a, ValueT b, RealT w) { return a + ValueT(w) * (b - a); };
+    using ScalarT = typename detail::ScalarOf<ValueT>::type;
+    auto lerp = [](ValueT a, ValueT b, RealT w) { return a + ValueT(ScalarT(w)) * (b - a); };
 #endif
     return lerp(lerp(lerp(v[0][0][0], v[0][0][1], uvw[2]), lerp(v[0][1][0], v[0][1][1], uvw[2]), uvw[1]),
                 lerp(lerp(v[1][0][0], v[1][0][1], uvw[2]), lerp(v[1][1][0], v[1][1][1], uvw[2]), uvw[1]),
@@ -533,8 +557,8 @@ template<typename RealT, template<typename...> class Vec3T>
 __hostdev__ typename TreeOrAccT::ValueType TriquadraticSampler<TreeOrAccT>::sample(const Vec3T<RealT> &uvw, const ValueT (&v)[3][3][3])
 {
     auto kernel = [](const ValueT* value, double weight)->ValueT {
-        return weight * (weight * (0.5f * (value[0] + value[2]) - value[1]) +
-                        0.5f * (value[2] - value[0])) + value[1];
+        return ValueT(weight * (weight * (0.5f * (value[0] + value[2]) - value[1]) +
+                               0.5f * (value[2] - value[0])) + value[1]);
     };
 
     ValueT vx[3];
@@ -893,11 +917,11 @@ __hostdev__ typename TreeOrAccT::ValueType TricubicSampler<TreeOrAccT>::sample(c
 #if 0
             sum = fma( yPow, zPow * fma(xyz[0], fma(xyz[0], fma(xyz[0], C[n + 3], C[n + 2]), C[n + 1]), C[n]), sum);
 #else
-            sum += yPow * zPow * (C[n] + xyz[0] * (C[n + 1] + xyz[0] * (C[n + 2] + xyz[0] * C[n + 3])));
+            sum = ValueT(sum + yPow * zPow * (C[n] + xyz[0] * (C[n + 1] + xyz[0] * (C[n + 2] + xyz[0] * C[n + 3]))));
 #endif
-            yPow *= xyz[1];
+            yPow = detail::scale(yPow, xyz[1]);
         }
-        zPow *= xyz[2];
+        zPow = detail::scale(zPow, xyz[2]);
     }
     return sum;
 }

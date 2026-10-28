@@ -60,11 +60,11 @@ public:
                 mStep[axis] = 0;
             } else if (inv[axis] > 0) {
                 mStep[axis] = 1;
-                mNext[axis] = mT0 + (mVoxel[axis] + dim - pos[axis]) * inv[axis];
+                mNext[axis] = mT0 + (RealT(mVoxel[axis] + dim) - pos[axis]) * inv[axis];
                 mDelta[axis] = inv[axis];
             } else {
                 mStep[axis] = -1;
-                mNext[axis] = mT0 + (mVoxel[axis] - pos[axis]) * inv[axis];
+                mNext[axis] = mT0 + (RealT(mVoxel[axis]) - pos[axis]) * inv[axis];
                 mDelta[axis] = -inv[axis];
             }
         }
@@ -98,9 +98,9 @@ public:
         for (int axis = 0; axis < 3; ++axis) {
             if (mStep[axis] == 0)
                 continue;
-            mNext[axis] = mT0 + (mVoxel[axis] - pos[axis]) * inv[axis];
+            mNext[axis] = mT0 + (RealT(mVoxel[axis]) - pos[axis]) * inv[axis];
             if (mStep[axis] > 0)
-                mNext[axis] += dim * inv[axis];
+                mNext[axis] += RealT(dim) * inv[axis];
         }
 
         return true;
@@ -124,7 +124,7 @@ public:
         }
 #else
         mT0 = mNext[axis];
-        mNext[axis] += mDim * mDelta[axis];
+        mNext[axis] += RealT(mDim) * mDelta[axis];
         mVoxel[axis] += mDim * mStep[axis];
         return mT0 <= mT1;
 #endif
@@ -172,7 +172,7 @@ private:
         }
 #endif
         mT0 = mNext[axis];
-        mNext[ axis] += mDim * mDelta[axis];
+        mNext[ axis] += RealT(mDim) * mDelta[axis];
         mVoxel[axis] += mDim * mStep[ axis];
         return mT0 <= mT1;
     }
@@ -284,11 +284,11 @@ public:
                 mStep[axis] = 0;
             } else if (inv[axis] > 0) {
                 mStep[axis] = Dim;
-                mNext[axis] = (mT0 + (mVoxel[axis] + Dim - pos[axis]) * inv[axis]);
+                mNext[axis] = (mT0 + (RealT(mVoxel[axis] + Dim) - pos[axis]) * inv[axis]);
                 mDelta[axis] = inv[axis];
             } else {
                 mStep[axis] = -Dim;
-                mNext[axis] = mT0 + (mVoxel[axis] - pos[axis]) * inv[axis];
+                mNext[axis] = mT0 + (RealT(mVoxel[axis]) - pos[axis]) * inv[axis];
                 mDelta[axis] = -inv[axis];
             }
         }

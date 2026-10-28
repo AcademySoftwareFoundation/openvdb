@@ -148,7 +148,7 @@ static fileSize_t write(std::ostream& os, const GridHandle<BufferT>& handle, Cod
 template<typename BufferT>
 static void read(std::istream& is, BufferT& buffer, Codec codec);
 
-static void read(std::istream& is, char* data, fileSize_t size, Codec codec);
+static inline void read(std::istream& is, char* data, fileSize_t size, Codec codec);
 } // namespace Internal
 /// @endcond
 
