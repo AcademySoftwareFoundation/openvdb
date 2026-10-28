@@ -16,10 +16,13 @@
 #                            the openvdb_ax component
 #   OpenVDB::openvdb_ax_shared, OpenVDB::openvdb_ax_static
 #                            The AX libraries, if installed
+#   OpenVDB::nanovdb         NanoVDB::nanovdb and OpenVDB::openvdb, with the
+#                            nanovdb component
 #
 # Components:
 #   openvdb                  The core library, always available
 #   openvdb_ax               OpenVDB AX, if installed. Requires LLVM
+#   nanovdb                  NanoVDB, found through its own NanoVDBConfig
 #
 # Variables:
 #   OpenVDB_VERSION, OpenVDB_ABI
@@ -148,6 +151,31 @@ if("openvdb_ax" IN_LIST OpenVDB_FIND_COMPONENTS)
       endif()
       set(OpenVDB_openvdb_ax_FOUND TRUE)
     endif()
+  endif()
+endif()
+
+# NanoVDB installs its own package config. This runs after OpenVDB::openvdb
+# exists, so NanoVDBConfig does not look for OpenVDB again.
+if("nanovdb" IN_LIST OpenVDB_FIND_COMPONENTS)
+  set(_openvdb_find_arguments)
+  if(OpenVDB_FIND_QUIETLY OR NOT OpenVDB_FIND_REQUIRED_nanovdb)
+    list(APPEND _openvdb_find_arguments QUIET)
+  endif()
+  find_package(NanoVDB CONFIG ${_openvdb_find_arguments}
+    HINTS "${CMAKE_CURRENT_LIST_DIR}/../NanoVDB")
+  unset(_openvdb_find_arguments)
+
+  # OpenVDB::nanovdb always links the core library, even when NanoVDB was
+  # built without NANOVDB_USE_OPENVDB
+  if(NanoVDB_FOUND)
+    if(NOT TARGET OpenVDB::nanovdb)
+      add_library(OpenVDB::nanovdb INTERFACE IMPORTED)
+      set_target_properties(OpenVDB::nanovdb PROPERTIES
+        INTERFACE_LINK_LIBRARIES "NanoVDB::nanovdb;OpenVDB::openvdb")
+    endif()
+    set(OpenVDB_nanovdb_FOUND TRUE)
+  else()
+    set(OpenVDB_nanovdb_FOUND FALSE)
   endif()
 endif()
 

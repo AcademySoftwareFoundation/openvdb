@@ -7,3 +7,12 @@ OpenVDB:
     paths in the source or build tree.
   - The OpenVDB CMake Config-file provides OpenVDB::openvdb_ax through its
     openvdb_ax component, which requires LLVM.
+
+NanoVDB:
+  Build:
+  - Added a NanoVDB CMake Config-file, so downstream projects can use
+    find_package(NanoVDB CONFIG) and link against NanoVDB::nanovdb, which
+    carries the configured NANOVDB_USE_* definitions and dependencies. The
+    OpenVDB Config-file provides OpenVDB::nanovdb through its nanovdb component.
+  - Standalone NanoVDB builds now install headers to the CMAKE_INSTALL_PREFIX
+    include directory instead of /nanovdb.

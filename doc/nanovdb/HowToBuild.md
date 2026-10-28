@@ -53,3 +53,15 @@ From the root OpenVDB directory:
   foo@bar:~$ make -j 4 && make install
   ```
 Note that if you already have the correct version of OpenVDB pre-installed, you can configure CMake to link against that library by passing the arguments `-DOPENVDB_BUILD_CORE=OFF -DOPENVDB_BUILD_BINARIES=OFF -DOPENVDB_ROOT=/path/to/openvdb` when invoking `cmake`.
+
+## Using an installed NanoVDB from CMake
+
+NanoVDB installs a CMake package config to `/install/path/lib/cmake/NanoVDB`. Its `NanoVDB::nanovdb` target carries the include path, the `NANOVDB_USE_*` definitions NanoVDB was configured with, and their dependencies:
+  ```cmake
+  list(APPEND CMAKE_PREFIX_PATH "/install/path")
+  find_package(NanoVDB CONFIG REQUIRED)
+  target_link_libraries(myapp NanoVDB::nanovdb)
+  ```
+When NanoVDB is installed with OpenVDB, `find_package(OpenVDB CONFIG COMPONENTS nanovdb)` provides the same target as `OpenVDB::nanovdb`.
+
+`find_package(NanoVDB 32 CONFIG)` only accepts an installation with the same major version, which tracks the NanoVDB ABI and file format. A NanoVDB installed with `NANOVDB_USE_CUDA=ON` requires the CUDA toolkit and a CCCL release with the same major version as the one NanoVDB was built against.
