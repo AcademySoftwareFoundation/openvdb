@@ -561,8 +561,14 @@ list(APPEND CMAKE_MODULE_PATH "/location/of/openvdb/install/lib/cmake/OpenVDB")
 find_package(OpenVDB REQUIRED)
 @endcode
 
-The Find-module is required for the `openvdb_ax`, `nanovdb` and Houdini
-components, which the Config-file does not provide.
+OpenVDB AX is available through the `openvdb_ax` component, which provides
+`OpenVDB::openvdb_ax` and needs LLVM to be available to your project:
+
+@code{.cmake}
+find_package(OpenVDB CONFIG REQUIRED COMPONENTS openvdb openvdb_ax)
+target_link_libraries(myapp OpenVDB::openvdb_ax)
+@endcode
+
 
 `myapp` in the above is a CMake target, usually created with `add_library()`
 or `add_executable()`. You can optionally provide `CMAKE_PREFIX_PATH` (or
