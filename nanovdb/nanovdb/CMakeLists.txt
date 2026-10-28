@@ -180,6 +180,8 @@ if(NANOVDB_USE_BLOSC AND NOT TARGET nanovdb_blosc)
   install(TARGETS nanovdb_blosc ARCHIVE DESTINATION ${NANOVDB_INSTALL_LIBDIR})
 endif()
 
+# NanoVDB headers include zlib.h, so zlib is found independently of OpenVDB
+# (where it is a private dependency).
 if(NANOVDB_USE_ZLIB AND NOT TARGET ZLIB::ZLIB)
   find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
 endif()

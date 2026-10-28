@@ -635,6 +635,12 @@ if(NOT OPENVDB_USE_STATIC_LIBS)
   if(OpenVDB_USES_ZLIB)
     list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES ZLIB::ZLIB)
   endif()
+else()
+  # A static archive does not carry its own dependencies, so these must be
+  # linked by the consumer.
+  if(OpenVDB_USES_ZLIB)
+    list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES ZLIB::ZLIB)
+  endif()
 endif()
 
 if(openvdb_je IN_LIST OpenVDB_FIND_COMPONENTS)
