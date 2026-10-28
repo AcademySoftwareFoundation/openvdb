@@ -5,6 +5,7 @@ $VerbosePreference = "Continue"
 # Required dependencies
 $vcpkgPackages = @(
     "zlib",
+    "zstd",
     "libpng",
     "openexr",
     "tbb",

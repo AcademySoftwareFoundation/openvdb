@@ -4,11 +4,11 @@ NanoVDB:
   - NANOVDB_OFFSETOF now uses the standard offsetof instead of subtracting null pointers, which is undefined behavior.
 
   Build:
-  - NanoVDB, its unit tests and its command-line tools now build with OPENVDB_CXX_STRICT=ON under Clang/AppleClang. The headers no longer trigger implicit-conversion, unused-parameter, unused-function or deprecated-copy warnings, so they can be included in code compiled with -Wconversion -Werror.
+  - NanoVDB, its unit tests and its command-line tools now build with OPENVDB_CXX_STRICT=ON under Clang/AppleClang. Fixed implicit-conversion, unused-parameter, unused-function and deprecated-copy warnings under the project's strict warning configuration, which includes -Wconversion -Werror -Wno-sign-conversion.
   - The static functions in CNanoVDB.h and io/IO.h are now static inline.
-  - -Winvalid-offsetof is now suppressed for Clang/AppleClang, as it already was for GCC.
+  - -Winvalid-offsetof is suppressed privately for the NanoVDB layout-test target under Clang/AppleClang. The existing GCC suppression is unchanged.
   - The macOS NanoVDB CI jobs now build with OPENVDB_CXX_STRICT=ON.
 
 vdb_tool:
   Build:
-  - Link Blosc and PNG through their imported CMake targets, fixing "library 'blosc' not found" link errors when the libraries are not on the default linker search path.
+  - Link Blosc through its imported CMake target, fixing "library 'blosc' not found" link errors when the libraries are not on the default linker search path.

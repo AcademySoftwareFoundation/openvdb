@@ -75,6 +75,9 @@ endif()
 
 add_executable(nanovdb_test_nanovdb "TestNanoVDB.cc")
 target_link_libraries(nanovdb_test_nanovdb PRIVATE nanovdb GTest::GTest GTest::Main)
+# Layout tests use offsetof on compressed leaf types that are not standard-layout.
+target_compile_options(nanovdb_test_nanovdb PRIVATE
+  "$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wno-invalid-offsetof>")
 add_test(nanovdb_unit_test nanovdb_test_nanovdb)
 
 # -----------------------------------------------------------------------------

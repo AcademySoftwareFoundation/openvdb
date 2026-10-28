@@ -228,11 +228,9 @@ TEST_F(TestOpenVDB, getExtrema)
 
 TEST_F(TestOpenVDB, Basic)
 {
-    { // openvdb::Vec3::operator<
+    { // openvdb::math::cwiseLessThan
         const openvdb::Vec3f a(1.0f, 10.0f, 200.0f), b(2.0f, 0.0f, 0.0f);
-        OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-        EXPECT_TRUE(a < b);// default behavior inherited from openvdb::math::Tuple
-        OPENVDB_NO_DEPRECATION_WARNING_END
+        EXPECT_TRUE(openvdb::math::cwiseLessThan(a, b));
         EXPECT_TRUE(a.lengthSqr() > b.lengthSqr());// behavior used in nanovdb::GridStats
     }
 }
@@ -3268,6 +3266,45 @@ TEST_F(TestOpenVDB, Tricubic)
     //std::cerr << "3'rd order: v = " << sampler3(ijk) << std::endl;
     EXPECT_NEAR(exact, sampler3(ijk), 1e-4); // it's a 3nd order polynomial
 } // Tricubic
+
+TEST_F(TestOpenVDB, TricubicMixedPrecision)
+{
+    struct OpenVDBVec3fAccessor {
+        using ValueType = openvdb::Vec3f;
+        using CoordType = openvdb::Coord;
+    };
+    using ScalarSampler = nanovdb::math::TricubicSampler<nanovdb::NanoTree<float>>;
+    using OpenSampler = nanovdb::math::TricubicSampler<OpenVDBVec3fAccessor>;
+    using NanoSampler = nanovdb::math::TricubicSampler<nanovdb::NanoTree<nanovdb::Vec3f>>;
+
+    // The three components are y^3, z^3 and y^3*z^3. These expose rounding
+    // changes when double coordinates are converted to float before multiplication.
+    float coefficients[3][64] = {};
+    coefficients[0][12] = coefficients[1][48] = coefficients[2][60] = 1.0f;
+    openvdb::Vec3f openCoefficients[64];
+    nanovdb::Vec3f nanoCoefficients[64];
+    for (int i = 0; i < 64; ++i) {
+        for (int c = 0; c < 3; ++c) {
+            openCoefficients[i][c] = nanoCoefficients[i][c] = coefficients[c][i];
+        }
+    }
+
+    const nanovdb::Vec3d positions[] = {
+        {0.0, 0.234567891, 0.345678912},
+        {0.0, 0.654321987, 0.543219876}
+    };
+    for (const auto& xyz : positions) {
+        const auto openResult = OpenSampler::sample(xyz, openCoefficients);
+        const auto nanoResult = NanoSampler::sample(xyz, nanoCoefficients);
+        const nanovdb::Vec3f floatXYZ(xyz);
+        for (int c = 0; c < 3; ++c) {
+            // Exact equality catches even a one-ULP change. OpenVDB vectors
+            // promote the multiplication; NanoVDB vectors narrow the weight first.
+            EXPECT_EQ(ScalarSampler::sample(xyz, coefficients[c]), openResult[c]);
+            EXPECT_EQ(ScalarSampler::sample(floatXYZ, coefficients[c]), nanoResult[c]);
+        }
+    }
+}
 
 TEST_F(TestOpenVDB, GridValidator)
 {

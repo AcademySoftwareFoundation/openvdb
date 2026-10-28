@@ -178,16 +178,17 @@ struct ScalarOf { using type = T; };
 template<typename T>
 struct ScalarOf<T, typename MakeVoid<typename T::ValueType>::type> { using type = typename T::ValueType; };
 
-/// @brief Return @a v * @a s with the same precision as @c v *= s, i.e. a scalar @a v is
-///        multiplied in the precision of @a s whereas a vector @a v uses its own precision
+/// @brief Preserve NanoVDB vectors' component-precision scalar multiplication.
+///        For other types, multiply before converting the result back to T.
 template<typename T, typename S>
 __hostdev__ inline T scale(const T& v, S s)
 {
     using ScalarT = typename ScalarOf<T>::type;
-    if constexpr(util::is_same<ScalarT, T>::value) {
-        return T(v * s);
-    } else {
+    if constexpr(util::is_specialization<T, Vec3>::value ||
+                 util::is_specialization<T, Vec4>::value) {
         return v * ScalarT(s);
+    } else {
+        return T(v * s);
     }
 }
 }// namespace detail

@@ -14,8 +14,6 @@
 #include <memory>
 #include <string>
 
-class TestMappedFile;
-
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -132,36 +130,6 @@ struct PointDataGridMultiPass {};
 class File;
 
 
-// This class is deprecated and will be removed. Delayed loading is no longer supported.
-// It is retained for API backwards compatibility only, but all methods are no-ops.
-class OPENVDB_API MappedFile
-{
-public:
-    using Ptr = SharedPtr<MappedFile>;
-    using Notifier = std::function<void(std::string /*filename*/)>;
-
-    OPENVDB_DEPRECATED_MESSAGE("This class is deprecated and will be removed. Delayed loading is no longer supported.")
-    explicit MappedFile(const std::string& /*filename*/, bool /*autoDelete*/ = false) {}
-
-    /// @brief Destructor
-    ~MappedFile() = default;
-
-    MappedFile(const MappedFile&) = delete;
-    MappedFile& operator=(const MappedFile&) = delete;
-
-    OPENVDB_DEPRECATED_MESSAGE("Always returns an empty string. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    std::string filename() const { return std::string(); }
-
-    OPENVDB_DEPRECATED_MESSAGE("Always returns a null stream buffer pointer. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    SharedPtr<std::streambuf> createBuffer() const { return SharedPtr<std::streambuf>(); }
-
-    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    void setNotifier(const Notifier&) {}
-
-    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    void clearNotifier() {}
-}; // class MappedFile
-
 
 ////////////////////////////////////////
 
@@ -237,11 +205,6 @@ OPENVDB_API bool getWriteGridStatsMetadata(std::ios_base&);
 /// @brief Specify whether to compute grid statistics (active voxel count and bounding box, etc.)
 /// and store them as grid metadata when writing to the given stream.
 OPENVDB_API void setWriteGridStatsMetadata(std::ios_base&, bool writeGridStats);
-
-OPENVDB_DEPRECATED_MESSAGE("Always returns a null pointer. This function is deprecated and will be removed. Delayed loading is no longer supported.")
-inline SharedPtr<MappedFile> getMappedFilePtr(std::ios_base&) { return SharedPtr<MappedFile>(); }
-OPENVDB_DEPRECATED_MESSAGE("This function is deprecated and will be removed. Delayed loading is no longer supported.")
-inline void setMappedFilePtr(std::ios_base&, SharedPtr<MappedFile>&) { }
 
 /// @brief Return a shared pointer to an object that stores metadata (file format,
 /// compression scheme, etc.) for use when reading from or writing to the given stream.

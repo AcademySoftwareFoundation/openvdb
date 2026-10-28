@@ -912,14 +912,6 @@ pca(PointDataGridT& points,
     const size_t posSumIndex = initAttribute(temps[0], zeroVal<WeightedPositionSumT>());
     const size_t weightSumIndex = initAttribute(temps[1], zeroVal<WeightSumT>());
 
-OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-    // DEPRECATED, TO REMOVE
-    size_t oldRotAttr = INVALID_IDX;
-    if (!attrs.rotation.empty()) {
-        oldRotAttr = initAttribute(attrs.rotation, zeroVal<Mat3T>());
-    }
-OPENVDB_NO_DEPRECATION_WARNING_END
-
     // 3) Create ellipses group
     if (!leaf->attributeSet().descriptor().hasGroup(attrs.ellipses)) {
         points::appendGroup(tree, attrs.ellipses);
@@ -1066,19 +1058,6 @@ OPENVDB_NO_DEPRECATION_WARNING_END
             stretchHandle.set(i, stretchScale * stretch);
         }
     });
-
-    // DEPRECATED, TO REMOVE
-    if (oldRotAttr != INVALID_IDX) {
-        // Copy xform to "rotation"
-        manager.foreach([&](LeafNodeT& leafnode, size_t) {
-            // pretty inefficient way to do this, but its deprecated behaviour
-            AttributeWriteHandle<Mat3T, NullCodec> oldRotHandle(leafnode.attributeArray(oldRotAttr));
-            Mat3T* R = initPcaArrayAttribute<Mat3T>(leafnode, rotIdx, /*fill=*/false);
-            for (Index idx = 0; idx < oldRotHandle.size(); ++idx) {
-                R[idx] = oldRotHandle.get(idx);
-            }
-        });
-    }
 
     /// 8) Covert attributes to desired format
     /// @note  We could consolidate this method into the parallel operators above,
