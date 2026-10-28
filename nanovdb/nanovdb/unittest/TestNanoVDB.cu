@@ -3897,15 +3897,16 @@ __global__ void testStencilResolverKernel(
     VBM::decodeInverseMap(grid, firstLeafID, jumpMap, blockFirstOffset, tID, leafIndex, voxelOffset);
 
     uint64_t *stencil = stencilArray + 27 * (uint64_t(bID) * VBM::BlockWidth + tID);
-    auto store = [stencil](int tap, uint64_t index) { stencil[tap] = index; };
     if constexpr (Resolver == VBMStencilResolver::Box) {
         VBM::computeBoxStencil(grid, leafIndex, voxelOffset, stencil);
     } else if constexpr (Resolver == VBMStencilResolver::ForEachBox) {
-        VBM::forEachBoxStencil(grid, leafIndex, voxelOffset, store);
+        VBM::forEachBoxStencil(grid, leafIndex, voxelOffset,
+            [stencil](int tap, uint64_t index) { stencil[tap] = index; });
     } else if constexpr (Resolver == VBMStencilResolver::BoxCached) {
         VBM::computeBoxStencilCached(grid, firstLeafID, jumpMap, leafIndex, voxelOffset, stencil);
     } else if constexpr (Resolver == VBMStencilResolver::ForEachBoxCached) {
-        VBM::forEachBoxStencilCached(grid, firstLeafID, jumpMap, leafIndex, voxelOffset, store);
+        VBM::forEachBoxStencilCached(grid, firstLeafID, jumpMap, leafIndex, voxelOffset,
+            [stencil](int tap, uint64_t index) { stencil[tap] = index; });
     } else if constexpr (Resolver == VBMStencilResolver::Cross) {
         VBM::computeCrossStencil(grid, leafIndex, voxelOffset, stencil);
     } else {
