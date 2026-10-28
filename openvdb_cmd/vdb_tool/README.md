@@ -7,25 +7,28 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | Action | Description |
 |---|---|
 | **ax** | run an OpenVDB AX expression over selected grids (requires the openvdb_ax library and LLVM) |
-| **calc** | calculate string expression |
+| **calc** (alias: math) | calculate string expression |
 | **case** | case branch inside a -switch scope. Body runs only if key matches the parent -switch's selector. Use key=* or key=default for a catch-all that fires when no earlier case matched. Closed by -end. |
 | **clear** | Deletes geometry, VDB grids and local variables |
 | **clip** | Clip a VDB grid against another grid, a bbox or frustum |
-| **close** | morphological closing, i.e. dilation followed by erosion, of level set surface by a fixed radius |
-| **config** | Import and process one or more configuration files |
+| **close** (alias: closeLS) | morphological closing, i.e. dilation followed by erosion, of level set surface by a fixed radius |
+| **config** (alias: c) | Import and process one or more configuration files |
+| **copy** | Deep-copy VDB grids and/or Geometry by index onto the top of their respective stacks |
 | **cpt** | generate a vector grid with the closest-point-transform to a level set surface |
 | **curl** | generate a vector grid with the curl of another vector grid |
 | **curvature** | generate scalar grid with the mean curvature of a level set surface |
 | **debug** | print debugging information to the terminal |
 | **default** | define default values to be used by subsequent actions |
+| **diagnose** | Run OpenVDB diagnostics checks on one or more VDB grids |
 | **difference** | CSG difference of two level sets surfaces |
-| **dilate** | dilate level set surface by a fixed radius |
+| **dilate** (alias: dilateLS) | dilate level set surface by a fixed radius |
 | **div** | generate a scalar grid with the divergence of a vector grid |
+| **divide** | Given grids A and B, compute a / b per voxel |
 | **each** | start of each-loop over a user-defined loop variable and list of values. |
 | **end** | marks the end scope of "-for, -each, -files, -if, -switch and -case" control actions |
 | **enright** | Performs Enright advection benchmark test on a level set |
-| **erode** | erode level set surface by a fixed radius |
-| **errorOnWarning** | stop on warnings, i.e. treat warnings as errors |
+| **erode** (alias: erodeLS) | erode level set surface by a fixed radius |
+| **errorOnWarning** (alias: stopOnWarning) | stop on warnings, i.e. treat warnings as errors |
 | **eval** | evaluate string expression |
 | **examples** | print examples to the terminal and terminate |
 | **expand** | expand narrow band of level set |
@@ -36,50 +39,56 @@ The vdb_tool is a versatile yet lightweight command-line utility that chains tog
 | **forAllValues** | Applied a simple computational kernel to ALL values in a grid. |
 | **forOffValues** | Applied a simple computational kernel to OFF values in a grid. |
 | **forOnValues** | Applied a simple computational kernel to ON values in a grid. |
-| **gauss** | gaussian convolution of a level set surface |
+| **gauss** (alias: gaussLS) | gaussian convolution of a level set surface |
 | **grad** | generate a vector grid with the gradient of a scalar grid |
-| **help** | Print documentation for one, multiple or all available actions |
+| **help** (alias: h) | Print documentation for one, multiple or all available actions |
+| **histogram** (alias: hist) | Print an ASCII bar histogram of the distribution of active values for one or more VDB grids |
 | **if** | start of if-scope. If the value of its option, named test, evaluates to false the entire scope is skipped |
 | **intersection** | CSG intersection of two level sets surfaces |
-| **iso2ls** | Convert an iso-surface of a scalar field into a level set (i.e. SDF) |
+| **iso2ls** (aliases: lsRebuild, i2l) | Convert an iso-surface of a scalar field into a level set (i.e. SDF) |
 | **length** | generate a scalar grid with the magnitude of a vector grid |
 | **log** | enable logging to file |
-| **ls2fog** | Convert a level set VDB into a VDB with a fog volume, i.e. normalized density. |
-| **ls2mesh** | Convert a level set to an adaptive polygon mesh |
+| **ls2fog** (aliases: l2f, sdf2fog) | Convert a level set VDB into a VDB with a fog volume, i.e. normalized density. |
+| **ls2mesh** (alias: sdf2mesh) | Convert a level set to an adaptive polygon mesh |
 | **max** | Given grids A and B, compute max(a, b) per voxel |
-| **mean** | mean value filtering of a level set surface |
-| **median** | median value filtering of a level set surface |
-| **mesh2ls** | Convert a watertight polygon surface into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
+| **mean** (alias: meanLS) | mean value filtering of a level set surface |
+| **median** (alias: medianLS) | median value filtering of a level set surface |
+| **mesh2ls** (alias: mesh2sdf) | Convert a watertight polygon surface into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
+| **mesh2offset** (alias: soup2offset; deprecated) | Convert a polygon mesh or polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
+| **mesh2udf** (alias: soup2udf; deprecated) | Convert a polygon mesh or polygon soup into a to a unsigned distance field with an symmetrical narrow band |
 | **min** | Given grids A and B, compute min(a, b) per voxel |
-| **movie** | Convert image and movie files to mpeg or animated gif files |
+| **movie** (aliases: img2mpeg, mov2mpeg, mov2gif, img2gif) | Convert image and movie files to mpeg or animated gif files |
+| **multiply** (alias: mul) | Given grids A and B, compute a * b per voxel |
 | **multires** | construct a LoD sequences of VDB trees with powers of two refinements |
-| **open** | morphological opening, i.e. erosion followed by dilation, of a level set surface by a fixed radius |
+| **open** (alias: openLS) | morphological opening, i.e. erosion followed by dilation, of a level set surface by a fixed radius |
 | **platonic** | Create a level set shape with the specified number of polygon faces |
-| **points2ls** | Convert geometry points into a narrow-band level set |
-| **points2vdb** | Encode geometry points into a VDB grid |
-| **print** | prints information to the terminal about the current stack of VDB grids and Geometry |
+| **points2ls** (aliases: points2sdf, p2l, pts2sdf) | Convert geometry points into a narrow-band level set |
+| **points2vdb** (alias: p2v) | Encode geometry points into a VDB grid |
+| **print** (alias: p) | prints information to the terminal about the current stack of VDB grids and Geometry |
 | **prune** | prune away inactive values in a VDB grid |
-| **quad2tri** | Convert all quads in mesh to triangles, assuming they are both planar and convex |
+| **quad2tri** (alias: q2t) | Convert all quads in mesh to triangles, assuming they are both planar and convex |
 | **quiet** | disable printing to the terminal |
-| **read** | Read one or more geometry or VDB files from disk or STDIN. |
+| **read** (aliases: import, load, i) | Read one or more geometry or VDB files from disk or STDIN. |
+| **rename** | Rename a VDB grid and/or Geometry on the stack by age index |
 | **render** | ray-tracing of level set surfaces and volume rendering of fog volumes |
 | **resample** | resample one VDB grid into another VDB grid or a transformation of the input grid |
 | **scatter** | Scatter point into the active values of an input VDB grid |
 | **sdf2udf** | Converts a signed distance field into an unsigned distance field, i.e. performs the Abs of all values and changes GridClass to UNKNOWN. |
 | **segment** | segment an input VDB into a list if topologically disconnected VDB grids |
+| **shrinkwrap** (aliases: soup2ls, soup2sdf; the aliases are deprecated) | Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
 | **slice** | Generate images of slices of a VDB grid |
-| **soup2offset** | Convert a polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh |
-| **soup2udf** | Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band |
 | **sphere** | Create a level set sphere, i.e. a narrow-band signed distance to a sphere |
+| **stats** | Print value statistics (min, max, mean, std. dev.) of active voxels for one or more VDB grids |
 | **sum** | Given grids A and B, compute sum(a, b) per voxel |
+| **swap** | Swap two VDB grids and/or two Geometry entries on their respective stacks |
 | **switch** | start of switch-scope. The selector value (on=) is compared against each enclosed -case's key; only the matching case body runs (or the '*'/'default' case if nothing else matched). Closed by -end. |
 | **transform** | apply affine transformations (uniform scale -> rotation -> translation) to a VDB grids and geometry |
 | **union** | CSG union of two level sets surfaces |
-| **vdb2points** | Extract points encoded in a VDB to points in a geometry format |
+| **vdb2points** (alias: v2p) | Extract points encoded in a VDB to points in a geometry format |
 | **verbose** | print timing information to the terminal |
 | **version** | write timing information to the terminal |
-| **vol2mesh** | Convert a scalar volume to an adaptive polygon mesh |
-| **write** | Write list of geometry, VDB or config files to disk or STDOUT |
+| **vol2mesh** (alias: vdb2mesh) | Convert a scalar volume to an adaptive polygon mesh |
+| **write** (aliases: export, save, o) | Write list of geometry, VDB or config files to disk or STDOUT |
 <!-- END AUTO-GENERATED ACTION TABLE -->
 
 For support, bug-reports or ideas for improvements please contact ken.museth@gmail.com
@@ -104,6 +113,20 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 | jpg | optional write | Binary JPEG image file |
 | exr | optional write | Binary OpenEXR image file |
 
+# Inspecting grids: -print vs -stats
+
+Two actions are available for inspecting grids on the stack, and they are intentionally complementary and non-overlapping:
+
+- **`-print`** reports *structural* metadata that is independent of voxel values: grid name, value type, grid class, active voxel count, voxel size, memory usage, and (at `level=1`) the active-voxel bounding box in index and world space plus tree node counts. Nothing printed by `-print` requires reading voxel data.
+
+- **`-stats`** reports *value-derived* information computed from the voxels themselves: background value, min, max, mean, standard deviation of active voxels, and — for level set grids — the world-space surface area and enclosed volume. All columns require touching voxel data.
+
+```bash
+vdb_tool -sphere -print          # structural: type, class, dim, voxels, dx, size
+vdb_tool -sphere -print level=1  # + bounding box and tree topology
+vdb_tool -sphere -stats          # value: background, min, max, mean, stddev, area, volume
+```
+
 # Terminology
 
 We introduce the following terms: **actions**, **options**, **expressions**, and **instructions**. Actions are high-level openvdb tools, which each have unique options, e.g. -mesh2ls geo=1 voxel=0.1, where "-mesh2ls" is an action with two options "geo" and "voxel". Expressions are strings of code with one or more low-level instructions in our stack-based programming language (see below). These expressions start with "{" and ends with "}", and ":" is used to separate values and instructions. E.g. {1:2:+} is an expression with two values (1 and 2) and one instruction "+", and it reduces to the string value "3". See section on the "Stack-based string expressions" below for more details.
@@ -116,19 +139,41 @@ Note that this tool maintains two stacks of primitives, namely geometry (i.e. po
 
 This tool supports its own light-weight stack-oriented programming language that is (very loosely) inspired by Forth. Specifically, it uses Reverse Polish Notation (RPN) to define instructions that are evaluated during paring of the command-line arguments (options to be precise). All such expressions start with the character "{", ends with "}", and arguments are separated by ":". Variables starting with "\$" are substituted by its (previously) defined values, and variables starting with "@" are stored in memory. So, "{1:2:+:@x}" is conceptually equivalent to "x = 1 + 2". Conversely, "{\$x:++}" is conceptually equivalent "2 + 1 = 3" since "x=2" was already saved to memory. This is especially useful in combination with loops, e.g. "-quiet -for i=1,3,1 -eval {\$i:++} -end" will print 2 and 3 to the terminal. Branching is also supported, e.g. "radius={$x:1:>:if(0.5:sin?0.3:cos)}" is conceptually equal to "if (x>1) radius=sin(0.5) else radius=cos(0.3)". See the root-searching example below or run vdb_tool -eval help="*" to see a list of all instructions currently supported by this scripting language. Note that since this language uses characters that are interpreted by most shells it is necessary to use single quotes around strings! This is of course not the case when using config files.
 
+# Execution and logging
+
+Ordinary action failures are reported and subsequent actions continue, but the
+process exits with a nonzero status if any action failed. `-errorOnWarning` stops
+at the first action failure. Errors in control-flow actions (`for`, `each`,
+`files`, `if`, `switch`, `case`, and `end`) always stop execution.
+
+Numeric `for` loops use an inclusive start and exclusive end. Positive and
+negative steps are supported, for example `-for i=3,0,-1` visits 3, 2, and 1.
+Steps must be finite, nonzero, and advance toward the end; a step too small to
+change the current value is reported as an error.
+
+Logging redirects diagnostic streams only. Binary stdout remains available to
+pipelines with either `-log tee=true` or `-log tee=false`.
+
 # Configuration file format
 
 vdb_tool can read and write configuration files (any extension is accepted, but the convention is `.txt`) that capture an entire action pipeline for replay or sharing. Run a saved config with `vdb_tool -config <file>`; produce one from the current command line by piping it to `-write file.txt`.
 
 The format is intentionally tiny and line-oriented:
 
-1. **The first line must be a version header**: `vdb_tool MAJOR.MINOR.PATCH` (e.g. `vdb_tool 10.8.0`). Loading fails if it's missing or the major version doesn't match the running tool.
+1. **The first line must be a version header**: `vdb_tool MAJOR.MINOR.PATCH` (e.g. `vdb_tool 10.9.0`). Loading fails if it's missing or the major version doesn't match the running tool.
 2. **One action per line**. The first non-whitespace token on each line is the action name; the leading `-` used on the command line is **implicit and must be omitted**.
 3. **Subsequent tokens on the same line are that action's options/values**, separated by whitespace. E.g. `sphere r=2 voxel=0.05` is a single action with two options.
-4. **Comments**: any text from `#` or `%` to the end of the line is stripped. A line whose first non-whitespace character is `#` or `%` is treated as a full-line comment.
+4. **Comments**: a line whose first non-whitespace character is `#` or `%` is a full-line comment. Inline `#` comments are stripped only outside `{...}` expressions and quoted text, preserving loop counters such as `{$#i}`. Within an action, `%` is the modulo operator, so `calc n = 5 % 2` evaluates to 1. Use `#` for inline comments previously introduced with `%`.
 5. **Leading and trailing whitespace are ignored**, so indenting nested control-flow scopes (`-for` / `-each` / `-files` / `-if` / `-switch` / `-case`) for readability has no effect on behavior.
 6. **No shell quoting is needed** — the line is parsed verbatim. Characters that would otherwise need escaping on the command line (`*`, `{`, `}`, `$`, `(`, `)` etc.) are written plain.
 7. **Blank lines are skipped.**
+8. **Line continuation with `\`** — a line ending in `\` is joined to the next line before parsing, allowing long action invocations to be split across multiple lines for readability:
+   ```
+   sphere \
+     voxel=0.1 \
+     radius=2.0 \
+     name=mysphere
+   ```
 
 Example: the [switch-statement example above](#switch-statement-to-pick-one-of-n-branches) written as a config file demonstrates all of these rules &mdash; one action per line, no leading `-`, nested scopes indented, and `key=*` unquoted.
 
@@ -521,7 +566,7 @@ git clone https://github.com/PixarAnimationStudios/OpenUSD.git
 python3 OpenUSD/build_scripts/build_usd.py \
     --no-imaging --no-usdview --no-alembic --no-draco --no-openimageio \
     --no-tutorials --no-examples ~/dev/src/openusd
-cmake -DOPENVDB_TOOL_USE_USD=ON -Dpxr_DIR=$HOME/local/openusd/lib/cmake/pxr ..
+cmake -DOPENVDB_TOOL_USE_USD=ON -Dpxr_DIR=$HOME/dev/openusd/lib/cmake/pxr ..
 ```
 
 For a slimmer build (skips Alembic, Draco, OpenImageIO, materials, imaging, etc., cutting build time substantially), pass `--no-imaging --no-alembic --no-draco --no-openimageio` to `build_usd.py`. vdb_tool only needs the core USD libraries (`usd`, `usdGeom`, `sdf`, `gf`, `vt`, `tf`).
@@ -749,7 +794,7 @@ Each `-case` opens its own scope closed by `-end`, and the outer `-switch` is cl
 The same example as a configuration file (`switch.txt`, run with `vdb_tool -config switch.txt`):
 
 ```
-vdb_tool 10.8.0
+vdb_tool 10.9.0
 for c=0,4
    switch {$c}
       case 0
@@ -841,7 +886,7 @@ vdb_tool -read mesh_mask.obj -mesh2ls voxel=0.1 width=3 -for n=200,300,1 -read p
 
 ## Example of a configuration file performing Particle-to-Mesh generation
 ```
-vdb_tool 10.8.0
+vdb_tool 10.9.0
 
 # 1. LOAD A MASK (Optional)
 # Used to clip the fluid so it doesn't leak out of the container
@@ -894,7 +939,7 @@ or as a config file:
 
 Same 200-sphere phyllotaxis spiral as the RPN config above, written with the more readable infix `-calc` syntax (one multi-statement kernel replaces seven sequential `-eval` calls). Notice how `x` and `y` already include the radial factor (`x = r*cos(a)`), so the sphere's `center=` doesn't need to multiply by `r` again as the RPN version does — the two examples are mathematically equivalent.
 ```
-vdb_tool 10.8.0
+vdb_tool 10.9.0
 for n=0,200,1
     # Multi-statement calc kernel. Reads `n` from for-loop memory; writes
     # back a, r, x, y. The final assignment `r = 0.5*(5+r)^0.25` reuses
@@ -912,7 +957,7 @@ render spiral.ppm image=1024x1024 translate=(0,0,40)
 ## Production example with complex math in a configuration file using RPN syntax
 This example, based on -eval vs -calc, is only included for completion! The example above using -calc is much more user-friendly.
 ```
-vdb_tool 10.8.0
+vdb_tool 10.9.0
 for n=0,200,1
     eval {$n:137.5:*:@deg}  # deg = 137.5 * n
     eval {$deg:d2r:@radian} # radian = d2r(deg)
@@ -929,4 +974,3 @@ end
 render spiral.ppm image=1024x1024 translate=(0,0,40)
 ```
 ---
-

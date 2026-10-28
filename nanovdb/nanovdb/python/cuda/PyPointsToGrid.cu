@@ -1,6 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 #include "PyPointsToGrid.h"
+#include "PyDeviceGridHandle.h"
 
 #include <nanobind/ndarray.h>
 
@@ -47,8 +48,7 @@ template<typename BuildT> void definePointsToGrid(nb::module_& m, const char* na
         [](nb::ndarray<int32_t, nb::shape<-1, 3>, nb::c_contig, nb::device::cuda> tensor) {
             NdArrayCoordPtr                            points(tensor.data(), tensor.stride(0), tensor.stride(1));
             nanovdb::tools::cuda::PointsToGrid<BuildT> converter;
-            auto                                       handle = converter.getHandle(points, tensor.shape(0));
-            return handle;
+            return DeviceGridHandle(converter.getHandle(points, tensor.shape(0), DeviceGridHandle::DeviceBufferT()));
         },
         "tensor"_a);
 }

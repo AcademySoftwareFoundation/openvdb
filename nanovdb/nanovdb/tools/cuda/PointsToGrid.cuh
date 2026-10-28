@@ -22,11 +22,22 @@
 #include <vector>
 #include <tuple>
 #include <cinttypes>
+#include <algorithm>
+#include <cmath> // for std::isfinite
+#include <cstddef> // for std::byte
+#include <stdexcept> // for std::invalid_argument
+#include <type_traits> // for the stream-argument check
+#include <iostream> // for std::cerr
+#include <limits> // for std::numeric_limits
+#include <string> // for std::string, std::to_string
+#include <utility> // for std::move
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/GridHandle.h>
+#include <nanovdb/cuda/HandleStorage.h>
+#include <nanovdb/cuda/GridHandle.cuh> // for merging the per-set grids in the point-set overloads
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
@@ -48,13 +59,14 @@ namespace tools::cuda {// ======================================================
 /// @param pointCount number of point in the list @c d_world
 /// @param voxelSize Size of a voxel in world units used for the output grid
 /// @param type Defined the way point information is represented in the output grid (see PointType enum NanoVDB.h)
-///             Should not be PointType::Disable!
+///             Must not be PointType::Disable
 /// @param buffer Instance of the device buffer used for memory allocation
 /// @param stream optional CUDA stream (defaults to CUDA stream 0)
 /// @return Returns a handle with a grid of type NanoGrid<Point> where point information, e.g. coordinates,
 ///         are represented as blind data defined by @c type.
-template<typename PtrT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
-GridHandle<BufferT>
+/// @throw std::invalid_argument if the point count is negative, or the voxel size is not positive and finite, or @c type is PointType::Disable
+template<typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
 pointsToGrid(const PtrT dWorldPoints,
              int pointCount,
              double voxelSize,
@@ -77,13 +89,14 @@ pointsToGrid(const PtrT dWorldPoints,
 /// @param maxIterations Maximum number of iterations used to search for a voxel size that produces a point density
 ///                      with specified tolerance takes.
 /// @param type Defined the way point information is represented in the output grid (see PointType enum in NanoVDB.h)
-///             Should not be PointType::Disable!
+///             Must not be PointType::Disable
 /// @param buffer Instance of the device buffer used for memory allocation
 /// @param stream optional CUDA stream (defaults to CUDA stream 0)
 /// @return Returns a handle with a grid of type NanoGrid<Point> where point information, e.g. coordinates,
 ///         are represented as blind data defined by @c type.
-template<typename PtrT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
-GridHandle<BufferT>
+/// @throw std::invalid_argument if the point count is negative, or the maximum points per voxel is not positive, or @c type is PointType::Disable
+template<typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
 pointsToGrid(const PtrT dWorldPoints,
              int pointCount,
              int maxPointPerVoxel,
@@ -95,9 +108,11 @@ pointsToGrid(const PtrT dWorldPoints,
 
 //-----------------------------------------------------------------------------------------------------
 
-template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
-GridHandle<BufferT>
-pointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> pointSet,
+/// @note An empty @c pointSet yields an empty handle, and a set without points an empty grid.
+/// @throw std::invalid_argument if any set's voxel size is not positive and finite, or its point type is PointType::Disable
+template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
+pointsToGrid(const std::vector<std::tuple<const PtrT,size_t,double,PointType>> &pointSet,
             const BufferT &buffer = BufferT(),
             cudaStream_t stream = 0);
 
@@ -115,8 +130,9 @@ pointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> pointSe
 /// @param voxelSize Size of a voxel in world units used for the output grid
 /// @param buffer Instance of the device buffer used for memory allocation
 /// @return Returns a handle with the grid of type NanoGrid<BuildT>
-template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
-GridHandle<BufferT>
+/// @throw std::invalid_argument if the voxel size is not positive and finite
+template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
 voxelsToGrid(const PtrT dGridVoxels,
              size_t voxelCount,
              double voxelSize = 1.0,
@@ -125,11 +141,80 @@ voxelsToGrid(const PtrT dGridVoxels,
 
 //-------------------------------------------------------------------------------------------------------
 
-template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
-GridHandle<BufferT>
-voxelsToGrid(std::vector<std::tuple<const PtrT, size_t, double>> pointSet,
+/// @note An empty @c pointSet yields an empty handle, and a set without points an empty grid.
+/// @throw std::invalid_argument if any set's voxel size is not positive and finite
+template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
+voxelsToGrid(const std::vector<std::tuple<const PtrT, size_t, double>> &pointSet,
              const BufferT &buffer = BufferT(),
              cudaStream_t stream = 0);
+
+//-------------------------------------------------------------------------------------------------------
+
+/// @brief Resource form of voxelsToGrid: the output and all internal scratch
+///        allocate through @c resource, on @c stream. Passing a cudaStream_t, or a
+///        non-buffer type that converts to one, selects this form (a literal 0 does not: write cudaStream_t(0)); the
+///        prototype-buffer form above keeps its call shape.
+/// @tparam ResourceT stream-ordered memory resource, held by value (a copy of
+///         default_resource<ResourceT>() when omitted); pass a
+///         cuda::ResourceRef<R> to allocate through a borrowed instance
+/// @return a handle over cuda::Buffer<std::byte, ResourceT> on the device
+/// @throw std::invalid_argument if the voxel size is not positive and finite
+template<typename BuildT, typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
+typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+voxelsToGrid(const PtrT dGridVoxels,
+             size_t voxelCount,
+             double voxelSize,
+             cudaStream_t stream,
+             ResourceT resource = nanovdb::cuda::default_resource<ResourceT>());
+
+/// @brief Resource form of pointsToGrid for a fixed voxel size; see the
+///        resource form of voxelsToGrid.
+/// @throw std::invalid_argument if the point count is negative, or the voxel size is not positive and finite, or @c type is PointType::Disable
+template<typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
+typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+pointsToGrid(const PtrT dWorldPoints,
+             int pointCount,
+             double voxelSize,
+             PointType type,
+             cudaStream_t stream,
+             ResourceT resource = nanovdb::cuda::default_resource<ResourceT>());
+
+/// @brief Resource form of pointsToGrid targeting a maximum point density;
+///        see the resource form of voxelsToGrid.
+/// @throw std::invalid_argument if the point count is negative, or the maximum points per voxel is not positive, or @c type is PointType::Disable
+template<typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
+typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+pointsToGrid(const PtrT dWorldPoints,
+             int pointCount,
+             int maxPointsPerVoxel,
+             int tolerance,
+             int maxIterations,
+             PointType type,
+             cudaStream_t stream,
+             ResourceT resource = nanovdb::cuda::default_resource<ResourceT>());
+
+/// @brief Resource form of pointsToGrid over a point set: one grid per set,
+///        merged into one handle; see the single-set resource form of
+///        voxelsToGrid above.
+/// @note An empty @c pointSet yields an empty handle, and a set without points an empty grid.
+/// @throw std::invalid_argument if any set's voxel size is not positive and finite, or its point type is PointType::Disable
+template<typename BuildT, typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
+typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+pointsToGrid(const std::vector<std::tuple<const PtrT,size_t,double,PointType>> &pointSet,
+             cudaStream_t stream,
+             ResourceT resource = nanovdb::cuda::default_resource<ResourceT>());
+
+/// @brief Resource form of voxelsToGrid over a voxel set: one grid per set,
+///        merged into one handle; see the single-set resource form of
+///        voxelsToGrid above.
+/// @note An empty @c pointSet yields an empty handle, and a set without points an empty grid.
+/// @throw std::invalid_argument if any set's voxel size is not positive and finite
+template<typename BuildT, typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
+typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+voxelsToGrid(const std::vector<std::tuple<const PtrT, size_t, double>> &pointSet,
+             cudaStream_t stream,
+             ResourceT resource = nanovdb::cuda::default_resource<ResourceT>());
 
 }// namespace tools::cuda ========================================================================
 
@@ -196,7 +281,7 @@ struct pointer_traits {
 template<typename Vec3T>
 __hostdev__ inline static void worldToVoxel(Vec3u8 &voxel, const Vec3T &world, const Map &indexToWorld)
 {
-    const Vec3d ijk = indexToWorld.applyInverseMap(world);// world -> index
+    const Vec3d ijk = Vec3d(indexToWorld.applyInverseMap(world));// world -> index
     static constexpr double encode = double((1<<8) - 1);
     voxel[0] = uint8_t( encode*(ijk[0] - math::Floor(ijk[0] + 0.5) + 0.5) );
     voxel[1] = uint8_t( encode*(ijk[1] - math::Floor(ijk[1] + 0.5) + 0.5) );
@@ -211,7 +296,7 @@ __hostdev__ inline static void worldToVoxel(Vec3u8 &voxel, const Vec3T &world, c
 template<typename Vec3T>
 __hostdev__ inline static void worldToVoxel(Vec3u16 &voxel, const Vec3T &world, const Map &indexToWorld)
 {
-    const Vec3d ijk = indexToWorld.applyInverseMap(world);// world -> index
+    const Vec3d ijk = Vec3d(indexToWorld.applyInverseMap(world));// world -> index
     static constexpr double encode = double((1<<16) - 1);
     voxel[0] = uint16_t( encode*(ijk[0] - math::Floor(ijk[0] + 0.5) + 0.5) );
     voxel[1] = uint16_t( encode*(ijk[1] - math::Floor(ijk[1] + 0.5) + 0.5) );
@@ -226,7 +311,7 @@ __hostdev__ inline static void worldToVoxel(Vec3u16 &voxel, const Vec3T &world, 
 template<typename Vec3T>
 __hostdev__ inline static void worldToVoxel(Vec3f &voxel, const Vec3T &world, const Map &indexToWorld)
 {
-    const Vec3d ijk = indexToWorld.applyInverseMap(world);// world -> index
+    const Vec3d ijk = Vec3d(indexToWorld.applyInverseMap(world));// world -> index
     voxel[0] = float( ijk[0] - math::Floor(ijk[0] + 0.5) );
     voxel[1] = float( ijk[1] - math::Floor(ijk[1] + 0.5) );
     voxel[2] = float( ijk[2] - math::Floor(ijk[2] + 0.5) );
@@ -291,43 +376,85 @@ struct PointsToGridData {
 };// PointsToGridData
 
 
+namespace detail {
+
+/// @brief Argument checks for the PointsToGrid constructors (map, voxel size,
+///        density target) and the pointsToGrid free functions (point count).
+inline double checkVoxelSize(double voxelSize, const char* tool)
+{
+    if (!(voxelSize > 0.0) || !std::isfinite(voxelSize))
+        throw std::invalid_argument(std::string(tool) + ": voxel size must be positive and finite");
+    return voxelSize;
+}
+inline void checkMap(const Map& map, const char* tool)
+{
+    const double* m = map.mMatD;
+    const double det = m[0]*(m[4]*m[8] - m[5]*m[7]) - m[1]*(m[3]*m[8] - m[5]*m[6]) + m[2]*(m[3]*m[7] - m[4]*m[6]);
+    if (!(det != 0.0) || !std::isfinite(det))
+        throw std::invalid_argument(std::string(tool) + ": the map must be invertible and finite");
+}
+inline void checkPointCount(int pointCount, const char* tool)
+{
+    if (pointCount < 0) throw std::invalid_argument(std::string(tool) + ": negative point count");
+}
+inline void checkMaxPointsPerVoxel(int maxPointsPerVoxel, const char* tool)
+{
+    if (maxPointsPerVoxel <= 0) throw std::invalid_argument(std::string(tool) + ": maximum points per voxel must be positive");
+}
+
+}// namespace detail
+
 template<typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class PointsToGrid
 {
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "PointsToGrid allocates stream-ordered scratch and requires an AsyncResource");
 public:
     /// @brief Map constructor, which other constructors might call
     /// @param map Map to be used for the output device grid
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
+    /// @throw std::invalid_argument if @c map is singular or not finite
     PointsToGrid(const Map &map, cudaStream_t stream = 0, ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
-        : mStream(stream)
+        : mStream((detail::checkMap(map, "PointsToGrid"), stream))
         , mResource(&resource)
         , mTimer(stream)
         , mPointType(util::is_same<BuildT,Point>::value ? PointType::Default : PointType::Disable)
+        , mDeviceDataBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 1, nanovdb::cuda::noInit)
+        , mKeysBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
+        , mTileKeysBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
+        , mLeafKeysBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
+        , mLowerKeysBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
+        , mIndxBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
+        , mPointsPerVoxelBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
+        , mPointsPerVoxelPrefixBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
+        , mPointsPerLeafBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
+        , mPointsPerLeafPrefixBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
         , mTempDevicePool(resource)
     {
         mData.map = map;
-        mDeviceData = static_cast<PointsToGridData<BuildT>*>(mResource->allocate_async(sizeof(PointsToGridData<BuildT>), ResourceT::DEFAULT_ALIGNMENT, mStream));
+        mDeviceData = mDeviceDataBuf.data();
     }
 
     /// @brief Default constructor that calls the Map constructor defined above
     /// @param scale Voxel size in world units
     /// @param trans Translation of origin in world units
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
+    /// @throw std::invalid_argument if @c scale is not positive
     PointsToGrid(const double scale = 1.0, const Vec3d &trans = Vec3d(0.0), cudaStream_t stream = 0, ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
-        : PointsToGrid(Map(scale, trans), stream, resource){}
+        : PointsToGrid(Map(detail::checkVoxelSize(scale, "PointsToGrid"), trans), stream, resource){}
 
     /// @brief Constructor from a target maximum number of particles per voxel. Calls the Map constructor defined above
     /// @param maxPointsPerVoxel Maximum number of points oer voxel
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
+    /// @throw std::invalid_argument if @c maxPointsPerVoxel is not positive
     PointsToGrid(int maxPointsPerVoxel, int tolerance = 1, int maxIterations = 10, cudaStream_t stream = 0, ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
-        : PointsToGrid(Map(1.0), stream, resource)
+        : PointsToGrid((detail::checkMaxPointsPerVoxel(maxPointsPerVoxel, "PointsToGrid"), Map(1.0)), stream, resource)
     {
         mMaxPointsPerVoxel = maxPointsPerVoxel;
         mTolerance = tolerance;
         mMaxIterations = maxIterations;
     }
 
-    ~PointsToGrid(){ mResource->deallocate_async(mDeviceData, sizeof(PointsToGridData<BuildT>), ResourceT::DEFAULT_ALIGNMENT, mStream); }
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -341,9 +468,14 @@ public:
     /// @param name name of the output grid
     void setGridName(const std::string &name) {mGridName = name;}
 
-    // only available when BuildT == Point
+    /// @brief Set how the output grid represents the points, only available when BuildT == Point
+    /// @throw std::invalid_argument if @c type is PointType::Disable, which would leave a point grid without points
     template<typename T = BuildT> typename util::enable_if<util::is_same<T, Point>::value>::type
-    setPointType(PointType type) { mPointType = type; }
+    setPointType(PointType type)
+    {
+        if (type == PointType::Disable) throw std::invalid_argument("PointsToGrid<Point>: the point type must not be PointType::Disable");
+        mPointType = type;
+    }
 
     /// @brief Creates a handle to a grid with the specified build type from a list of points in index or world space
     /// @tparam BuildT Build type of the output grid, i.e NanoGrid<BuildT>
@@ -351,12 +483,27 @@ public:
     /// @tparam BufferT Buffer type used for allocation of the grid handle
     /// @param points device point to an array of points in world space
     /// @param pointCount number of input points or voxels
-    /// @param buffer optional buffer (currently ignored)
+    /// @param buffer prototype buffer whose resource (or create() pool) allocates the output
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
-    template<typename PtrT, typename BufferT = nanovdb::cuda::DeviceBuffer>
+    /// @note An empty input (@c pointCount == 0) yields a valid empty grid.
+    template<typename PtrT, typename BufferT = nanovdb::cuda::DualDeviceBuffer>
     GridHandle<BufferT> getHandle(const PtrT points,
                                   size_t pointCount,
                                   const BufferT &buffer = BufferT());
+
+    /// @brief Resource form of getHandle: the grid allocates through this
+    ///        builder's resource, the one its scratch uses, on its stream.
+    /// @return a handle over cuda::Buffer<std::byte, ResourceRef<ResourceT>>,
+    ///         which borrows the resource: it must outlive the handle
+    /// @param points device point to an array of points in world space
+    /// @param pointCount number of input points or voxels
+    /// @note An empty input (@c pointCount == 0) yields a valid empty grid.
+    template<typename PtrT>
+    GridHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>> build(const PtrT points, size_t pointCount)
+    {
+        using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
+        return this->getHandle(points, pointCount, BufferT(mStream, this->ref(), 0, nanovdb::cuda::noInit));
+    }
 
     template<typename PtrT>
     void countNodes(const PtrT points, size_t pointCount);
@@ -373,6 +520,13 @@ public:
     template<typename PtrT>
     void processPoints(const PtrT points, size_t pointCount);
 
+    // Only instantiated when BuildT == Point, from the corresponding branch of
+    // processPoints. Holds the encode kernels because nvcc rejects an extended
+    // lambda defined directly inside the block of an if constexpr statement on
+    // some host compilers.
+    template<typename PtrT>
+    void encodePoints(const PtrT points, size_t pointCount);
+
     void processBBox();
 
     // the following methods are only defined when BuildT == Point
@@ -385,13 +539,26 @@ private:
     static constexpr unsigned int mNumThreads = 128;// seems faster than the old value of 256!
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
+    template<typename T>
+    using BufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ResourceRef<ResourceT>>;
+    nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::detail::borrowInternal(*mResource); }
+
     cudaStream_t             mStream{0};
     ResourceT*               mResource;// non-owning; all device allocations (mDeviceData + scratch) route through this resource instance
     util::cuda::Timer        mTimer;
     PointType                mPointType;
     std::string              mGridName;
     int                      mVerbose{0};
-    PointsToGridData<BuildT> mData, *mDeviceData;
+    PointsToGridData<BuildT> mData, *mDeviceData;// mDeviceData views mDeviceDataBuf
+    // Owners of the device arrays that mData's raw pointers view. Raw views are
+    // refreshed immediately after every owner event (assign, swap, destroy), so
+    // the views -- including the device-visible fields inside mData -- are
+    // never stale. Members rather than locals because the pipeline frees them
+    // across member functions (countNodes allocates; processUpperNodes,
+    // processLeafNodes, processPoints and processBBox release).
+    BufT<PointsToGridData<BuildT>> mDeviceDataBuf;
+    BufT<uint64_t>           mKeysBuf, mTileKeysBuf, mLeafKeysBuf, mLowerKeysBuf;
+    BufT<uint32_t>           mIndxBuf, mPointsPerVoxelBuf, mPointsPerVoxelPrefixBuf, mPointsPerLeafBuf, mPointsPerLeafPrefixBuf;
     uint32_t                 mMaxPointsPerVoxel{0u}, mMaxPointsPerLeaf{0u};
     int                      mTolerance{1}, mMaxIterations{1};
     CheckMode                mChecksum{CheckMode::Disable};
@@ -482,24 +649,26 @@ PointsToGrid<BuildT, ResourceT>::getHandle(const PtrT points,
     if (mVerbose==1) mTimer.restart("Process grid,tree,root");
     this->processGridTreeRoot(points, pointCount);
 
-    if (mVerbose==1) mTimer.restart("Process upper nodes");
-    this->processUpperNodes();
+    if (pointCount > 0) {// no points: the headers alone form a valid empty grid
+        if (mVerbose==1) mTimer.restart("Process upper nodes");
+        this->processUpperNodes();
 
-    if (mVerbose==1) mTimer.restart("Process lower nodes");
-    this->processLowerNodes();
+        if (mVerbose==1) mTimer.restart("Process lower nodes");
+        this->processLowerNodes();
 
-    if (mVerbose==1) mTimer.restart("Process leaf nodes");
-    this->processLeafNodes(pointCount);
+        if (mVerbose==1) mTimer.restart("Process leaf nodes");
+        this->processLeafNodes(pointCount);
 
-    if (mVerbose==1) mTimer.restart("Process points");
-    this->processPoints(points, pointCount);
+        if (mVerbose==1) mTimer.restart("Process points");
+        this->processPoints(points, pointCount);
 
-    if (mVerbose==1) mTimer.restart("Process bbox");
-    this->processBBox();
+        if (mVerbose==1) mTimer.restart("Process bbox");
+        this->processBBox();
+    }
     if (mVerbose==1) mTimer.stop();
 
     if (mVerbose==1) mTimer.restart("Computation of checksum");
-    tools::cuda::updateChecksum((GridData*)buffer.deviceData(), mChecksum, mStream);
+    tools::cuda::updateChecksum((GridData*)nanovdb::cuda::detail::deviceStorageData(buffer), mChecksum, mStream);
     if (mVerbose==1) mTimer.stop();
 
     cudaStreamSynchronize(mStream);
@@ -594,6 +763,12 @@ void PointsToGrid<BuildT, ResourceT>::countNodes(const PtrT points, size_t point
     } else {
         static_assert(util::is_same<Vec3T, Coord, Vec3f, Vec3d>::value, "Voxel coordinates should be represented as Coord, Vec3f or Vec3d");
     }
+    if (pointCount == 0) {// no points: no nodes and no voxels
+        mData.nodeCount[0] = mData.nodeCount[1] = mData.nodeCount[2] = 0;
+        mData.voxelCount = 0;
+        mMaxPointsPerLeaf = 0u;
+        return;
+    }
 
     mMaxPointsPerVoxel = math::Min(mMaxPointsPerVoxel, pointCount);
     int iterCounter = 0;
@@ -603,126 +778,165 @@ void PointsToGrid<BuildT, ResourceT>::countNodes(const PtrT points, size_t point
         bool operator<(const Foo &rhs) const {return density < rhs.density || (density == rhs.density && dx < rhs.dx);}
     } min{0.0, 1}, max{0.0, 0};// min: as dx -> 0 density -> 1 point per voxel, max: density is 0 i.e. undefined
 
-jump:// this marks the beginning of the actual algorithm
+    // Declared ahead of the search loop below: d_keys and d_node_count carry
+    // results past it, and the event is recorded and re-used across iterations
+    // (previously it was re-created per iteration, leaking the prior handle).
+    BufT<uint64_t> keysScratch(mStream, this->ref(), 0, nanovdb::cuda::noInit);
+    BufT<uint32_t> indxScratch(mStream, this->ref(), 0, nanovdb::cuda::noInit);
+    BufT<uint32_t> nodeCountScratch(mStream, this->ref(), 0, nanovdb::cuda::noInit);
+    uint64_t *d_keys = nullptr;
+    uint32_t *d_indx = nullptr, *d_points_per_tile = nullptr, *d_node_count = nullptr;
+    // Owns the copy event so the too-many-points-per-leaf throw below cannot
+    // leak the handle.
+    struct EventGuard {
+        cudaEvent_t event;
+        EventGuard() { cudaCheck(cudaEventCreate(&event)); }
+        ~EventGuard() { cudaCheck(cudaEventDestroy(event)); }
+        EventGuard(const EventGuard&) = delete;
+        EventGuard& operator=(const EventGuard&) = delete;
+    } eventGuard;
+    cudaEvent_t copyEvent = eventGuard.event;
 
-    mData.d_keys = static_cast<uint64_t*>(mResource->allocate_async(pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    mData.d_indx = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));// uint32_t can index 4.29 billion Coords, corresponding to 48 GB
-    cudaCheck(cudaMemcpyAsync(mDeviceData, &mData, sizeof(PointsToGridData<BuildT>), cudaMemcpyHostToDevice, mStream));// copy mData from CPU -> GPU
+    // Bisection search for the voxel size dx that yields the target point
+    // density: each iteration builds tile and voxel keys at the current dx,
+    // then either converges or frees this iteration's buffers and retries.
+    while (true) {
 
-    if (mVerbose==2) mTimer.start("\nAllocating arrays for keys and indices");
-    auto *d_keys = static_cast<uint64_t*>(mResource->allocate_async(pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    auto *d_indx = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+        mKeysBuf = BufT<uint64_t>(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
+        mIndxBuf = BufT<uint32_t>(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);// uint32_t can index 4.29 billion Coords, corresponding to 48 GB
+        mData.d_keys = mKeysBuf.data();
+        mData.d_indx = mIndxBuf.data();
+        cudaCheck(cudaMemcpyAsync(mDeviceData, &mData, sizeof(PointsToGridData<BuildT>), cudaMemcpyHostToDevice, mStream));// copy mData from CPU -> GPU
 
-    if (mVerbose==2) mTimer.restart("Generate tile keys");
-    util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, TileKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_keys, d_indx);
-    cudaCheckError();
-    if (mVerbose==2) mTimer.restart("DeviceRadixSort of "+std::to_string(pointCount)+" tile keys");
-    CALL_CUBS(DeviceRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, pointCount, 0, 63);// 21 bits per coord
-    std::swap(d_indx, mData.d_indx);// sorted indices are now in d_indx
+        if (mVerbose==2) mTimer.start("\nAllocating arrays for keys and indices");
+        keysScratch = BufT<uint64_t>(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
+        indxScratch = BufT<uint32_t>(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
+        d_keys = keysScratch.data();
+        d_indx = indxScratch.data();
 
-    if (mVerbose==2) mTimer.restart("Allocate runs");
-    auto *d_points_per_tile = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    uint32_t *d_node_count  = static_cast<uint32_t*>(mResource->allocate_async(3*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-
-    if (mVerbose==2) mTimer.restart("DeviceRunLengthEncode tile keys");
-    CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, d_points_per_tile, d_node_count+2, pointCount);
-    cudaCheck(cudaMemcpyAsync(mData.nodeCount+2, d_node_count+2, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-    cudaCheck(cudaStreamSynchronize(mStream));
-    mData.d_tile_keys = static_cast<uint64_t*>(mResource->allocate_async(mData.nodeCount[2]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    cudaCheck(cudaMemcpyAsync(mData.d_tile_keys, d_keys, mData.nodeCount[2]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
-
-    static constexpr uint32_t SEGMENTED_SORT_TILE_THRESHOLD = 32;
-    if (mData.nodeCount[2] >= SEGMENTED_SORT_TILE_THRESHOLD) {
-        // Bulk segmented sort: one kernel launch + one segmented radix sort (faster for many tiles)
-        if (mVerbose==2) mTimer.restart("Segmented radix sort of " + std::to_string(pointCount) + " voxel keys in " + std::to_string(mData.nodeCount[2]) + " tiles");
-        auto *d_tile_offsets = static_cast<uint32_t*>(mResource->allocate_async((mData.nodeCount[2]+1)*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-        cudaCheck(cudaMemsetAsync(d_tile_offsets, 0, sizeof(uint32_t), mStream));
-        CALL_CUBS(DeviceScan::InclusiveSum, d_points_per_tile, d_tile_offsets + 1, mData.nodeCount[2]);
-        mResource->deallocate_async(d_points_per_tile, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-
-        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, BulkVoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_tile_offsets, mData.nodeCount[2], d_keys, d_indx, uint32_t(0));
+        if (mVerbose==2) mTimer.restart("Generate tile keys");
+        util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, TileKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_keys, d_indx);
         cudaCheckError();
-        CALL_CUBS(DeviceSegmentedRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, (int)pointCount, (int)mData.nodeCount[2], d_tile_offsets, d_tile_offsets + 1, 0, 36);
-        mResource->deallocate_async(d_tile_offsets, (mData.nodeCount[2]+1)*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-    } else {
-        // Serial per-tile sort: individual kernel + sort per tile (lower overhead for few tiles)
-        if (mVerbose==2) mTimer.restart("DeviceRadixSort of " + std::to_string(pointCount) + " voxel keys in " + std::to_string(mData.nodeCount[2]) + " tiles");
-        uint32_t *points_per_tile = new uint32_t[mData.nodeCount[2]];
-        cudaCheck(cudaMemcpyAsync(points_per_tile, d_points_per_tile, mData.nodeCount[2]*sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-        mResource->deallocate_async(d_points_per_tile, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-        for (uint32_t id = 0, offset = 0; id < mData.nodeCount[2]; ++id) {
-            const uint32_t count = points_per_tile[id];
-            util::cuda::offsetLambdaKernel<<<numBlocks(count), mNumThreads, 0, mStream>>>(count, offset, VoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, id, d_keys, d_indx);
+        if (mVerbose==2) mTimer.restart("DeviceRadixSort of "+std::to_string(pointCount)+" tile keys");
+        CALL_CUBS(DeviceRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, pointCount, 0, 63);// 21 bits per coord
+        mIndxBuf.swap(indxScratch);// the sorted indices' owner is now indxScratch
+        d_indx = indxScratch.data();// sorted indices
+        mData.d_indx = mIndxBuf.data();// receives the voxel-sorted indices below
+
+        if (mVerbose==2) mTimer.restart("Allocate runs");
+        BufT<uint32_t> pointsPerTileScratch(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
+        d_points_per_tile = pointsPerTileScratch.data();
+        nodeCountScratch = BufT<uint32_t>(mStream, this->ref(), 3, nanovdb::cuda::noInit);
+        d_node_count = nodeCountScratch.data();
+
+        if (mVerbose==2) mTimer.restart("DeviceRunLengthEncode tile keys");
+        CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, d_points_per_tile, d_node_count+2, pointCount);
+        cudaCheck(cudaMemcpyAsync(mData.nodeCount+2, d_node_count+2, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
+        cudaCheck(cudaStreamSynchronize(mStream));
+        mTileKeysBuf = BufT<uint64_t>(mStream, this->ref(), mData.nodeCount[2], nanovdb::cuda::noInit);
+        mData.d_tile_keys = mTileKeysBuf.data();
+        cudaCheck(cudaMemcpyAsync(mData.d_tile_keys, d_keys, mData.nodeCount[2]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
+
+        static constexpr uint32_t SEGMENTED_SORT_TILE_THRESHOLD = 32;
+        if (mData.nodeCount[2] >= SEGMENTED_SORT_TILE_THRESHOLD) {
+            // Bulk segmented sort: one kernel launch + one segmented radix sort (faster for many tiles)
+            if (mVerbose==2) mTimer.restart("Segmented radix sort of " + std::to_string(pointCount) + " voxel keys in " + std::to_string(mData.nodeCount[2]) + " tiles");
+            BufT<uint32_t> tileOffsetsScratch(mStream, this->ref(), mData.nodeCount[2]+1, nanovdb::cuda::noInit);
+            auto *d_tile_offsets = tileOffsetsScratch.data();
+            cudaCheck(cudaMemsetAsync(d_tile_offsets, 0, sizeof(uint32_t), mStream));
+            CALL_CUBS(DeviceScan::InclusiveSum, d_points_per_tile, d_tile_offsets + 1, mData.nodeCount[2]);
+            pointsPerTileScratch.destroy(); d_points_per_tile = nullptr;
+
+            util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, BulkVoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, d_tile_offsets, mData.nodeCount[2], d_keys, d_indx, uint32_t(0));
             cudaCheckError();
-            CALL_CUBS(DeviceRadixSort::SortPairs, d_keys + offset, mData.d_keys + offset, d_indx + offset, mData.d_indx + offset, count, 0, 36);
-            offset += count;
-        }
-        delete [] points_per_tile;
-    }
-    mResource->deallocate_async(d_indx, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-
-    if (mVerbose==2) mTimer.restart("Count points per voxel");
-
-    cudaEvent_t copyEvent;
-    cudaCheck(cudaEventCreate(&copyEvent));
-    mData.pointsPerVoxel    = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    uint32_t *d_voxel_count = static_cast<uint32_t*>(mResource->allocate_async(sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-    CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, mData.pointsPerVoxel, d_voxel_count, pointCount);
-    cudaCheck(cudaMemcpyAsync(&mData.voxelCount, d_voxel_count, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-    cudaCheck(cudaEventRecord(copyEvent, mStream));
-    mResource->deallocate_async(d_voxel_count, sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-
-    if (util::is_same<BuildT, Point>::value) {
-        if (mVerbose==2) mTimer.restart("Count max points per voxel");
-        uint32_t *d_maxPointsPerVoxel = static_cast<uint32_t*>(mResource->allocate_async(sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream)), maxPointsPerVoxel;
-        cudaCheck(cudaEventSynchronize(copyEvent));
-        CALL_CUBS(DeviceReduce::Max, mData.pointsPerVoxel, d_maxPointsPerVoxel, mData.voxelCount);
-        cudaCheck(cudaMemcpyAsync(&maxPointsPerVoxel, d_maxPointsPerVoxel, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
-        cudaCheck(cudaEventRecord(copyEvent, mStream));
-        mResource->deallocate_async(d_maxPointsPerVoxel, sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-        double dx = mData.map.getVoxelSize()[0];
-        cudaCheck(cudaEventSynchronize(copyEvent));
-        if (++iterCounter >= mMaxIterations || pointCount == 1u || math::Abs((int)maxPointsPerVoxel - (int)mMaxPointsPerVoxel) <= mTolerance) {
-            mMaxPointsPerVoxel = maxPointsPerVoxel;
+            CALL_CUBS(DeviceSegmentedRadixSort::SortPairs, d_keys, mData.d_keys, d_indx, mData.d_indx, (int)pointCount, (int)mData.nodeCount[2], d_tile_offsets, d_tile_offsets + 1, 0, 36);
         } else {
-            const Foo tmp{dx, maxPointsPerVoxel};
-            if (maxPointsPerVoxel < mMaxPointsPerVoxel) {
-                if (min < tmp) min = tmp;
-            } else if (max.density == 0 || tmp < max) {
-                max = tmp;
+            // Serial per-tile sort: individual kernel + sort per tile (lower overhead for few tiles)
+            if (mVerbose==2) mTimer.restart("DeviceRadixSort of " + std::to_string(pointCount) + " voxel keys in " + std::to_string(mData.nodeCount[2]) + " tiles");
+            uint32_t *points_per_tile = new uint32_t[mData.nodeCount[2]];
+            cudaCheck(cudaMemcpyAsync(points_per_tile, d_points_per_tile, mData.nodeCount[2]*sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
+            pointsPerTileScratch.destroy(); d_points_per_tile = nullptr;
+            for (uint32_t id = 0, offset = 0; id < mData.nodeCount[2]; ++id) {
+                const uint32_t count = points_per_tile[id];
+                util::cuda::offsetLambdaKernel<<<numBlocks(count), mNumThreads, 0, mStream>>>(count, offset, VoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, id, d_keys, d_indx);
+                cudaCheckError();
+                CALL_CUBS(DeviceRadixSort::SortPairs, d_keys + offset, mData.d_keys + offset, d_indx + offset, mData.d_indx + offset, count, 0, 36);
+                offset += count;
             }
-            if (max.density) {
-                dx = (min.dx*(max.density - mMaxPointsPerVoxel) + max.dx*(mMaxPointsPerVoxel-min.density))/double(max.density-min.density);
-            } else if (maxPointsPerVoxel > 1u) {
-                dx *= (mMaxPointsPerVoxel-1.0)/(maxPointsPerVoxel-1.0);
-            } else {// maxPointsPerVoxel = 1 so increase dx significantly
-                dx *= 10.0;
-            }
-            if (mVerbose==2) printf("\ntarget density = %" PRIu32 ", current density = %" PRIu32 ", current dx = %f, next dx = %f\n", mMaxPointsPerVoxel, maxPointsPerVoxel, tmp.dx, dx);
-            mData.map = Map(dx);
-            mResource->deallocate_async(mData.d_keys, pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            mResource->deallocate_async(mData.d_indx, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            mResource->deallocate_async(d_keys, pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            mResource->deallocate_async(mData.d_tile_keys, mData.nodeCount[2]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            mResource->deallocate_async(d_node_count, 3*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            mResource->deallocate_async(mData.pointsPerVoxel, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-            goto jump;
+            delete [] points_per_tile;
         }
-    }
+        indxScratch.destroy(); d_indx = nullptr;// tile-order copy, superseded by the voxel sort
+
+        if (mVerbose==2) mTimer.restart("Count points per voxel");
+
+        mPointsPerVoxelBuf = BufT<uint32_t>(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
+        mData.pointsPerVoxel = mPointsPerVoxelBuf.data();
+        BufT<uint32_t> voxelCountScratch(mStream, this->ref(), 1, nanovdb::cuda::noInit);
+        uint32_t *d_voxel_count = voxelCountScratch.data();
+        CALL_CUBS(DeviceRunLengthEncode::Encode, mData.d_keys, d_keys, mData.pointsPerVoxel, d_voxel_count, pointCount);
+        cudaCheck(cudaMemcpyAsync(&mData.voxelCount, d_voxel_count, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
+        cudaCheck(cudaEventRecord(copyEvent, mStream));
+        voxelCountScratch.destroy(); d_voxel_count = nullptr;
+
+        if (util::is_same<BuildT, Point>::value) {
+            if (mVerbose==2) mTimer.restart("Count max points per voxel");
+            BufT<uint32_t> maxPointsPerVoxelScratch(mStream, this->ref(), 1, nanovdb::cuda::noInit);
+            uint32_t *d_maxPointsPerVoxel = maxPointsPerVoxelScratch.data(), maxPointsPerVoxel;
+            cudaCheck(cudaEventSynchronize(copyEvent));
+            CALL_CUBS(DeviceReduce::Max, mData.pointsPerVoxel, d_maxPointsPerVoxel, mData.voxelCount);
+            cudaCheck(cudaMemcpyAsync(&maxPointsPerVoxel, d_maxPointsPerVoxel, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
+            cudaCheck(cudaEventRecord(copyEvent, mStream));
+            maxPointsPerVoxelScratch.destroy(); d_maxPointsPerVoxel = nullptr;
+            double dx = mData.map.getVoxelSize()[0];
+            cudaCheck(cudaEventSynchronize(copyEvent));
+            if (++iterCounter >= mMaxIterations || pointCount == 1u || math::Abs((int)maxPointsPerVoxel - (int)mMaxPointsPerVoxel) <= mTolerance) {
+                mMaxPointsPerVoxel = maxPointsPerVoxel;
+            } else {
+                const Foo tmp{dx, maxPointsPerVoxel};
+                if (maxPointsPerVoxel < mMaxPointsPerVoxel) {
+                    if (min < tmp) min = tmp;
+                } else if (max.density == 0 || tmp < max) {
+                    max = tmp;
+                }
+                if (max.density) {
+                    dx = (min.dx*(max.density - mMaxPointsPerVoxel) + max.dx*(mMaxPointsPerVoxel-min.density))/double(max.density-min.density);
+                } else if (maxPointsPerVoxel > 1u) {
+                    dx *= (mMaxPointsPerVoxel-1.0)/(maxPointsPerVoxel-1.0);
+                } else {// maxPointsPerVoxel = 1 so increase dx significantly
+                    dx *= 10.0;
+                }
+                if (mVerbose==2) printf("\ntarget density = %" PRIu32 ", current density = %" PRIu32 ", current dx = %f, next dx = %f\n", mMaxPointsPerVoxel, maxPointsPerVoxel, tmp.dx, dx);
+                mData.map = Map(dx);
+                // free before the next iteration reallocates, so peak device
+                // memory matches the pre-loop behavior
+                mKeysBuf.destroy();          mData.d_keys = nullptr;
+                mIndxBuf.destroy();          mData.d_indx = nullptr;
+                keysScratch.destroy();       d_keys = nullptr;
+                mTileKeysBuf.destroy();      mData.d_tile_keys = nullptr;
+                nodeCountScratch.destroy();  d_node_count = nullptr;
+                mPointsPerVoxelBuf.destroy();mData.pointsPerVoxel = nullptr;
+                continue;
+            }
+        }
+        break;
+    }// while (true)
     if (iterCounter>1 && mVerbose) std::cerr << "Used " << iterCounter << " attempts to determine dx that produces a target dpoint denisty\n\n";
 
     if (mVerbose==2) mTimer.restart("Compute prefix sum of points per voxel");
     cudaCheck(cudaEventSynchronize(copyEvent));
-    mData.pointsPerVoxelPrefix = static_cast<uint32_t*>(mResource->allocate_async(mData.voxelCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+    mPointsPerVoxelPrefixBuf = BufT<uint32_t>(mStream, this->ref(), mData.voxelCount, nanovdb::cuda::noInit);
+    mData.pointsPerVoxelPrefix = mPointsPerVoxelPrefixBuf.data();
     CALL_CUBS(DeviceScan::ExclusiveSum, mData.pointsPerVoxel, mData.pointsPerVoxelPrefix, mData.voxelCount);
 
-    mData.pointsPerLeaf = static_cast<uint32_t*>(mResource->allocate_async(pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+    mPointsPerLeafBuf = BufT<uint32_t>(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
+    mData.pointsPerLeaf = mPointsPerLeafBuf.data();
     CALL_CUBS(DeviceRunLengthEncode::Encode, thrust::make_transform_iterator(mData.d_keys, ShiftRight<9>()), d_keys, mData.pointsPerLeaf, d_node_count, pointCount);
     cudaCheck(cudaMemcpyAsync(mData.nodeCount, d_node_count, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaEventRecord(copyEvent, mStream));
 
     if constexpr(util::is_same<BuildT, Point>::value) {
-        uint32_t *d_maxPointsPerLeaf = static_cast<uint32_t*>(mResource->allocate_async(sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+        BufT<uint32_t> maxPointsPerLeafScratch(mStream, this->ref(), 1, nanovdb::cuda::noInit);
+        uint32_t *d_maxPointsPerLeaf = maxPointsPerLeafScratch.data();
         cudaCheck(cudaEventSynchronize(copyEvent));
         CALL_CUBS(DeviceReduce::Max, mData.pointsPerLeaf, d_maxPointsPerLeaf, mData.nodeCount[0]);
         cudaCheck(cudaMemcpyAsync(&mMaxPointsPerLeaf, d_maxPointsPerLeaf, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
@@ -730,27 +944,26 @@ jump:// this marks the beginning of the actual algorithm
         if (mMaxPointsPerLeaf > std::numeric_limits<uint16_t>::max()) {
             throw std::runtime_error("Too many points per leaf: "+std::to_string(mMaxPointsPerLeaf));
         }
-        mResource->deallocate_async(d_maxPointsPerLeaf, sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
     }
 
     cudaCheck(cudaEventSynchronize(copyEvent));
-    mData.pointsPerLeafPrefix = static_cast<uint32_t*>(mResource->allocate_async(mData.nodeCount[0]*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+    mPointsPerLeafPrefixBuf = BufT<uint32_t>(mStream, this->ref(), mData.nodeCount[0], nanovdb::cuda::noInit);
+    mData.pointsPerLeafPrefix = mPointsPerLeafPrefixBuf.data();
     CALL_CUBS(DeviceScan::ExclusiveSum, mData.pointsPerLeaf, mData.pointsPerLeafPrefix, mData.nodeCount[0]);
 
     cudaCheck(cudaStreamSynchronize(mStream));
-    mData.d_leaf_keys = static_cast<uint64_t*>(mResource->allocate_async(mData.nodeCount[0]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+    mLeafKeysBuf = BufT<uint64_t>(mStream, this->ref(), mData.nodeCount[0], nanovdb::cuda::noInit);
+    mData.d_leaf_keys = mLeafKeysBuf.data();
     cudaCheck(cudaMemcpyAsync(mData.d_leaf_keys, d_keys, mData.nodeCount[0]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
 
     CALL_CUBS(DeviceSelect::Unique, thrust::make_transform_iterator(mData.d_leaf_keys, ShiftRight<12>()), d_keys, d_node_count+1, mData.nodeCount[0]);// count lower nodes
     cudaCheck(cudaMemcpyAsync(mData.nodeCount+1, d_node_count+1, sizeof(uint32_t), cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaStreamSynchronize(mStream));
-    mData.d_lower_keys = static_cast<uint64_t*>(mResource->allocate_async(mData.nodeCount[1]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+    mLowerKeysBuf = BufT<uint64_t>(mStream, this->ref(), mData.nodeCount[1], nanovdb::cuda::noInit);
+    mData.d_lower_keys = mLowerKeysBuf.data();
     cudaCheck(cudaMemcpyAsync(mData.d_lower_keys, d_keys, mData.nodeCount[1]*sizeof(uint64_t), cudaMemcpyDeviceToDevice, mStream));
 
-    mResource->deallocate_async(d_keys, pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-    mResource->deallocate_async(d_node_count, 3*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
     if (mVerbose==2) mTimer.stop();
-    cudaCheck(cudaEventDestroy(copyEvent));
 
     //printf("Leaf count = %u, lower count = %u, upper count = %u\n", mData.nodeCount[0], mData.nodeCount[1], mData.nodeCount[2]);
 }// PointsToGrid<BuildT, ResourceT>::countNodes
@@ -784,14 +997,22 @@ inline BufferT PointsToGrid<BuildT, ResourceT>::getBuffer(const PtrT, size_t poi
     mData.leaf  = mData.lower + NanoLower<BuildT>::memUsage()*mData.nodeCount[1]; // lower internal nodes ends and leaf nodes begin
     mData.meta  = mData.leaf  + NanoLeaf<BuildT>::DataType::memUsage()*mData.nodeCount[0];// leaf nodes end and blind meta data begins
     mData.blind = mData.meta  + sizeof(GridBlindMetaData)*int( mPointType!=PointType::Disable ); // meta data ends and blind data begins
-    mData.size  = mData.blind + pointCount*sizeofPoint();// end of buffer
+    // padded like GridBlindMetaData::blindDataSize, so the grid size stays a multiple of
+    // NANOVDB_DATA_ALIGNMENT and the next grid in a multi-grid buffer starts aligned
+    mData.size  = mData.blind + math::AlignUp<NANOVDB_DATA_ALIGNMENT>(pointCount*sizeofPoint());// end of buffer
 
     int device = 0;
     cudaGetDevice(&device);
-    auto buffer = BufferT::create(mData.size, &pool, device, mStream);// only allocate buffer on the device
+    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(mData.size, &pool, device, mStream); // only allocate buffer on the device
 
-    mData.d_bufferPtr = buffer.deviceData();
-    if (mData.d_bufferPtr == nullptr) throw std::runtime_error("Failed to allocate grid buffer on the device");
+    mData.d_bufferPtr = nanovdb::cuda::detail::deviceStorageData(buffer);
+    if (mData.d_bufferPtr == nullptr) throw std::runtime_error("The grid buffer type produced no device-accessible memory");
+    // Zero the whole grid buffer up front. This (a) makes the dense background
+    // fills (upper/lower value tables, inactive leaf values - all zero in this
+    // builder) redundant, so those kernels are skipped, and (b) makes the
+    // output bit-deterministic: alignment padding and stats fields no longer
+    // carry recycled pool bytes (which previously leaked into written files).
+    cudaCheck(cudaMemsetAsync(mData.d_bufferPtr, 0, mData.size, mStream));
     cudaCheck(cudaMemcpyAsync(mDeviceData, &mData, sizeof(PointsToGridData<BuildT>), cudaMemcpyHostToDevice, mStream));// copy Data CPU -> GPU
     return buffer;
 }// PointsToGrid<BuildT, ResourceT>::getBuffer
@@ -816,9 +1037,15 @@ struct BuildGridTreeRootFunctor
         // process Tree
         auto &tree = d_data->getTree();
         tree.setRoot(&root);
-        tree.setFirstNode(&d_data->getUpper(0));
-        tree.setFirstNode(&d_data->getLower(0));
-        tree.setFirstNode(&d_data->getLeaf(0));
+        if (d_data->nodeCount[0]) {
+            tree.setFirstNode(&d_data->getUpper(0));
+            tree.setFirstNode(&d_data->getLower(0));
+            tree.setFirstNode(&d_data->getLeaf(0));
+        } else {// empty grid
+            tree.template setFirstNode<NanoUpper<BuildT>>(nullptr);
+            tree.template setFirstNode<NanoLower<BuildT>>(nullptr);
+            tree.template setFirstNode<NanoLeaf<BuildT>>(nullptr);
+        }
         tree.mNodeCount[2] = d_data->nodeCount[2];
         tree.mNodeCount[1] = d_data->nodeCount[1];
         tree.mNodeCount[0] = d_data->nodeCount[0];
@@ -830,12 +1057,14 @@ struct BuildGridTreeRootFunctor
         // process Grid
         auto &grid = d_data->getGrid();
         grid.init({GridFlags::HasBBox, GridFlags::IsBreadthFirst}, d_data->size, d_data->map, toGridType<BuildT>());
+        if (d_data->nodeCount[0] == 0) grid.mFlags.setMaskOff(GridFlags::HasBBox);// an empty grid has no bbox
         grid.mChecksum = ~uint64_t(0);// set all bits on which means it's disabled
-        grid.mBlindMetadataCount  = util::is_same<BuildT, Point>::value;// ? 1u : 0u;
+        grid.mBlindMetadataCount  = util::is_same<BuildT, Point>::value && pointType != PointType::Disable;
         grid.mBlindMetadataOffset = d_data->meta;
         if (pointType != PointType::Disable) {
-            const auto lastLeaf = tree.mNodeCount[0] - 1;
-            grid.mData1 = d_data->pointsPerLeafPrefix[lastLeaf] + d_data->pointsPerLeaf[lastLeaf];
+            if (const uint32_t leafCount = tree.mNodeCount[0]) {
+                grid.mData1 = d_data->pointsPerLeafPrefix[leafCount - 1] + d_data->pointsPerLeaf[leafCount - 1];
+            }
             auto &meta = d_data->getMeta();
             meta.mDataOffset = sizeof(GridBlindMetaData);// blind data is placed right after this meta data
             meta.mValueCount = pointCount;
@@ -924,6 +1153,7 @@ struct BuildGridTreeRootFunctor
             }
         } else if constexpr(BuildTraits<BuildT>::is_onindex) {
             grid.mGridClass = GridClass::IndexGrid;
+            if (d_data->nodeCount[0] == 0) grid.mData1 = 1u;// the background value only
         } else if constexpr(BuildTraits<BuildT>::is_offindex) {
             grid.mData1 = 1u + 512u*d_data->nodeCount[0];
             grid.mGridClass = GridClass::IndexGrid;
@@ -938,11 +1168,18 @@ inline void PointsToGrid<BuildT, ResourceT>::processGridTreeRoot(const PtrT poin
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, BuildGridTreeRootFunctor<BuildT, PtrT>(), mDeviceData, mPointType, pointCount);// lambdaKernel
     cudaCheckError();
 
+    // Zero the name field, then copy only the actual string (if any). The
+    // previous code copied MaxNameSize bytes from the std::string buffer
+    // (whose .data() is never null, so the memset branch was dead), reading
+    // up to 255 bytes past the allocation and leaking host heap contents
+    // into the grid - nondeterministic output and a hygiene issue for files.
     char *dst = mData.getGrid().mGridName;
-    if (const char *src = mGridName.data()) {
-        cudaCheck(cudaMemcpyAsync(dst, src, GridData::MaxNameSize, cudaMemcpyHostToDevice, mStream));
-    } else {
-        cudaCheck(cudaMemsetAsync(dst, 0, GridData::MaxNameSize, mStream));
+    cudaCheck(cudaMemsetAsync(dst, 0, GridData::MaxNameSize, mStream));
+    if (!mGridName.empty()) {
+        // Copy at most MaxNameSize-1 bytes so the memset's trailing '\0' always
+        // survives; a name >= MaxNameSize is truncated, never left unterminated.
+        const size_t nameSize = std::min<size_t>(mGridName.size(), GridData::MaxNameSize - 1);
+        cudaCheck(cudaMemcpyAsync(dst, mGridName.c_str(), nameSize, cudaMemcpyHostToDevice, mStream));
     }
 }// PointsToGrid<BuildT, ResourceT>::processGridTreeRoot
 
@@ -993,11 +1230,8 @@ inline void PointsToGrid<BuildT, ResourceT>::processUpperNodes()
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[2]), mNumThreads, 0, mStream>>>(mData.nodeCount[2], BuildUpperNodesFunctor<BuildT>(), mDeviceData);
     cudaCheckError();
 
-    mResource->deallocate_async(mData.d_tile_keys, mData.nodeCount[2]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+    mTileKeysBuf.destroy(); mData.d_tile_keys = nullptr;
 
-    const uint64_t valueCount = mData.nodeCount[2] << 15;
-    util::cuda::lambdaKernel<<<numBlocks(valueCount), mNumThreads, 0, mStream>>>(valueCount, SetUpperBackgroundValuesFunctor<BuildT>(), mDeviceData);
-    cudaCheckError();
 }// PointsToGrid<BuildT, ResourceT>::processUpperNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1039,9 +1273,6 @@ inline void PointsToGrid<BuildT, ResourceT>::processLowerNodes()
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[1]), mNumThreads, 0, mStream>>>(mData.nodeCount[1], BuildLowerNodesFunctor<BuildT>(), mDeviceData);
     cudaCheckError();
 
-    const uint64_t valueCount = mData.nodeCount[1] << 12;
-    util::cuda::lambdaKernel<<<numBlocks(valueCount), mNumThreads, 0, mStream>>>(valueCount, SetLowerBackgroundValuesFunctor<BuildT>(), mDeviceData);
-    cudaCheckError();
 }// PointsToGrid<BuildT, ResourceT>::processLowerNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1128,28 +1359,35 @@ inline void PointsToGrid<BuildT, ResourceT>::processLeafNodes(size_t pointCount)
     util::cuda::lambdaKernel<<<numBlocks(mData.voxelCount), mNumThreads, 0, mStream>>>(mData.voxelCount, SetLeafActiveVoxelStateAndValuesFunctor<BuildT>(), mDeviceData);
     cudaCheckError();
 
-    mResource->deallocate_async(mData.d_keys, pointCount*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-    mResource->deallocate_async(mData.pointsPerVoxel, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-    mResource->deallocate_async(mData.pointsPerVoxelPrefix, mData.voxelCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-    mResource->deallocate_async(mData.pointsPerLeafPrefix, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-    mResource->deallocate_async(mData.pointsPerLeaf,mData.nodeCount[0]*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+    mKeysBuf.destroy();                mData.d_keys = nullptr;
+    mPointsPerVoxelBuf.destroy();      mData.pointsPerVoxel = nullptr;
+    mPointsPerVoxelPrefixBuf.destroy();mData.pointsPerVoxelPrefix = nullptr;
+    mPointsPerLeafPrefixBuf.destroy(); mData.pointsPerLeafPrefix = nullptr;
+    mPointsPerLeafBuf.destroy();       mData.pointsPerLeaf = nullptr;
 
-    if (mVerbose==2) mTimer.restart("set inactive voxel values");
-    const uint64_t denseVoxelCount = mData.nodeCount[0] << 9;
-    util::cuda::lambdaKernel<<<numBlocks(denseVoxelCount), mNumThreads, 0, mStream>>>(denseVoxelCount, SetLeafInactiveVoxelValuesFunctor<BuildT>(), mDeviceData);
-    cudaCheckError();
+    // Inactive voxel values are zero for every build type except Point (which
+    // copies the previous active value for rank queries); the zero cases are
+    // covered by the buffer memset in getBuffer, and for index grids this
+    // dense pass (nodeCount[0]<<9 threads) is a no-op.
+    if constexpr(util::is_same<BuildT, Point>::value) {
+        if (mVerbose==2) mTimer.restart("set inactive voxel values");
+        const uint64_t denseVoxelCount = mData.nodeCount[0] << 9;
+        util::cuda::lambdaKernel<<<numBlocks(denseVoxelCount), mNumThreads, 0, mStream>>>(denseVoxelCount, SetLeafInactiveVoxelValuesFunctor<BuildT>(), mDeviceData);
+        cudaCheckError();
+    }
 
     if constexpr(BuildTraits<BuildT>::is_onindex) {
         if (mVerbose==2) mTimer.restart("prefix-sum for index grid");
-        auto devValueIndex = static_cast<uint64_t*>(mResource->allocate_async(mData.nodeCount[0]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
-        auto devValueIndexPrefix = static_cast<uint64_t*>(mResource->allocate_async(mData.nodeCount[0]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream));
+        BufT<uint64_t> valueIndexScratch(mStream, this->ref(), mData.nodeCount[0], nanovdb::cuda::noInit);
+        BufT<uint64_t> valueIndexPrefixScratch(mStream, this->ref(), mData.nodeCount[0], nanovdb::cuda::noInit);
+        auto devValueIndex = valueIndexScratch.data();
+        auto devValueIndexPrefix = valueIndexPrefixScratch.data();
         kernels::fillValueIndexKernel<BuildT><<<numBlocks(mData.nodeCount[0]), mNumThreads, 0, mStream>>>(mData.nodeCount[0], 0, devValueIndex, mDeviceData);
         cudaCheckError();
         CALL_CUBS(DeviceScan::InclusiveSum, devValueIndex, devValueIndexPrefix, mData.nodeCount[0]);
-        mResource->deallocate_async(devValueIndex, mData.nodeCount[0]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+        valueIndexScratch.destroy(); devValueIndex = nullptr;
         kernels::leafPrefixSumKernel<BuildT><<<numBlocks(mData.nodeCount[0]), mNumThreads, 0, mStream>>>(mData.nodeCount[0], 0, devValueIndexPrefix, mDeviceData);
         cudaCheckError();
-        mResource->deallocate_async(devValueIndexPrefix, mData.nodeCount[0]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
     }
 
     if (mVerbose==2) mTimer.stop();
@@ -1164,23 +1402,24 @@ inline void PointsToGrid<BuildT, ResourceT>::processLeafNodes(size_t pointCount)
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+// The point-encode kernels operate on device data and are independent of the
+// resource type; only the trailing d_indx deallocation routes through ResourceT.
+// Dispatching the encode with if constexpr keeps it reachable for any ResourceT.
 template<typename BuildT, typename ResourceT>
 template<typename PtrT>
-inline void PointsToGrid<BuildT, ResourceT>::processPoints(const PtrT, size_t pointCount)
+inline void PointsToGrid<BuildT, ResourceT>::processPoints(const PtrT points, size_t pointCount)
 {
-    mResource->deallocate_async(mData.d_indx, pointCount*sizeof(uint32_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-}
+    if constexpr(util::is_same<BuildT, Point>::value) this->encodePoints(points, pointCount);
+    mIndxBuf.destroy(); mData.d_indx = nullptr;
+}// PointsToGrid<BuildT, ResourceT>::processPoints
 
-//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-// Template specialization with BuildT = Point
-template<>
+template<typename BuildT, typename ResourceT>
 template<typename PtrT>
-inline void PointsToGrid<Point>::processPoints(const PtrT points, size_t pointCount)
+inline void PointsToGrid<BuildT, ResourceT>::encodePoints(const PtrT points, size_t pointCount)
 {
     switch (mPointType){
     case PointType::Disable:
-        throw std::runtime_error("PointsToGrid<Point>::processPoints: mPointType == PointType::Disable\n");
+        throw std::runtime_error("PointsToGrid<Point, ResourceT>::encodePoints: mPointType == PointType::Disable\n");
     case PointType::PointID:
         util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
             d_data->template getPoint<uint32_t>(tid) = d_data->d_indx[tid];
@@ -1223,16 +1462,13 @@ inline void PointsToGrid<Point>::processPoints(const PtrT points, size_t pointCo
         break;
     case PointType::Default:
         util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, [=] __device__(size_t tid, PointsToGridData<Point> *d_data) {
-            d_data->template getPoint<typename pointer_traits<PtrT>::element_type>(tid) = points[d_data->d_indx[tid]];
+            d_data->template getPoint<typename util::remove_const<typename pointer_traits<PtrT>::element_type>::type>(tid) = points[d_data->d_indx[tid]];
         }, mDeviceData); cudaCheckError();
         break;
     default:
-        printf("Internal error in PointsToGrid<Point>::processPoints\n");
+        printf("Internal error in PointsToGrid<Point, ResourceT>::encodePoints\n");
     }
-    // This is the PointsToGrid<Point> (== <Point, DeviceResource>) member specialization,
-    // so ResourceT is not a name here; mResource is a DeviceResource* and the alignment is concrete.
-    mResource->deallocate_async(mData.d_indx, pointCount*sizeof(uint32_t), nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT, mStream);
-}// PointsToGrid<Point>::processPoints
+}// PointsToGrid<BuildT, ResourceT>::encodePoints
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1310,7 +1546,7 @@ inline void PointsToGrid<BuildT, ResourceT>::processBBox()
 
     // update and propagate bbox from leaf -> lower/parent nodes
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[0]), mNumThreads, 0, mStream>>>(mData.nodeCount[0], UpdateAndPropagateLeafBBoxFunctor<BuildT>(), mDeviceData);
-    mResource->deallocate_async(mData.d_leaf_keys, mData.nodeCount[0]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
+    mLeafKeysBuf.destroy(); mData.d_leaf_keys = nullptr;
     cudaCheckError();
 
     // reset bbox in upper nodes
@@ -1319,8 +1555,8 @@ inline void PointsToGrid<BuildT, ResourceT>::processBBox()
 
     // propagate bbox from lower -> upper/parent node
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[1]), mNumThreads, 0, mStream>>>(mData.nodeCount[1], PropagateLowerBBoxFunctor<BuildT>(), mDeviceData);
-    mResource->deallocate_async(mData.d_lower_keys, mData.nodeCount[1]*sizeof(uint64_t), ResourceT::DEFAULT_ALIGNMENT, mStream);
-    cudaCheckError()
+    mLowerKeysBuf.destroy(); mData.d_lower_keys = nullptr;
+    cudaCheckError();
 
     // propagate bbox from upper -> root/parent node
     util::cuda::lambdaKernel<<<numBlocks(mData.nodeCount[2]), mNumThreads, 0, mStream>>>(mData.nodeCount[2], PropagateUpperBBoxFunctor<BuildT>(), mDeviceData);
@@ -1333,10 +1569,34 @@ inline void PointsToGrid<BuildT, ResourceT>::processBBox()
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+namespace detail {
+
+/// @brief Merges the per-set handles built by the point-set overloads,
+///        allocating the result through @c buffer for either buffer family.
+template<typename BufferT>
+GridHandle<BufferT> mergeBuiltHandles(const std::vector<GridHandle<BufferT>> &handles, const BufferT &buffer, cudaStream_t stream)
+{
+    static_assert(BufferHasDeviceSingle<BufferT>::value || BufferTraits<BufferT>::hasDeviceDual,
+                  "the point-set overloads build into a device buffer");
+    // explicit template arguments: MSVC cannot deduce the template-template VectorT
+    if constexpr (BufferHasDeviceSingle<BufferT>::value) {// merging no handles gives an empty handle over the prototype's resource
+        return nanovdb::cuda::mergeGridHandles<BufferT, std::vector>(handles, stream, &buffer);
+    } else {
+        if (handles.empty()) return GridHandle<BufferT>();// no sets: an empty handle
+        return nanovdb::cuda::detail::mergeDualGridHandles<BufferT, std::vector>(handles, &buffer, stream);
+    }
+}
+
+}// namespace detail
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 template<typename BuildT, typename PtrT, typename BufferT, typename ResourceT>
-GridHandle<BufferT>// Grid<BuildT>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>// Grid<BuildT>
 voxelsToGrid(const PtrT d_ijk, size_t voxelCount, double voxelSize, const BufferT &buffer, cudaStream_t stream)
 {
+    static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
+                  "voxelsToGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
     PointsToGrid<BuildT, ResourceT> converter(voxelSize, Vec3d(0.0), stream);
     return converter.getHandle(d_ijk, voxelCount, buffer);
 }
@@ -1344,9 +1604,26 @@ voxelsToGrid(const PtrT d_ijk, size_t voxelCount, double voxelSize, const Buffer
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename PtrT, typename BufferT, typename ResourceT>
-GridHandle<BufferT>// Grid<Point> with PointType coordinates as blind data
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>// Grid<Point> with PointType coordinates as blind data
+pointsToGrid(const PtrT d_xyz, int pointCount, double voxelSize, PointType type, const BufferT &buffer, cudaStream_t stream)
+{
+    static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
+                  "pointsToGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
+    detail::checkPointCount(pointCount, "PointsToGrid");
+    PointsToGrid<Point, ResourceT> converter(voxelSize, Vec3d(0.0), stream);
+    converter.setPointType(type);
+    return converter.getHandle(d_xyz, pointCount, buffer);
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename PtrT, typename BufferT, typename ResourceT>
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>// Grid<Point> with PointType coordinates as blind data
 pointsToGrid(const PtrT d_xyz, int pointCount, int maxPointsPerVoxel, int tolerance, int maxIterations, PointType type, const BufferT &buffer, cudaStream_t stream)
 {
+    static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
+                  "pointsToGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
+    detail::checkPointCount(pointCount, "PointsToGrid");
     PointsToGrid<Point, ResourceT> converter(maxPointsPerVoxel, tolerance, maxIterations, stream);
     converter.setPointType(type);
     return converter.getHandle(d_xyz, pointCount, buffer);
@@ -1355,30 +1632,121 @@ pointsToGrid(const PtrT d_xyz, int pointCount, int maxPointsPerVoxel, int tolera
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT, typename PtrT, typename BufferT, typename ResourceT>
-GridHandle<BufferT>
-pointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> vec, const BufferT &buffer, cudaStream_t stream)
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
+pointsToGrid(const std::vector<std::tuple<const PtrT,size_t,double,PointType>> &vec, const BufferT &buffer, cudaStream_t stream)
 {
+    static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
+                  "pointsToGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
+    static_assert(util::is_same<BuildT, Point>::value, "pointsToGrid over a point set builds NanoGrid<Point>");
     std::vector<GridHandle<BufferT>> handles;
-    for (auto &p : vec) handles.push_back(pointsToGrid<BuildT, PtrT, BufferT, ResourceT>(std::get<0>(p), std::get<1>(p), std::get<2>(p), std::get<3>(p), buffer, stream));
-    return mergeDeviceGrids(handles, stream);
+    for (auto &p : vec) {
+        PointsToGrid<Point, ResourceT> converter(std::get<2>(p), Vec3d(0.0), stream);
+        converter.setPointType(std::get<3>(p));
+        handles.push_back(converter.getHandle(std::get<0>(p), std::get<1>(p), buffer));
+    }
+    return detail::mergeBuiltHandles(handles, buffer, stream);
 }
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT, typename PtrT, typename BufferT, typename ResourceT>
-GridHandle<BufferT>
-voxelsToGrid(std::vector<std::tuple<const PtrT,size_t,double>> vec, const BufferT &buffer, cudaStream_t stream)
+nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
+voxelsToGrid(const std::vector<std::tuple<const PtrT,size_t,double>> &vec, const BufferT &buffer, cudaStream_t stream)
 {
+    static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
+                  "voxelsToGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
     std::vector<GridHandle<BufferT>> handles;
     for (auto &p : vec) handles.push_back(voxelsToGrid<BuildT, PtrT, BufferT, ResourceT>(std::get<0>(p), std::get<1>(p), std::get<2>(p), buffer, stream));
-    return mergeDeviceGrids(handles, stream);
+    return detail::mergeBuiltHandles(handles, buffer, stream);
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename BuildT, typename PtrT, typename ResourceT>
+typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+voxelsToGrid(const PtrT d_ijk, size_t voxelCount, double voxelSize, cudaStream_t stream, ResourceT resource)
+{
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "the GPU tools allocate stream-ordered scratch: pass an AsyncResource, or wrap a synchronous one in cuda::AsyncFromSync");
+    using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
+    PointsToGrid<BuildT, ResourceT> converter(voxelSize, Vec3d(0.0), stream, resource);
+    return converter.getHandle(d_ijk, voxelCount, BufferT(stream, resource, 0, nanovdb::cuda::noInit));
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename PtrT, typename ResourceT>
+typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+pointsToGrid(const PtrT d_xyz, int pointCount, double voxelSize, PointType type, cudaStream_t stream, ResourceT resource)
+{
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "the GPU tools allocate stream-ordered scratch: pass an AsyncResource, or wrap a synchronous one in cuda::AsyncFromSync");
+    detail::checkPointCount(pointCount, "PointsToGrid");
+    using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
+    PointsToGrid<Point, ResourceT> converter(voxelSize, Vec3d(0.0), stream, resource);
+    converter.setPointType(type);
+    return converter.getHandle(d_xyz, pointCount, BufferT(stream, resource, 0, nanovdb::cuda::noInit));
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename PtrT, typename ResourceT>
+typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+pointsToGrid(const PtrT d_xyz, int pointCount, int maxPointsPerVoxel, int tolerance, int maxIterations, PointType type,
+             cudaStream_t stream, ResourceT resource)
+{
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "the GPU tools allocate stream-ordered scratch: pass an AsyncResource, or wrap a synchronous one in cuda::AsyncFromSync");
+    detail::checkPointCount(pointCount, "PointsToGrid");
+    using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
+    PointsToGrid<Point, ResourceT> converter(maxPointsPerVoxel, tolerance, maxIterations, stream, resource);
+    converter.setPointType(type);
+    return converter.getHandle(d_xyz, pointCount, BufferT(stream, resource, 0, nanovdb::cuda::noInit));
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename BuildT, typename PtrT, typename ResourceT>
+typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+pointsToGrid(const std::vector<std::tuple<const PtrT,size_t,double,PointType>> &vec, cudaStream_t stream, ResourceT resource)
+{
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "the GPU tools allocate stream-ordered scratch: pass an AsyncResource, or wrap a synchronous one in cuda::AsyncFromSync");
+    static_assert(util::is_same<BuildT, Point>::value, "pointsToGrid over a point set builds NanoGrid<Point>");
+    using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
+    const BufferT proto(stream, resource, 0, nanovdb::cuda::noInit);
+    std::vector<GridHandle<BufferT>> handles;
+    for (auto &p : vec) {
+        PointsToGrid<Point, ResourceT> converter(std::get<2>(p), Vec3d(0.0), stream, resource);
+        converter.setPointType(std::get<3>(p));
+        handles.push_back(converter.getHandle(std::get<0>(p), std::get<1>(p), proto));
+    }
+    return detail::mergeBuiltHandles(handles, proto, stream);
+}
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename BuildT, typename PtrT, typename ResourceT>
+typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
+voxelsToGrid(const std::vector<std::tuple<const PtrT,size_t,double>> &vec, cudaStream_t stream, ResourceT resource)
+{
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "the GPU tools allocate stream-ordered scratch: pass an AsyncResource, or wrap a synchronous one in cuda::AsyncFromSync");
+    using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
+    const BufferT proto(stream, resource, 0, nanovdb::cuda::noInit);
+    std::vector<GridHandle<BufferT>> handles;
+    for (auto &p : vec) {
+        PointsToGrid<BuildT, ResourceT> converter(std::get<2>(p), Vec3d(0.0), stream, resource);
+        handles.push_back(converter.getHandle(std::get<0>(p), std::get<1>(p), proto));
+    }
+    return detail::mergeBuiltHandles(handles, proto, stream);
 }
 
 }// namespace tools::cuda ======================================================================================================================================
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename PtrT, typename BufferT = cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename PtrT, typename BufferT = cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 [[deprecated("Use cuda::pointsToGrid instead")]]
 GridHandle<BufferT>
 cudaPointsToGrid(const PtrT dWorldPoints,
@@ -1393,7 +1761,7 @@ cudaPointsToGrid(const PtrT dWorldPoints,
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT, typename PtrT, typename BufferT = cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename BuildT, typename PtrT, typename BufferT = cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 [[deprecated("Use cuda::pointsToGrid instead")]]
 GridHandle<BufferT>
 cudaPointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> pointSet,
@@ -1405,7 +1773,7 @@ cudaPointsToGrid(std::vector<std::tuple<const PtrT,size_t,double,PointType>> poi
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT, typename PtrT, typename BufferT = cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename BuildT, typename PtrT, typename BufferT = cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 [[deprecated("Use cuda::voxelsToGrid instead")]]
 GridHandle<BufferT>
 cudaVoxelsToGrid(const PtrT dGridVoxels,
@@ -1419,7 +1787,7 @@ cudaVoxelsToGrid(const PtrT dGridVoxels,
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT, typename PtrT, typename BufferT = cuda::DeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
+template<typename BuildT, typename PtrT, typename BufferT = cuda::DualDeviceBuffer, typename ResourceT = nanovdb::cuda::DeviceResource>
 [[deprecated("Use cuda::voxelsToGrid instead")]]
 GridHandle<BufferT>
 cudaVoxelsToGrid(std::vector<std::tuple<const PtrT, size_t, double>> pointSet,

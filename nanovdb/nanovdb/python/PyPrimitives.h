@@ -9,7 +9,10 @@ namespace nb = nanobind;
 
 namespace pynanovdb {
 
-template<typename BufferT> void definePrimitives(nb::module_& m);
+void definePrimitives(nb::module_& m);
+#ifdef NANOVDB_USE_CUDA
+void defineDevicePrimitives(nb::module_& m);
+#endif
 
 } // namespace pynanovdb
 

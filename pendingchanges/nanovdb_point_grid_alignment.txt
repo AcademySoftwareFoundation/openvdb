@@ -1,0 +1,3 @@
+NanoVDB:
+  Fixes:
+  - tools::cuda::PointsToGrid (CUDA) now pads the point blind data to NANOVDB_DATA_ALIGNMENT when sizing a Point grid, as GridBlindMetaData::blindDataSize and the other builders do. A point payload that was not a multiple of 32 bytes (e.g. PointType::Voxel8 or Voxel16, or most point counts with World32) left mGridSize misaligned, so the next grid in any multi-grid buffer built from it (mergeGrids, cuda::mergeGridHandles) started at a misaligned address and device code reading its header faulted. Point grids with such payloads are now larger by the padding, so their serialized bytes differ from files written before this fix.

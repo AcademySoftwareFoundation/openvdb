@@ -30,6 +30,11 @@ public:
     // alignment is always satisfied; 256 is the nominal default advertised here.
     static constexpr size_t DEFAULT_ALIGNMENT = 256;
 
+    /// @brief Pinned allocations are mapped into the host address space, so
+    ///        containers over this resource remain host-readable (detected by
+    ///        nanovdb::cuda::is_host_accessible_resource).
+    static constexpr bool HOST_ACCESSIBLE = true;
+
     /// @brief Synchronous allocation of page-locked host memory.
     /// @param bytes number of bytes to allocate
     /// @param alignment requested alignment (ignored; cudaMallocHost is page-aligned)
@@ -49,6 +54,12 @@ public:
         (void)alignment;
         cudaCheck(cudaFreeHost(p));
     }
+
+    /// @brief Stateless: memory allocated through one instance may be
+    ///        deallocated through any other, so every two instances compare
+    ///        equal (the equality cuda::mr's resource concepts require).
+    friend bool operator==(const PinnedResource&, const PinnedResource&) { return true; }
+    friend bool operator!=(const PinnedResource&, const PinnedResource&) { return false; }
 };
 
 }

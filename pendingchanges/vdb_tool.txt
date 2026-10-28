@@ -1,0 +1,34 @@
+vdb_tool:
+
+  Bug Fixes:
+  - Preserve rebuilt CSG results when replacing input grids.
+  - Return a failing exit status after action errors and stop immediately on
+    control-flow errors instead of entering invalid scopes.
+  - Report invalid files-loop directories as errors instead of aborting when
+    assertions are enabled, including when advancing to subsequent directories.
+  - Preserve input grids after failed VDB/NanoVDB writes and avoid changing
+    the grid stack or names when voxel-kernel variable validation fails.
+  - Preserve modulo expressions and loop counters in configuration files.
+    Inline comments now use '#'; '%' still supports full-line comments. The
+    config version is bumped to 10.9.0 to reflect this change.
+  - Reject truncated or malformed PLY data instead of hanging or reading
+    incomplete records.
+  - Read tab-indented ASCII STL files instead of silently loading empty geometry.
+  - Recover complete binary STL triangles with a warning when the header overstates
+    their count; continue rejecting partial records and extra data. Accept small STL files.
+  - Support descending loops and reject zero or non-progressing steps. Loop bodies
+    may still move the loop variable backward, e.g. to retry an iteration.
+  - Write VDB grids with their own half-float setting unless bits=16 or bits=32
+    is specified, so half grids that are read and written again stay half grids.
+  - -sdf2udf now reports failures through the common error handling, i.e. a
+    failing exit status, and leaves the grid stack unchanged on failure. Its output
+    now defaults to the name "sdf2udf_<input name>" instead of "sphere".
+  - Record fatal errors in the -log file before it is closed.
+  - Reject truncated or malformed OFF data, and ignore CRLF blank lines in OFF
+    and XYZ input read from binary stdin.
+  - Read int32 vertex coordinates in binary PLY files instead of reinterpreting
+    their bits as floats.
+  - Avoid an extra deep copy of the output grid in -forValues with keep=true.
+  - Keep binary stdout separate from diagnostic logs in both logging modes.
+  - Use binary stdin/stdout on Windows to prevent piped data corruption, while
+    retaining CRLF support for OFF text input.

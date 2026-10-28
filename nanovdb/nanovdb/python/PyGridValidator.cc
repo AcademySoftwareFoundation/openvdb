@@ -5,7 +5,7 @@
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/tools/GridValidator.h>
 #ifdef NANOVDB_USE_CUDA
-#include <nanovdb/cuda/DeviceBuffer.h>
+#include "cuda/PyDeviceGridHandle.h"
 #endif
 
 #include <nanobind/operators.h>
@@ -23,7 +23,18 @@ template<typename BufferT> void defineValidateGrids(nb::module_& m)
 
 template void defineValidateGrids<HostBuffer>(nb::module_&);
 #ifdef NANOVDB_USE_CUDA
-template void defineValidateGrids<cuda::DeviceBuffer>(nb::module_&);
+// Validates the host copy of the grids.
+void defineDeviceValidateGrids(nb::module_& m)
+{
+    m.def(
+        "validateGrids",
+        [](const DeviceGridHandle& handle, CheckMode mode, bool verbose) {
+            return handle.withHost("validateGrids", [&](const auto& h) { return tools::validateGrids(h, mode, verbose); });
+        },
+        "handle"_a,
+        "mode"_a,
+        "verbose"_a);
+}
 #endif
 
 } // namespace pynanovdb

@@ -61,7 +61,7 @@ jobs:
       (github.event_name != 'workflow_dispatch' ||
        github.event.inputs.type == 'all' ||
        github.event.inputs.type == 'houdini')
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-latest-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-houdini:${{ matrix.config.hou_hash }}
     env:
       CXX: clang++
@@ -70,6 +70,7 @@ jobs:
     strategy:
       matrix:
         config:
+          - { houdini_version: '22.0', platform: 'linux_x86_64_gcc14.2', hou_hash: '22_0' }
           - { houdini_version: '21.0', platform: 'linux_x86_64_gcc11.2', hou_hash: '21_0' }
           - { houdini_version: '20.5', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_5' }
       fail-fast: false
@@ -136,7 +137,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'extra'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-latest-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-extra:${{ matrix.config.name }}
     container:
       image: aswf/ci-openvdb:${{ matrix.config.image }}
@@ -146,13 +147,14 @@ jobs:
       matrix:
         config:
           - { name: 'all',    image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
-          - { name: 'lite',   image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF -DOPENVDB_USE_DELAYED_LOADING=OFF' }
+          - { name: 'lite',   image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF' }
           - { name: 'half',   image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
           - { name: 'simd',   image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_X86_INSTRSET=7 -DUSE_VCL=ON' } # 7=AVX
           - { name: 'pygrid', image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
           - { name: 'asan',   image: '2026', build: 'asan',    components: 'core,test',                        cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF -DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
           - { name: 'ubsan',  image: '2026', build: 'ubsan',   components: 'core,test',                        cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" ' }
           - { name: 'c++20',  image: '2026', build: 'Release', components: 'core,test',                        cmake: '-DCMAKE_CXX_STANDARD=20' }
+          - { name: 'abi14',  image: '2026',           build: 'Release', components: 'core,test',              cmake: '-DOPENVDB_USE_FUTURE_ABI_14=ON -DOPENVDB_ENABLE_ASSERTS=ON' }
           - { name: 'conf',   image: '2026', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON' }
       fail-fast: false
     steps:
@@ -188,10 +190,10 @@ jobs:
     strategy:
       matrix:
         config:
-          # llvm-17 is currently the default which has symbol issues with the python module
-          - { runson: ubuntu-latest, cxx: g++, cmake: '-DOPENVDB_PYTHON_USE_AX=OFF' }
-          # Disable the clang job for now. See https://github.com/actions/runner-images/issues/8659
-          # - { runson: ubuntu-latest, cxx: clang++, cmake: '' }
+          # Note that ubuntu-latest currently points to ubuntu-24.04,
+          # when this link has been updated, use ubuntu-latest instead
+          - { runson: ubuntu-26.04, cxx: g++, cmake: '' }
+          - { runson: ubuntu-26.04, cxx: clang++, cmake: '' }
           # @todo gcc on macos
           - { runson: macos-latest, cxx: '', cmake: '-DLLVM_DIR=/opt/homebrew/opt/llvm@20/lib/cmake/llvm' }
       fail-fast: false
@@ -200,7 +202,7 @@ jobs:
       - name: install_deps
         run: |
           if [ "$RUNNER_OS" == "Linux" ]; then
-            sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev libgtest-dev libgmock-dev python3-numpy
+            sudo apt-get -q install -y libtbb-dev libblosc-dev libgtest-dev libgmock-dev python3-numpy
             ./ci/install_nanobind.sh 2.5.0
           elif [ "$RUNNER_OS" == "macOS" ]; then
             ./ci/install_macos.sh 20
@@ -214,8 +216,7 @@ jobs:
           --build-type=Release
           --components=\"core,axcore,python,bin,render,test,axbin\"
           --cargs=\'
-          -DCMAKE_CXX_STANDARD=20
-          -DOPENVDB_USE_DELAYED_LOADING=OFF
+          -DCMAKE_CXX_STANDARD=23
           -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install
           ${{ matrix.config.cmake }}
           \'
@@ -236,8 +237,8 @@ jobs:
       matrix:
         config:
           # static build of blosc from vcpkg does not build internal sources.
-          # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
-          # Boost as both shared and static libs are installed.
+          # USE_STATIC_DEPENDENCIES is required for OpenEXR defines as both
+          # shared and static libs are installed.
           # USE_EXPLICIT_INSTANTIATION is disabled for debug static libraries
           # due to disk space constraints
           - { vc: 'x64-windows-static', components: 'core,bin,view,render,test',       build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
@@ -290,7 +291,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'ax'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-latest-8c-32g-300h') || 'ubuntu-latest' }}
     name: >
       linux-ax:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
@@ -392,8 +393,8 @@ jobs:
       matrix:
         config:
           # static build of blosc from vcpkg does not build internal sources.
-          # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
-          # Boost as both shared and static libs are installed.
+          # USE_STATIC_DEPENDENCIES is required for OpenEXR defines and as
+          # both shared and static libs are installed.
           # @todo  We don't currently run the axtests with shared builds of ax
           # due to symbol issues using LLVM as a static lib (which is the only
           # option on Windows).
@@ -420,7 +421,6 @@ jobs:
         --components="${{ matrix.config.components }}"
         --cargs=\'
         -A x64 -G \"Visual Studio 17 2022\"
-        -DOPENVDB_USE_DELAYED_LOADING=OFF
         -DUSE_BLOSC=OFF \
         -DUSE_ZLIB=OFF \
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
@@ -454,13 +454,13 @@ jobs:
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
       visual_studio: "Visual Studio 17 2022"
-      cuda: "12.4.0"
+      cuda: "12.9.1"
     strategy:
       matrix:
         config:
           # static build of blosc from vcpkg does not build internal sources.
-          # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
-          # Boost as both shared and static libs are installed.
+          # USE_STATIC_DEPENDENCIES is required for OpenEXR defines as both
+          # shared and static libs are installed.
           - { vc: 'x64-windows-static', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded' }
           - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDebug' }
           - { vc: 'x64-windows',        build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
@@ -509,7 +509,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'blosc'
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-latest-8c-32g-300h') || 'ubuntu-latest' }}
     name: linux-blosc:${{ matrix.blosc }}
     container:
       image: aswf/ci-openvdb:2025-clang19.1
@@ -527,7 +527,7 @@ jobs:
         --build-type=Release
         --components=\"core,test\"
     - name: test
-      run: cd build && sudo ctest -V
+      run: cd build && ctest -V
 
   #############################################################################
   ################################## ABI ######################################
@@ -538,7 +538,7 @@ jobs:
       github.event_name == 'workflow_dispatch' &&
       (github.event.inputs.type == 'all' ||
        github.event.inputs.type == 'abi')
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     env:
       # The 'abicheck' build type sets these, but older versions of the library
       # may not have this build type. See OpenVDBCXX.cmake
@@ -561,7 +561,7 @@ jobs:
         echo "Using major version: ${VDB_MAJOR_VERSION}"
         echo "VDB_MAJOR_VERSION=${VDB_MAJOR_VERSION}" >> "$GITHUB_ENV"
     - name: install_deps
-      run: sudo apt-get -q install -y libboost-iostreams-dev libtbb-dev libblosc-dev elfutils
+      run: sudo apt-get -q install -y libboost-dev libboost-iostreams-dev libtbb-dev libblosc-dev elfutils
     - name: install_abi_checker
       run: sudo apt-get -q install -y abi-dumper abi-compliance-checker
     - name: build_new

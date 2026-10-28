@@ -1,5 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
+
+//! [read_nanovdb_sphere_accessor]
 #include <nanovdb/io/IO.h> // this is required to read (and write) NanoVDB files on the host
 
 /// @brief Read a NanoVDB grid from a file and print out multiple values.
@@ -25,3 +27,4 @@ int main()
     }
     return 0;
 }
+//! [read_nanovdb_sphere_accessor]

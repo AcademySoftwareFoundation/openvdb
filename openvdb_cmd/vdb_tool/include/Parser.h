@@ -35,6 +35,8 @@
 #include <sstream>
 #include <string> // for std::string, std::stof and std::stoi
 #include <algorithm> // std::sort
+#include <cmath>
+#include <limits>
 #include <filesystem>
 #include <random>
 #include <functional>
@@ -132,6 +134,7 @@ struct Action {
     void print(std::ostream& os = std::clog) const;
 
     std::vector<std::string> names;         ///< Names/aliases of the action, e.g. {"read", "import", "load", "i"}.
+    std::string              matchedName;   ///< The literal alias typed on the command line for this invocation (set during parsing).
     std::string              documentation; ///< One-line description shown in usage output.
     size_t                   anonymous;     ///< Index of the option receiving un-named values, or -1 if disallowed.
     bool                     greedy;        ///< If true, tokens with an unrecognized "name=" prefix also go to the anonymous option (see constructor docstring).
@@ -772,22 +775,43 @@ public:
     /// @param i Iterator pointing at the -for action.
     /// @param n Name of the loop variable.
     /// @param v Vector containing {start, end} or {start, end, step}. Step defaults to 1.
-    /// @throw std::invalid_argument if @a v has any size other than 2 or 3.
+    /// @throw std::invalid_argument for non-finite bounds, zero or misdirected steps,
+    ///        or if @a v has any size other than 2 or 3.
     ForLoop(Memory &s, ActIterT i, const std::string &n, const std::vector<T> &v) : BaseLoop(s, i, n), vec(1) {
         if (v.size()!=2 && v.size()!=3)  throw std::invalid_argument("ForLoop: expected two or three arguments, i=1,9 or i=1,9,2");
         for (size_t i=0; i<v.size(); ++i) vec[i] = v[i];
+        for (int i = 0; i < 3; ++i) {
+            if (!std::isfinite(static_cast<double>(vec[i])))
+                throw std::invalid_argument("ForLoop: bounds and step must be finite");
+        }
+        if (vec[2] == T(0)) throw std::invalid_argument("ForLoop: step must be non-zero");
+        if ((vec[0] < vec[1] && vec[2] < T(0)) ||
+            (vec[0] > vec[1] && vec[2] > T(0)))
+            throw std::invalid_argument("ForLoop: step must advance toward the end bound");
         if (this->valid()) this->set(vec[0]);
     }
     virtual ~ForLoop() {}
-    /// @brief Returns true if the current value is still strictly less than the upper bound.
-    bool valid() override {return vec[0] < vec[1];}
+    /// @brief Returns true if the current value has not reached the exclusive end bound.
+    bool valid() override {return vec[2] > T(0) ? vec[0] < vec[1] : vec[0] > vec[1];}
     /// @brief Advance the loop variable by the step and publish it to Memory.
     /// @return true if the new value is still in range.
     bool next() override {
         ++pos;
-        vec[0] = this->template get<T>() + vec[2];// read from memory
-        if (vec[0] < vec[1]) this->set(vec[0]);
-        return vec[0] < vec[1];
+        const T current = this->template get<T>();// loop bodies may update the variable
+        // Widen before addition to avoid signed integer overflow at the end of a range.
+        const long double sum = static_cast<long double>(current) + vec[2];
+        if (!std::isfinite(sum)) throw std::invalid_argument("ForLoop: non-finite loop value");
+        if (vec[2] > T(0) ? sum >= vec[1] : sum <= vec[1]) return false;
+        if (sum < std::numeric_limits<T>::lowest() || sum > std::numeric_limits<T>::max())
+            throw std::invalid_argument("ForLoop: loop value out of range");
+        const T next = static_cast<T>(sum);
+        // Compare with the current value, not the previous loop value, since loop bodies
+        // may move the variable backward, e.g. to retry an iteration.
+        if (vec[2] > T(0) ? next <= current : next >= current)
+            throw std::invalid_argument("ForLoop: step does not advance the loop value");
+        vec[0] = next;
+        if (this->valid()) this->set(vec[0]);
+        return this->valid();
     }
 
 private:
@@ -847,6 +871,7 @@ public:
     /// @param excludePattern Substring patterns; if non-empty, file name must contain none of them.
     /// @param minFileSize    Minimum file size in bytes (inclusive).
     /// @param maxFileSize    Maximum file size in bytes (inclusive).
+    /// @throw std::invalid_argument if a path being opened is not a directory.
     FilesLoop(Memory &s, ActIterT i, const std::string &name,
               std::vector<std::string> &&pathString,
               std::vector<std::string> &&fileExt,
@@ -863,7 +888,9 @@ public:
     {
         for (mPathIter = mPathNames.begin(); mPathIter != mPathNames.end(); ++mPathIter) {
             mFilePath = std::filesystem::path(*mPathIter);
-            OPENVDB_ASSERT(std::filesystem::is_directory(mFilePath));
+            if (!std::filesystem::is_directory(mFilePath)) {
+                throw std::invalid_argument("FilesLoop: path \"" + mFilePath.string() + "\" is not a directory");
+            }
             mIter = IterT(mFilePath);
             mEnd  = std::filesystem::end(mIter);
             for(; !this->valid() && mIter != mEnd; ++mIter);
@@ -913,6 +940,7 @@ public:
     }
     /// @brief Advance to the next matching file, spanning directories if needed.
     /// @return true if another valid file was found.
+    /// @throw std::invalid_argument if a subsequent path is not a directory.
     bool next() override {
         if (mPathIter == mPathNames.end()) return false;
         ++pos;
@@ -923,7 +951,9 @@ public:
             ++mPathIter;
             if (mPathIter != mPathNames.end()) {
                 mFilePath = std::filesystem::path(*mPathIter);
-                OPENVDB_ASSERT(std::filesystem::is_directory(mFilePath));
+                if (!std::filesystem::is_directory(mFilePath)) {
+                    throw std::invalid_argument("FilesLoop: path \"" + mFilePath.string() + "\" is not a directory");
+                }
                 mIter = IterT(mFilePath);
                 mEnd  = std::filesystem::end(mIter);
             }
@@ -1008,6 +1038,8 @@ struct Parser {
     /// @brief Constructor.
     /// @param def Global default options (applied to every matching action unless overridden).
     Parser(std::vector<Option> &&def);
+    /// @brief Destroy active scopes while their referenced Processor memory is still alive.
+    ~Parser() { loops.clear(); }
     /// @brief Parse argv into the @c actions list, dispatching each token to an action's options.
     /// @throw std::invalid_argument if no arguments are supplied, an unknown action is encountered,
     ///        or "-for/-each/-files/-if" actions are not balanced by matching "-end" actions.
@@ -1015,7 +1047,8 @@ struct Parser {
     /// @brief Validate the parsed action list (loop matching, etc.) and prepare for run().
     inline void finalize();
     /// @brief Execute every action in @c actions, in order, honoring loops and if-blocks.
-    inline void run();
+    /// @return false if an action failed and the error handler allowed execution to continue.
+    inline bool run();
     /// @brief Apply currently-stored defaults to the option list of the action at @c iter.
     inline void setDefaults();
     /// @brief Print every selected action in canonical form (useful for config-file output).
@@ -1097,9 +1130,21 @@ struct Parser {
     mutable int         mCurrentArgIdx = -1;
     /// @brief Optional callback to handle action errors. Called when an action throws.
     ///        If the callback returns true, the error is treated as fatal (re-thrown).
-    ///        If it returns false, the error is logged as a skip and execution continues.
+    ///        If it returns false, ordinary action errors are logged and execution continues.
+    ///        Control-flow errors always propagate to avoid executing an invalid scope.
     ///        The callback receives (action_name, exception_message).
     std::function<bool(const std::string&, const std::string&)> onActionError = nullptr;
+    /// @brief Optional callback applied to an option's value every time it is read,
+    ///        after {} expression expansion but before the caller sees it. Receives the
+    ///        option's name and its expanded value, which it may rewrite in place (e.g.
+    ///        resolving a grid name to a stack age) using state the generic Parser has
+    ///        no access to.
+    /// @note  This deliberately post-processes a COPY on each read rather than rewriting
+    ///        Option::value, so the stored source expression survives. Overwriting it
+    ///        would break loops, where the same Action is revisited and must re-evaluate
+    ///        its expressions each iteration (e.g. "-for v=0,3 -render vdb={$v} -end"),
+    ///        and would also corrupt the source form written out by -write to a config file.
+    std::function<void(const std::string&, std::string&)> onGetOption = nullptr;
 };// Parser struct
 
 // ==============================================================================================================
@@ -1111,6 +1156,8 @@ std::string Parser::getStr(const std::string &name) const
       if (opt.name != name) continue;// linear search
       std::string str = opt.value;// deep copy since it might get modified by map
       processor(str);
+      // Post-process the COPY, never opt.value itself -- see onGetOption's docstring.
+      if (onGetOption) onGetOption(name, str);
       return str;
   }
   throw std::invalid_argument(iter->names[0]+": Parser::getStr: no option named \""+name+"\"");
@@ -1119,12 +1166,12 @@ std::string Parser::getStr(const std::string &name) const
 // ==============================================================================================================
 
 template <>
-std::string Parser::get<std::string>(const std::string &name) const {return this->getStr(name);}
+inline std::string Parser::get<std::string>(const std::string &name) const {return this->getStr(name);}
 
 // ==============================================================================================================
 
 template <>
-std::vector<std::string> Parser::getVec<std::string>(const std::string &name, const char* delimiters) const
+inline std::vector<std::string> Parser::getVec<std::string>(const std::string &name, const char* delimiters) const
 {
     return tokenize(this->getStr(name), delimiters);
 }// Parser::getVec
@@ -1152,7 +1199,7 @@ math::Vec3<T> Parser::getVec3(const std::string &name, const char* delimiters) c
 
 // ==============================================================================================================
 
-std::multimap<size_t, std::string> Parser::closeMatches(const std::string &str) const
+inline std::multimap<size_t, std::string> Parser::closeMatches(const std::string &str) const
 {// Returns sorted map of available actions that look "close" to str. Leading
  // '-' is stripped before matching; the actual scoring (substring + Lev) lives
  // in Util.h's fuzzyMatch and is shared with Action::closeOptionMatches and
@@ -1167,7 +1214,7 @@ std::multimap<size_t, std::string> Parser::closeMatches(const std::string &str) 
 
 // ==============================================================================================================
 
-void Action::setOption(const std::string &str)
+inline void Action::setOption(const std::string &str)
 {
     // Greedy mode (set on actions whose anonymous option may take a value
     // containing '=', e.g. the kernel string in -calc / forValues): when no
@@ -1237,7 +1284,7 @@ void Action::setOption(const std::string &str)
     }
 }// Action::setOption
 
-std::multimap<size_t, std::string> Action::closeOptionMatches(const std::string &name) const
+inline std::multimap<size_t, std::string> Action::closeOptionMatches(const std::string &name) const
 {// Returns option names that look "close" to the user's input — handles both
  // typo (`radiuss=` → `radius`) and truncation (`rad=` → `radius`). Scoring
  // logic lives in Util.h's fuzzyMatch.
@@ -1249,7 +1296,7 @@ std::multimap<size_t, std::string> Action::closeOptionMatches(const std::string 
 
 // ==============================================================================================================
 
-void Action::print(std::ostream& os) const
+inline void Action::print(std::ostream& os) const
 {
     os << "-" << names[0];
     for (auto &a : options) os << " " << a.name << "=" << a.value;
@@ -1258,7 +1305,7 @@ void Action::print(std::ostream& os) const
 
 // ==============================================================================================================
 
-Parser::Parser(std::vector<Option> &&def)
+inline Parser::Parser(std::vector<Option> &&def)
   : available()// vector of all available actions
   , actions()//   vector of all selected actions
   , iter()// iterator pointing to the current actions being processed
@@ -1585,6 +1632,7 @@ Parser::Parser(std::vector<Option> &&def)
         },
         [&](){
             OPENVDB_ASSERT(iter->names[0] == "end");
+            if (loops.empty()) throw std::invalid_argument("-end has no active scope");
             auto loop = loops.back();// current loop
             if (loop->next()) {// rewind loop
                 iter = loop->begin;
@@ -1597,8 +1645,9 @@ Parser::Parser(std::vector<Option> &&def)
 
 // ==============================================================================================================
 
-void Parser::run()
+bool Parser::run()
 {
+    bool success = true;
     for (iter=actions.begin(); iter!=actions.end(); ++iter) {
         if (onActionError) {
             // Centralized error handling: wrap the action callback
@@ -1606,10 +1655,14 @@ void Parser::run()
                 iter->run();
             } catch (const std::exception& e) {
                 const std::string &action_name = iter->names[0];
-                const bool isFatal = onActionError(action_name, e.what());
+                const bool controlFlow = findMatch(action_name,
+                    {"for", "each", "files", "if", "switch", "case", "end"}) != 0;
+                const bool isFatal = controlFlow || onActionError(action_name, e.what());
                 if (isFatal) {
+                    loops.clear();
                     throw std::invalid_argument(action_name + ": " + e.what());
                 } else {
+                    success = false;
                     std::clog << action_name << ": skipping due to: " << e.what() << std::endl;
                 }
             }
@@ -1618,6 +1671,7 @@ void Parser::run()
             iter->run();
         }
     }
+    return success;
 }// Parser::run(
 
 // ==============================================================================================================
@@ -1635,7 +1689,7 @@ void Parser::finalize()
 
 // ==============================================================================================================
 
-void Parser::parse(int argc, char *argv[])
+inline void Parser::parse(int argc, char *argv[])
 {
     OPENVDB_ASSERT(!hashMap.empty());
     if (argc <= 1) throw std::invalid_argument("Parser: No arguments provided, try \"" + getFile(argv[0]) + " -help\"");
@@ -1687,6 +1741,7 @@ void Parser::parse(int argc, char *argv[])
             const int actionIdx = i;// remember the action keyword's position for diagnostics
             actions.push_back(*search->second);// copy construction of Action
             iter = std::prev(actions.end());// important
+            iter->matchedName = str.substr(pos);// literal alias typed by the user
             while(i+1<argc && argv[i+1][0] != '-') {
                 const int badIdx = i + 1;
                 try {
@@ -1734,7 +1789,7 @@ void Parser::parse(int argc, char *argv[])
 
 // ==============================================================================================================
 
-void Parser::usage(const VecS &actions, bool brief) const
+inline void Parser::usage(const VecS &actions, bool brief) const
 {
     for (const std::string &str : actions) {
         auto search = hashMap.find(str);
@@ -1760,7 +1815,7 @@ void Parser::usage(const VecS &actions, bool brief) const
 
 // ==============================================================================================================
 
-std::string Parser::usage(const Action &action, bool brief) const
+inline std::string Parser::usage(const Action &action, bool brief) const
 {
     std::stringstream ss;
     const static int w = 17;

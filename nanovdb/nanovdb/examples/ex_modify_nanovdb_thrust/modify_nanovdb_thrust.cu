@@ -7,8 +7,8 @@
 #include <thrust/iterator/counting_iterator.h>
 #include <thrust/for_each.h>
 
-#include <nanovdb/cuda/DeviceBuffer.h>
-#include <nanovdb/cuda/GridHandle.cuh>
+#include <nanovdb/cuda/GridHandle.cuh> // for cuda::copyTo, the explicit host<->device grid transfer
+
 
 extern "C"  void scaleActiveVoxels(nanovdb::FloatGrid *grid_d, uint64_t leafCount, float scale)
 {

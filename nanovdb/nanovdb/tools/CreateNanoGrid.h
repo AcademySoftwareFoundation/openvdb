@@ -92,6 +92,7 @@
 #include <nanovdb/util/Reduce.h>
 #include <nanovdb/util/PrefixSum.h>
 #include <nanovdb/math/DitherLUT.h>// for nanovdb::math::DitherLUT
+#include <nanovdb/math/HalfLite.h>
 
 #include <limits>
 #include <vector>
@@ -172,6 +173,7 @@ createNanoGrid(const SrcGridT &srcGrid,
 /// @tparam DstBuildT If ValueIndex all (active and inactive) values are indexed and if
 ///         it is ValueOnIndex only active values are indexed.
 /// @tparam BufferT BufferT Type of the buffer used ti allocate the destination grid
+/// @param srcGrid Input (source) grid to be converted
 /// @param channels If non-zero the values (active or all) in @c srcGrid are encoded as blind
 ///                 data in the output index grid. @c channels indicates the number of copies
 ///                 of these blind data
@@ -784,6 +786,37 @@ private:
     std::vector<uint64_t>    mValIdx[3];// store id of first value in node
 }; // CreateNanoGrid
 
+template <typename DstT, typename SrcT>
+inline DstT CreateNanoGridValueCast(const SrcT val)
+{
+    return static_cast<DstT>(val);
+}
+
+template <>
+inline nanovdb::Half CreateNanoGridValueCast<nanovdb::Half, float>(const float val)
+{
+    nanovdb::Half ret;
+    ret.raw = math::FloatToHalf(val);
+    return ret;
+}
+template <>
+inline nanovdb::Half CreateNanoGridValueCast<nanovdb::Half, double>(const double val)
+{
+    nanovdb::Half ret;
+    ret.raw = math::FloatToHalf(float(val));
+    return ret;
+}
+template <>
+inline float CreateNanoGridValueCast<float, nanovdb::Half>(const nanovdb::Half val)
+{
+    return math::HalfToFloat(val.raw);
+}
+template <>
+inline double CreateNanoGridValueCast<double, nanovdb::Half>(const nanovdb::Half val)
+{
+    return double(math::HalfToFloat(val.raw));
+}
+
 //================================================================================================
 
 template <typename SrcGridT>
@@ -859,7 +892,7 @@ struct CreateNanoGrid<SrcGridT>::OrderedBlindMetaData
         return type;
     }
     /// @brief Maps from string names of point attributes in openvdb to GridBlindDataSemantic
-    /// @param String name, typically used for point attributes in OpenVDB
+    /// @param name Attribute name, typically used for point attributes in OpenVDB
     /// @return GridBlindDataSemantic
     static GridBlindDataSemantic mapToSemantics(const std::string& name)
     {
@@ -1214,7 +1247,7 @@ CreateNanoGrid<SrcGridT>::processLeafs()
                     dst[3] = src[3];
                 }
             } else {
-                for (uint32_t j=0; j<512u; ++j) *dst++ = static_cast<DstValueT>(srcLeaf.getValue(j));
+                for (uint32_t j=0; j<512u; ++j) *dst++ = CreateNanoGridValueCast<DstValueT>(srcLeaf.getValue(j));
             }
         }
     });
@@ -1516,7 +1549,7 @@ CreateNanoGrid<SrcGridT>::processInternalNodes()
                     DstChildT *dstChild = this->template dstNode<DstBuildT,LEVEL-1>(childID++);// might be Leaf<FpN>
                     dstNode->setChild(it.pos(), dstChild);
                 } else {
-                    dstNode->setValue(it.pos(), static_cast<DstValueT>(value));
+                    dstNode->setValue(it.pos(), CreateNanoGridValueCast<DstValueT>(value));
                 }
             }
         }
@@ -1595,7 +1628,7 @@ CreateNanoGrid<SrcGridT>::processRoot()
     const uint32_t tableSize = srcRoot.getTableSize();
     if (DstRootT::DataType::padding()>0) util::memzero(dstRoot, DstRootT::memUsage(tableSize));
     dstRoot->mTableSize = tableSize;
-    dstRoot->mMinimum = dstRoot->mMaximum = dstRoot->mBackground = srcRoot.background();
+    dstRoot->mMinimum = dstRoot->mMaximum = dstRoot->mBackground = CreateNanoGridValueCast<DstValueT>(srcRoot.background());
     dstRoot->mBBox = CoordBBox(); // // set to an empty bounding box
     if (tableSize==0) return;
     auto *dstChild = this->template dstNode<DstBuildT, 2>(0);// fixed size and linear in memory
@@ -1605,7 +1638,7 @@ CreateNanoGrid<SrcGridT>::processRoot()
         if (it.probeChild(value)) {
             dstTile->setChild(it.getCoord(), dstChild++, dstRoot);
         } else {
-            dstTile->setValue(it.getCoord(), it.isValueOn(), static_cast<DstValueT>(value));
+            dstTile->setValue(it.getCoord(), it.isValueOn(), CreateNanoGridValueCast<DstValueT>(value));
         }
     }
 } // CreateNanoGrid::processRoot<T>

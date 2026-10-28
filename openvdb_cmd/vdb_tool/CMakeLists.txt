@@ -124,7 +124,12 @@ if(OPENVDB_TOOL_USE_EXR)
   target_compile_definitions(vdb_tool_common INTERFACE "VDB_TOOL_USE_EXR")
   find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED)
   find_package(Imath ${MINIMUM_IMATH_VERSION} CONFIG REQUIRED)
-  target_link_libraries(vdb_tool_common INTERFACE OpenEXR::OpenEXR Imath::Imath)
+
+  if(TARGET OpenEXR::OpenEXR)
+    target_link_libraries(vdb_tool_common INTERFACE OpenEXR::OpenEXR Imath::Imath)
+  else()
+    target_link_libraries(vdb_tool_common INTERFACE OpenEXR::IlmImf Imath::Imath)
+  endif()
 endif()
 
 if(OPENVDB_TOOL_USE_ABC)
@@ -236,7 +241,7 @@ else()
     target_link_libraries(vdb_tool_common INTERFACE TBB::tbb OpenVDB::openvdb)
 endif()
 
-target_include_directories(vdb_tool_common INTERFACE "${Boost_INCLUDE_DIRS}" "${OpenVDB_INCLUDE_DIRS}" "include")
+target_include_directories(vdb_tool_common INTERFACE "${OpenVDB_INCLUDE_DIRS}" "include")
 
 # vdb_tool
 add_executable(vdb_tool src/main.cpp)
@@ -251,6 +256,13 @@ if(OPENVDB_BUILD_VDB_TOOL_UNITTESTS)
 
   add_executable(vdb_tool_test src/unittest.cpp)
   target_include_directories(vdb_tool_test PRIVATE vdb_tool_common)
-  target_link_libraries(vdb_tool_test PRIVATE vdb_tool_common GTest::gmock GTest::gtest GTest::gmock_main GTest::gtest_main)
+  # The test provides its own main() and uses only gtest (no gmock), so link just
+  # GTest::gtest. Listing gmock / *_main as well pulls gtest/gmock onto the link
+  # line multiple times, which the macOS linker flags as "ignoring duplicate libraries".
+  target_link_libraries(vdb_tool_test PRIVATE vdb_tool_common GTest::gtest)
+  target_compile_definitions(vdb_tool_test PRIVATE
+    "VDB_TOOL_TEST_EXECUTABLE=\"$<TARGET_FILE:vdb_tool>\"")
+  add_dependencies(vdb_tool_test vdb_tool)
   add_test(vdb_tool_unit_test vdb_tool_test)
+  set_tests_properties(vdb_tool_unit_test PROPERTIES TIMEOUT 180)
 endif()

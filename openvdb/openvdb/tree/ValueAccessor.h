@@ -997,7 +997,7 @@ private:
         return this->evalFirstPred([&](const auto Idx) -> bool
             {
                 if constexpr(Idx < Start)                  return false;
-                else if constexpr(Idx > NumCacheLevels+1)  return false;
+                else if constexpr(static_cast<ptrdiff_t>(Idx) > static_cast<ptrdiff_t>(NumCacheLevels) + 1)  return false;
                 else {
                     using NodeType = typename NodeLevelList::template Get<Idx>;
                     return this->isHashed<NodeType>(xyz);

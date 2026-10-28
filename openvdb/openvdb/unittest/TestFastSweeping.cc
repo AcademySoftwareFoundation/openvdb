@@ -252,7 +252,7 @@ TEST_F(TestFastSweeping, testMaskSdf)
          openvdb::initialize();//required whenever I/O of OpenVDB files is performed!
          const std::string path(TestFastSweeping_DATA_PATH);
          io::File file( path + "bunny.vdb" );
-         file.open(false);//disable delayed loading
+         file.open();
          FloatGrid::Ptr mask = openvdb::gridPtrCast<openvdb::FloatGrid>(file.getGrids()->at(0));
 
          //this->writeFile("/tmp/bunny_mask_input.vdb", grid);
@@ -595,7 +595,7 @@ TEST_F(TestFastSweeping, velocityExtensionOfFogBunny)
   openvdb::initialize();//required whenever I/O of OpenVDB files is performed!
   const std::string path(TestFastSweeping_DATA_PATH);
   io::File file( path + "bunny.vdb" );
-  file.open(false);//disable delayed loading
+  file.open();
   auto grid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.getGrids()->at(0));
   tools::sdfToFogVolume(*grid);
   writeFile("/tmp/bunny1_fog_in.vdb", grid);
@@ -619,7 +619,7 @@ TEST_F(TestFastSweeping, velocityExtensionOfSdfBunny)
   using namespace openvdb;
   const std::string path(TestFastSweeping_DATA_PATH);
   io::File file( path + "bunny.vdb" );
-  file.open(false);//disable delayed loading
+  file.open();
   auto grid = openvdb::gridPtrCast<openvdb::FloatGrid>(file.getGrids()->at(0));
   writeFile("/tmp/bunny2_sdf_in.vdb", grid);
   auto bbox = grid->evalActiveVoxelBoundingBox();

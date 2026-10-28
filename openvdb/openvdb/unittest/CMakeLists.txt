@@ -82,12 +82,12 @@ else()
     TestAttributeSet.cc
     TestBBox.cc
     TestClip.cc
+    TestCodec.cc
     TestConjGradient.cc
     TestCoord.cc
     TestCount.cc
     TestCpt.cc
     TestCurl.cc
-    TestDelayedLoadMetadata.cc
     TestDense.cc
     TestDenseSparseTools.cc
     TestDiagnostics.cc
@@ -110,8 +110,8 @@ else()
     TestInit.cc
     TestInt32Metadata.cc
     TestInt64Metadata.cc
-    TestInternalOrigin.cc
     TestInternalNode.cc
+    TestInternalOrigin.cc
     TestLaplacian.cc
     TestLeaf.cc
     TestLeafBool.cc
@@ -132,8 +132,8 @@ else()
     TestMerge.cc
     TestMeshToVolume.cc
     TestMetadata.cc
-    TestMetaMap.cc
     TestMetadataIO.cc
+    TestMetaMap.cc
     TestMorphology.cc
     TestMultiResGrid.cc
     TestName.cc
@@ -141,11 +141,12 @@ else()
     TestNodeManager.cc
     TestNodeMask.cc
     TestNodeVisitor.cc
-    TestPCA.cc
     TestParticleAtlas.cc
     TestParticlesToLevelSet.cc
+    TestPCA.cc
     TestPointAdvect.cc
     TestPointAttribute.cc
+    TestPointCodec.cc
     TestPointConversion.cc
     TestPointCount.cc
     TestPointDataLeaf.cc
@@ -163,6 +164,7 @@ else()
     TestPointSample.cc
     TestPointScatter.cc
     TestPointStatistics.cc
+    TestPointTransfer.cc
     TestPointsToMask.cc
     TestPoissonSolver.cc
     TestPotentialFlow.cc
@@ -172,6 +174,7 @@ else()
     TestQuat.cc
     TestRay.cc
     TestRootNode.cc
+    TestSimd.cc
     TestStats.cc
     TestStencils.cc
     TestStream.cc

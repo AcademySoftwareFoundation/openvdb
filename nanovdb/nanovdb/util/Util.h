@@ -131,6 +131,32 @@ typedef unsigned long long uint64_t;
     __pragma(message(__FILE__ "(" NANOVDB_STRINGIZE(__LINE__) ") : Warning: " MSG))
 #endif
 
+//==============================================
+/// @brief Brackets code that calls deprecated NanoVDB API on purpose, e.g. a
+///        deprecated member that forwards to another deprecated member, so that
+///        the warning is reported only at the user's call.
+#if defined(__NVCC__) && defined(_MSC_VER)// with an MSVC host, nvcc mismatches nv_diagnostic push/pop, so restore the defaults as CCCL does
+#define NANOVDB_SUPPRESS_DEPRECATION_NVCC_BEGIN __pragma("nv_diag_suppress 1444") __pragma("nv_diag_suppress 20199")
+#define NANOVDB_SUPPRESS_DEPRECATION_NVCC_END __pragma("nv_diag_default 1444") __pragma("nv_diag_default 20199")
+#elif defined(__NVCC__)
+#define NANOVDB_SUPPRESS_DEPRECATION_NVCC_BEGIN _Pragma("nv_diagnostic push") _Pragma("nv_diag_suppress 1444") _Pragma("nv_diag_suppress 20199")
+#define NANOVDB_SUPPRESS_DEPRECATION_NVCC_END _Pragma("nv_diagnostic pop")
+#else
+#define NANOVDB_SUPPRESS_DEPRECATION_NVCC_BEGIN
+#define NANOVDB_SUPPRESS_DEPRECATION_NVCC_END
+#endif
+#if defined(__GNUC__) || defined(__clang__)
+#define NANOVDB_SUPPRESS_DEPRECATION_BEGIN \
+    _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"") NANOVDB_SUPPRESS_DEPRECATION_NVCC_BEGIN
+#define NANOVDB_SUPPRESS_DEPRECATION_END NANOVDB_SUPPRESS_DEPRECATION_NVCC_END _Pragma("GCC diagnostic pop")
+#elif defined(_MSC_VER)
+#define NANOVDB_SUPPRESS_DEPRECATION_BEGIN __pragma(warning(push)) __pragma(warning(disable : 4996)) NANOVDB_SUPPRESS_DEPRECATION_NVCC_BEGIN
+#define NANOVDB_SUPPRESS_DEPRECATION_END NANOVDB_SUPPRESS_DEPRECATION_NVCC_END __pragma(warning(pop))
+#else
+#define NANOVDB_SUPPRESS_DEPRECATION_BEGIN NANOVDB_SUPPRESS_DEPRECATION_NVCC_BEGIN
+#define NANOVDB_SUPPRESS_DEPRECATION_END NANOVDB_SUPPRESS_DEPRECATION_NVCC_END
+#endif
+
 // A portable implementation of offsetof - unfortunately it doesn't work with static_assert
 #define NANOVDB_OFFSETOF(CLASS, MEMBER) ((int)(size_t)((char*)&((CLASS*)0)->MEMBER - (char*)0))
 

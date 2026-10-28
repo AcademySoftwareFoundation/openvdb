@@ -24,28 +24,35 @@
 *
 * (c) Copyright 2012-2022 Agner Fog.
 * Apache License version 2.0 or later.
+*
+* -----------------------------------------------------------------------------
+*
+* This file has been modified from the original in the following ways:
+*  > Various defines and guards have been prefixed with OPENVDB_VCL_.
+*  > VCL_NAMESPACE has been removed in favour of an explicit OPENVDB_VCL_NAMESPACE.
+* Copyright Contributors to the OpenVDB Project
+* SPDX-License-Identifier: Apache-2.0*
+*
 ******************************************************************************/
 
-#ifndef VECTORI512SE_H
-#define VECTORI512SE_H
+#ifndef OPENVDB_VCL_VECTORI512SE_H
+#define OPENVDB_VCL_VECTORI512SE_H
 
-#ifndef VECTORCLASS_H
+#ifndef OPENVDB_VCL_VECTORCLASS_H
 #include "vectorclass.h"
 #endif
 
-#if VECTORCLASS_H < 20200
+#if OPENVDB_VCL_VECTORCLASS_H < 20200
 #error Incompatible versions of vector class library mixed
 #endif
 
 // check combination of header files
-#ifdef VECTORI512S_H
+#ifdef OPENVDB_VCL_VECTORI512S_H
 #error Two different versions of vectorf256.h included
 #endif
 
 
-#ifdef VCL_NAMESPACE
-namespace VCL_NAMESPACE {
-#endif
+namespace OPENVDB_VCL_NAMESPACE {
 
 
 /*****************************************************************************
@@ -87,7 +94,7 @@ public:
             i48, i49, i50, i51, i52, i53, i54, i55, i56, i57, i58, i59, i60, i61, i62, i63 };
         load(aa);
     }
-#ifdef VECTORI512_H
+#ifdef OPENVDB_VCL_VECTORI512_H
     // Constructor to convert from type __m512i used in intrinsics:
     Vec64c(__m512i const x) {
         z0 = Vec16i(x).get_low();
@@ -667,7 +674,7 @@ public:
         load(aa);
     }
 
-#ifdef VECTORI512_H
+#ifdef OPENVDB_VCL_VECTORI512_H
    // Constructor to convert from type __m512i used in intrinsics:
    Vec64uc(__m512i const x) : Vec64c(x) {};
 
@@ -880,7 +887,7 @@ public:
     Vec32s(Vec16s const a0, Vec16s const a1) {
         z0 = a0;  z1 = a1;
     }
-#ifdef VECTORI512_H
+#ifdef OPENVDB_VCL_VECTORI512_H
     // Constructor to convert from type __m512i used in intrinsics:
     Vec32s(__m512i const x) {
         Vec16i zz(x);
@@ -1413,7 +1420,7 @@ public:
     Vec32us(Vec16us const a0, Vec16us const a1) {
         z0 = a0;  z1 = a1;
     }
-#ifdef VECTORI512_H
+#ifdef OPENVDB_VCL_VECTORI512_H
     // Constructor to convert from type __m512i used in intrinsics:
     Vec32us(__m512i const x) : Vec32s(x) {
     }
@@ -2088,8 +2095,6 @@ static inline Vec64uc & operator /= (Vec64uc & a, Const_int_t<d> b) {
     return a;
 }
 
-#ifdef VCL_NAMESPACE
 }
-#endif
 
-#endif // VECTORI512S_H
+#endif // OPENVDB_VCL_VECTORI512S_H

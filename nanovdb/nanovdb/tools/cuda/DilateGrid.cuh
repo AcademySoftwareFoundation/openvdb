@@ -12,8 +12,8 @@
              to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NVIDIA_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
-#define NVIDIA_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <cub/cub.cuh>
 
@@ -24,15 +24,22 @@
 #include <nanovdb/util/cuda/Morphology.cuh>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
+#include <cstddef> // for std::byte
+#include <map>
+#include <stdexcept>
+#include <utility>
 
 
 namespace nanovdb {
 
 namespace tools::cuda {
 
-template <typename BuildT>
+template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class DilateGrid
 {
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "DilateGrid allocates stream-ordered scratch and requires an AsyncResource");
+
     using GridT  = NanoGrid<BuildT>;
     using TreeT  = NanoTree<BuildT>;
     using RootT  = NanoRoot<BuildT>;
@@ -43,8 +50,11 @@ public:
     /// @brief Constructor
     /// @param deviceGrid source device grid to be dilated
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    DilateGrid(const GridT* d_srcGrid, cudaStream_t stream = 0)
-        : mBuilder(stream), mStream(stream), mTimer(stream), mDeviceSrcGrid(d_srcGrid) {}
+    /// @param resource resource instance all device scratch is allocated from;
+    ///        must outlive this operator (defaults to the per-type default resource)
+    DilateGrid(const GridT* d_srcGrid, cudaStream_t stream = 0,
+               ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
+        : mBuilder(stream, resource), mStream(stream), mTimer(stream), mDeviceSrcGrid(d_srcGrid) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -60,11 +70,21 @@ public:
 
     /// @brief Creates a handle to the dilated grid
     /// @tparam BufferT Buffer type used for allocation of the grid handle
-    /// @param buffer optional buffer (currently ignored)
+    /// @param buffer prototype buffer whose resource (or create() pool) allocates the output
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
-    template<typename BufferT = nanovdb::cuda::DeviceBuffer>
+    template<typename BufferT = nanovdb::cuda::DualDeviceBuffer>
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
+
+    /// @brief Resource form of getHandle: the grid allocates through this
+    ///        builder's resource, the one its scratch uses, on its stream.
+    /// @return a handle over cuda::Buffer<std::byte, ResourceRef<ResourceT>>,
+    ///         which borrows the resource: it must outlive the handle
+    GridHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>> build()
+    {
+        using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
+        return this->getHandle(BufferT(mStream, mBuilder.ref(), 0, nanovdb::cuda::noInit));
+    }
 
 private:
     void dilateRoot();
@@ -78,25 +98,24 @@ private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
-    TopologyBuilder<BuildT>      mBuilder;
+    TopologyBuilder<BuildT, ResourceT> mBuilder;
     cudaStream_t                 mStream{0};
     util::cuda::Timer            mTimer;
     int                          mVerbose{0};
     const GridT                  *mDeviceSrcGrid;
     morphology::NearestNeighbors mOp{morphology::NN_FACE_EDGE_VERTEX};
     TreeData                     mSrcTreeData;
-};// tools::cuda::DilateGrid<BuildT>
+};// tools::cuda::DilateGrid<BuildT, ResourceT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
+template<typename BuildT, typename ResourceT>
 template<typename BufferT>
 GridHandle<BufferT>
-DilateGrid<BuildT>::getHandle(const BufferT &pool)
+DilateGrid<BuildT, ResourceT>::getHandle(const BufferT &pool)
 {
     // Copy TreeData from GPU -> CPU
-    cudaStreamSynchronize(mStream);
-    mSrcTreeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid);
+    mSrcTreeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid, mStream);
 
     // Ensure that the input grid contains no tile values
     if (mSrcTreeData.mTileCount[2] || mSrcTreeData.mTileCount[1] || mSrcTreeData.mTileCount[0])
@@ -117,8 +136,6 @@ DilateGrid<BuildT>::getHandle(const BufferT &pool)
     // Enumerate tree nodes
     if (mVerbose==1) mTimer.restart("Count dilated tree nodes");
     mBuilder.countNodes(mStream);
-
-    cudaStreamSynchronize(mStream);
 
     // Allocate new device grid buffer for dilated result
     if (mVerbose==1) mTimer.restart("Allocating dilated grid buffer");
@@ -152,35 +169,23 @@ DilateGrid<BuildT>::getHandle(const BufferT &pool)
     cudaStreamSynchronize(mStream);
 
     return GridHandle<BufferT>(std::move(buffer));
-}// DilateGrid<BuildT>::getHandle
+}// DilateGrid<BuildT, ResourceT>::getHandle
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void DilateGrid<BuildT>::dilateRoot()
+template<typename BuildT, typename ResourceT>
+void DilateGrid<BuildT, ResourceT>::dilateRoot()
 {
     // This method conservatively and speculatively dilates the root tiles, to accommodate
     // any new root nodes that might be introduced by the dilation operation.
-    // The index-space bounding box of each tile is examined, and if it is within a 1-pixel of
-    // intersecting any of the 26-connected neighboring root tiles, those are preemptively
-    // introduced into the root topology.
+    // The index-space bounding box of each upper node is expanded by one voxel, and every
+    // root tile it overlaps (at most the 26-connected neighbors) is preemptively introduced
+    // into the root topology.
     // (As of the present implementation this presumes a maximum of 1-voxel radius in dilation)
     // Root tiles that were preemptively introduced, but end up having no active contents will
     // be pruned in later stages of processing.
 
-    int device = 0;
-    cudaGetDevice(&device);
-
-    std::map<uint64_t, typename RootT::DataType::Tile> dilatedTiles;
-
-    // This encoding scheme mirrors the one used in PointsToGrid; note that it is different from Tile::key
-    auto coordToKey = [](const Coord &ijk)->uint64_t{
-        // Note: int32_t has a range of -2^31 to 2^31 - 1 whereas uint32_t has a range of 0 to 2^32 - 1
-        static constexpr int64_t kOffset = 1 << 31;
-        return (uint64_t(uint32_t(int64_t(ijk[2]) + kOffset) >> 12)      ) | // z is the lower 21 bits
-            (uint64_t(uint32_t(int64_t(ijk[1]) + kOffset) >> 12) << 21) | // y is the middle 21 bits
-            (uint64_t(uint32_t(int64_t(ijk[0]) + kOffset) >> 12) << 42); //  x is the upper 21 bits
-    };// coordToKey lambda functor
+    topology::detail::ProcessedTileMap<RootT> tiles;
 
     if (mSrcTreeData.mVoxelCount) { // If the input grid is not empty
         // Make a host copy of the source topology RootNode *and* the Upper Nodes (needed for BBox'es)
@@ -191,41 +196,23 @@ void DilateGrid<BuildT>::dilateRoot()
         cudaCheck(cudaMemcpyAsync(srcRootAndUpperBuffer.data(), deviceSrcRoot, rootAndUpperSize, cudaMemcpyDeviceToHost, mStream));
         auto srcRootAndUpper = static_cast<RootT*>(srcRootAndUpperBuffer.data());
 
-        // For each original root tile, consider adding those tiles in its 26-connected neighborhood
         for (uint32_t t = 0; t < srcRootAndUpper->tileCount(); t++) {
             auto srcUpper = srcRootAndUpper->getChild(srcRootAndUpper->tile(t));
             const auto dilatedBBox = srcUpper->bbox().expandBy(1); // TODO: update/specialize if larger dilation neighborhoods are used
-
-            static constexpr int32_t rootTileDim = UpperT::DIM; // 4096
-            for (int di = -rootTileDim; di <= rootTileDim; di += rootTileDim)
-            for (int dj = -rootTileDim; dj <= rootTileDim; dj += rootTileDim)
-            for (int dk = -rootTileDim; dk <= rootTileDim; dk += rootTileDim) {
-                auto testBBox = nanovdb::CoordBBox::createCube(srcUpper->origin().offsetBy(di,dj,dk), rootTileDim);
-                auto sortKey = coordToKey(testBBox.min()); // key used in the radix sort, in accordance with PointsToGrid
-                auto tileKey = RootT::CoordToKey(testBBox.min()); // encoding used in the NanoVDB tile
-                if (testBBox.hasOverlap(dilatedBBox) & (dilatedTiles.count(sortKey) == 0)) {
-                    typename RootT::Tile neighborTile{tileKey}; // Only the key value is needed; child pointer & value will be unused
-                    dilatedTiles.emplace(sortKey, neighborTile);
-                }
-            }
+            topology::detail::insertProcessedTiles<RootT>(tiles, dilatedBBox);
         }
     }
 
     // Package the new root topology into a RootNode plus Tile list; upload to the GPU
-    uint64_t rootSize = RootT::memUsage(dilatedTiles.size());
-    mBuilder.mProcessedRoot = nanovdb::cuda::DeviceBuffer::create(rootSize);
-    auto dilatedRootPtr = static_cast<RootT*>(mBuilder.mProcessedRoot.data());
-    dilatedRootPtr->mTableSize = dilatedTiles.size();
-    uint32_t t = 0;
-    for (const auto& [key, tile] : dilatedTiles)
-        *dilatedRootPtr->tile(t++) = tile;
-    mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
-}// DilateGrid<BuildT>::dilateRoot
+    auto rootPtr = mBuilder.allocateProcessedRootTiles(static_cast<uint32_t>(tiles.size()));
+    topology::detail::packProcessedRoot(tiles, rootPtr);
+    mBuilder.uploadProcessedRoot(mStream);
+}// DilateGrid<BuildT, ResourceT>::dilateRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void DilateGrid<BuildT>::dilateInternalNodes()
+template<typename BuildT, typename ResourceT>
+void DilateGrid<BuildT, ResourceT>::dilateInternalNodes()
 {
     // Computes the masks of upper and (densified) lower internal nodes, as a result of the dilation operation
     // Masks of lower internal nodes are densified in the sense that a serialized array of them is allocated,
@@ -247,24 +234,24 @@ void DilateGrid<BuildT>::dilateInternalNodes()
                 <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
                 (mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
     }
-}// DilateGrid<BuildT>::dilateInternalNodes
+}// DilateGrid<BuildT, ResourceT>::dilateInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template <typename BuildT>
-void DilateGrid<BuildT>::processGridTreeRoot()
+template <typename BuildT, typename ResourceT>
+void DilateGrid<BuildT, ResourceT>::processGridTreeRoot()
 {
     // Copy GridData from source grid
     // By convention: this will duplicate grid name and map. Others will be reset later
     cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrid->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
     cudaCheckError();
-}// DilateGrid<BuildT>::processGridTreeRoot
+}// DilateGrid<BuildT, ResourceT>::processGridTreeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void DilateGrid<BuildT>::dilateLeafNodes()
+template<typename BuildT, typename ResourceT>
+void DilateGrid<BuildT, ResourceT>::dilateLeafNodes()
 {
     // Dilates the active masks of the source grid (as indicated at the leaf level), into a new grid that
     // has been already topologically dilated to include all necessary leaf nodes.
@@ -279,13 +266,13 @@ void DilateGrid<BuildT>::dilateLeafNodes()
         else if (mOp == morphology::NN_FACE_EDGE_VERTEX) {
             using Op = util::morphology::cuda::DilateLeafNodesFunctor<BuildT, morphology::NN_FACE_EDGE_VERTEX>;
             util::cuda::operatorKernel<Op>
-                <<<dim3(mBuilder.data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock>>>
+                <<<dim3(mBuilder.data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
                 (mDeviceSrcGrid, static_cast<GridT*>(mBuilder.data()->d_bufferPtr)); }
     }
 
     // Update leaf offsets and prefix sums
     mBuilder.processLeafOffsets(mStream);
-}// DilateGrid<BuildT>::dilateLeafNodes
+}// DilateGrid<BuildT, ResourceT>::dilateLeafNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -293,4 +280,4 @@ void DilateGrid<BuildT>::dilateLeafNodes()
 
 }// namespace nanovdb
 
-#endif // NVIDIA_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
+#endif // NANOVDB_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED

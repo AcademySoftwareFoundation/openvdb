@@ -12,8 +12,8 @@
              to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NVIDIA_TOOLS_CUDA_COARSENGRID_CUH_HAS_BEEN_INCLUDED
-#define NVIDIA_TOOLS_CUDA_COARSENGRID_CUH_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_TOOLS_CUDA_COARSENGRID_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_TOOLS_CUDA_COARSENGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <cub/cub.cuh>
 
@@ -24,15 +24,22 @@
 #include <nanovdb/util/cuda/Morphology.cuh>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
+#include <cstddef> // for std::byte
+#include <map>
+#include <stdexcept>
+#include <utility>
 
 
 namespace nanovdb {
 
 namespace tools::cuda {
 
-template <typename BuildT>
+template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
 class CoarsenGrid
 {
+    static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
+                  "CoarsenGrid allocates stream-ordered scratch and requires an AsyncResource");
+
     using GridT  = NanoGrid<BuildT>;
     using TreeT  = NanoTree<BuildT>;
     using RootT  = NanoRoot<BuildT>;
@@ -43,8 +50,11 @@ public:
     /// @brief Constructor
     /// @param deviceGrid source device grid to be coarsened
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    CoarsenGrid(const GridT* d_srcGrid, cudaStream_t stream = 0)
-        : mBuilder(stream), mStream(stream), mTimer(stream), mDeviceSrcGrid(d_srcGrid) {}
+    /// @param resource resource instance all device scratch is allocated from;
+    ///        must outlive this operator (defaults to the per-type default resource)
+    CoarsenGrid(const GridT* d_srcGrid, cudaStream_t stream = 0,
+                ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
+        : mBuilder(stream, resource), mStream(stream), mTimer(stream), mDeviceSrcGrid(d_srcGrid) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -56,11 +66,21 @@ public:
 
     /// @brief Creates a handle to the coarsened grid
     /// @tparam BufferT Buffer type used for allocation of the grid handle
-    /// @param buffer optional buffer (currently ignored)
+    /// @param buffer prototype buffer whose resource (or create() pool) allocates the output
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
-    template<typename BufferT = nanovdb::cuda::DeviceBuffer>
+    template<typename BufferT = nanovdb::cuda::DualDeviceBuffer>
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
+
+    /// @brief Resource form of getHandle: the grid allocates through this
+    ///        builder's resource, the one its scratch uses, on its stream.
+    /// @return a handle over cuda::Buffer<std::byte, ResourceRef<ResourceT>>,
+    ///         which borrows the resource: it must outlive the handle
+    GridHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>> build()
+    {
+        using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
+        return this->getHandle(BufferT(mStream, mBuilder.ref(), 0, nanovdb::cuda::noInit));
+    }
 
 private:
     void coarsenRoot();
@@ -74,24 +94,23 @@ private:
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
-    TopologyBuilder<BuildT> mBuilder;
+    TopologyBuilder<BuildT, ResourceT> mBuilder;
     cudaStream_t            mStream{0};
     util::cuda::Timer       mTimer;
     int                     mVerbose{0};
     const GridT             *mDeviceSrcGrid;
     TreeData                mSrcTreeData;
-};// tools::cuda::CoarsenGrid<BuildT>
+};// tools::cuda::CoarsenGrid<BuildT, ResourceT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
+template<typename BuildT, typename ResourceT>
 template<typename BufferT>
 GridHandle<BufferT>
-CoarsenGrid<BuildT>::getHandle(const BufferT &pool)
+CoarsenGrid<BuildT, ResourceT>::getHandle(const BufferT &pool)
 {
     // Copy TreeData from GPU -> CPU
-    cudaStreamSynchronize(mStream);
-    mSrcTreeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid);
+    mSrcTreeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid, mStream);
 
     // Ensure that the input grid contains no tile values
     if (mSrcTreeData.mTileCount[2] || mSrcTreeData.mTileCount[1] || mSrcTreeData.mTileCount[0])
@@ -112,8 +131,6 @@ CoarsenGrid<BuildT>::getHandle(const BufferT &pool)
     // Enumerate tree nodes
     if (mVerbose==1) mTimer.restart("Count coarsened tree nodes");
     mBuilder.countNodes(mStream);
-
-    cudaStreamSynchronize(mStream);
 
     // Allocate new device grid buffer for coarsened result
     if (mVerbose==1) mTimer.restart("Allocating coarsened grid buffer");
@@ -147,31 +164,19 @@ CoarsenGrid<BuildT>::getHandle(const BufferT &pool)
     cudaStreamSynchronize(mStream);
 
     return GridHandle<BufferT>(std::move(buffer));
-}// CoarsenGrid<BuildT>::getHandle
+}// CoarsenGrid<BuildT, ResourceT>::getHandle
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void CoarsenGrid<BuildT>::coarsenRoot()
+template<typename BuildT, typename ResourceT>
+void CoarsenGrid<BuildT, ResourceT>::coarsenRoot()
 {
     // This method coarsens the root tiles, to accommodate for the overall downsamping operation.
 
-    int device = 0;
-    cudaGetDevice(&device);
-
-    std::map<uint64_t, typename RootT::DataType::Tile> coarsenedTiles;
-
-    // This encoding scheme mirrors the one used in PointsToGrid; note that it is different from Tile::key
-    auto coordToKey = [](const Coord &ijk)->uint64_t{
-        // Note: int32_t has a range of -2^31 to 2^31 - 1 whereas uint32_t has a range of 0 to 2^32 - 1
-        static constexpr int64_t kOffset = 1 << 31;
-        return (uint64_t(uint32_t(int64_t(ijk[2]) + kOffset) >> 12)      ) | // z is the lower 21 bits
-            (uint64_t(uint32_t(int64_t(ijk[1]) + kOffset) >> 12) << 21) | // y is the middle 21 bits
-            (uint64_t(uint32_t(int64_t(ijk[0]) + kOffset) >> 12) << 42); //  x is the upper 21 bits
-    };// coordToKey lambda functor
+    topology::detail::ProcessedTileMap<RootT> tiles;
 
     if (mSrcTreeData.mVoxelCount) { // If the input grid is not empty
-        // Make a host copy of the Root topology
+        // Make a host copy of the source topology RootNode
         auto deviceSrcRoot = static_cast<const RootT*>(util::PtrAdd(mDeviceSrcGrid, GridT::memUsage() + mSrcTreeData.mNodeOffset[3]));
         uint64_t rootSize = mSrcTreeData.mNodeOffset[2] - mSrcTreeData.mNodeOffset[3];
         auto srcRootBuffer = nanovdb::HostBuffer::create(rootSize);
@@ -179,30 +184,20 @@ void CoarsenGrid<BuildT>::coarsenRoot()
         auto srcRoot = static_cast<RootT*>(srcRootBuffer.data());
 
         // Add all root tiles, reordering if necessary
-        for (uint32_t t = 0; t < srcRoot->tileCount(); t++) {
-            auto coarsenedOrigin = util::morphology::coarsenCoord(srcRoot->tile(t)->origin());
-            auto sortKey = coordToKey(coarsenedOrigin); // key used in the radix sort, in accordance with PointsToGrid
-            auto tileKey = RootT::CoordToKey(coarsenedOrigin); // encoding used in the NanoVDB tile
-            typename RootT::Tile coarsenedTile{tileKey}; // Only the key value is needed; child pointer & value will be unused
-            coarsenedTiles.emplace(sortKey, coarsenedTile);
-        }
+        for (uint32_t t = 0; t < srcRoot->tileCount(); t++)
+            topology::detail::insertProcessedTile<RootT>(tiles, util::morphology::coarsenCoord(srcRoot->tile(t)->origin()));
     }
 
     // Package the new root topology into a RootNode plus Tile list; upload to the GPU
-    uint64_t rootSize = RootT::memUsage(coarsenedTiles.size());
-    mBuilder.mProcessedRoot = nanovdb::cuda::DeviceBuffer::create(rootSize);
-    auto coarsenedRootPtr = static_cast<RootT*>(mBuilder.mProcessedRoot.data());
-    coarsenedRootPtr->mTableSize = coarsenedTiles.size();
-    uint32_t t = 0;
-    for (const auto& [key, tile] : coarsenedTiles)
-        *coarsenedRootPtr->tile(t++) = tile;
-    mBuilder.mProcessedRoot.deviceUpload(device, mStream, false);
-}// CoarsenGrid<BuildT>::coarsenRoot
+    auto rootPtr = mBuilder.allocateProcessedRootTiles(static_cast<uint32_t>(tiles.size()));
+    topology::detail::packProcessedRoot(tiles, rootPtr);
+    mBuilder.uploadProcessedRoot(mStream);
+}// CoarsenGrid<BuildT, ResourceT>::coarsenRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void CoarsenGrid<BuildT>::coarsenInternalNodes()
+template<typename BuildT, typename ResourceT>
+void CoarsenGrid<BuildT, ResourceT>::coarsenInternalNodes()
 {
     // Computes the masks of upper and (densified) lower internal nodes, as a result of the coarsening operation
     // Masks of lower internal nodes are densified in the sense that a serialized array of them is allocated,
@@ -210,26 +205,26 @@ void CoarsenGrid<BuildT>::coarsenInternalNodes()
     if (auto srcLeafCount = mSrcTreeData.mNodeCount[0]) { // Unless it's an empty grid
         util::cuda::lambdaKernel<<<numBlocks(srcLeafCount), mNumThreads, 0, mStream>>>(
             srcLeafCount, util::morphology::cuda::CoarsenInternalNodesFunctor<BuildT>(),
-            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.mUpperMasks.deviceData(), mBuilder.mLowerMasks.deviceData() );
+            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks() );
     }
-}// CoarsenGrid<BuildT>::coarsenInternalNodes
+}// CoarsenGrid<BuildT, ResourceT>::coarsenInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template <typename BuildT>
-void CoarsenGrid<BuildT>::processGridTreeRoot()
+template <typename BuildT, typename ResourceT>
+void CoarsenGrid<BuildT, ResourceT>::processGridTreeRoot()
 {
     // Copy GridData from source grid
     // By convention: this will duplicate grid name and map. Others will be reset later
     cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrid->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
     util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
     cudaCheckError();
-}// CoarsenGrid<BuildT>::processGridTreeRoot
+}// CoarsenGrid<BuildT, ResourceT>::processGridTreeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-template<typename BuildT>
-void CoarsenGrid<BuildT>::coarsenLeafNodes()
+template<typename BuildT, typename ResourceT>
+void CoarsenGrid<BuildT, ResourceT>::coarsenLeafNodes()
 {
     // Coarsens the active masks of the source grid (as indicated at the leaf level), into a new grid that
     // has been already topologically coarsened to include all necessary leaf nodes.
@@ -241,7 +236,7 @@ void CoarsenGrid<BuildT>::coarsenLeafNodes()
 
     // Update leaf offsets and prefix sums
     mBuilder.processLeafOffsets(mStream);
-}// CoarsenGrid<BuildT>::coarsenLeafNodes
+}// CoarsenGrid<BuildT, ResourceT>::coarsenLeafNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -249,4 +244,4 @@ void CoarsenGrid<BuildT>::coarsenLeafNodes()
 
 }// namespace nanovdb
 
-#endif // NVIDIA_TOOLS_CUDA_COARSENGRID_CUH_HAS_BEEN_INCLUDED
+#endif // NANOVDB_TOOLS_CUDA_COARSENGRID_CUH_HAS_BEEN_INCLUDED

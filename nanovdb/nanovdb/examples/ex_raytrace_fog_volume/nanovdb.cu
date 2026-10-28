@@ -1,16 +1,16 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
+#ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
+#endif
 #include <cmath>
 #include <chrono>
 
 #if defined(NANOVDB_USE_CUDA)
-#include <nanovdb/cuda/DeviceBuffer.h>
-using BufferT = nanovdb::cuda::DeviceBuffer;
-#else
-using BufferT = nanovdb::HostBuffer;
+#include <nanovdb/cuda/GridHandle.cuh> // for cuda::copyTo, the explicit host->device grid transfer
 #endif
+using BufferT = nanovdb::HostBuffer;
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/io/IO.h>
 #include <nanovdb/math/Ray.h>
@@ -84,14 +84,15 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
     }
 
 #if defined(NANOVDB_USE_CUDA)
-    handle.deviceUpload();
+    // deep-copy the grid to the device; the returned handle validates it there
+    auto deviceHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle);
 
-    auto* d_grid = handle.deviceGrid<float>();
+    auto* d_grid = deviceHandle.deviceGrid<float>();
     if (!d_grid)
         throw std::runtime_error("GridHandle does not contain a valid device grid");
 
-    imageBuffer.deviceUpload();
-    float* d_outImage = reinterpret_cast<float*>(imageBuffer.deviceData());
+    nanovdb::cuda::Buffer<float> deviceImage(cudaStream_t(0), size_t(width) * height, nanovdb::cuda::noInit);
+    float* d_outImage = deviceImage.data();
 
     {
         float durationAvg = 0;
@@ -103,7 +104,7 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int wid
         durationAvg /= numIterations;
         std::cout << "Average Duration(NanoVDB-Cuda) = " << durationAvg << " ms" << std::endl;
 
-        imageBuffer.deviceDownload();
+        cudaMemcpy(imageBuffer.data(), deviceImage.data(), size_t(width) * height * sizeof(float), cudaMemcpyDeviceToHost);
         saveImage("raytrace_fog_volume-nanovdb-cuda.pfm", width, height, (float*)imageBuffer.data());
     }
 #endif

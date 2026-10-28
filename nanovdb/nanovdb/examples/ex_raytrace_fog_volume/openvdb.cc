@@ -3,7 +3,9 @@
 
 #if defined(NANOVDB_USE_OPENVDB)
 
+#ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES
+#endif
 #include <cmath>
 #include <chrono>
 
@@ -15,12 +17,7 @@
 
 #include "common.h"
 
-#if defined(NANOVDB_USE_CUDA)
-#include <nanovdb/cuda/DeviceBuffer.h>
-using BufferT = nanovdb::cuda::DeviceBuffer;
-#else
-using BufferT = nanovdb::HostBuffer;
-#endif
+using BufferT = nanovdb::HostBuffer; // the handle lives in host memory; the CUDA side deep-copies it to the device
 
 void runOpenVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int width, int height, BufferT& imageBuffer)
 {

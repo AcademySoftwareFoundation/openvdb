@@ -34,6 +34,8 @@
 #include <openvdb/util/Assert.h>
 #include <openvdb/tools/Composite.h>
 #include <openvdb/tools/Count.h>// for tools::minMax (used by -print level=2)
+#include <openvdb/tools/Diagnostics.h>
+#include <openvdb/tools/Statistics.h>
 #include <openvdb/tools/FastSweeping.h>
 #include <openvdb/tools/LevelSetAdvect.h>
 #include <openvdb/tools/LevelSetDilatedMesh.h>
@@ -48,14 +50,11 @@
 #include <openvdb/tools/RayTracer.h>
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/tools/ParticlesToLevelSet.h>
-#include <openvdb/tools/PolySoupToLevelSet.h>
 #include <openvdb/tools/PointScatter.h>
 #include <openvdb/tools/PointsToMask.h>
-#include <openvdb/tools/Composite.h>
 #include <openvdb/tools/VolumeToMesh.h>
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/GridTransformer.h>
-#include <openvdb/tools/FastSweeping.h>
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tools/Clip.h>
 #include <openvdb/tools/Mask.h> // for tools::interiorMask()
@@ -102,6 +101,7 @@
 #include "Calculator.h"
 #include "Parser.h"
 #include "Geometry.h"
+#include "ShrinkWrap.h"
 
 #if defined(_WIN32)
 #include <io.h>
@@ -146,11 +146,11 @@ public:
     Tool& operator=(Tool&&) = delete;      ///< Move assignment is disabled.
 
     /// @brief Execute every action that was registered during construction, in order.
-    /// @note  On a fatal exception inside an action this method writes the message to
-    ///        std::cerr and calls std::exit(EXIT_FAILURE) rather than propagating.
-    void run();
+    /// @return true if every action succeeded, false if any action was skipped after an error.
+    /// @throw std::exception on a fatal action error (including control-flow failures).
+    bool run();
 
-    /// @brief Redirect std::clog/std::cerr/std::cout to a log file for the remainder of this Tool's lifetime.
+    /// @brief Redirect std::clog/std::cerr to a log file, leaving binary stdout untouched.
     /// @param logFile Path of the log file. If empty, a timestamped name is generated.
     /// @param append  If true, append to the existing file; otherwise truncate it (default).
     /// @param tee     If true (default), output is also written to the original terminal stream so the
@@ -160,18 +160,15 @@ public:
     /// @note Subsequent calls are no-ops while a redirection is already active.
     void startLog(std::string logFile, bool append = false, bool tee = true);
 
-    /// @brief Restore std::clog/std::cerr/std::cout to their original buffers and close the log file (if any).
+    /// @brief Restore diagnostic streams to their original buffers and close the log file (if any).
     void endLog() {
       if (mOldClogBuffer) std::clog.rdbuf(mOldClogBuffer);
       if (mOldCerrBuffer) std::cerr.rdbuf(mOldCerrBuffer);
-      if (mOldCoutBuffer) std::cout.rdbuf(mOldCoutBuffer);
       if (mLogFile.is_open()) mLogFile.close();
       mOldClogBuffer = nullptr;
       mOldCerrBuffer = nullptr;
-      mOldCoutBuffer = nullptr;
       mClogTee.reset();
       mCerrTee.reset();
-      mCoutTee.reset();
     }
 
     /// @brief Print a summary of the current VDB-grid and Geometry stacks to @a os.
@@ -192,7 +189,7 @@ public:
 private:
 
     static const int sMajor = 10; ///< Major version: incremented on incompatible option/file changes.
-    static const int sMinor =  8; ///< Minor version: incremented on backwards-compatible new features.
+    static const int sMinor =  9; ///< Minor version: incremented on backwards-compatible new features.
     static const int sPatch =  0; ///< Patch version: incremented on backwards-compatible bug fixes.
 
     using GridT   = FloatGrid;                                       ///< Scalar grid type used by most level-set operations.
@@ -210,13 +207,29 @@ private:
     std::ofstream            mLogFile;        ///< Backing file used by startLog/endLog when active.
     std::streambuf          *mOldClogBuffer;  ///< Cached std::clog buffer for restoring after logging.
     std::streambuf          *mOldCerrBuffer;  ///< Cached std::cerr buffer for restoring after logging.
-    std::streambuf          *mOldCoutBuffer;  ///< Cached std::cout buffer for restoring after logging.
     std::unique_ptr<TeeBuf>  mClogTee;        ///< Tee streambuf for std::clog (terminal + log file) when -log tee=true.
     std::unique_ptr<TeeBuf>  mCerrTee;        ///< Tee streambuf for std::cerr.
-    std::unique_ptr<TeeBuf>  mCoutTee;        ///< Tee streambuf for std::cout.
 
     /// @brief Delete all queued Geometry, VDB grids, and local variables.
     void clear();
+
+    /// @brief Deep-copy VDB grids and/or Geometry by index onto their respective stacks.
+    void copy();
+
+    /// @brief Run OpenVDB diagnostics checks on VDB grids on the stack.
+    void diagnose();
+
+    /// @brief Print value statistics (min, max, mean, std. dev.) for VDB grids on the stack.
+    void stats();
+
+    /// @brief Print an ASCII bar histogram of the active values of VDB grids on the stack.
+    void histogram();
+
+    /// @brief Rename a VDB grid and/or Geometry on the stack by age index.
+    void rename();
+
+    /// @brief Swap two VDB grids and/or two Geometry entries on their respective stacks.
+    void swap();
 
     /// @brief Clip an input VDB grid against another grid, a bbox, or a frustum.
     /// @tparam GridType Type of the input grid being clipped.
@@ -283,15 +296,11 @@ private:
     /// @brief Convert a polygon mesh into a symmetric narrow-band unsigned distance field.
     void meshToUnsignedDistanceField();
 
-#ifdef VDB_TOOL_USE_SHRINKWRAP
     /// @brief Convert an arbitrary (possibly non-watertight) polygon soup into a narrow-band level set.
-    /// @note  Gated behind VDB_TOOL_USE_SHRINKWRAP (temporarily disabled; not exposed via CMake).
-    ///        Enable a local build with: cmake -DCMAKE_CXX_FLAGS="-DVDB_TOOL_USE_SHRINKWRAP" ..
-    void soupToLevelSet();
-#endif
+    void shrinkWrap();
 
-    /// @brief Generate a dx-offset surface from a polygon soup.
-    void soupToOffset();
+    /// @brief Generate a dx-offset surface from a polygon mesh or polygon soup.
+    void meshToOffset();
 
 #ifdef VDB_TOOL_USE_AX
     /// @brief Run an OpenVDB AX code snippet over one or more selected grids.
@@ -393,6 +402,22 @@ private:
     /// @throw std::invalid_argument if @a age exceeds the current stack depth.
     inline auto getGeom(size_t age) const;
 
+    /// @brief Translate one "vdb"/"geo" option value, replacing any non-numeric (name)
+    ///        token with the stack age of the entry carrying that exact name.
+    /// @details Installed as mParser.onGetOption so it runs on every read of a "vdb"/"geo"
+    ///          option, letting each action's existing numeric parsing and error handling
+    ///          (age lists, "*", out-of-range checks, etc.) operate unchanged downstream.
+    ///          Resolution happens per-read against the CURRENT stack rather than being
+    ///          written back into the option, so loop bodies re-resolve each iteration.
+    /// @param optName Option name, either "vdb" or "geo" (selects which stack to search).
+    /// @param raw     Fully expression-resolved option value (i.e. after {} substitution).
+    /// @return The translated value: unchanged if empty or "*", otherwise every token is numeric.
+    /// @throw std::out_of_range   if a name token matches no entry on the corresponding stack.
+    /// @throw std::invalid_argument if a name token matches more than one entry. A name must
+    ///        identify exactly one entry, since most actions read "vdb"/"geo" as a single age
+    ///        and those that read a list may mutate the stack while consuming it.
+    std::string resolveStackOption(const std::string &optName, const std::string &raw) const;
+
     /// @brief Convert the output of a VolumeToMesh pass into a Geometry instance.
     Geometry::Ptr mesherToGeometry(tools::VolumeToMesh&) const;
     /// @brief Adaptively mesh a scalar grid at @a isoValue and return the result as a Geometry.
@@ -405,7 +430,7 @@ private:
 
 // ==============================================================================================================
 
-Tool::Tool(int argc, char *argv[])
+inline Tool::Tool(int argc, char *argv[])
     : mTimer(std::clog)
     , mCmdName(getBase(argv[0]))// name of executable
     , mRawCmdLine([&]{
@@ -426,7 +451,6 @@ Tool::Tool(int argc, char *argv[])
     , mLogFile()
     , mOldClogBuffer(nullptr)
     , mOldCerrBuffer(nullptr)
-    , mOldCoutBuffer(nullptr)
 {
     openvdb::initialize();
     this->init();// fast: less than 1 ms
@@ -435,6 +459,13 @@ Tool::Tool(int argc, char *argv[])
         // Set up centralized error handler for action execution
         mParser.onActionError = [this](const std::string&, const std::string&) {
             return mErrorOnWarning; // true = fatal (re-throw), false = skip
+        };
+        // Translate "vdb"/"geo" name tokens into stack ages on every read of those
+        // options. Every option so named refers to an entry on one of the two stacks,
+        // so no action needs to opt out of this.
+        mParser.onGetOption = [this](const std::string &name, std::string &value) {
+            if (name != "vdb" && name != "geo") return;
+            value = this->resolveStackOption(name, value);
         };
         mParser.parse(argc, argv);// extremely fast, but might throw
     } catch (const std::exception& e) {
@@ -445,7 +476,7 @@ Tool::Tool(int argc, char *argv[])
 
 // ==============================================================================================================
 
-void Tool::startLog(std::string logFile, bool append, bool tee)
+inline void Tool::startLog(std::string logFile, bool append, bool tee)
 {
     if (mOldClogBuffer != nullptr) return;// handles repeated calls
     if (logFile.empty()) logFile = "vdb_tool_" + dateStamp() + ".log";
@@ -459,12 +490,10 @@ void Tool::startLog(std::string logFile, bool append, bool tee)
     // block buffer to flush. The help text recommends this workflow.
     mLogFile.setf(std::ios::unitbuf);
 
-    // Redirect all three text streams so warnings/errors (cerr) and any
-    // stdout-bound output also land in the log — not just clog.
+    // Only diagnostics belong in the log. stdout carries binary grid data.
     mOldClogBuffer = std::clog.rdbuf();
     mOldCerrBuffer = std::cerr.rdbuf();
-    mOldCoutBuffer = std::cout.rdbuf();
-    if (mOldClogBuffer == nullptr || mOldCerrBuffer == nullptr || mOldCoutBuffer == nullptr) {
+    if (mOldClogBuffer == nullptr || mOldCerrBuffer == nullptr) {
         throw std::invalid_argument("startLog: failed to cache standard stream buffers");
     }
     if (tee) {
@@ -472,15 +501,12 @@ void Tool::startLog(std::string logFile, bool append, bool tee)
         // the user keeps live console feedback while the log accumulates.
         mClogTee = std::make_unique<TeeBuf>(mOldClogBuffer, mLogFile.rdbuf());
         mCerrTee = std::make_unique<TeeBuf>(mOldCerrBuffer, mLogFile.rdbuf());
-        mCoutTee = std::make_unique<TeeBuf>(mOldCoutBuffer, mLogFile.rdbuf());
         std::clog.rdbuf(mClogTee.get());
         std::cerr.rdbuf(mCerrTee.get());
-        std::cout.rdbuf(mCoutTee.get());
     } else {
-        // Exclusive log mode (tee=false): nothing goes to the terminal.
+        // Exclusive log mode (tee=false): diagnostics only go to the log.
         std::clog.rdbuf(mLogFile.rdbuf());
         std::cerr.rdbuf(mLogFile.rdbuf());
-        std::cout.rdbuf(mLogFile.rdbuf());
     }
 
     // Self-describing log header — timestamp, vdb_tool version, and the full
@@ -497,7 +523,7 @@ void Tool::startLog(std::string logFile, bool append, bool tee)
 
 // ==============================================================================================================
 
-auto Tool::getGrid(size_t age) const
+inline auto Tool::getGrid(size_t age) const
 {
     if (age>=mGrid.size()) {
       throw std::invalid_argument("-"+mParser.getAction().names[0]+" called getGrid("+std::to_string(age)+"), but grid count = "+std::to_string(mGrid.size()));
@@ -509,7 +535,7 @@ auto Tool::getGrid(size_t age) const
 
 // ==============================================================================================================
 
-auto Tool::getGeom(size_t age) const
+inline auto Tool::getGeom(size_t age) const
 {
     if (age>=mGeom.size()) {
       throw std::invalid_argument("-"+mParser.getAction().names[0]+" called getGeom("+std::to_string(age)+"), but geometry count = "+std::to_string(mGeom.size()));
@@ -521,20 +547,73 @@ auto Tool::getGeom(size_t age) const
 
 // ==============================================================================================================
 
-void Tool::run()
+inline std::string Tool::resolveStackOption(const std::string &optName, const std::string &raw) const
+{
+    if (raw.empty() || raw == "*") return raw;// unchanged: every action already special-cases these
+
+    const bool isVdb = optName == "vdb";
+    const size_t stackSize = isVdb ? mGrid.size() : mGeom.size();
+    const std::string &actionName = mParser.getAction().names[0];
+
+    VecS out;
+    for (const std::string &tok : tokenize(raw, "(),")) {
+        int age;
+        if (isInt(tok, age)) { out.push_back(tok); continue; }// already a stack age
+        // Name lookup: scan age 0 (top/most-recent) upward, collecting every match.
+        std::vector<int> matches;
+        int a = 0;
+        if (isVdb) {
+            for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it, ++a)
+                if ((*it)->getName() == tok) matches.push_back(a);
+        } else {
+            for (auto it = mGeom.crbegin(); it != mGeom.crend(); ++it, ++a)
+                if ((*it)->getName() == tok) matches.push_back(a);
+        }
+        const std::string what = isVdb ? "VDB grid" : "Geometry";
+        if (matches.empty()) {
+            throw std::out_of_range(actionName + ": no " + what + " named \"" + tok +
+                                    "\" on the stack (stack size " + std::to_string(stackSize) + ")");
+        }
+        // A name must identify exactly one entry. Expanding it to several ages would be
+        // unsafe: most actions read "vdb"/"geo" as a single age via get<int>() and cannot
+        // parse a list at all, and those that do read a list may erase entries by index
+        // while consuming it, so a multi-age expansion can delete the wrong grid.
+        if (matches.size() > 1) {
+            std::string ages;
+            for (size_t k = 0; k < matches.size(); ++k) ages += (k ? "," : "") + std::to_string(matches[k]);
+            throw std::invalid_argument(actionName + ": the name \"" + tok + "\" is ambiguous -- it matches " +
+                                        std::to_string(matches.size()) + " " + what + " entries at ages " +
+                                        ages + ". Use an explicit age index to select one.");
+        }
+        out.push_back(std::to_string(matches[0]));
+    }
+
+    std::string result;
+    for (size_t i = 0; i < out.size(); ++i) {
+        if (i) result += ",";
+        result += out[i];
+    }
+    return result;
+}// Tool::resolveStackOption
+
+// ==============================================================================================================
+
+inline bool Tool::run()
 {
     if (mParser.verbose>1) this->print_args();
     try {
-        mParser.run();
+        return mParser.run();
     } catch (const std::exception& e) {
-        std::cerr << "Fatal error in Tool::run: " << e.what() << std::endl;
-        std::exit(EXIT_FAILURE);
+        // The destructor closes the log before main() reports the error, so record it
+        // here. Writing to the file directly avoids printing it twice when tee=true.
+        if (mLogFile.is_open()) mLogFile << "Fatal error in " << mCmdName << ":\n\t" << e.what() << std::endl;
+        throw;
     }
 }// Tool::run
 
 // ==============================================================================================================
 
-void Tool::warning(const std::string &msg, std::ostream& os) const
+inline void Tool::warning(const std::string &msg, std::ostream& os) const
 {
     if (mParser.verbose) {
         os << "\n" << std::setw(static_cast<int>(msg.size())) << std::setfill('*') << "\n" << msg
@@ -552,7 +631,7 @@ struct Tool::Header {
     /// @brief Construct a header for the current tool version.
     Header() : mMagic("vdb_tool"), mMajor(sMajor), mMinor(sMinor), mPatch(sPatch) {}
     /// @brief Parse a header from the first line of a config file.
-    /// @param line First line of the config file, e.g. "vdb_tool 10.8.0".
+    /// @param line First line of the config file, e.g. "vdb_tool 10.9.0".
     /// @throw std::invalid_argument if @a line does not match "vdb_tool MAJOR.MINOR.PATCH".
     Header(const std::string &line) : mMagic("vdb_tool") {
       const VecS header = tokenize(line, " .");
@@ -596,7 +675,7 @@ struct Tool::Points {
 
 // ==============================================================================================================
 
-void Tool::init()
+inline void Tool::init()
 {
   // note, the following actions were added when mParser was constructed: -quiet,-verbose,-debug,-default,-for,-each,-end
 
@@ -622,8 +701,7 @@ void Tool::init()
   mParser.addAction(
      {"read", "import", "load", "i"}, "Read one or more geometry or VDB files from disk or STDIN.",
     {{"files", "", "{file|stdin}.{obj|ply|abc|stl|off|pts|xyz|e57|vdb|nvdb|gltf|glb|geo|usd|usda|usdc|usdz}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
-     {"grids", "*", "*|grid_name,...", "list of VDB grids name to be imported (defaults to \"*\", i.e. import all available grids)"},
-     {"delayed", "true", "1|0|true|false", "toggle delayed loading of VDB grids (enabled by default). This option is ignored by other file types"}},
+     {"grids", "*", "*|grid_name,...", "list of VDB grids name to be imported (defaults to \"*\", i.e. import all available grids)"}},
      [](){}, [&](){this->read();}, 0);//  anonymous options are treated as to the first option,i.e. "files"
 
   mParser.addAction(
@@ -633,7 +711,7 @@ void Tool::init()
      {"vdb", "*", "0,1,...", "list of VDB grids to write (defaults to \"*\", i.e. all available grids)."},
      {"keep", "", "1|0|true|false", "toggle wether to preserved or deleted geometry and grids after they have been written."},
      {"codec", "", "none|zip|blosc|active", "compression codec for the file or stream"},
-     {"bits", "32", "32|16|8|4|N", "bit-width of floating point numbers during quantization of VDB and NanoVDB grids, i.e. 32 is full, 16, is half (defaults to 32). NanoVDB also supports 8, 4 and N which is adaptive bit-width"},// VDB: 32, 16 + for NVDB 8, 4 or N
+     {"bits", "", "32|16|8|4|N", "bit-width of floating point numbers during quantization of VDB and NanoVDB grids, i.e. 32 is full, 16, is half. By default VDB grids keep their current precision (e.g. half grids that were read from a file) and NanoVDB grids use 32. NanoVDB also supports 8, 4 and N which is adaptive bit-width"},// VDB: 32, 16 + for NVDB 8, 4 or N
      {"dither", "false", "1|0|true|false", "toggle dithering of quantized NanoVDB grids (disabled by default)"},
      {"absolute", "true", "1|0|true|false", "toggle absolute or relative error tolerance during quantization of NanoVDBs. Only used if bits=N. Defaults to absolute"},// absolute or relative error for N bits in NVDB
      {"tolerance", "-1", "1.0", "absolute or relative error tolerance used during quantization of NanoVDBs. Only used if bits=N."},// error tolerance for N bits in NVDB
@@ -641,6 +719,26 @@ void Tool::init()
      {"ascii", "false", "1|0|true|false", "for ascii vs binary output format when available (e.g. for ply files). Defaults to false, i.e. binary is preferred over ascii when available"},
      {"checksum", "", "none|partial|full", "specify the type of checksum to compute for NanoVDBs"}},
      [&](){mParser.setDefaults();}, [&](){this->write();}, 0);// anonymous options are treated as to the first option,i.e. "files"
+
+  mParser.addAction(
+     {"rename"}, "Rename a VDB grid and/or Geometry on the stack by age index",
+    {{"vdb",  "", "0",      "age index of the VDB grid to rename (omit to skip VDB)"},
+     {"geo",  "", "0",      "age index of the Geometry to rename (omit to skip Geometry)"},
+     {"name", "", "sphere", "new name to assign"}},
+     [](){}, [&](){this->rename();});
+
+  mParser.addAction(
+     {"swap"}, "Swap two VDB grids and/or two Geometry entries on their respective stacks",
+    {{"vdb", "", "0,1", "comma-separated pair of age indices of VDB grids to swap (omit to skip VDB)"},
+     {"geo", "", "0,1", "comma-separated pair of age indices of Geometry to swap (omit to skip Geometry)"}},
+     [](){}, [&](){this->swap();});
+
+  mParser.addAction(
+     {"copy"}, "Deep-copy VDB grids and/or Geometry by index onto the top of their respective stacks",
+    {{"vdb",    "", "0|0,1,2|*", "comma-separated age index/indices of VDB grids to copy, or \"*\" for all (omit to skip VDB)"},
+     {"geo",    "",  "0|0,1|*",  "comma-separated age index/indices of Geometry to copy, or \"*\" for all (omit to skip Geometry)"},
+     {"prefix", "", "copy_",     "prefix prepended to the name of each copy (default is empty, preserving the original name)"}},
+     [&](){mParser.setDefaults();}, [&](){this->copy();});
 
   mParser.addAction(
      {"clear"}, "Deletes geometry, VDB grids and local variables",
@@ -700,8 +798,8 @@ void Tool::init()
   mParser.addAction(
      {"sdf2udf"}, "Converts a signed distance field into an unsigned distance field, i.e. performs the Abs of all values and changes GridClass to UNKNOWN.",
     {{"keep", "", "1|0|true|false", "toggle wether the input volume is preserved or deleted after the conversion"},
-     {"vdb", "0", "0|0,1", "age(s) (i.e. stack index) of grid(s) to be processed. Defaults to 0, i.e. most recently inserted VDB. Accepts a comma-separated list to use multiple grids in the kernel: the FIRST grid is written (iterated), the rest are read-only inputs. Length must match use=."},
-     {"name", "sphere", "sphere", "name assigned to the output volume"}},
+     {"vdb", "0", "0", "age (i.e. stack index) of the level set to be converted. Defaults to 0, i.e. most recently inserted VDB."},
+     {"name", "", "udf", "name assigned to the output volume. Defaults to \"sdf2udf_\" followed by the name of the input volume"}},
      [&](){mParser.setDefaults();}, [&](){this->sdf2udf();});
 
   mParser.addAction(
@@ -734,7 +832,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
 
   mParser.addAction(
-     {"soup2udf", "mesh2udf"}, "Convert a polygon soup into a to a unsigned distance field with an symmetrical narrow band",
+     {"mesh2udf", "soup2udf"}, "Convert a polygon mesh or polygon soup into a to a unsigned distance field with an symmetrical narrow band",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
@@ -744,25 +842,22 @@ void Tool::init()
      {"name", "", "mesh2udf_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
      [&](){mParser.setDefaults();}, [&](){this->meshToUnsignedDistanceField();});
 
-#ifdef VDB_TOOL_USE_SHRINKWRAP
-  // Temporarily gated out of the PR. Not exposed via CMake by design; enable a
-  // local build with: cmake -DCMAKE_CXX_FLAGS="-DVDB_TOOL_USE_SHRINKWRAP" ..
   mParser.addAction(
-     {"soup2ls", "soup2sdf", "shrinkwrap"}, "Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
-    {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
+     {"shrinkwrap", "soup2ls", "soup2sdf"}, "Convert a polygon soup into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+    {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
      {"mode", "0", "0", "mode of offset operator: 0) old method (using mesh -> UDF -> mesh -> SDF), 1) Mihai's signed-flood-fill and 2) Greg's createLevelSetDilatedMesh. Defaults to 0, i.e. paper."},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
-     {"erode", "8", "2", "number of iterations of constrained erosion. Defaults to 8."},
+     {"erode", "8", "2", "maximum constrained-erosion distance, in units of the 2-voxel erosion step used per shrink-wrap iteration (need not be an integer). Defaults to 8."},
      {"thres", "0", "0.01", "closing (or engineering) threshold. Defaults to 0, i.e. it\'s diabled."},
+     {"levels", "0", "0|0,1,2|*", "selects which of the level-set grids generated by the hierarchical shrink-wrap algorithm to output, by resolution level: 0 is the finest (highest-resolution) grid, 1 the next-finest, and so on. Accepts a single index (default 0, i.e. only the finest grid), a comma-separated list (e.g. \"0,1,2\" outputs the three finest grids), or \"*\" to output every generated grid. A runtime error is thrown if a requested level does not exist. Note that these are resolution levels of the output hierarchy, not ages on the VDB stack, which is why this option is named \"levels\" rather than \"vdb\"."},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
-     {"name", "", "soup2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
-     [&](){mParser.setDefaults();}, [&](){this->soupToLevelSet();});
-#endif
+     {"name", "", "shrinkwrap_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
+     [&](){mParser.setDefaults();}, [&](){this->shrinkWrap();});
 
   mParser.addAction(
-     {"soup2offset"}, "Convert a polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+     {"mesh2offset", "soup2offset"}, "Convert a polygon mesh or polygon soup into an offset narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      //{"offset", "1.0", "1.0", "Offset in voxel units. Defaults to one, i.e. offset surface corresponds to one voxel dilation from mesh."},
@@ -770,8 +865,8 @@ void Tool::init()
      {"mode", "0", "0", "mode of offset operator: 0) old method (using mesh -> UDF -> mesh -> SDF), 1) Mihai's signed-flood-fill and 2) Greg's createLevelSetDilatedMesh. Defaults to 0, i.e. paper."},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
-     {"name", "", "soup2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
-     [&](){mParser.setDefaults();}, [&](){this->soupToOffset();});
+     {"name", "", "mesh2offset_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
+     [&](){mParser.setDefaults();}, [&](){this->meshToOffset();});
 
   mParser.addAction(
      {"vol2mesh", "vdb2mesh"}, "Convert a scalar volume to an adaptive polygon mesh",
@@ -1019,6 +1114,18 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->composite();});
 
   mParser.addAction(
+     {"multiply", "mul"}, "Given grids A and B, compute a * b per voxel",
+    {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
+     {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
+     [&](){mParser.setDefaults();}, [&](){this->composite();});
+
+  mParser.addAction(
+     {"divide"}, "Given grids A and B, compute a / b per voxel",
+    {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
+     {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
+     [&](){mParser.setDefaults();}, [&](){this->composite();});
+
+  mParser.addAction(
      {"multires"}, "construct a LoD sequences of VDB trees with powers of two refinements",
     {{"levels", "2", "2", "number of multi-resolution grids in the output LoD sequence"},
      {"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
@@ -1124,8 +1231,30 @@ void Tool::init()
       {{"vdb", "*", "*", "print information about VDB grids"},
        {"geo", "*", "*", "print information about geometries"},
        {"mem", "0", "0|1|false|true", "print a list of all stored variables"},
-       {"level", "0", "0|1|2", "detail level: 0=base table, 1=+bbox column, 2=+value range column"}},
+       {"level", "0", "0|1", "detail level: 0=base table, 1=+bbox and node-count columns"}},
       [](){}, [&](){this->print();});
+
+  mParser.addAction(
+      {"diagnose"}, "Run OpenVDB diagnostics checks on one or more VDB grids",
+     {{"vdb",    "*", "*|0|0,1,2", "comma-separated age indices of VDB grids to check, or \"*\" for all (default)"},
+      {"checks", "9", "1|...|9",   "number of checks to run (level set: 1-9, fog volume: 1-6). Lower values skip slower or stricter checks"},
+      {"fatal",  "0", "1|0|true|false", "if true, throw an exception when any check fails (default false)"}},
+     [&](){mParser.setDefaults();}, [&](){this->diagnose();});
+
+  mParser.addAction(
+      {"stats"}, "Print value statistics (min, max, mean, std. dev.) of active voxels for one or more VDB grids",
+     {{"vdb", "*", "*|0|0,1,2", "comma-separated age indices of VDB grids to analyze, or \"*\" for all (default)"}},
+     [](){}, [&](){this->stats();});
+
+  mParser.addAction(
+      {"histogram", "hist"}, "Print an ASCII bar histogram of the distribution of active values for one or more VDB grids",
+     {{"vdb",  "*",  "*|0|0,1,2", "comma-separated age indices of VDB grids to analyze, or \"*\" for all (default)"},
+      {"bins", "10", "10|20|50",  "number of histogram bins (defaults to 10)"},
+      {"min",  "",   "0.0",       "lower bound of the histogram range (defaults to the grid's smallest active value)"},
+      {"max",  "",   "1.0",       "upper bound of the histogram range (defaults to the grid's largest active value)"},
+      {"cols", "40", "40",        "width in characters of the longest bar (defaults to 40)"},
+      {"log",  "false", "1|0|true|false", "use a logarithmic scale for the bar lengths, which makes highly peaked distributions (common for level sets and fog volumes) readable. Defaults to false, i.e. a linear scale"}},
+     [](){}, [&](){this->histogram();});
 
   mParser.addAction(
       {"version"}, "write timing information to the terminal", {},
@@ -1276,7 +1405,7 @@ void Tool::init()
 
 // ==============================================================================================================
 
-void Tool::help()
+inline void Tool::help()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "help");
   mParser.printAction();
@@ -1323,7 +1452,13 @@ void Tool::help()
         desc.replace(bar, 1, "\\|");
         bar += 2;
       }
-      std::clog << "| **" << a.names[0] << "** | " << desc << " |\n";
+      std::clog << "| **" << a.names[0] << "**";
+      if (a.names.size() > 1) {
+        std::clog << " (alias" << (a.names.size() > 2 ? "es" : "") << ": ";
+        for (size_t i = 1; i < a.names.size(); ++i) std::clog << (i>1 ? ", " : "") << a.names[i];
+        std::clog << ")";
+      }
+      std::clog << " | " << desc << " |\n";
     }
     if (stop) std::exit(EXIT_SUCCESS);
     return;
@@ -1366,7 +1501,7 @@ void Tool::help()
 
 // ==============================================================================================================
 
-std::string Tool::examples() const
+inline std::string Tool::examples() const
 {
     const int w = 16;
     std::stringstream ss;
@@ -1378,24 +1513,39 @@ std::string Tool::examples() const
 
 // ==============================================================================================================
 
-void Tool::clear()
+inline void Tool::clear()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "clear");
+  // Resolve every requested age to a stable list iterator BEFORE erasing anything.
+  // Erasing inside the loop instead would (a) leave earlier deletions in place when
+  // a later age turns out to be out of range, and (b) shift the remaining entries,
+  // since an age is a distance from the back of the list -- so "-clear vdb=0,2" on a
+  // three-grid stack erased age 0 and then failed on age 2, having already destroyed
+  // a grid. Duplicate ages are removed first: resolving one twice would yield the
+  // same iterator twice, and erasing it twice is undefined behaviour. This is safe
+  // because mGrid/mGeom are std::lists, whose iterators stay valid when *other*
+  // elements are erased.
+  auto resolveVictims = [](VecI ages, auto &stack, auto &&get) {
+    std::sort(ages.begin(), ages.end());
+    ages.erase(std::unique(ages.begin(), ages.end()), ages.end());
+    std::vector<typename std::decay_t<decltype(stack)>::const_iterator> victims;
+    victims.reserve(ages.size());
+    for (int a : ages) victims.push_back(std::next(get(a)).base());// throws if out of range
+    return victims;
+  };
   if (mParser.get<std::string>("geo") == "*") {
     mGeom.clear();
   } else {
-    for (int a : mParser.getVec<int>("geo")) {
-      auto it = this->getGeom(a);
-      mGeom.erase(std::next(it).base());
-    }
+    const auto victims = resolveVictims(mParser.getVec<int>("geo"), mGeom,
+                                        [this](int a){ return this->getGeom(a); });
+    for (auto it : victims) mGeom.erase(it);
   }
   if (mParser.get<std::string>("vdb")  == "*") {
     mGrid.clear();
   } else {
-    for (int a : mParser.getVec<int>("vdb")) {
-      auto it = this->getGrid(a);
-      mGrid.erase(std::next(it).base());
-    }
+    const auto victims = resolveVictims(mParser.getVec<int>("vdb"), mGrid,
+                                        [this](int a){ return this->getGrid(a); });
+    for (auto it : victims) mGrid.erase(it);
   }
   if (mParser.get<bool>("variables")) {
     mParser.processor.memory().clear();
@@ -1404,7 +1554,469 @@ void Tool::clear()
 
 // ==============================================================================================================
 
-void Tool::read()
+inline void Tool::copy()
+{
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "copy");
+  mParser.printAction();
+  const std::string vdb_str = mParser.get<std::string>("vdb");
+  const std::string geo_str = mParser.get<std::string>("geo");
+  const std::string prefix  = mParser.get<std::string>("prefix");
+  if (vdb_str.empty() && geo_str.empty()) {
+    throw std::invalid_argument("copy: at least one of \"vdb\" or \"geo\" must be specified");
+  }
+  auto applyPrefix = [&](const std::string& name) { return prefix + name; };
+  if (!vdb_str.empty()) {
+    std::vector<GridBase::Ptr> copies;
+    if (vdb_str == "*") {
+      for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it)
+        copies.push_back((*it)->deepCopyGrid());
+    } else {
+      const auto indices = mParser.getVec<int>("vdb");
+      for (int a : indices) {
+        if (size_t(a) >= mGrid.size()) {
+          throw std::out_of_range("copy: vdb index " + std::to_string(a) +
+                                  " is out of range (stack size " + std::to_string(mGrid.size()) + ")");
+        }
+      }
+      copies.reserve(indices.size());
+      for (int a : indices) copies.push_back((*this->getGrid(a))->deepCopyGrid());
+    }
+    for (auto& c : copies) {
+      if (!prefix.empty()) c->setName(applyPrefix(c->getName()));
+      mGrid.push_back(c);
+    }
+  }
+  if (!geo_str.empty()) {
+    std::vector<Geometry::Ptr> copies;
+    if (geo_str == "*") {
+      for (auto it = mGeom.crbegin(); it != mGeom.crend(); ++it)
+        copies.push_back((*it)->deepCopy());
+    } else {
+      const auto indices = mParser.getVec<int>("geo");
+      for (int a : indices) {
+        if (size_t(a) >= mGeom.size()) {
+          throw std::out_of_range("copy: geo index " + std::to_string(a) +
+                                  " is out of range (stack size " + std::to_string(mGeom.size()) + ")");
+        }
+      }
+      copies.reserve(indices.size());
+      for (int a : indices) copies.push_back((*this->getGeom(a))->deepCopy());
+    }
+    for (auto& c : copies) {
+      if (!prefix.empty()) c->setName(applyPrefix(c->getName()));
+      mGeom.push_back(c);
+    }
+  }
+}// Tool::copy
+
+// ==============================================================================================================
+
+inline void Tool::rename()
+{
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "rename");
+  mParser.printAction();
+  const std::string vdb_str  = mParser.get<std::string>("vdb");
+  const std::string geo_str  = mParser.get<std::string>("geo");
+  const std::string new_name = mParser.get<std::string>("name");
+  if (vdb_str.empty() && geo_str.empty()) {
+    throw std::invalid_argument("rename: at least one of \"vdb\" or \"geo\" must be specified");
+  }
+  if (new_name.empty()) {
+    throw std::invalid_argument("rename: \"name\" must not be empty");
+  }
+  if (!vdb_str.empty()) {
+    const int a = mParser.get<int>("vdb");
+    if (size_t(a) >= mGrid.size()) {
+      throw std::out_of_range("rename: vdb index " + std::to_string(a) +
+                              " is out of range (stack size " + std::to_string(mGrid.size()) + ")");
+    }
+    (*this->getGrid(a))->setName(new_name);
+  }
+  if (!geo_str.empty()) {
+    const int a = mParser.get<int>("geo");
+    if (size_t(a) >= mGeom.size()) {
+      throw std::out_of_range("rename: geo index " + std::to_string(a) +
+                              " is out of range (stack size " + std::to_string(mGeom.size()) + ")");
+    }
+    (*this->getGeom(a))->setName(new_name);
+  }
+}// Tool::rename
+
+// ==============================================================================================================
+
+inline void Tool::diagnose()
+{
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "diagnose");
+  mParser.printAction();
+  const std::string vdb_str = mParser.get<std::string>("vdb");
+  const bool fatal    = mParser.get<bool>("fatal");
+  const size_t checks = static_cast<size_t>(mParser.get<int>("checks"));
+
+  std::vector<GridBase::Ptr> grids;
+  if (vdb_str == "*") {
+    for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it) grids.push_back(*it);
+  } else {
+    for (int a : mParser.getVec<int>("vdb")) {
+      if (size_t(a) >= mGrid.size())
+        throw std::out_of_range("diagnose: vdb index " + std::to_string(a) +
+                                " is out of range (stack size " + std::to_string(mGrid.size()) + ")");
+      grids.push_back(*this->getGrid(a));
+    }
+  }
+
+  if (grids.empty()) { std::clog << "diagnose: no grids on stack\n"; return; }
+
+  bool anyFailed = false;
+  for (auto& base : grids) {
+    const std::string& name = base->getName();
+    auto grid = gridPtrCast<FloatGrid>(base);
+    if (!grid) {
+      std::clog << "diagnose: [" << name << "] skipped (not a FloatGrid)\n";
+      continue;
+    }
+    std::string msg;
+    if (base->getGridClass() == GRID_LEVEL_SET) {
+      msg = tools::checkLevelSet(*grid, checks);
+    } else if (base->getGridClass() == GRID_FOG_VOLUME) {
+      msg = tools::checkFogVolume(*grid, checks);
+    } else {
+      // For generic float grids run NaN and infinity checks.
+      tools::Diagnose<FloatGrid> d(*grid);
+      tools::CheckNan<FloatGrid> checkNan;
+      tools::CheckInf<FloatGrid> checkInf;
+      msg += d.check(checkNan, /*updateMask*/false, /*voxels*/true, /*tiles*/true, /*background*/true);
+      msg += d.check(checkInf, /*updateMask*/false, /*voxels*/true, /*tiles*/true, /*background*/true);
+    }
+    if (msg.empty()) {
+      std::clog << "diagnose: [" << name << "] OK\n";
+    } else {
+      anyFailed = true;
+      std::clog << "diagnose: [" << name << "] FAILED\n";
+      // indent each line of the diagnostic message
+      std::istringstream ss(msg);
+      std::string line;
+      while (std::getline(ss, line))
+        if (!line.empty()) std::clog << "  " << line << "\n";
+    }
+  }
+  if (fatal && anyFailed)
+    throw std::runtime_error("diagnose: one or more grids failed validation");
+}// Tool::diagnose
+
+// ==============================================================================================================
+
+inline void Tool::stats()
+{
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "stats");
+  mParser.printAction();
+  const std::string vdb_str = mParser.get<std::string>("vdb");
+
+  std::vector<GridBase::Ptr> grids;
+  std::vector<int> ages;
+  if (vdb_str == "*") {
+    int age = 0;
+    for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it, ++age) {
+      grids.push_back(*it);
+      ages.push_back(age);
+    }
+  } else {
+    for (int a : mParser.getVec<int>("vdb")) {
+      if (size_t(a) >= mGrid.size())
+        throw std::out_of_range("stats: vdb index " + std::to_string(a) +
+                                " is out of range (stack size " + std::to_string(mGrid.size()) + ")");
+      grids.push_back(*this->getGrid(a));
+      ages.push_back(a);
+    }
+  }
+
+  if (grids.empty()) { std::clog << "stats: no grids on stack\n"; return; }
+
+  const int aw = 5, w = 14;
+  int nw = 4;// minimum width for "name" header
+  for (auto& g : grids) nw = std::max(nw, (int)g->getName().size());
+  nw += 2;// two-space gap after the longest name
+  std::clog << std::right << std::setw(aw) << "age"
+            << "  "
+            << std::left  << std::setw(nw) << "name"
+            << std::right << std::setw(w)  << "background"
+                          << std::setw(w)  << "min"
+                          << std::setw(w)  << "max"
+                          << std::setw(w)  << "mean"
+                          << std::setw(w)  << "stddev"
+                          << std::setw(w)  << "area"
+                          << std::setw(w)  << "volume"
+            << "\n" << std::string(aw + 2 + nw + 7*w, '-') << "\n";
+
+  // Background column: numeric grid types print their scalar background, vector
+  // grids print the whole vector as "[x, y, z]" (NOT its magnitude, unlike the
+  // value columns below), anything else is "(n/a)".
+  auto backgroundStr = [](const GridBase::Ptr& base) -> std::string {
+    std::stringstream ss;
+    if      (auto p = gridPtrCast<FloatGrid>(base))  ss << p->background();
+    else if (auto p = gridPtrCast<DoubleGrid>(base)) ss << p->background();
+    else if (auto p = gridPtrCast<Int32Grid>(base))  ss << p->background();
+    else if (auto p = gridPtrCast<Int64Grid>(base))  ss << p->background();
+    else if (auto p = gridPtrCast<BoolGrid>(base))   ss << p->background();
+    else if (auto p = gridPtrCast<Vec3SGrid>(base))  ss << p->background();
+    else if (auto p = gridPtrCast<Vec3DGrid>(base))  ss << p->background();
+    else if (auto p = gridPtrCast<Vec3IGrid>(base))  ss << p->background();
+    else return "(n/a)";
+    return ss.str();
+  };
+
+  /// @brief True if @a base is a vector-valued grid, whose value columns therefore
+  ///        report magnitudes rather than the values themselves.
+  auto isVectorGrid = [](const GridBase::Ptr& base) {
+    return gridPtrCast<Vec3SGrid>(base) || gridPtrCast<Vec3DGrid>(base) || gridPtrCast<Vec3IGrid>(base);
+  };
+
+  // min/max/mean/stddev of active voxels, dispatched by value type. tools::statistics()
+  // returns a (non-templated) math::Stats regardless of the grid's value type, so this
+  // covers every scalar type the file formats can round-trip. For vector grids it
+  // reduces each value to its magnitude (see stats_internal::GetValImpl), so these
+  // four columns report statistics of |v| -- flagged by a legend under the table.
+  auto valueStatsStr = [&](const GridBase::Ptr& base) -> std::string {
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(6);
+    auto printFromStats = [&](const math::Stats& s) {
+      // An empty grid (no active voxels) has no min/max/mean/stddev to report;
+      // math::Stats would otherwise print the ±inf/NaN sentinels it initializes to.
+      if (s.size() == 0) {
+        ss << std::setw(w) << "(empty)" << std::setw(w) << "(empty)"
+           << std::setw(w) << "(empty)" << std::setw(w) << "(empty)";
+      } else {
+        ss << std::setw(w) << s.min() << std::setw(w) << s.max()
+           << std::setw(w) << s.mean() << std::setw(w) << s.stdDev();
+      }
+    };
+    if      (auto p = gridPtrCast<FloatGrid>(base))  printFromStats(tools::statistics(p->cbeginValueOn()));
+    else if (auto p = gridPtrCast<DoubleGrid>(base)) printFromStats(tools::statistics(p->cbeginValueOn()));
+    else if (auto p = gridPtrCast<Int32Grid>(base))  printFromStats(tools::statistics(p->cbeginValueOn()));
+    else if (auto p = gridPtrCast<Int64Grid>(base))  printFromStats(tools::statistics(p->cbeginValueOn()));
+    else if (auto p = gridPtrCast<BoolGrid>(base))   printFromStats(tools::statistics(p->cbeginValueOn()));
+    else if (auto p = gridPtrCast<Vec3SGrid>(base))  printFromStats(tools::statistics(p->cbeginValueOn()));
+    else if (auto p = gridPtrCast<Vec3DGrid>(base))  printFromStats(tools::statistics(p->cbeginValueOn()));
+    else if (auto p = gridPtrCast<Vec3IGrid>(base))  printFromStats(tools::statistics(p->cbeginValueOn()));
+    else ss << std::setw(w) << "(n/a)" << std::setw(w) << "(n/a)" << std::setw(w) << "(n/a)" << std::setw(w) << "(n/a)";
+    return ss.str();
+  };
+
+  bool anyVector = false;
+  for (size_t i = 0; i < grids.size(); ++i) {
+    auto& base = grids[i];
+    const int age = ages[i];
+    anyVector |= isVectorGrid(base);
+    std::clog << std::right << std::setw(aw) << age << "  "
+              << std::left  << std::setw(nw) << base->getName()
+              << std::right << std::setw(w)  << backgroundStr(base)
+                            << valueStatsStr(base);
+    // area and volume are only defined for float level sets
+    auto grid = gridPtrCast<FloatGrid>(base);
+    if (grid && base->getGridClass() == GRID_LEVEL_SET) {
+      try { std::clog << std::setw(w) << tools::levelSetArea(*grid); }
+      catch (...) { std::clog << std::setw(w) << "(n/a)"; }
+      try { std::clog << std::setw(w) << tools::levelSetVolume(*grid); }
+      catch (...) { std::clog << std::setw(w) << "(n/a)"; }
+    } else {
+      std::clog << std::setw(w) << "(n/a)" << std::setw(w) << "(n/a)";
+    }
+    std::clog << "\n";
+  }
+  if (anyVector) {
+    std::clog << "(for vector grids min/max/mean/stddev are of the vector magnitude |v|,"
+                 " while background is the vector itself)\n";
+  }
+}// Tool::stats
+
+// ==============================================================================================================
+
+inline void Tool::histogram()
+{
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "histogram");
+  mParser.printAction();
+  const std::string vdb_str = mParser.get<std::string>("vdb");
+  const std::string min_str = mParser.get<std::string>("min");
+  const std::string max_str = mParser.get<std::string>("max");
+  const int  bins   = mParser.get<int>("bins");
+  const int  cols   = mParser.get<int>("cols");
+  const bool useLog = mParser.get<bool>("log");
+
+  if (bins < 1) throw std::invalid_argument("histogram: \"bins\" must be at least 1, got "+std::to_string(bins));
+  if (cols < 1) throw std::invalid_argument("histogram: \"cols\" must be at least 1, got "+std::to_string(cols));
+  // An explicit range is optional: either bound may be given on its own, in which
+  // case the other is still derived from the grid's own extrema.
+  const bool hasMin = !min_str.empty(), hasMax = !max_str.empty();
+  const double userMin = hasMin ? mParser.get<double>("min") : 0.0;
+  const double userMax = hasMax ? mParser.get<double>("max") : 0.0;
+  if (hasMin && hasMax && userMin >= userMax) {
+    throw std::invalid_argument("histogram: \"min\" must be less than \"max\", got min="+min_str+" max="+max_str);
+  }
+
+  std::vector<GridBase::Ptr> grids;
+  std::vector<int> ages;
+  if (vdb_str == "*") {
+    int age = 0;
+    for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it, ++age) {
+      grids.push_back(*it);
+      ages.push_back(age);
+    }
+  } else {
+    for (int a : mParser.getVec<int>("vdb")) {
+      if (size_t(a) >= mGrid.size())
+        throw std::out_of_range("histogram: vdb index " + std::to_string(a) +
+                                " is out of range (stack size " + std::to_string(mGrid.size()) + ")");
+      grids.push_back(*this->getGrid(a));
+      ages.push_back(a);
+    }
+  }
+
+  if (grids.empty()) { std::clog << "histogram: no grids on stack\n"; return; }
+
+  // Bin the active values of one typed grid.
+  // Returns null when there is nothing to plot; the caller uses @a n and @a constant
+  // to distinguish cases: n==0 → no active voxels; n>0 && constant → every active
+  // voxel shares a single value; n>0 && !constant → user-supplied bounds exclude all
+  // grid values (tools::histogram requires a non-empty range).
+  auto build = [&](const auto &grid, double &lo, double &hi, uint64_t &n, bool &constant)
+      -> std::unique_ptr<math::Histogram> {
+    const math::Extrema ex = tools::extrema(grid.cbeginValueOn());
+    n = ex.size();
+    if (n == 0) return nullptr;
+    lo = hasMin ? userMin : ex.min();
+    hi = hasMax ? userMax : ex.max();
+    if (lo >= hi) {
+      // If neither bound came from the user, lo/hi equal ex.min()/ex.max(), so lo>=hi
+      // means the grid is truly constant.  If at least one bound is user-supplied the
+      // grid may span a valid range that simply doesn't intersect [lo, hi).
+      constant = !hasMin && !hasMax;
+      if (constant) lo = ex.min(); // report the actual constant, not a user value
+      return nullptr;
+    }
+    return std::make_unique<math::Histogram>(
+        tools::histogram(grid.cbeginValueOn(), lo, hi, static_cast<size_t>(bins)));
+  };
+
+  // Every value below is printed with an explicit format, since the per-bin rows
+  // switch std::clog to fixed/low precision and that state would otherwise leak
+  // into the next grid's summary line (and into whatever action runs next).
+  const std::ios_base::fmtflags oldFlags = std::clog.flags();
+  const std::streamsize oldPrecision = std::clog.precision();
+  auto summaryFmt = [](std::ostream &os) -> std::ostream& {
+    return os << std::defaultfloat << std::setprecision(6);
+  };
+
+  for (size_t i = 0; i < grids.size(); ++i) {
+    auto &base = grids[i];
+    if (i) std::clog << "\n";
+    std::clog << "histogram: [" << ages[i] << "] \"" << base->getName() << "\" ("
+              << base->valueType() << ")\n";
+
+    double lo = 0.0, hi = 0.0;
+    uint64_t n = 0;
+    bool isVec = false, constant = false;
+    std::unique_ptr<math::Histogram> hist;
+    if      (auto p = gridPtrCast<FloatGrid>(base))  hist = build(*p, lo, hi, n, constant);
+    else if (auto p = gridPtrCast<DoubleGrid>(base)) hist = build(*p, lo, hi, n, constant);
+    else if (auto p = gridPtrCast<Int32Grid>(base))  hist = build(*p, lo, hi, n, constant);
+    else if (auto p = gridPtrCast<Int64Grid>(base))  hist = build(*p, lo, hi, n, constant);
+    else if (auto p = gridPtrCast<BoolGrid>(base))   hist = build(*p, lo, hi, n, constant);
+    // tools::histogram reduces a vector value to its magnitude (see
+    // stats_internal::GetValImpl), so vector grids are binned by |v|. This is what
+    // makes "-grad -histogram" a useful check of the Eikonal condition |grad(phi)|=1.
+    else if (auto p = gridPtrCast<Vec3SGrid>(base)) { hist = build(*p, lo, hi, n, constant); isVec = true; }
+    else if (auto p = gridPtrCast<Vec3DGrid>(base)) { hist = build(*p, lo, hi, n, constant); isVec = true; }
+    else if (auto p = gridPtrCast<Vec3IGrid>(base)) { hist = build(*p, lo, hi, n, constant); isVec = true; }
+    else {
+      std::clog << "  (unsupported value type, skipped)\n";
+      continue;
+    }
+    const char *unit = isVec ? " (by vector magnitude)" : "";
+    if (n == 0) { std::clog << "  (no active voxels)\n"; continue; }
+    if (!hist && constant) {
+      summaryFmt(std::clog) << "  all " << n << " active voxels have the constant "
+                            << (isVec ? "magnitude " : "value ") << lo << "\n";
+      continue;
+    }
+    if (!hist || hist->size() == 0) {// user-supplied range excludes all grid values
+      summaryFmt(std::clog) << "  none of the " << n << " active voxels fall within the requested range ["
+                            << lo << ", " << hi << "]\n";
+      continue;
+    }
+
+    uint64_t peak = 0;
+    for (size_t b = 0; b < hist->numBins(); ++b) peak = std::max(peak, hist->count(b));
+
+    summaryFmt(std::clog) << "  " << hist->size() << " of " << n << " active voxels" << unit
+                          << " in " << hist->numBins() << " bins over [" << lo << ", " << hi << "]"
+                          << (useLog ? ", log scale" : "") << "\n";
+
+    for (size_t b = 0; b < hist->numBins(); ++b) {
+      const uint64_t c = hist->count(b);
+      // Scale bars against the tallest bin so the plot always spans "cols" characters.
+      // log1p keeps empty bins at zero length while compressing very peaked
+      // distributions (common for level sets and fog volumes) into a readable range.
+      int len = 0;
+      if (peak > 0 && c > 0) {
+        const double frac = useLog ? std::log1p(double(c)) / std::log1p(double(peak))
+                                   : double(c) / double(peak);
+        len = std::max(1, static_cast<int>(frac * cols + 0.5));
+      }
+      std::clog << "  [" << std::right << std::setw(12) << std::fixed << std::setprecision(4) << hist->min(b)
+                << ", " << std::setw(12) << hist->max(b)
+                << (b + 1 == hist->numBins() ? "] " : ") ")
+                << std::setw(10) << c << " "
+                << std::setw(5) << std::setprecision(1) << (100.0 * double(c) / double(hist->size())) << "% "
+                << std::defaultfloat << std::string(size_t(len), '#') << "\n";
+    }
+  }
+  std::clog.flags(oldFlags);
+  std::clog.precision(oldPrecision);
+}// Tool::histogram
+
+// ==============================================================================================================
+
+inline void Tool::swap()
+{
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "swap");
+  mParser.printAction();
+  const std::string vdb_str = mParser.get<std::string>("vdb");
+  const std::string geo_str = mParser.get<std::string>("geo");
+  if (vdb_str.empty() && geo_str.empty()) {
+    throw std::invalid_argument("swap: at least one of \"vdb\" or \"geo\" must be specified");
+  }
+  if (!vdb_str.empty()) {
+    const auto idx = mParser.getVec<int>("vdb");
+    if (idx.size() != 2) {
+      throw std::invalid_argument("swap: \"vdb\" requires exactly two indices, e.g. vdb=0,1");
+    }
+    if (size_t(idx[0]) >= mGrid.size() || size_t(idx[1]) >= mGrid.size()) {
+      throw std::out_of_range("swap: vdb index out of range (stack size " + std::to_string(mGrid.size()) + ")");
+    }
+    if (idx[0] != idx[1]) {
+      auto it0 = mGrid.rbegin(); std::advance(it0, idx[0]);
+      auto it1 = mGrid.rbegin(); std::advance(it1, idx[1]);
+      std::iter_swap(it0, it1);
+    }
+  }
+  if (!geo_str.empty()) {
+    const auto idx = mParser.getVec<int>("geo");
+    if (idx.size() != 2) {
+      throw std::invalid_argument("swap: \"geo\" requires exactly two indices, e.g. geo=0,1");
+    }
+    if (size_t(idx[0]) >= mGeom.size() || size_t(idx[1]) >= mGeom.size()) {
+      throw std::out_of_range("swap: geo index out of range (stack size " + std::to_string(mGeom.size()) + ")");
+    }
+    if (idx[0] != idx[1]) {
+      auto it0 = mGeom.rbegin(); std::advance(it0, idx[0]);
+      auto it1 = mGeom.rbegin(); std::advance(it1, idx[1]);
+      std::iter_swap(it0, it1);
+    }
+  }
+}// Tool::swap
+
+// ==============================================================================================================
+
+inline void Tool::read()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
   for (auto &fileName : mParser.getVec<std::string>("files")) {
@@ -1433,7 +2045,7 @@ void Tool::read()
 
 // ==============================================================================================================
 
-void Tool::readGeo(const std::string &fileName)
+inline void Tool::readGeo(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
   if (mParser.verbose>1) std::clog << "Reading geometry from \"" << fileName << "\"\n";
@@ -1452,7 +2064,7 @@ void Tool::readGeo(const std::string &fileName)
 
 // ==============================================================================================================
 
-void Tool::readVDB(const std::string &fileName)
+inline void Tool::readVDB(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
   const VecS gridNames = mParser.getVec<std::string>("grids");
@@ -1466,7 +2078,7 @@ void Tool::readVDB(const std::string &fileName)
   } else {
     if (mParser.verbose) mTimer.start("Reading VDB grid(s) from file named \""+fileName+"\"");
     io::File file(fileName);
-    file.open(mParser.get<bool>("delayed"));
+    file.open();
     grids = file.getGrids();
   }
   const size_t count = mGrid.size();
@@ -1487,7 +2099,7 @@ void Tool::readVDB(const std::string &fileName)
 // ==============================================================================================================
 
 #ifdef VDB_TOOL_USE_NANO
-void Tool::readNVDB(const std::string &fileName)
+inline void Tool::readNVDB(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "read");
   const VecS gridNames = mParser.getVec<std::string>("grids");
@@ -1517,7 +2129,7 @@ void Tool::readNVDB(const std::string &fileName)
   }
 }// Tool::readNVDB
 #else
-void Tool::readNVDB(const std::string&)
+inline void Tool::readNVDB(const std::string&)
 {
     throw std::runtime_error("NanoVDB support was disabled during compilation!");
 }// Tool::readNVDB
@@ -1525,7 +2137,7 @@ void Tool::readNVDB(const std::string&)
 
 // ==============================================================================================================
 
-void Tool::config()
+inline void Tool::config()
 {
     OPENVDB_ASSERT(mParser.getAction().names[0] == "config");
     const bool update  = mParser.get<bool>("update");
@@ -1554,21 +2166,32 @@ void Tool::config()
             if (!getline (file,line)) throw std::invalid_argument("readConf: empty file \""+fileName+"\"");
             Header header(line);
             if (!header.isCompatible()) throw std::invalid_argument("readConf: incompatible version \""+line+"\"");
-            std::vector<char*> args({&header.mMagic[0]});//parser is expecting first argument to the name of the executable
+            std::vector<std::string> tokens{header.mMagic};// argv[0] is the executable name
+            std::string accum;
             while (getline(file, line)) {
-                const size_t start = line.find_first_not_of(" \t"), stop = line.find_first_of("#%");
-                if (start >= stop) continue;// line is empty or starts with a comment
-                line = line.substr(start, stop - start);// remove leading whitespaces and tailing comments
-                line = line.substr(0, line.find_last_not_of(" \t") + 1);// remove tailing whitespaces
-                VecS tmp = vdb_tool::tokenize(line, " ");
+                // A blank or comment-only line is skipped without touching accum, so a
+                // comment line in the middle of a backslash continuation is transparently
+                // absorbed rather than breaking (or being appended to) the continued line.
+                const size_t start = line.find_first_not_of(" \t\r");
+                if (start == std::string::npos || line[start] == '#' || line[start] == '%') continue;
+                line = trim(stripConfigComment(accum + line), " \t\r");
+                accum.clear();
+                if (!line.empty() && line.back() == '\\') {
+                    accum = line.substr(0, line.size() - 1);// strip \ and accumulate
+                    accum += ' ';// separate this line's tokens from the next line's
+                    continue;
+                }
+                VecS tmp = vdb_tool::tokenize(line, " \t\r");
+                if (tmp.empty()) continue;
                 tmp[0].insert (0, 1, '-');// first token is an action
-                std::transform(tmp.begin(), tmp.end(), std::back_inserter(args), [](const std::string &s){
-                    char *c = new char[s.size()+1];
-                    std::strcpy(c, s.c_str());
-                    return c;
-                });
+                tokens.insert(tokens.end(), tmp.begin(), tmp.end());
+            }
+            if (!accum.empty()) {
+                throw std::invalid_argument("readConf: unterminated line continuation at end of file \""+fileName+"\"");
             }
             file.close();
+            std::vector<char*> args;
+            for (auto &token : tokens) args.push_back(token.data());
             mParser.parse(static_cast<int>(args.size()), args.data());
             if (mParser.verbose) mTimer.stop();
         }
@@ -1577,7 +2200,7 @@ void Tool::config()
 
 // ==============================================================================================================
 
-void Tool::write()
+inline void Tool::write()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
   for (std::string &fileName : mParser.getVec<std::string>("files")) {
@@ -1603,7 +2226,7 @@ void Tool::write()
 
 // ==============================================================================================================
 
-void Tool::writeVDB(const std::string &fileName)
+inline void Tool::writeVDB(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
   try {
@@ -1611,22 +2234,17 @@ void Tool::writeVDB(const std::string &fileName)
     const std::string age = mParser.get<std::string>("vdb");
     const bool keep = mParser.get<bool>("keep");
     const std::string codec = toLowerCase(mParser.get<std::string>("codec"));
-    bool half;
-    switch (mParser.get<int>("bits")) {
-      case 16:
-        half = true; break;
-      case 32:
-        half = false; break;
-      default:
-        throw std::invalid_argument("writeVDB: bits should either be 32 or 16, not "+mParser.get<std::string>("bits"));
+    // An empty bits option preserves each grid's own half-float setting, so
+    // e.g. half grids read from a file are written back as half grids.
+    const std::string bits = mParser.get<std::string>("bits");
+    if (!bits.empty() && bits != "16" && bits != "32") {
+        throw std::invalid_argument("writeVDB: bits should either be 32 or 16, not "+bits);
     }
     GridPtrVec grids;// vector of grids to be written and possibly removed from mGrid
     if (age == "*") {
       for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it) grids.push_back(*it);
-      if (!keep) mGrid.clear();
     } else {
       for (int a : vectorize<int>(age, ",")) grids.push_back(*this->getGrid(a));
-      if (!keep) for (auto &g : grids) mGrid.remove(g);
     }
 
     if (grids.empty()) throw std::invalid_argument("no vdb grids to write");
@@ -1644,21 +2262,29 @@ void Tool::writeVDB(const std::string &fileName)
         throw std::invalid_argument("writeVDB: unsupported codec \""+codec+"\"");
       }
     };
-    for (size_t i=0; half && i<grids.size(); ++i) grids[i]->setSaveFloatAsHalf(true);
+    // Copy metadata while sharing the trees, so serialization settings never
+    // modify the inputs, even if opening or writing the output fails.
+    GridPtrVec output;
+    for (const auto &grid : grids) {
+      output.push_back(grid->copyGrid());
+      if (!bits.empty()) output.back()->setSaveFloatAsHalf(bits == "16");
+    }
     if (fileName=="stdout.vdb") {
       if (isatty(fileno(stdout)))  throw std::invalid_argument("writeVDB: stdout is not connected to the terminal");
       if (mParser.verbose) mTimer.start("Streaming VDB grid(s) to output stream");
       io::Stream stream(std::cout);
       setCodec(stream);
-      stream.write(grids);
+      stream.write(output);
+      std::cout.flush();
+      if (!std::cout) throw std::runtime_error("failed to write VDB to stdout");
     } else {
       if (mParser.verbose) mTimer.start("Writing VDB grid(s) to file named \""+fileName+"\"");
       io::File file(fileName);
       setCodec(file);
-      file.write(grids);
+      file.write(output);
       file.close();
     }
-    for (size_t i=0; half && i<grids.size(); ++i) grids[i]->setSaveFloatAsHalf(false);
+    if (!keep) for (const auto &grid : grids) mGrid.remove(grid);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
     throw std::invalid_argument(std::string("writeVDB: ") + e.what());// catch in Tool::write
@@ -1668,7 +2294,7 @@ void Tool::writeVDB(const std::string &fileName)
 // ==============================================================================================================
 
 #ifdef VDB_TOOL_USE_NANO
-void Tool::writeNVDB(const std::string &fileName)
+inline void Tool::writeNVDB(const std::string &fileName)
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "write");
@@ -1734,10 +2360,8 @@ void Tool::writeNVDB(const std::string &fileName)
     GridPtrVec grids;// vector of grids to be written and possibly removed from mGrid
     if (age == "*") {
       for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it) grids.push_back(*it);
-      if (!keep) mGrid.clear();
     } else {
       for (int a : vectorize<int>(age, ",")) grids.push_back(*this->getGrid(a));
-      if (!keep) for (auto &g : grids) mGrid.remove(g);
     }
 
     if (grids.empty()) throw std::invalid_argument(action_name+": no vdb grids to write");
@@ -1771,21 +2395,27 @@ void Tool::writeNVDB(const std::string &fileName)
         auto handle = openToNano(grid);
         nanovdb::io::writeGrid(std::cout, handle, codec);
       }
+      std::cout.flush();
+      if (!std::cout) throw std::runtime_error("failed to write NanoVDB to stdout");
     } else {
       if (mParser.verbose) mTimer.start("Writing NanoVDB to file");
-      std::ofstream os(fileName, std::ios::out | std::ios::binary);
+      std::ofstream os;
+      os.exceptions(std::ios::failbit | std::ios::badbit);
+      os.open(fileName, std::ios::out | std::ios::binary);
       for (auto grid: grids) {
         auto handle = openToNano(grid);
         nanovdb::io::writeGrid(os, handle, codec);
       }
+      os.close();
     }
+    if (!keep) for (const auto &grid : grids) mGrid.remove(grid);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
     throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::writeNVDB
 #else
-void Tool::writeNVDB(const std::string&)
+inline void Tool::writeNVDB(const std::string&)
 {
     throw std::runtime_error("NanoVDB support was disabled during compilation!");
 }// Tool::writeNVDB
@@ -1793,7 +2423,7 @@ void Tool::writeNVDB(const std::string&)
 
 // ==============================================================================================================
 
-void Tool::writeGeo(const std::string &fileName)
+inline void Tool::writeGeo(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
   const int age = mParser.get<int>("geo");
@@ -1809,7 +2439,7 @@ void Tool::writeGeo(const std::string &fileName)
 
 // ==============================================================================================================
 
-void Tool::writeConf(const std::string &fileName)
+inline void Tool::writeConf(const std::string &fileName)
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "write");
   if (mParser.verbose>1) std::clog << "Writing configuration to \"" << fileName << "\"\n";
@@ -1825,7 +2455,7 @@ void Tool::writeConf(const std::string &fileName)
 
 // ==============================================================================================================
 
-void Tool::vdbToPoints()
+inline void Tool::vdbToPoints()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "vdb2points");
   mParser.printAction();
@@ -1864,7 +2494,7 @@ void Tool::vdbToPoints()
 
 // ==============================================================================================================
 
-void Tool::pointsToVdb()
+inline void Tool::pointsToVdb()
 {
   const std::string &name = mParser.getAction().names[0];
   OPENVDB_ASSERT(name == "points2vdb");
@@ -1938,7 +2568,7 @@ void Tool::pointsToVdb()
 
 // ==============================================================================================================
 
-void Tool::transform()
+inline void Tool::transform()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "transform");
   mParser.printAction();
@@ -1992,7 +2622,7 @@ void Tool::transform()
 
 // ==============================================================================================================
 
-void Tool::levelSetToFog()
+inline void Tool::levelSetToFog()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "ls2fog");
   mParser.printAction();
@@ -2018,7 +2648,7 @@ void Tool::levelSetToFog()
 
 // ==============================================================================================================
 
-void Tool::isoToLevelSet()
+inline void Tool::isoToLevelSet()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "iso2ls");
   mParser.printAction();
@@ -2050,7 +2680,7 @@ void Tool::isoToLevelSet()
 
 // ==============================================================================================================
 
-float Tool::estimateVoxelSize(int maxDim,  float exWidth, float inWidth, int geo_age)
+inline float Tool::estimateVoxelSize(int maxDim,  float exWidth, float inWidth, int geo_age)
 {
   auto it = this->getGeom(geo_age);
   const auto bbox = (*it)->bbox();
@@ -2065,7 +2695,7 @@ float Tool::estimateVoxelSize(int maxDim,  float exWidth, float inWidth, int geo
 
 // ==============================================================================================================
 
-void Tool::quadsToTriangles()
+inline void Tool::quadsToTriangles()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "quad2tri");
   mParser.printAction();
@@ -2085,7 +2715,7 @@ void Tool::quadsToTriangles()
 
 // ==============================================================================================================
 
-void Tool::meshToLevelSet()
+inline void Tool::meshToLevelSet()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "mesh2ls");
   mParser.printAction();
@@ -2132,9 +2762,12 @@ void Tool::meshToLevelSet()
 
 // ==============================================================================================================
 
-void Tool::meshToUnsignedDistanceField()
+inline void Tool::meshToUnsignedDistanceField()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "mesh2udf");
+  if (mParser.getAction().matchedName == "soup2udf") {
+    std::cerr << "Warning: action \"-soup2udf\" is deprecated; use \"-mesh2udf\" instead.\n";
+  }
   mParser.printAction();
   const int dim = mParser.get<int>("dim");
   float voxel = mParser.get<float>("voxel");
@@ -2166,20 +2799,26 @@ void Tool::meshToUnsignedDistanceField()
 
 // ==============================================================================================================
 
-#ifdef VDB_TOOL_USE_SHRINKWRAP
-void Tool::soupToLevelSet()
+inline void Tool::shrinkWrap()
 {
-  OPENVDB_ASSERT(mParser.getAction().names[0] == "soup2ls");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "shrinkwrap");
+  const std::string &matched = mParser.getAction().matchedName;
+  if (matched == "soup2ls" || matched == "soup2sdf") {
+    std::cerr << "Warning: action \"-" << matched << "\" is deprecated; use \"-shrinkwrap\" instead.\n";
+  }
   mParser.printAction();
   const int dim = mParser.get<int>("dim");// final dimension
   float voxel = mParser.get<float>("voxel");// final voxel size
   const float width = mParser.get<float>("width");
   const int offset_mode = mParser.get<int>("mode");
   const int geo_age = mParser.get<int>("geo");
-  const int nErode = mParser.get<int>("erode");
+  const float erode = mParser.get<float>("erode");
   const float thres = mParser.get<float>("thres");
   const bool keep = mParser.get<bool>("keep");
   std::string grid_name = mParser.get<std::string>("name");
+  // Output selector (NB: selects outputs, not inputs): "*" for all generated
+  // grids, otherwise a list of resolution levels (0 = finest). Defaults to "0".
+  const std::string level_sel = mParser.get<std::string>("levels");
 
   auto it = this->getGeom(geo_age);
   Geometry::Ptr mesh = *it;
@@ -2188,27 +2827,64 @@ void Tool::soupToLevelSet()
     throw std::invalid_argument("got points, expected mesh! Hint: use -points2ls instead!");
   }
   if (keep) mesh = mesh->deepCopy();// deep copy since mesh will be modified below
-  if (mParser.verbose) mTimer.start("Soup -> SDF");
+  if (mParser.verbose) mTimer.start("ShrinkWrap -> SDF");
 
   Spinner spin, *progress = mParser.verbose ? &spin : nullptr;
-  const tools::ShrinkWrapLimit D(nErode, thres);
-  tools::PolySoup poly{std::move(mesh->vtx()), std::move(mesh->tri()), std::move(mesh->quad()), mesh->bbox()};
-  auto grid = tools::polySoupToLevelSet<GridT>(std::move(poly), dim, voxel, D, width, progress, offset_mode);
+  const ShrinkWrapLimit D(erode, thres);
+  PolySoup poly{std::move(mesh->vtx()), std::move(mesh->tri()), std::move(mesh->quad()), mesh->bbox()};
+
+  // Build the LOD hierarchy directly (rather than the single-grid free function)
+  // so we can output more than just the finest level. grids() is ordered
+  // finest(0) -> coarsest(size-1), matching the "levels" indices below.
+  using SW = ShrinkWrap<GridT>;
+  auto sw = voxel > 0.0f ? std::make_unique<SW>(std::move(poly), voxel, width)
+                         : std::make_unique<SW>(std::move(poly), dim, width);
+  sw->process(D, progress, offset_mode);
 
   if (mParser.verbose) mTimer.stop();
 
-  if (grid_name.empty()) grid_name = "soup2ls_" + mesh->getName();
-  grid->setName(grid_name);
-  mGrid.push_back(grid);
+  const std::vector<GridT::Ptr> grids = sw->grids();// finest(0) -> coarsest
+  const int count = static_cast<int>(grids.size());
+
+  // Resolve the selector into a list of level indices. "*" -> every level.
+  std::vector<int> levels;
+  if (level_sel == "*") {
+    for (int i = 0; i < count; ++i) levels.push_back(i);
+  } else {
+    levels = mParser.getVec<int>("levels");
+    if (levels.empty()) levels.push_back(0);
+  }
+
+  // Validate every requested level BEFORE pushing any grid, so an out-of-range
+  // index produces a clean error with no partial output on the stack.
+  for (const int lvl : levels) {
+    if (lvl < 0 || lvl >= count) {
+      throw std::invalid_argument("shrinkwrap: requested output grid levels=" + std::to_string(lvl) +
+          " does not exist; the shrink-wrap hierarchy generated " + std::to_string(count) +
+          " grid(s), so valid levels are 0 (finest) .. " + std::to_string(count - 1) + " (coarsest)");
+    }
+  }
+
+  if (grid_name.empty()) grid_name = "shrinkwrap_" + mesh->getName();
+  const bool multi = levels.size() > 1;
+  for (const int lvl : levels) {
+    GridT::Ptr g = grids[lvl];
+    // Disambiguate names only when several grids are output; a single output
+    // keeps the plain name (preserving the historical single-grid behavior).
+    g->setName(multi ? grid_name + "_" + std::to_string(lvl) : grid_name);
+    mGrid.push_back(g);
+  }
   if (!keep) mGeom.erase(std::next(it).base());
-}// Tool::soupToLevelSet
-#endif// VDB_TOOL_USE_SHRINKWRAP
+}// Tool::shrinkWrap
 
 // ==============================================================================================================
 
-void Tool::soupToOffset()
+inline void Tool::meshToOffset()
 {
-  OPENVDB_ASSERT(mParser.getAction().names[0] == "soup2offset");
+  OPENVDB_ASSERT(mParser.getAction().names[0] == "mesh2offset");
+  if (mParser.getAction().matchedName == "soup2offset") {
+    std::cerr << "Warning: action \"-soup2offset\" is deprecated; use \"-mesh2offset\" instead.\n";
+  }
   mParser.printAction();
   const int dim = mParser.get<int>("dim");// final dimension
   float voxel = mParser.get<float>("voxel");// final voxel size
@@ -2227,19 +2903,19 @@ void Tool::soupToOffset()
     throw std::invalid_argument("got points, expected mesh! Hint: use -points2ls instead!");
   }
   if (keep) mesh = mesh->deepCopy();// deep copy since mesh will be modified below
-  if (mParser.verbose) mTimer.start("Soup -> Offset");
+  if (mParser.verbose) mTimer.start("Mesh -> Offset");
 
-  tools::PolySoup poly{std::move(mesh->vtx()), std::move(mesh->tri()), std::move(mesh->quad()), mesh->bbox()};
-  tools::PolySoupToLevelSet<GridT> tmp(std::move(poly), voxel, width);
+  PolySoup poly{std::move(mesh->vtx()), std::move(mesh->tri()), std::move(mesh->quad()), mesh->bbox()};
+  ShrinkWrap<GridT> tmp(std::move(poly), voxel, width);
   auto grid = tmp.offset(voxel, offset_mode);
 
   if (mParser.verbose) mTimer.stop();
 
-  if (grid_name.empty()) grid_name = "soup2offset_" + mesh->getName();
+  if (grid_name.empty()) grid_name = "mesh2offset_" + mesh->getName();
   grid->setName(grid_name);
   mGrid.push_back(grid);
   if (!keep) mGeom.erase(std::next(it).base());
-}// Tool::soupToOffset
+}// Tool::meshToOffset
 
 // ==============================================================================================================
 
@@ -2313,7 +2989,7 @@ void Tool::ax()
 // ==============================================================================================================
 #endif// VDB_TOOL_USE_AX
 
-void Tool::particlesToLevelSet()
+inline void Tool::particlesToLevelSet()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "points2ls");
   mParser.printAction();
@@ -2340,7 +3016,7 @@ void Tool::particlesToLevelSet()
 
 // ==============================================================================================================
 
-typename Tool::FilterT Tool::createFilter(GridT &grid, int space, int time)
+inline typename Tool::FilterT Tool::createFilter(GridT &grid, int space, int time)
 {
   auto filter = std::make_unique<tools::LevelSetFilter<GridT>>(grid);
 
@@ -2383,7 +3059,7 @@ typename Tool::FilterT Tool::createFilter(GridT &grid, int space, int time)
 
 // ==============================================================================================================
 
-void Tool::offsetLevelSet()
+inline void Tool::offsetLevelSet()
 {
   OPENVDB_ASSERT(findMatch(mParser.getAction().names[0], {"dilate", "erode", "open", "close"}));
   mParser.printAction();
@@ -2424,7 +3100,7 @@ void Tool::offsetLevelSet()
 
 // ==============================================================================================================
 
-void Tool::filterLevelSet()
+inline void Tool::filterLevelSet()
 {
   OPENVDB_ASSERT(findMatch(mParser.getAction().names[0], {"gauss", "mean", "median"}));
   mParser.printAction();
@@ -2461,7 +3137,7 @@ void Tool::filterLevelSet()
 
 // ==============================================================================================================
 
-void Tool::pruneLevelSet()
+inline void Tool::pruneLevelSet()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "prune");
   mParser.printAction();
@@ -2479,7 +3155,7 @@ void Tool::pruneLevelSet()
 
 // ==============================================================================================================
 
-void Tool::floodLevelSet()
+inline void Tool::floodLevelSet()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "flood");
   mParser.printAction();
@@ -2497,7 +3173,7 @@ void Tool::floodLevelSet()
 
 // ==============================================================================================================
 
-void Tool::compute()
+inline void Tool::compute()
 {
   OPENVDB_ASSERT(findMatch(mParser.getAction().names[0], {"cpt","div","curl","length","grad","curvature"}));
   mParser.printAction();
@@ -2561,9 +3237,9 @@ void Tool::compute()
 
 // ==============================================================================================================
 
-void Tool::composite()
+inline void Tool::composite()
 {
-  OPENVDB_ASSERT(findMatch(mParser.getAction().names[0], {"min","max","sum"}));
+  OPENVDB_ASSERT(findMatch(mParser.getAction().names[0], {"min","max","sum","multiply","divide"}));
   mParser.printAction();
   const std::string &action_name = mParser.getAction().names[0];
   const VecI ij = mParser.getVec<int>("vdb");
@@ -2594,6 +3270,10 @@ void Tool::composite()
     tools::compMax(*tmpA, *tmpB);// Store the result in the A grid and leave the B grid empty.
   } else if (action_name == "sum") {
     tools::compSum(*tmpA, *tmpB);// Store the result in the A grid and leave the B grid empty.
+  } else if (action_name == "multiply") {
+    tools::compMul(*tmpA, *tmpB);// Store the result in the A grid and leave the B grid empty.
+  } else if (action_name == "divide") {
+    tools::compDiv(*tmpA, *tmpB);// Store the result in the A grid and leave the B grid empty.
   } else {
     throw std::invalid_argument(action_name+": invalid operation");
   }
@@ -2602,7 +3282,7 @@ void Tool::composite()
 
 // ==============================================================================================================
 
-void Tool::csg()
+inline void Tool::csg()
 {
   OPENVDB_ASSERT(findMatch(mParser.getAction().names[0], {"union", "intersection", "difference"}));
   mParser.printAction();
@@ -2622,6 +3302,7 @@ void Tool::csg()
   if (!gridB || gridB->getGridClass() != GRID_LEVEL_SET) {
     throw std::invalid_argument(action_name + ": no level set with age " + std::to_string(ij[1]));
   }
+  const std::string resultName = action_name + "_" + gridA->getName();
   if (gridA->transform() != gridB->transform()) {
     if (gridA->voxelSize()[0]<gridB->voxelSize()[0]) {// use the smallest voxel size
       const float halfWidth = static_cast<float>(gridA->background()/gridA->voxelSize()[0]);
@@ -2639,47 +3320,51 @@ void Tool::csg()
     if (keep) {
       GridT::Ptr grid = tools::csgUnionCopy(*gridA, *gridB);
       if (rebuild) grid = tools::sdfToSdf(*grid);
-      grid->setName("union_"+gridA->getName());
+      grid->setName(resultName);
       mGrid.push_back(grid);// A and B are unchanged!
     } else {
       tools::csgUnion(*gridA, *gridB, prune);// overwrites A and cannibalizes B
       if (rebuild) gridA = tools::sdfToSdf(*gridA);
-      gridA->setName("union_"+gridA->getName());
+      gridA->setName(resultName);
     }
   } else if (action_name == "intersection") {
     if (mParser.verbose) mTimer.start("Intersection");
     if (keep) {
       GridT::Ptr grid = tools::csgIntersectionCopy(*gridA, *gridB);
       if (rebuild) grid = tools::sdfToSdf(*grid);
-      grid->setName("intersection_"+gridA->getName());
+      grid->setName(resultName);
       mGrid.push_back(grid);// A and B are unchanged!
     } else {
       tools::csgIntersection(*gridA, *gridB, prune);// overwrites A and cannibalizes B
       if (rebuild) gridA = tools::sdfToSdf(*gridA);
-      gridA->setName("intersection_"+gridA->getName());
+      gridA->setName(resultName);
     }
   } else if (action_name == "difference") {
     if (mParser.verbose) mTimer.start("Difference");
     if (keep) {
       GridT::Ptr grid = tools::csgDifferenceCopy(*gridA, *gridB);
       if (rebuild) grid = tools::sdfToSdf(*grid);
-      grid->setName("difference_"+gridA->getName());
+      grid->setName(resultName);
       mGrid.push_back(grid);// A and B are unchanged!
     } else {
       tools::csgDifference(*gridA, *gridB, prune);// overwrites A and deletes B
       if (rebuild) gridA = tools::sdfToSdf(*gridA);
-      gridA->setName("difference_"+gridA->getName());
+      gridA->setName(resultName);
     }
   } else {
     throw std::invalid_argument("csg: invalid type");
   }
-  if (!keep) mGrid.erase(std::next(itB).base());// remove B since it was corrupted
+  if (!keep) {
+    // Rebuilding can replace gridA, so commit the resulting pointer to its stack slot.
+    *std::next(mGrid.rbegin(), ij[0]) = gridA;
+    mGrid.erase(std::next(itB).base());// remove B since it was corrupted
+  }
   if (mParser.verbose) mTimer.stop();
 }// Tool::csg
 
 // ==============================================================================================================
 
-void Tool::volumeToMesh()
+inline void Tool::volumeToMesh()
 {
   const int mode = findMatch(mParser.getAction().names[0], {"ls2mesh", "fog2mesh", "vol2mesh"});// 1-based index
   OPENVDB_ASSERT(mode);// mode = 0 for no match
@@ -2730,7 +3415,7 @@ void Tool::volumeToMesh()
 
 // ==============================================================================================================
 
-void Tool::forValues()
+inline void Tool::forValues()
 {
   OPENVDB_ASSERT(findMatch(mParser.getAction().names[0], {"forAllValues", "forOnValues", "forOffValues"}));
   mParser.printAction();
@@ -2810,14 +3495,7 @@ void Tool::forValues()
     calc.compile(kernel);// throws on syntax error / unknown op
   }
 
-  // NOW SAFE TO MODIFY STACK AND NAMES: compilation and binding have succeeded.
-  if (keep) {
-    GridT::Ptr tmp = grid->deepCopy();
-    mGrid.push_back(tmp);
-    grid = tmp;
-  }
   if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
-  grid->setName(grid_name);
 
   if (mParser.verbose) mTimer.start(action_name);
   if (!kernel.empty()) {
@@ -2910,11 +3588,17 @@ void Tool::forValues()
         base[i] = strTo<float>(mem.get(name));
     }
 
+    // All kernel variables have now been validated. Keep copies private until
+    // execution succeeds, and defer renaming the input until then as well.
+    if (keep) grid = grid->deepCopy();
+
     // Snapshot the OUTPUT grid if the kernel reads non-zero offsets from it
     // (directly or via any alias): otherwise parallel writes to the iterator's
     // grid would race with neighbor reads from the same grid. Check pointer
-    // identity to catch all aliases, not just the primary gridIdx == 0.
-    const GridT::ConstPtr outputGridPtr = grids[0].grid;
+    // identity to catch all aliases, not just the primary gridIdx == 0. With
+    // keep=true the output is a private copy, so neighbor reads use the
+    // untouched input and no snapshot is needed.
+    const GridT::ConstPtr outputGridPtr = grid;
     const bool needSnapshot = std::any_of(neighbors.begin(), neighbors.end(),
         [outputGridPtr, &grids](const NeighborBinding &n) {
             return grids[n.gridIdx].grid.get() == outputGridPtr.get() &&
@@ -2982,6 +3666,7 @@ void Tool::forValues()
       break;
     }
   }
+  if (kernel.empty() && keep) grid = grid->deepCopy();
   if (int n = findMatch(cls, {"ls", "fog", "unknown"})) {
     auto class_tag = n==1 ? GRID_LEVEL_SET : n==2 ? GRID_FOG_VOLUME : GRID_UNKNOWN;
     grid->setGridClass(class_tag);
@@ -2991,50 +3676,45 @@ void Tool::forValues()
   } else if (back.size()==2) {
     tools::changeAsymmetricLevelSetBackground(grid->tree(), back[0], back[1]);// outside, inside
   }
+  grid->setName(grid_name);
+  if (keep) mGrid.push_back(grid);
   if (mParser.verbose) mTimer.stop();
 }// Tool::forValues
 
 // ==============================================================================================================
 
-void Tool::sdf2udf()
+inline void Tool::sdf2udf()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(findMatch(action_name, {"sdf2udf"}));// mode = 0 for no match
-  try {
-    const int age = mParser.get<int>("vdb");
-    const bool keep = mParser.get<bool>("keep");
-    std::string grid_name = mParser.get<std::string>("name");
+  // Errors propagate to Parser::run, which reports them and sets the exit status.
+  const int age = mParser.get<int>("vdb");
+  const bool keep = mParser.get<bool>("keep");
+  std::string grid_name = mParser.get<std::string>("name");
 
-    /// get the relevant grid to be processed
-    auto it = this->getGrid(age);// will throw if grid doesn't exist
-    GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid) throw std::invalid_argument("no FloatGrid with age " + std::to_string(age));
-    if (keep) {
-      GridT::Ptr tmp = grid->deepCopy();
-      mGrid.push_back(tmp);
-      grid = tmp;
-    }
-    if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
-    grid->setName(grid_name);
-    if (grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("no level set with age "+std::to_string(age));
-    grid->setGridClass(GRID_UNKNOWN);// GRID_LEVEL_SET -> GRID_UNKNOW
-
-    if (mParser.verbose) mTimer.start(action_name);
-    tools::foreach(grid->beginValueAll(), [](auto &it){it.setValue(math::Abs(*it));});
-    if (mParser.verbose) mTimer.stop();
-
-  } catch (const std::exception& e) {
-    if (mErrorOnWarning) {
-      throw std::invalid_argument(action_name+": "+e.what());
-    } else {
-      std::clog << action_name << ": skipping due to " << e.what() << std::endl;
-    }
+  /// get the relevant grid to be processed
+  auto it = this->getGrid(age);// will throw if grid doesn't exist
+  GridT::Ptr grid = gridPtrCast<GridT>(*it);
+  if (!grid) throw std::invalid_argument("no FloatGrid with age " + std::to_string(age));
+  // validate before copying or renaming, so a failure leaves the grid stack unchanged
+  if (grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("no level set with age "+std::to_string(age));
+  if (keep) {
+    GridT::Ptr tmp = grid->deepCopy();
+    mGrid.push_back(tmp);
+    grid = tmp;
   }
+  if (grid_name.empty()) grid_name = action_name + "_" + grid->getName();
+  grid->setName(grid_name);
+  grid->setGridClass(GRID_UNKNOWN);// GRID_LEVEL_SET -> GRID_UNKNOW
+
+  if (mParser.verbose) mTimer.start(action_name);
+  tools::foreach(grid->beginValueAll(), [](auto &it){it.setValue(math::Abs(*it));});
+  if (mParser.verbose) mTimer.stop();
 }// Tool::sdf2udf
 
 // ==============================================================================================================
 
-void Tool::levelSetSphere()
+inline void Tool::levelSetSphere()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "sphere");
@@ -3055,7 +3735,7 @@ void Tool::levelSetSphere()
 
 // ==============================================================================================================
 
-void Tool::levelSetPlatonic()
+inline void Tool::levelSetPlatonic()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "platonic");
   mParser.printAction();
@@ -3089,7 +3769,7 @@ void Tool::levelSetPlatonic()
 
 // ==============================================================================================================
 
-void Tool::multires()
+inline void Tool::multires()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "multires");
@@ -3114,7 +3794,7 @@ void Tool::multires()
 
 // ==============================================================================================================
 
-void Tool::expandLevelSet()
+inline void Tool::expandLevelSet()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "expand");
@@ -3138,7 +3818,7 @@ void Tool::expandLevelSet()
 
 // ==============================================================================================================
 
-void Tool::segment()
+inline void Tool::segment()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "segment");
@@ -3167,7 +3847,7 @@ void Tool::segment()
 // ==============================================================================================================
 
 // for simplicity we are restricting this resampler to only work on float grids!
-void Tool::resample()
+inline void Tool::resample()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "resample");
@@ -3216,7 +3896,7 @@ void Tool::resample()
 
 // ==============================================================================================================
 
-void Tool::scatter()
+inline void Tool::scatter()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "scatter");
@@ -3263,7 +3943,7 @@ void Tool::scatter()
 
 // ==============================================================================================================
 
-void Tool::slice()
+inline void Tool::slice()
 {
   using RangeT = tbb::blocked_range2d<int>;
   struct Axis {
@@ -3345,7 +4025,7 @@ void Tool::slice()
 /// @brief Convert multiple image files to a mpeg movie file
 // vdb_tool -sphere -for x=0,1,0.01 -slice X='{$x}' -end -img2mpeg input="slice_*.ppm" output=slices.mp4
 // vdb_tool -sphere -for x=0,1,0.01 -slice X='{$x}' -end -img2mpeg && open slices.mp4
-void Tool::movie()
+inline void Tool::movie()
 {
 #ifdef VDB_TOOL_USE_MPEG
   OPENVDB_ASSERT(mParser.getAction().names[0] == "movie");
@@ -3394,7 +4074,7 @@ void Tool::movie()
 // ==============================================================================================================
 // LeVeque, R., High-Resolution Conservative Algorithms For Advection In Incompressible Flow, SIAM J. Numer. Anal. 33, 627–665 (1996)
 // https://faculty.washington.edu/rjl/pubs/hiresadv/0733033.pdf
-void Tool::enright()
+inline void Tool::enright()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "enright");
@@ -3484,7 +4164,7 @@ GridBase::Ptr Tool::clip(const VecF &v, int age, const GridType &input)
 
 // ==============================================================================================================
 
-void Tool::clip()
+inline void Tool::clip()
 {
   OPENVDB_ASSERT(mParser.getAction().names[0] == "clip");
   mParser.printAction();
@@ -3514,7 +4194,7 @@ void Tool::clip()
 // ==============================================================================================================
 
 #ifdef VDB_TOOL_USE_PNG
-void savePNG(const std::string& fname, const tools::Film& film)
+inline void savePNG(const std::string& fname, const tools::Film& film)
 {
   png_structp png = png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
   if (!png) OPENVDB_THROW(RuntimeError, "png_create_write_struct failed");
@@ -3565,7 +4245,7 @@ void savePNG(const std::string& fname, const tools::Film& film)
   png_destroy_write_struct(&png, &info);
 }// savePNG
 #else
-void savePNG(const std::string&, const tools::Film&)
+inline void savePNG(const std::string&, const tools::Film&)
 {
   OPENVDB_THROW(RuntimeError, "vdb_tool has not been compiled with .png support.");
 }// savePNG
@@ -3574,7 +4254,7 @@ void savePNG(const std::string&, const tools::Film&)
 // ==============================================================================================================
 
 #ifdef VDB_TOOL_USE_JPG
-void saveJPG(const std::string& fname, const tools::Film& film)
+inline void saveJPG(const std::string& fname, const tools::Film& film)
 {
   jpeg_error_mgr jerr;
   jpeg_compress_struct cinfo;
@@ -3601,7 +4281,7 @@ void saveJPG(const std::string& fname, const tools::Film& film)
   std::fclose(fp);
 }// saveJPG
 #else
-void saveJPG(const std::string&, const tools::Film&)
+inline void saveJPG(const std::string&, const tools::Film&)
 {
   OPENVDB_THROW(RuntimeError, "vdb_tool has not been compiled with .jpg support.");
 }// saveJPG
@@ -3610,7 +4290,7 @@ void saveJPG(const std::string&, const tools::Film&)
 // ==============================================================================================================
 
 #ifdef VDB_TOOL_USE_EXR
-void saveEXR(const std::string& filename, const tools::Film& film, const std::string &compression = "zip")
+inline void saveEXR(const std::string& filename, const tools::Film& film, const std::string &compression = "zip")
 {
     Imf::setGlobalThreadCount(8);
     Imf::Header header(int(film.width()), int(film.height()));
@@ -3646,7 +4326,7 @@ void saveEXR(const std::string& filename, const tools::Film& film, const std::st
     imgFile.writePixels(int(film.height()));
 }// saveEXR
 #else
-void saveEXR(const std::string&, const tools::Film&, const std::string& = "zip")
+inline void saveEXR(const std::string&, const tools::Film&, const std::string& = "zip")
 {
     OPENVDB_THROW(RuntimeError, "vdb_tool has not been compiled with .exr support.");
 }// saveEXR
@@ -3654,7 +4334,7 @@ void saveEXR(const std::string&, const tools::Film&, const std::string& = "zip")
 
 // ==============================================================================================================
 
-void Tool::render()
+inline void Tool::render()
 {
   const std::string &action_name = mParser.getAction().names[0];
   OPENVDB_ASSERT(action_name == "render");
@@ -3810,7 +4490,7 @@ void Tool::render()
 
 // ==============================================================================================================
 
-void Tool::print_args(std::ostream& os) const
+inline void Tool::print_args(std::ostream& os) const
 {
   os << "\n" << std::setw(40) << std::setfill('=') << "> Actions <" << std::setw(40) << "\n";
   mParser.print(os);
@@ -3884,80 +4564,6 @@ inline std::string formatBBoxd(const BBoxT& bbox)
     return ss.str();
 }
 
-template <typename GridT>
-inline std::string gridRangeStr(const GridT& grid)
-{
-    if (grid.activeVoxelCount() == 0) return "(empty)";
-    const auto mm = tools::minMax(grid.tree());
-    std::stringstream ss;
-    ss << "[" << mm.min() << ", " << mm.max() << "]";
-    return ss.str();
-}
-
-// Dispatch min/max stringification across the scalar grid types we know how
-// to compare. Vec3-typed grids etc. get "(n/a)" because ordering isn't
-// well-defined for them.
-inline std::string formatRange(const openvdb::GridBase& grid)
-{
-    if (auto p = dynamic_cast<const openvdb::FloatGrid*>(&grid))  return gridRangeStr(*p);
-    if (auto p = dynamic_cast<const openvdb::DoubleGrid*>(&grid)) return gridRangeStr(*p);
-    if (auto p = dynamic_cast<const openvdb::Int32Grid*>(&grid))  return gridRangeStr(*p);
-    if (auto p = dynamic_cast<const openvdb::Int64Grid*>(&grid))  return gridRangeStr(*p);
-    if (auto p = dynamic_cast<const openvdb::BoolGrid*>(&grid))   return gridRangeStr(*p);
-    return "(n/a)";
-}
-
-// Background value, dispatched by grid type. Falls back to the typed grid's
-// own background() accessor, which prints scalars as numbers and Vec3s as
-// "[x, y, z]".
-template <typename GridT>
-inline std::string gridBgStr(const GridT& grid)
-{
-    std::stringstream ss;
-    ss << grid.background();
-    return ss.str();
-}
-inline std::string formatBackground(const openvdb::GridBase& grid)
-{
-    if (auto p = dynamic_cast<const openvdb::FloatGrid*>(&grid))  return gridBgStr(*p);
-    if (auto p = dynamic_cast<const openvdb::DoubleGrid*>(&grid)) return gridBgStr(*p);
-    if (auto p = dynamic_cast<const openvdb::Int32Grid*>(&grid))  return gridBgStr(*p);
-    if (auto p = dynamic_cast<const openvdb::Int64Grid*>(&grid))  return gridBgStr(*p);
-    if (auto p = dynamic_cast<const openvdb::BoolGrid*>(&grid))   return gridBgStr(*p);
-    if (auto p = dynamic_cast<const openvdb::Vec3SGrid*>(&grid))  return gridBgStr(*p);
-    return "(n/a)";
-}
-
-// World-space surface area / enclosed volume of a level set, via
-// tools::levelSetArea / tools::levelSetVolume. Both throw TypeError unless the
-// grid is a non-empty scalar float level set, so only Float GRID_LEVEL_SET
-// grids are measured; everything else (and any measurement failure) renders
-// as "(n/a)".
-inline std::string formatArea(const openvdb::GridBase& grid)
-{
-    auto p = dynamic_cast<const openvdb::FloatGrid*>(&grid);
-    if (p == nullptr || grid.getGridClass() != openvdb::GRID_LEVEL_SET) return "(n/a)";
-    try {
-        std::stringstream ss;
-        ss << openvdb::tools::levelSetArea(*p);
-        return ss.str();
-    } catch (const std::exception&) {
-        return "(n/a)";
-    }
-}
-inline std::string formatVolume(const openvdb::GridBase& grid)
-{
-    auto p = dynamic_cast<const openvdb::FloatGrid*>(&grid);
-    if (p == nullptr || grid.getGridClass() != openvdb::GRID_LEVEL_SET) return "(n/a)";
-    try {
-        std::stringstream ss;
-        ss << openvdb::tools::levelSetVolume(*p);
-        return ss.str();
-    } catch (const std::exception&) {
-        return "(n/a)";
-    }
-}
-
 // Per-level node counts, top-down, e.g. "2->10->58" = 2 upper-internal nodes,
 // 10 lower-internal nodes, 58 leaf nodes. TreeBase::nodeCount() returns counts
 // bottom-up (index 0 = leaf) sized treeDepth, with the last element being the
@@ -4018,7 +4624,7 @@ inline void printTable(std::ostream& os,
 }// namespace print_detail
 // ----- end helpers ---------------------------------------------------------
 
-void Tool::print(std::ostream& os) const
+inline void Tool::print(std::ostream& os) const
 {
   using namespace print_detail;
   OPENVDB_ASSERT(mParser.getAction().names[0] == "print");
@@ -4044,7 +4650,6 @@ void Tool::print(std::ostream& os) const
     std::vector<std::string> geomHeaders = {"age", "name", "vtx", "tri", "quad", "size"};
     std::vector<Align>       geomAligns  = {RIGHT, LEFT,   RIGHT, RIGHT, RIGHT,  RIGHT};
     if (level >= 1) { geomHeaders.push_back("bbox"); geomAligns.push_back(LEFT); }
-    if (level >= 2) { geomHeaders.push_back("rgb");  geomAligns.push_back(RIGHT); }
 
     auto buildGeomRow = [&](int age, const Geometry& geom) {
         const std::uint64_t mem = sizeof(geom)
@@ -4061,7 +4666,6 @@ void Tool::print(std::ostream& os) const
             formatBytes(mem),
         };
         if (level >= 1) row.push_back(formatBBoxd(geom.bbox()));
-        if (level >= 2) row.push_back(formatCommas(geom.rgb().size()));
         return row;
     };
 
@@ -4088,10 +4692,6 @@ void Tool::print(std::ostream& os) const
     if (level >= 1) { headers.push_back("bbox(index)"); aligns.push_back(LEFT); }
     if (level >= 1) { headers.push_back("bbox(world)"); aligns.push_back(LEFT); }
     if (level >= 1) { headers.push_back("32->16->8");   aligns.push_back(RIGHT); }
-    if (level >= 2) { headers.push_back("background"); aligns.push_back(LEFT); }
-    if (level >= 2) { headers.push_back("range");      aligns.push_back(LEFT); }
-    if (level >= 2) { headers.push_back("area");       aligns.push_back(RIGHT); }
-    if (level >= 2) { headers.push_back("volume");     aligns.push_back(RIGHT); }
 
     auto buildRow = [&](int age, const GridBase& grid) {
         const auto bbox = grid.evalActiveVoxelBoundingBox();
@@ -4114,10 +4714,6 @@ void Tool::print(std::ostream& os) const
         if (level >= 1) row.push_back(formatBBox(bbox));
         if (level >= 1) row.push_back(formatBBoxd(grid.transform().indexToWorld(bbox)));
         if (level >= 1) row.push_back(formatNodes(grid));
-        if (level >= 2) row.push_back(formatBackground(grid));
-        if (level >= 2) row.push_back(formatRange(grid));
-        if (level >= 2) row.push_back(formatArea(grid));
-        if (level >= 2) row.push_back(formatVolume(grid));
         return row;
     };
 
@@ -4151,7 +4747,7 @@ void Tool::print(std::ostream& os) const
 
 // ==============================================================================================================
 
-Geometry::Ptr Tool::mesherToGeometry(tools::VolumeToMesh &mesher) const
+inline Geometry::Ptr Tool::mesherToGeometry(tools::VolumeToMesh &mesher) const
 {
   Geometry::Ptr geom(new Geometry());
 
@@ -4187,7 +4783,7 @@ Geometry::Ptr Tool::mesherToGeometry(tools::VolumeToMesh &mesher) const
 
 // ==============================================================================================================
 
-Geometry::Ptr Tool::volumeToGeometry(const GridT &grid, float isoValue, float adaptivity) const
+inline Geometry::Ptr Tool::volumeToGeometry(const GridT &grid, float isoValue, float adaptivity) const
 {
   tools::VolumeToMesh mesher(isoValue, adaptivity, /*relaxDisorientedTriangles*/true);
   mesher(grid);

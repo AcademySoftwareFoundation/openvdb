@@ -42,6 +42,7 @@
 #include <string> // for std::string
 #include <sstream> // for std::stringstream
 #include <cstring> // for std::strcmp
+#include <type_traits> // for std::is_unsigned
 #include <memory> // for std::unique_ptr
 #include <vector> // for std::vector
 #ifdef NANOVDB_USE_ZIP
@@ -125,8 +126,21 @@ using fileSize_t = uint64_t;
 /// @brief Internal functions for compressed read/write of a NanoVDB GridHandle into a stream
 ///
 /// @warning These functions should never be called directly by client code
+/// @cond
 namespace Internal {
 static constexpr fileSize_t MAX_SIZE = 1UL << 30; // size is 1 GB
+
+/// @brief Add a grid size read from a stream to a running byte count
+/// @throw std::runtime_error if the sum wraps around
+template<typename SizeT>
+inline void addGridSize(SizeT& total, SizeT gridSize)
+{
+    static_assert(std::is_unsigned<SizeT>::value,
+                  "addGridSize relies on unsigned wrap-around to detect overflow");
+    const SizeT sum = total + gridSize;// unsigned wrap-around is well defined
+    if (sum < total) throw std::runtime_error("Grid sizes in stream overflow a byte count");
+    total = sum;
+}
 
 template<typename BufferT>
 static fileSize_t write(std::ostream& os, const GridHandle<BufferT>& handle, Codec codec, uint32_t n);
@@ -136,6 +150,7 @@ static void read(std::istream& is, BufferT& buffer, Codec codec);
 
 static void read(std::istream& is, char* data, fileSize_t size, Codec codec);
 } // namespace Internal
+/// @endcond
 
 /// @brief Standard hash function to use on strings; std::hash may vary by
 ///        platform/implementation and is know to produce frequent collisions.
@@ -210,6 +225,8 @@ std::vector<FileGridMetaData> readGridMetaData(const std::string& fileName);
 std::vector<FileGridMetaData> readGridMetaData(std::istream& is);
 
 // --------------------------> Implementations for Internal <------------------------------------
+
+/// @cond
 
 template<typename BufferT>
 fileSize_t Internal::write(std::ostream& os, const GridHandle<BufferT>& handle, Codec codec, unsigned int n)
@@ -315,6 +332,7 @@ void Internal::read(std::istream& is, char* data, fileSize_t residual, Codec cod
     }
     if (!is) throw std::runtime_error("Failed to read Tree from file");
 } // Internal::read
+/// @endcond
 
 // --------------------------> Implementations for FileGridMetaData <------------------------------------
 
@@ -504,7 +522,7 @@ GridHandle<BufferT> readGrid(std::istream& is, int n, const BufferT& pool)
                 std::streamoff skipSize = 0;
                 for (auto& m : seg.meta) {
                     ++gridCount;
-                    bufferSize += m.gridSize;
+                    Internal::addGridSize(bufferSize, m.gridSize);
                     skipSize   += m.fileSize;
                 }// loop over grids in segment
                 is.seekg(skipSize, std::ios_base::cur); // skip forward from the current position
@@ -632,7 +650,7 @@ VecT<GridHandle<BufferT>> readGrids(std::istream& is, const BufferT& pool = Buff
         Segment seg;
         while (seg.read(is)) {
             uint64_t bufferSize = 0;
-            for (auto& m : seg.meta) bufferSize += m.gridSize;
+            for (auto& m : seg.meta) Internal::addGridSize(bufferSize, m.gridSize);
             auto buffer = BufferT::create(bufferSize, &pool);
             uint64_t bufferOffset = 0;
             for (uint16_t i = 0; i < seg.header.gridCount; ++i) {

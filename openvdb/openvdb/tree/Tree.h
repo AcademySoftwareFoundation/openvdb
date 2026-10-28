@@ -95,13 +95,7 @@ public:
 
     virtual void getIndexRange(CoordBBox& bbox) const = 0;
 
-    /// @brief Replace with background tiles any nodes whose voxel buffers
-    /// have not yet been allocated.
-    /// @details Typically, unallocated nodes are leaf nodes whose voxel buffers
-    /// are not yet resident in memory because delayed loading is in effect.
-    /// @sa readNonresidentBuffers, io::File::open
     virtual void clipUnallocatedNodes() = 0;
-    /// Return the total number of unallocated leaf nodes residing in this tree.
 #if OPENVDB_ABI_VERSION_NUMBER >= 12
     virtual Index64 unallocatedLeafCount() const = 0;
 #else
@@ -150,31 +144,30 @@ public:
     /// Return the total amount of memory in bytes occupied by this tree.
     virtual Index64 memUsage() const { return 0; }
 
-
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     //
     // I/O methods
     //
     /// @brief Read the tree topology from a stream.
     ///
     /// This will read the tree structure and tile values, but not voxel data.
-    virtual void readTopology(std::istream&, bool saveFloatAsHalf = false);
+    virtual void readTopology(std::istream&, bool saveFloatAsHalf = false) = 0;
     /// @brief Write the tree topology to a stream.
     ///
     /// This will write the tree structure and tile values, but not voxel data.
-    virtual void writeTopology(std::ostream&, bool saveFloatAsHalf = false) const;
+    virtual void writeTopology(std::ostream&, bool saveFloatAsHalf = false) const = 0;
 
     /// Read all data buffers for this tree.
     virtual void readBuffers(std::istream&, bool saveFloatAsHalf = false) = 0;
     /// Read all of this tree's data buffers that intersect the given bounding box.
     virtual void readBuffers(std::istream&, const CoordBBox&, bool saveFloatAsHalf = false) = 0;
-    /// @brief Read all of this tree's data buffers that are not yet resident in memory
-    /// (because delayed loading is in effect).
-    /// @details If this tree was read from a memory-mapped file, this operation
-    /// disconnects the tree from the file.
-    /// @sa clipUnallocatedNodes, io::File::open, io::MappedFile
+
+    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     virtual void readNonresidentBuffers() const = 0;
+
     /// Write out all the data buffers for this tree.
     virtual void writeBuffers(std::ostream&, bool saveFloatAsHalf = false) const = 0;
+#endif
 
     /// @brief Print statistics, memory usage and other information about this tree.
     /// @param os            a stream to which to write textual information
@@ -323,7 +316,7 @@ public:
     /// @note Because RootNodes are resizable, the RootNode Log2Dim is 0 for all trees.
     static void getNodeLog2Dims(std::vector<Index>& dims);
 
-
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     //
     // I/O methods
     //
@@ -339,14 +332,13 @@ public:
     void readBuffers(std::istream&, bool saveFloatAsHalf = false) override;
     /// Read all of this tree's data buffers that intersect the given bounding box.
     void readBuffers(std::istream&, const CoordBBox&, bool saveFloatAsHalf = false) override;
-    /// @brief Read all of this tree's data buffers that are not yet resident in memory
-    /// (because delayed loading is in effect).
-    /// @details If this tree was read from a memory-mapped file, this operation
-    /// disconnects the tree from the file.
-    /// @sa clipUnallocatedNodes, io::File::open, io::MappedFile
-    void readNonresidentBuffers() const override;
+
+    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
+    void readNonresidentBuffers() const override { }
+
     /// Write out all data buffers for this tree.
     void writeBuffers(std::ostream&, bool saveFloatAsHalf = false) const override;
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     void print(std::ostream& os = std::cout, int verboseLevel = 1) const override;
 
@@ -494,9 +486,6 @@ public:
     void clip(const CoordBBox&);
     /// @brief Replace with background tiles any nodes whose voxel buffers
     /// have not yet been allocated.
-    /// @details Typically, unallocated nodes are leaf nodes whose voxel buffers
-    /// are not yet resident in memory because delayed loading is in effect.
-    /// @sa readNonresidentBuffers, io::File::open
     void clipUnallocatedNodes() override;
 
     /// Return the total number of unallocated leaf nodes residing in this tree.
@@ -1141,23 +1130,6 @@ struct Tree5 {
 
 
 inline void
-TreeBase::readTopology(std::istream& is, bool /*saveFloatAsHalf*/)
-{
-    int32_t bufferCount;
-    is.read(reinterpret_cast<char*>(&bufferCount), sizeof(int32_t));
-    if (bufferCount != 1) OPENVDB_LOG_WARN("multi-buffer trees are no longer supported");
-}
-
-
-inline void
-TreeBase::writeTopology(std::ostream& os, bool /*saveFloatAsHalf*/) const
-{
-    int32_t bufferCount = 1;
-    os.write(reinterpret_cast<char*>(&bufferCount), sizeof(int32_t));
-}
-
-
-inline void
 TreeBase::print(std::ostream& os, int /*verboseLevel*/) const
 {
     os << "    Tree Type: " << type()
@@ -1278,12 +1250,16 @@ Tree<RootNodeType>::cbegin() const
 ////////////////////////////////////////
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 template<typename RootNodeType>
 void
 Tree<RootNodeType>::readTopology(std::istream& is, bool saveFloatAsHalf)
 {
     this->clearAllAccessors();
-    TreeBase::readTopology(is, saveFloatAsHalf);
+    int32_t bufferCount;
+    is.read(reinterpret_cast<char*>(&bufferCount), sizeof(int32_t));
+    if (bufferCount != 1) OPENVDB_LOG_WARN("multi-buffer trees are no longer supported");
     mRoot.readTopology(is, saveFloatAsHalf);
 }
 
@@ -1292,7 +1268,8 @@ template<typename RootNodeType>
 void
 Tree<RootNodeType>::writeTopology(std::ostream& os, bool saveFloatAsHalf) const
 {
-    TreeBase::writeTopology(os, saveFloatAsHalf);
+    int32_t bufferCount = 1;
+    os.write(reinterpret_cast<char*>(&bufferCount), sizeof(int32_t));
     mRoot.writeTopology(os, saveFloatAsHalf);
 }
 
@@ -1317,21 +1294,12 @@ Tree<RootNodeType>::readBuffers(std::istream &is, const CoordBBox& bbox, bool sa
 
 template<typename RootNodeType>
 inline void
-Tree<RootNodeType>::readNonresidentBuffers() const
-{
-    for (LeafCIter it = this->cbeginLeaf(); it; ++it) {
-        // Retrieving the value of a leaf voxel forces loading of the leaf node's voxel buffer.
-        it->getValue(Index(0));
-    }
-}
-
-
-template<typename RootNodeType>
-inline void
 Tree<RootNodeType>::writeBuffers(std::ostream &os, bool saveFloatAsHalf) const
 {
     mRoot.writeBuffers(os, saveFloatAsHalf);
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
 template<typename RootNodeType>
@@ -2025,7 +1993,6 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
 {
     if (verboseLevel <= 0) return;
 
-    /// @todo Consider using boost::io::ios_precision_saver instead.
     struct OnExit {
         std::ostream& os;
         std::streamsize savedPrecision;

@@ -1,3 +1,0 @@
-OpenVDB:
-  Improvements:
-  - Improved the interruptibility of tools::meshToVolume [Reported by @RustyLooks]

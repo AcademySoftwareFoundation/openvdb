@@ -31,6 +31,8 @@ option(NANOVDB_BUILD_PYTHON_MODULE "Build the nanovdb Python module" OFF)
 option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" OFF)
 option(NANOVDB_USE_CUDA "Build with CUDA support" OFF)
 option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
+option(NANOVDB_CUDA_WERROR "Treat all NVCC diagnostics as errors" ON)
+option(NANOVDB_USE_OLD_ACCESSOR "Use the old (buggy) ReadAccessor instead of the new fixed one" OFF)
 
 option(NANOVDB_USE_OPENVDB "Build with OpenVDB support" OFF)
 option(NANOVDB_USE_BLOSC "Build with BLOSC support" ${USE_BLOSC})
@@ -95,6 +97,21 @@ if(NANOVDB_USE_CUDA)
 
   set(CMAKE_CUDA_FLAGS "${NANOVDB_CUDA_EXTENDED_LAMBDA} -use_fast_math -lineinfo ${CMAKE_CUDA_FLAGS}")
 
+  if(NANOVDB_CUDA_WERROR OR OPENVDB_CXX_STRICT)
+    # Device-side analog of the host -Werror configured in OpenVDBCXX.cmake:
+    # every nvcc front-end diagnostic becomes an error. NANOVDB_CUDA_WERROR
+    # enables it independently of the host-side strict flags.
+    set(CMAKE_CUDA_FLAGS "--Werror=all-warnings ${CMAKE_CUDA_FLAGS}")
+  endif()
+
+  if(WIN32)
+    # NVCC analog of the /wd4251 and /wd4275 suppressions in OpenVDBCXX.cmake:
+    # it's not possible to use STL types in DLL interfaces in a portable and
+    # reliable way, so the dll-interface diagnostics (#1394 and #1388) fire on
+    # every include of the OpenVDB core headers from a CUDA source.
+    set(CMAKE_CUDA_FLAGS "--diag-suppress=1388,1394 ${CMAKE_CUDA_FLAGS}")
+  endif()
+
   # workaround for win32 bug when nvcc "--keep" is used.
   if(WIN32)
     if(NANOVDB_CUDA_KEEP_PTX)
@@ -119,11 +136,14 @@ if(NANOVDB_USE_CUDA)
 
   include(../../cmake/CPM.cmake)
 
-  # This will automatically clone CCCL from GitHub and make the exported cmake targets available
+  # Clones CCCL from GitHub and makes the exported cmake targets available.
+  # Pinned to a release so an upstream commit cannot change what CI builds;
+  # bump it deliberately.
+  set(NANOVDB_CCCL_TAG "v3.4.2" CACHE STRING "Git tag of the CCCL release to build against")
   CPMAddPackage(
       NAME CCCL
       GITHUB_REPOSITORY nvidia/cccl
-      GIT_TAG main # Fetches the latest commit on the main branch
+      GIT_TAG ${NANOVDB_CCCL_TAG}
   )
 
   find_package(NCCL)
@@ -182,12 +202,16 @@ set(NANOVDB_INCLUDE_FILES
 
 # NanoVDB cuda header files
 set(NANOVDB_INCLUDE_CUDA_FILES
+  cuda/Buffer.h
   cuda/DeviceBuffer.h
   cuda/DeviceMesh.h
   cuda/DeviceResource.h
   cuda/DeviceStreamMap.h
   cuda/GridHandle.cuh
+  cuda/HandleStorage.h
+  cuda/ManagedResource.h
   cuda/NodeManager.cuh
+  cuda/PinnedResource.h
   cuda/TempPool.h
   cuda/UnifiedBuffer.h
 )
@@ -201,8 +225,10 @@ set(NANOVDB_INCLUDE_IO_FILES
 set(NANOVDB_INCLUDE_MATH_FILES
   math/CSampleFromVoxels.h
   math/DitherLUT.h
+  math/HalfLite.h
   math/HDDA.h
   math/Math.h
+  math/Proximity.h
   math/Ray.h
   math/SampleFromVoxels.h
   math/Stencils.h
@@ -237,6 +263,8 @@ set(NANOVDB_INCLUDE_TOOLS_CUDA_FILES
   tools/cuda/DilateGrid.cuh
   tools/cuda/CoarsenGrid.cuh
   tools/cuda/VoxelBlockManager.cuh
+  tools/cuda/MeshToGrid.cuh
+  tools/cuda/ConnectedComponents.cuh
 )
 
 # NanoVDB util header files
@@ -266,6 +294,7 @@ set(NANOVDB_INCLUDE_UTIL_FILES
   util/Timer.h
   util/Util.h
   util/MorphologyHelpers.h
+  util/MaskPrefixSum.h
 )
 
 # NanoVDB util/cuda header files
@@ -288,6 +317,7 @@ set(NANOVDB_INCLUDE_UTIL_CUDA_FILES
   util/cuda/MorphologyHelpers.cuh
   util/cuda/DeviceGridTraits.cuh
   util/cuda/Injection.cuh
+  util/cuda/Rasterization.cuh
 )
 
 add_library(nanovdb INTERFACE)
@@ -302,6 +332,10 @@ endif()
 
 if(NANOVDB_USE_INTRINSICS)
   target_compile_definitions(nanovdb INTERFACE -DNANOVDB_USE_INTRINSICS)
+endif()
+
+if(NANOVDB_USE_OLD_ACCESSOR)
+  target_compile_definitions(nanovdb INTERFACE -DNANOVDB_USE_OLD_ACCESSOR)
 endif()
 
 if(NANOVDB_USE_OPENVDB)

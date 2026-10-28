@@ -42,5 +42,4 @@ provided:
  - @subpage axfunctionlist "AX Functions" for a list of all available AX functions.
  - @ref build "Building OpenVDB" and @ref dependencies "OpenVDB Dependencies" for information on building OpenVDB and <b>OpenVDB AX</b>.
 
-</div>
 */

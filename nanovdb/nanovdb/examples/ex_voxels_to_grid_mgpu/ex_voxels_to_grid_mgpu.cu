@@ -43,8 +43,11 @@ void testVoxelsToGrid(const std::string& filename)
     cudaMallocManaged(&coords, coordCount * sizeof(nanovdb::Coord));
     cudaMemcpy(coords, hostCoords.data(), coordCount * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice);
 
+    // The grid buffer must be addressable by the host and every device in the mesh,
+    // i.e. managed memory: a cuda::Buffer over ManagedResource.
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
     nanovdb::tools::cuda::DistributedPointsToGrid<nanovdb::ValueOnIndex> distributedConverter(deviceMesh);
-    auto distributedHandle = distributedConverter.getHandle(coords, coordCount);
+    auto distributedHandle = distributedConverter.getHandle(coords, coordCount, BufferT());
 
     cudaFree(coords);
 }

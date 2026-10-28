@@ -7,17 +7,31 @@
 #include "Parser.h"
 #include "Util.h"
 
-#include <stdio.h>// for std::remove
+#include <cstdio>// for std::remove and subprocess streams
+#include <climits>
 #include <string>
 #include <fstream>
 #include <set>
 #include <thread>
+#include <cmath>// for std::isinf, std::isnan
+#include <chrono>
+#include <filesystem>
+#include <memory>
 
 #if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <io.h>
 #include <direct.h>// for mkdir
 int mkdir_wrapper(const char *dirname) { return _mkdir(dirname); }
 #else
+#include <cerrno>
+#include <csignal>
 #include <sys/stat.h>// for mkdir
+#include <sys/wait.h>
+#include <unistd.h>
 int mkdir_wrapper(const char *dirname) { return mkdir(dirname, 0777); }
 #endif
 
@@ -941,6 +955,124 @@ TEST_F(Test_vdb_tool, Geometry)
     EXPECT_EQ(4u,                 geo.vtxCount());
   }
 }// Geometry
+
+TEST_F(Test_vdb_tool, GeometrySTLAsciiWhitespace)
+{
+    using namespace openvdb::vdb_tool;
+    const std::string fileName = "data/test_ascii_whitespace.stl";
+    const std::vector<openvdb::Vec3f> vertices = {
+        {0, 0, 0}, {1, 0, 0}, {0, 1, 0},
+        {1, 0, 0}, {1, 1, 0}, {0, 1, 0}
+    };
+    for (const std::string indent : {"  ", "\t", " \t"}) {
+        for (const std::string newline : {"\n", "\r\n"}) {
+            SCOPED_TRACE(::testing::Message() << "indent=" << indent << " newline=" << newline);
+            {
+                // Use binary mode to preserve the chosen line endings on every platform.
+                std::ofstream os(fileName, std::ios::binary);
+                ASSERT_TRUE(os.is_open());
+                os << "solid whitespace_test" << newline << std::scientific;
+                for (size_t i = 0; i < vertices.size(); i += 3) {
+                    os << indent << "facet normal 0 0 1" << newline
+                       << indent << indent << "outer loop" << newline;
+                    for (size_t j = 0; j < 3; ++j) {
+                        const auto& p = vertices[i + j];
+                        os << indent << indent << indent << "vertex "
+                           << p[0] << ' ' << p[1] << ' ' << p[2] << newline;
+                    }
+                    os << indent << indent << "endloop" << newline
+                       << indent << "endfacet" << newline;
+                }
+                os << "endsolid whitespace_test" << newline;
+            }
+            Geometry geo;
+            ASSERT_NO_THROW(geo.read(fileName));
+            ASSERT_EQ(vertices.size(), geo.vtxCount());
+            ASSERT_EQ(2u, geo.triCount());
+            EXPECT_EQ(0u, geo.quadCount());
+            for (size_t i = 0; i < vertices.size(); ++i) {
+                EXPECT_EQ(vertices[i], geo.vtx()[i]);
+            }
+            EXPECT_EQ(openvdb::Vec3I(0, 1, 2), geo.tri()[0]);
+            EXPECT_EQ(openvdb::Vec3I(3, 4, 5), geo.tri()[1]);
+        }
+    }
+    std::remove(fileName.c_str());
+}
+
+TEST_F(Test_vdb_tool, GeometrySTLBinaryTriangleCount)
+{
+    using namespace openvdb::vdb_tool;
+    if (!isLittleEndian()) GTEST_SKIP() << "Binary STL requires a little-endian host";
+
+    Geometry source;
+    source.vtx() = {{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
+    source.tri() = {{0, 1, 2}, {0, 3, 1}, {0, 2, 3}, {1, 3, 2}};
+    std::ostringstream os;
+    source.writeSTL(os);
+    const std::string binary = os.str();
+    const std::string fileName = "data/test_binary_triangle_count.stl";
+    auto writeFile = [&](const std::string& data) {
+        std::ofstream file(fileName, std::ios::binary);
+        file.write(data.data(), static_cast<std::streamsize>(data.size()));
+        file.close();
+        return bool(file);
+    };
+
+    struct Counts { uint32_t declared, available; };
+    const Counts cases[] = {
+        {4, 4}, {4, 3}, {4, 1}, {4, 0}, {1, 1}, {0, 0},
+        {std::numeric_limits<uint32_t>::max(), 1}
+    };
+    for (const auto& counts : cases) {
+        SCOPED_TRACE(::testing::Message() << "declared=" << counts.declared
+                                         << " available=" << counts.available);
+        std::string data = binary.substr(0, 84 + 50 * counts.available);
+        std::memcpy(&data[80], &counts.declared, sizeof(counts.declared));
+        ASSERT_TRUE(writeFile(data));
+
+        Geometry geo;
+        std::ostringstream warning;
+        auto* old = std::clog.rdbuf(warning.rdbuf());
+        EXPECT_NO_THROW(geo.read(fileName, /*verbose=*/0));
+        std::clog.rdbuf(old);
+
+        ASSERT_EQ(3 * counts.available, geo.vtxCount());
+        ASSERT_EQ(counts.available, geo.triCount());
+        EXPECT_EQ(0u, geo.quadCount());
+        for (uint32_t i = 0; i < counts.available; ++i) {
+            EXPECT_EQ(openvdb::Vec3I(3 * i, 3 * i + 1, 3 * i + 2), geo.tri()[i]);
+            for (int j = 0; j < 3; ++j) {
+                EXPECT_EQ(source.vtx()[source.tri()[i][j]], geo.vtx()[3 * i + j]);
+            }
+        }
+        if (counts.declared == counts.available) {
+            EXPECT_TRUE(warning.str().empty());
+        } else {
+            EXPECT_NE(std::string::npos, warning.str().find(
+                "header declares " + std::to_string(counts.declared) + " triangles"));
+            EXPECT_NE(std::string::npos, warning.str().find(
+                "contains " + std::to_string(counts.available)));
+            EXPECT_NE(std::string::npos, warning.str().find("geometry may be incomplete"));
+        }
+    }
+
+    // Keep rejecting partial headers/records, trailing bytes and understated counts.
+    std::string understated = binary;
+    const uint32_t fewerTriangles = 3;
+    std::memcpy(&understated[80], &fewerTriangles, sizeof(fewerTriangles));
+    for (const auto& malformed : {binary.substr(0, 83), binary.substr(0, binary.size() - 1),
+                                 binary.substr(0, 84 + 50 + 1), binary + " ", understated}) {
+        ASSERT_TRUE(writeFile(malformed));
+        Geometry geo;
+        geo.vtx().emplace_back(2, 3, 4);
+        EXPECT_THROW(geo.read(fileName), std::invalid_argument);
+        ASSERT_EQ(1u, geo.vtxCount());
+        EXPECT_EQ(openvdb::Vec3f(2, 3, 4), geo.vtx()[0]);
+        EXPECT_EQ(0u, geo.triCount());
+    }
+    std::remove(fileName.c_str());
+}
 
 #ifdef VDB_TOOL_USE_USD
 // Hand-author a minimal USD ASCII (.usda) file containing one Mesh inside an Xform
@@ -2728,11 +2860,14 @@ TEST_F(Test_vdb_tool, Processor)
     EXPECT_EQ(std::to_string(tan(2.0f)), proc("{2:tan}"));
     EXPECT_EQ(std::to_string(tan(2.0f)), proc("{2.0:tan}"));
 
-    EXPECT_EQ(std::to_string(asin(2.0f)), proc("{2:asin}"));
-    EXPECT_EQ(std::to_string(asin(2.0f)), proc("{2.0:asin}"));
+    // asin(2)/acos(2) are domain errors; libm does not guarantee the sign bit of the
+    // resulting NaN, so strip a leading '-' before comparing (e.g. "-nan" vs "nan").
+    auto stripNegNan = [](std::string s) { return s == "-nan" ? s.substr(1) : s; };
+    EXPECT_EQ(stripNegNan(std::to_string(asin(2.0f))), stripNegNan(proc("{2:asin}")));
+    EXPECT_EQ(stripNegNan(std::to_string(asin(2.0f))), stripNegNan(proc("{2.0:asin}")));
 
-    EXPECT_EQ(std::to_string(acos(2.0f)), proc("{2:acos}"));
-    EXPECT_EQ(std::to_string(acos(2.0f)), proc("{2.0:acos}"));
+    EXPECT_EQ(stripNegNan(std::to_string(acos(2.0f))), stripNegNan(proc("{2:acos}")));
+    EXPECT_EQ(stripNegNan(std::to_string(acos(2.0f))), stripNegNan(proc("{2.0:acos}")));
 
     EXPECT_EQ(std::to_string(atan(2.0f)), proc("{2:atan}"));
     EXPECT_EQ(std::to_string(atan(2.0f)), proc("{2.0:atan}"));
@@ -3140,6 +3275,1726 @@ TEST_F(Test_vdb_tool, ToolConfigHeader)
     std::remove(cfg.c_str());
 }
 
+// Runtime action failures are caught centrally by Parser::run() and logged
+// as "<action>: skipping due to: <what>" (see Tool's onActionError handler);
+// Ordinary failures return false from Tool::run(); control-flow errors and
+// errors under -errorOnWarning propagate as exceptions.
+static std::string runCapturingClog(const std::string& cmd, bool* success = nullptr)
+{
+    using namespace openvdb::vdb_tool;
+    const auto tmp = tokenize(cmd, " ");
+    std::vector<std::unique_ptr<char[]>> owned;
+    std::vector<char*> args;
+    for (const auto& s : tmp) {
+        owned.emplace_back(new char[s.size()+1]);
+        std::strcpy(owned.back().get(), s.c_str());
+        args.push_back(owned.back().get());
+    }
+    std::ostringstream oss;
+    auto *old = std::clog.rdbuf(oss.rdbuf());
+    try {
+        Tool tool(int(args.size()), args.data());
+        const bool result = tool.run();
+        if (success) *success = result;
+    } catch (...) {
+        std::clog.rdbuf(old);
+        throw;
+    }
+    std::clog.rdbuf(old);
+    return oss.str();
+}
+
+// Read back just the (single) grid name stored in a .vdb file, without
+// loading its tree.
+static std::string readGridName(const std::string& path)
+{
+    openvdb::io::File f(path);
+    f.open();
+    const std::string name = f.beginName().gridName();
+    f.close();
+    return name;
+}
+
+TEST_F(Test_vdb_tool, ToolConfigLineContinuation)
+{
+    using namespace openvdb::vdb_tool;
+
+    const std::string cfg = "data/continuation_test.txt";
+    const std::string out_vdb = "data/continuation_out.vdb";
+
+    // Reads back the single grid written by a config run and checks that
+    // the continuation actually joined the sphere's options: the grid must
+    // be named as given on the (continued) name= line, and its world-space
+    // active-voxel bbox must reflect the continued radius= line, not a
+    // truncated/ignored one. A no-op line-continuation implementation (one
+    // that dropped everything after the first backslash) would instead see
+    // a bare "sphere" action with default name/radius and fail these checks.
+    auto checkSphereOutput = [](const std::string& path, const std::string& expectedName, double expectedRadius) {
+        ASSERT_TRUE(openvdb::vdb_tool::fileExists(path));
+        openvdb::io::File f(path);
+        f.open();
+        std::vector<std::string> names;
+        for (auto it = f.beginName(); it != f.endName(); ++it) names.push_back(*it);
+        f.close();
+        ASSERT_EQ(size_t(1), names.size());
+        EXPECT_EQ(expectedName, names[0]);
+
+        openvdb::io::File f2(path);
+        f2.open();
+        auto grid = openvdb::gridPtrCast<openvdb::FloatGrid>(f2.readGrid(names[0]));
+        f2.close();
+        ASSERT_TRUE(grid != nullptr);
+        const auto bbox = grid->transform().indexToWorld(grid->evalActiveVoxelBoundingBox());
+        const double dx = bbox.max().x() - bbox.min().x();
+        // The active bbox spans roughly the diameter (plus narrow-band padding);
+        // a generous tolerance still clearly distinguishes this from other radii.
+        EXPECT_NEAR(2.0 * expectedRadius, dx, 0.5 * expectedRadius);
+    };
+
+    // Write a config that uses backslash line continuation to split a
+    // sphere action and its options (including name=) across multiple lines.
+    std::remove(cfg.c_str());
+    std::remove(out_vdb.c_str());
+    {
+        std::ofstream out(cfg);
+        out << "vdb_tool " << Tool::version() << "\n";
+        out << "sphere \\\n";
+        out << "  dim=64 \\\n";
+        out << "  radius=2.0 \\\n";
+        out << "  name=cont_sphere\n";
+        out << "write " << out_vdb << "\n";
+    }
+    ASSERT_TRUE(fileExists(cfg));
+
+    // The config must load and produce a grid named "cont_sphere" with
+    // radius=2.0 actually applied.
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -config " + cfg);
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    checkSphereOutput(out_vdb, "cont_sphere", 2.0);
+    std::remove(out_vdb.c_str());
+
+    // Verify that comments on a continuation line are stripped before the
+    // backslash is checked, so the backslash must precede any comment, and
+    // that the resulting sphere still gets its continued options (a
+    // different radius than the first case, so the two can't be confused).
+    std::remove(cfg.c_str());
+    {
+        std::ofstream out(cfg);
+        out << "vdb_tool " << Tool::version() << "\n";
+        out << "sphere \\\n";
+        out << "  dim=64 \\\n";
+        out << "  radius=1.5 \\ # backslash before comment continues the line\n";
+        out << "  name=cont_sphere2\n";
+        out << "write " << out_vdb << "\n";
+    }
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -config " + cfg);
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    checkSphereOutput(out_vdb, "cont_sphere2", 1.5);
+
+    // A continuation joined without a space before the backslash (e.g.
+    // "radius=2.5\") must still get a token separator inserted, so it
+    // doesn't concatenate directly onto the next line's first token (which
+    // would produce a garbled "radius=2.5name=..." token and a confusing
+    // parse error).
+    std::remove(cfg.c_str());
+    std::remove(out_vdb.c_str());
+    {
+        std::ofstream out(cfg);
+        out << "vdb_tool " << Tool::version() << "\n";
+        out << "sphere dim=64 radius=2.5\\\n";
+        out << "name=cont_sphere3\n";
+        out << "write " << out_vdb << "\n";
+    }
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -config " + cfg);
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    checkSphereOutput(out_vdb, "cont_sphere3", 2.5);
+
+    // A trailing "\" on the last line of a config (nothing left to continue
+    // onto) must be reported, not silently dropped.
+    std::remove(cfg.c_str());
+    std::remove(out_vdb.c_str());
+    {
+        std::ofstream out(cfg);
+        out << "vdb_tool " << Tool::version() << "\n";
+        out << "sphere dim=64 radius=1.0\\\n";
+    }
+    EXPECT_THROW({
+      auto args = getArgs("vdb_tool -quiet -config " + cfg);
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    }, std::invalid_argument);
+
+    std::remove(cfg.c_str());
+    std::remove(out_vdb.c_str());
+}
+
+TEST_F(Test_vdb_tool, ActionCopy)
+{
+    // -copy: "vdb" and "geo" both default to empty ("omit to skip"), so at
+    // least one must be given explicitly; specifying only one must not touch
+    // the other stack, even when it is empty.
+    using namespace openvdb::vdb_tool;
+
+    // Neither vdb= nor geo= given: the "at least one" guard must fire.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere dim=8 -copy");
+      EXPECT_NE(out.find("copy: skipping due to: copy: at least one of"), std::string::npos);
+    }
+
+    // geo=0 with no VDB grids on the stack must not touch (or throw over) the
+    // empty VDB stack, and must not implicitly copy a grid. Write to a .obj
+    // (not .vdb) file so the write actually exercises the Geometry stack.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere -ls2mesh -clear vdb=* geo="
+          " -copy geo=0 -write geo=0 keep=true data/test_copy_geo.obj");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+    ASSERT_TRUE(fileExists("data/test_copy_geo.obj"));
+    std::remove("data/test_copy_geo.obj");
+
+    // vdb=0 with a prefix produces a second, independently-named grid; the
+    // original grid must be left untouched.
+    std::remove("data/test_copy_vdb.vdb");
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -sphere name=orig dim=8"
+                          " -copy vdb=0 prefix=copy_"
+                          " -write vdb=* keep=true data/test_copy_vdb.vdb");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    ASSERT_TRUE(fileExists("data/test_copy_vdb.vdb"));
+    {
+      openvdb::io::File f("data/test_copy_vdb.vdb");
+      f.open();
+      std::set<std::string> names;
+      for (auto it = f.beginName(); it != f.endName(); ++it) names.insert(*it);
+      f.close();
+      EXPECT_EQ(size_t(2), names.size());
+      EXPECT_TRUE(names.count("orig"));
+      EXPECT_TRUE(names.count("copy_orig"));
+    }
+    std::remove("data/test_copy_vdb.vdb");
+
+    // copy must be an independent deep copy, not an alias: overwriting the
+    // copy's background via -forAllValues' explicit "background=" option
+    // must leave the original's background untouched.
+    std::remove("data/test_copy_indep_copy.vdb");
+    std::remove("data/test_copy_indep_orig.vdb");
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -sphere name=orig dim=16"
+                          " -copy vdb=0 prefix=copy_"
+                          " -forAllValues vdb=0 v background=999.0"
+                          " -write vdb=0 keep=true data/test_copy_indep_copy.vdb"
+                          " -write vdb=1 data/test_copy_indep_orig.vdb");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    {
+      openvdb::io::File cf("data/test_copy_indep_copy.vdb");
+      cf.open();
+      auto copyGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(cf.readGrid(cf.beginName().gridName()));
+      cf.close();
+      openvdb::io::File of("data/test_copy_indep_orig.vdb");
+      of.open();
+      auto origGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(of.readGrid(of.beginName().gridName()));
+      of.close();
+      ASSERT_TRUE(copyGrid != nullptr);
+      ASSERT_TRUE(origGrid != nullptr);
+      EXPECT_NEAR(999.0f, copyGrid->background(), 1e-4f);
+      EXPECT_NE(999.0f, origGrid->background());
+    }
+    std::remove("data/test_copy_indep_copy.vdb");
+    std::remove("data/test_copy_indep_orig.vdb");
+
+    // Indices are validated up front: an out-of-range index in the same
+    // vdb= list must abort the whole copy, leaving the stack untouched
+    // rather than applying the valid indices and skipping the bad one.
+    std::remove("data/test_copy_oob.vdb");
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=only dim=8"
+          " -copy vdb=0,5"
+          " -write vdb=* keep=true data/test_copy_oob.vdb");
+      EXPECT_NE(out.find("copy: skipping due to"), std::string::npos);
+    }
+    ASSERT_TRUE(fileExists("data/test_copy_oob.vdb"));
+    {
+      openvdb::io::File f("data/test_copy_oob.vdb");
+      f.open();
+      int count = 0;
+      for (auto it = f.beginName(); it != f.endName(); ++it) ++count;
+      f.close();
+      EXPECT_EQ(1, count);// no copy was made: still just "only" on the stack
+    }
+    std::remove("data/test_copy_oob.vdb");
+}// ActionCopy
+
+TEST_F(Test_vdb_tool, ActionRenameSwap)
+{
+    using namespace openvdb::vdb_tool;
+
+    std::remove("data/test_rename.vdb");
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -sphere name=a dim=8 -sphere name=b dim=8"
+                          " -rename vdb=0 name=renamed"
+                          " -write vdb=* keep=true data/test_rename.vdb");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    {
+      openvdb::io::File f("data/test_rename.vdb");
+      f.open();
+      std::set<std::string> names;
+      for (auto it = f.beginName(); it != f.endName(); ++it) names.insert(*it);
+      f.close();
+      // grid 0 (the most recently added, "b") was renamed; "a" is untouched.
+      EXPECT_TRUE(names.count("a"));
+      EXPECT_TRUE(names.count("renamed"));
+      EXPECT_FALSE(names.count("b"));
+    }
+    std::remove("data/test_rename.vdb");
+
+    // rename rejects an empty name and leaves the grid untouched.
+    std::remove("data/test_rename_empty.vdb");
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -rename vdb=0 name="
+          " -write vdb=0 data/test_rename_empty.vdb");
+      EXPECT_NE(out.find("rename: skipping due to"), std::string::npos);
+    }
+    ASSERT_TRUE(fileExists("data/test_rename_empty.vdb"));
+    EXPECT_EQ(std::string("a"), readGridName("data/test_rename_empty.vdb"));
+    std::remove("data/test_rename_empty.vdb");
+
+    // swap actually reorders the stack: before the swap, age 0 is "b" (most
+    // recently added) and age 1 is "a"; after "-swap vdb=0,1" the names at
+    // those two ages must be exchanged.
+    std::remove("data/test_swap_0.vdb");
+    std::remove("data/test_swap_1.vdb");
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -sphere name=a dim=8 -sphere name=b dim=8"
+                          " -swap vdb=0,1"
+                          " -write vdb=0 keep=true data/test_swap_0.vdb"
+                          " -write vdb=1 data/test_swap_1.vdb");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    ASSERT_TRUE(fileExists("data/test_swap_0.vdb"));
+    ASSERT_TRUE(fileExists("data/test_swap_1.vdb"));
+    EXPECT_EQ(std::string("a"), readGridName("data/test_swap_0.vdb"));
+    EXPECT_EQ(std::string("b"), readGridName("data/test_swap_1.vdb"));
+    std::remove("data/test_swap_0.vdb");
+    std::remove("data/test_swap_1.vdb");
+
+    // swap requires exactly two distinct ages; a single-entry stack must be
+    // reported as a (non-fatal, by default) action error, not crash the run.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere name=a dim=8 -swap vdb=0,1");
+      EXPECT_NE(out.find("swap: skipping due to"), std::string::npos);
+    }
+
+    // Since -difference is not commutative (A-B != B-A), swapping the two
+    // inputs beforehand must change the result. Two overlapping, differently
+    // sized/offset spheres on a shared transform (same voxel size) so the
+    // difference is purely a CSG effect, not a levelSetRebuild side-effect.
+    auto activeVoxelsAfterDifference = [](const std::string& cmd, const std::string& path) {
+        auto args = getArgs(cmd);
+        Tool tool(int(args.size()), args.data());
+        tool.run();
+        openvdb::io::File f(path);
+        f.open();
+        auto grid = openvdb::gridPtrCast<openvdb::FloatGrid>(f.readGrid(f.beginName().gridName()));
+        f.close();
+        return grid ? grid->activeVoxelCount() : openvdb::Index64(0);
+    };
+    const std::string spheres = " -sphere name=a voxel=0.05 radius=1.0 center=(0,0,0)"
+                                 " -sphere name=b voxel=0.05 radius=0.6 center=(0.5,0,0)";
+    std::remove("data/test_csg_noswap.vdb");
+    std::remove("data/test_csg_swap.vdb");
+    const auto noSwapCount = activeVoxelsAfterDifference(
+        "vdb_tool -quiet" + spheres + " -difference -write vdb=0 data/test_csg_noswap.vdb",
+        "data/test_csg_noswap.vdb");
+    const auto swapCount = activeVoxelsAfterDifference(
+        "vdb_tool -quiet" + spheres + " -swap vdb=0,1 -difference -write vdb=0 data/test_csg_swap.vdb",
+        "data/test_csg_swap.vdb");
+    EXPECT_NE(noSwapCount, swapCount);
+    std::remove("data/test_csg_noswap.vdb");
+    std::remove("data/test_csg_swap.vdb");
+}// ActionRenameSwap
+
+TEST_F(Test_vdb_tool, ActionDiagnose)
+{
+    // -diagnose runs OpenVDB's built-in level-set/fog-volume checks. Build a
+    // level set with an invalid (non-positive) background directly, since
+    // that violates the level-set invariant checkLevelSet() looks for.
+    using namespace openvdb::vdb_tool;
+    using GridT = openvdb::FloatGrid;
+
+    {
+      GridT::Ptr bad = GridT::create(/*background=*/0.0f);
+      bad->setGridClass(openvdb::GRID_LEVEL_SET);
+      bad->setName("bad_ls");
+      openvdb::io::File("data/test_diagnose_bad.vdb").write({bad});
+    }
+
+    // Default (fatal=false): a failing grid is reported as FAILED, and the
+    // action does not escalate to an error.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -read data/test_diagnose_bad.vdb -diagnose");
+      EXPECT_NE(out.find("bad_ls] FAILED"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    // fatal=true: a failing grid raises internally, which Tool::run() (via
+    // the default non-fatal onActionError policy) reports as a skipped action.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -read data/test_diagnose_bad.vdb -diagnose fatal=true");
+      EXPECT_NE(out.find("diagnose: skipping due to: diagnose: one or more grids failed validation"), std::string::npos);
+    }
+
+    // A valid level set must pass, even with fatal=true.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere dim=32 -diagnose fatal=true");
+      EXPECT_NE(out.find("] OK"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    std::remove("data/test_diagnose_bad.vdb");
+}// ActionDiagnose
+
+TEST_F(Test_vdb_tool, ActionStats)
+{
+    // -stats must not silently skip non-FloatGrid value types: background is
+    // reported for any numeric grid type, not just FloatGrid.
+    using namespace openvdb::vdb_tool;
+
+    {
+      openvdb::Int32Grid::Ptr grid = openvdb::Int32Grid::create(/*background=*/7);
+      grid->setName("int_grid");
+      auto acc = grid->getAccessor();
+      acc.setValue(openvdb::Coord(0, 0, 0), 3);
+      acc.setValue(openvdb::Coord(1, 0, 0), 9);
+      openvdb::io::File("data/test_stats_int.vdb").write({grid});
+    }
+
+    std::ostringstream oss;
+    auto *old = std::clog.rdbuf(oss.rdbuf());
+    try {
+      auto args = getArgs("vdb_tool -quiet -read data/test_stats_int.vdb -stats");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+      std::clog.rdbuf(old);
+    } catch (...) {
+      std::clog.rdbuf(old);
+      throw;
+    }
+    const std::string out = oss.str();
+    // Background (7) must be printed; the old "(not a FloatGrid, skipped)"
+    // fallback must be gone.
+    EXPECT_NE(out.find("int_grid"), std::string::npos);
+    EXPECT_NE(out.find("7"), std::string::npos);
+    EXPECT_EQ(out.find("skipped"), std::string::npos);
+
+    std::remove("data/test_stats_int.vdb");
+
+    // A grid with no active voxels has no min/max/mean/stddev; -stats must
+    // print "(empty)" rather than the +-inf/NaN sentinels math::Stats
+    // initializes to when nothing was ever added to it.
+    {
+      openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(0.0f);
+      grid->setName("empty_grid");
+      openvdb::io::File("data/test_stats_empty.vdb").write({grid});
+    }
+
+    std::ostringstream oss2;
+    auto *old2 = std::clog.rdbuf(oss2.rdbuf());
+    try {
+      auto args = getArgs("vdb_tool -quiet -read data/test_stats_empty.vdb -stats");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+      std::clog.rdbuf(old2);
+    } catch (...) {
+      std::clog.rdbuf(old2);
+      throw;
+    }
+    const std::string out2 = oss2.str();
+    EXPECT_NE(out2.find("empty_grid"), std::string::npos);
+    EXPECT_NE(out2.find("(empty)"), std::string::npos);
+    EXPECT_EQ(out2.find("inf"), std::string::npos);
+    EXPECT_EQ(out2.find("nan"), std::string::npos);
+
+    std::remove("data/test_stats_empty.vdb");
+
+    // Vector grids report statistics of the vector MAGNITUDE (tools::statistics
+    // reduces a vector value to val.length()), rather than being skipped. The
+    // background column still shows the vector itself, so a legend explains the
+    // mixed interpretation.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=32 -grad -stats vdb=0");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("grad_sphere"), std::string::npos);
+      EXPECT_NE(out.find("[0, 0, 0]"), std::string::npos);// background, as a vector
+      EXPECT_NE(out.find("vector magnitude |v|"), std::string::npos);// legend
+      // The magnitude columns must hold real numbers, not the old "(n/a)" filler.
+      EXPECT_EQ(out.find("(n/a)      (n/a)"), std::string::npos);
+    }
+
+    // ...and the legend must NOT appear when only scalar grids were reported.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere r=1 dim=16 -stats vdb=0");
+      EXPECT_EQ(out.find("vector magnitude |v|"), std::string::npos);
+    }
+}// ActionStats
+
+TEST_F(Test_vdb_tool, ActionCompositeDivide)
+{
+    // -divide computes A/B in place via tools::compDiv, which is plain
+    // floating-point division: division by zero yields +/-inf rather than
+    // throwing. Exercise both the ordinary and the zero-divisor case.
+    using namespace openvdb::vdb_tool;
+    using GridT = openvdb::FloatGrid;
+
+    auto readResult = [](const std::string& path) {
+        openvdb::io::File f(path);
+        f.open();
+        return openvdb::gridPtrCast<GridT>(f.readGrid(f.beginName().gridName()));
+    };
+
+    // (0,0,0): ordinary division. (1,0,0): active-zero divisor. (2,0,0): A is
+    // active but B is left untouched (inactive, so B contributes its 0.0f
+    // background) -- the "inactive-B-voxel" case called out in review.
+    {
+      GridT::Ptr a = GridT::create(0.0f);
+      a->setName("A");
+      auto aAcc = a->getAccessor();
+      aAcc.setValue(openvdb::Coord(0, 0, 0), 10.0f);
+      aAcc.setValue(openvdb::Coord(1, 0, 0), 4.0f);
+      aAcc.setValue(openvdb::Coord(2, 0, 0), 6.0f);
+      openvdb::io::File("data/test_div_a.vdb").write({a});
+
+      GridT::Ptr b = GridT::create(0.0f);
+      b->setName("B");
+      auto bAcc = b->getAccessor();
+      bAcc.setValue(openvdb::Coord(0, 0, 0), 2.0f);
+      bAcc.setValue(openvdb::Coord(1, 0, 0), 0.0f);
+      // (2,0,0) intentionally left inactive in B.
+      openvdb::io::File("data/test_div_b.vdb").write({b});
+    }
+
+    EXPECT_NO_THROW({
+      // Stack after both reads (top=most recent): [A, B] => age 0 = B, age 1 = A.
+      auto args = getArgs("vdb_tool -quiet -read data/test_div_a.vdb -read data/test_div_b.vdb"
+                          " -divide vdb=1,0"
+                          " -write vdb=0 data/test_div_out.vdb");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+
+    auto result = readResult("data/test_div_out.vdb");
+    ASSERT_TRUE(result != nullptr);
+    auto acc = result->getConstAccessor();
+    EXPECT_NEAR(5.0f, acc.getValue(openvdb::Coord(0, 0, 0)), 1e-5f);// 10/2
+    EXPECT_TRUE(std::isinf(acc.getValue(openvdb::Coord(1, 0, 0))));// 4/0 (active zero)
+    EXPECT_TRUE(std::isinf(acc.getValue(openvdb::Coord(2, 0, 0))));// 6/0 (inactive-B background)
+
+    std::remove("data/test_div_a.vdb");
+    std::remove("data/test_div_b.vdb");
+    std::remove("data/test_div_out.vdb");
+}// ActionCompositeDivide
+
+TEST_F(Test_vdb_tool, ActionMultiply)
+{
+    // -multiply computes A*B per voxel in place via tools::compMul.
+    using namespace openvdb::vdb_tool;
+    using GridT = openvdb::FloatGrid;
+
+    GridT::Ptr a = GridT::create(0.0f);
+    a->setName("A");
+    a->getAccessor().setValue(openvdb::Coord(0, 0, 0), 3.0f);
+    openvdb::io::File("data/test_mul_a.vdb").write({a});
+
+    GridT::Ptr b = GridT::create(0.0f);
+    b->setName("B");
+    b->getAccessor().setValue(openvdb::Coord(0, 0, 0), 7.0f);
+    openvdb::io::File("data/test_mul_b.vdb").write({b});
+
+    EXPECT_NO_THROW({
+      // Stack after both reads (top=most recent): [A, B] => age 0 = B, age 1 = A.
+      auto args = getArgs("vdb_tool -quiet -read data/test_mul_a.vdb -read data/test_mul_b.vdb"
+                          " -multiply vdb=1,0"
+                          " -write vdb=0 data/test_mul_out.vdb");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+
+    openvdb::io::File f("data/test_mul_out.vdb");
+    f.open();
+    auto result = openvdb::gridPtrCast<GridT>(f.readGrid(f.beginName().gridName()));
+    f.close();
+    ASSERT_TRUE(result != nullptr);
+    EXPECT_NEAR(21.0f, result->getConstAccessor().getValue(openvdb::Coord(0, 0, 0)), 1e-5f);// 3*7
+
+    std::remove("data/test_mul_a.vdb");
+    std::remove("data/test_mul_b.vdb");
+    std::remove("data/test_mul_out.vdb");
+}// ActionMultiply
+
+TEST_F(Test_vdb_tool, StackOptionNameResolution)
+{
+    // "vdb"/"geo" options accept a grid/geometry name wherever a stack age is
+    // accepted: Tool::resolveStackOption() (installed as Parser::onGetOption)
+    // translates each non-numeric token into the stack age of the entry with that
+    // exact name, on every read of the option.
+    using namespace openvdb::vdb_tool;
+
+    // A plain name resolves to its (single) age, same as the equivalent index.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -sphere name=b dim=8 -stats vdb=b");
+      EXPECT_NE(out.find("age"), std::string::npos);
+      // age 0 is "b" (most recently added); the name lookup must resolve to it,
+      // not to age 1 ("a").
+      EXPECT_NE(out.find("0  b"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    // A name matching MORE than one entry is rejected rather than expanded to a
+    // list of ages. Expansion would be unsafe: most actions read "vdb"/"geo" as a
+    // single age via get<int>() and cannot parse a list, and list consumers such as
+    // -clear erase by index while iterating, so a multi-age value can delete the
+    // wrong grid. The error names the ambiguous ages so the user can pick one.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -sphere name=other dim=8 -sphere name=a dim=8"
+          " -stats vdb=1,a");
+      EXPECT_NE(out.find("the name \"a\" is ambiguous"), std::string::npos);
+      EXPECT_NE(out.find("ages 0,2"), std::string::npos);
+    }
+
+    // ...and an ambiguous name must abort the action BEFORE it mutates the stack,
+    // so -clear leaves every grid in place rather than partially deleting.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -sphere name=x dim=8 -sphere name=mid dim=8 -sphere name=x dim=8"
+          " -clear vdb=x -print");
+      EXPECT_NE(out.find("is ambiguous"), std::string::npos);
+      // All three grids survive: two named "x" (ages 0 and 2) plus "mid".
+      EXPECT_NE(out.find("0  x"), std::string::npos);
+      EXPECT_NE(out.find("1  mid"), std::string::npos);
+      EXPECT_NE(out.find("2  x"), std::string::npos);
+    }
+
+    // A singleton consumer (rename reads get<int>("vdb")) rejects an ambiguous
+    // name with the same clear message rather than a raw "invalid int" parse error.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=x dim=8 -sphere name=mid dim=8 -sphere name=x dim=8"
+          " -rename vdb=x name=r");
+      EXPECT_NE(out.find("is ambiguous"), std::string::npos);
+      EXPECT_EQ(out.find("invalid int"), std::string::npos);
+    }
+
+    // A name that matches nothing on the stack is reported exactly like an
+    // out-of-range numeric index: a non-fatal, logged "skipping due to" error
+    // naming the culprit, not a silent no-op.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -stats vdb=nope");
+      EXPECT_NE(out.find("stats: skipping due to: stats: no VDB grid named \"nope\" on the stack"),
+                std::string::npos);
+    }
+
+    // "*" and "" (omitted) must still pass through untouched.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere name=a dim=8 -stats vdb=*");
+      EXPECT_NE(out.find("0  a"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    // "geo" resolves names against the Geometry stack independently of "vdb".
+    {
+      std::remove("data/test_geo_name.obj");
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere dim=8 -ls2mesh name=mesh_a"
+          " -rename geo=mesh_a name=renamed"
+          " -write geo=0 data/test_geo_name.obj");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_TRUE(fileExists("data/test_geo_name.obj"));
+      std::remove("data/test_geo_name.obj");
+    }
+
+    // REGRESSION: resolution must NOT be written back into the option. A loop body
+    // revisits the same Action every iteration, so the stored value has to remain the
+    // source expression "{$v}" and be re-expanded (and re-resolved) each time. Writing
+    // the first iteration's resolved age back into the option would pin every later
+    // iteration to that same grid.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -sphere name=b dim=8"
+          " -for v=0,2 -stats vdb={$v} -end");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      // Iteration v=0 reports age 0 ("b"), iteration v=1 reports age 1 ("a").
+      EXPECT_NE(out.find("0  b"), std::string::npos);
+      EXPECT_NE(out.find("1  a"), std::string::npos);
+    }
+
+    // Same guarantee for a NAME inside a loop body: it must be re-resolved against
+    // the current stack on every iteration, not frozen after the first.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere name=a dim=8 -for v=0,2 -sphere name=b dim=8"
+          " -stats vdb=a -clear vdb=0 -end");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      // "a" sits at age 1 while the loop-created "b" is on top, both iterations.
+      EXPECT_NE(out.find("1  a"), std::string::npos);
+      EXPECT_EQ(out.find("0  a"), std::string::npos);
+    }
+}// StackOptionNameResolution
+
+TEST_F(Test_vdb_tool, ActionClearMultipleAges)
+{
+    // -clear resolves every requested age to a list iterator before erasing any of
+    // them. Erasing inside the loop shifted the remaining entries (an age is a
+    // distance from the back of the stack) and left earlier deletions in place when
+    // a later age turned out to be invalid.
+    using namespace openvdb::vdb_tool;
+
+    // Stack [a,b,c] => age 0=c, 1=b, 2=a. Clearing 0 and 2 must remove c and a and
+    // leave exactly b. Previously age 0 was erased, the stack shrank to 2, and the
+    // action then failed on age 2 having already destroyed a grid.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -sphere name=a dim=8 -sphere name=b dim=8 -sphere name=c dim=8"
+          " -clear vdb=0,2 -print");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("0  b"), std::string::npos);
+      EXPECT_EQ(out.find("  a "), std::string::npos);
+      EXPECT_EQ(out.find("  c "), std::string::npos);
+    }
+
+    // An out-of-range age anywhere in the list must abort with NOTHING deleted,
+    // matching how -copy validates every index before making any copies.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -sphere name=a dim=8 -sphere name=b dim=8 -clear vdb=1,99 -print");
+      EXPECT_NE(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("0  b"), std::string::npos);
+      EXPECT_NE(out.find("1  a"), std::string::npos);
+    }
+
+    // A repeated age refers to one entry, so it must delete one grid -- and must not
+    // erase the same list iterator twice, which is undefined behaviour.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -sphere name=a dim=8 -sphere name=b dim=8 -sphere name=c dim=8"
+          " -clear vdb=0,0 -print");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("0  b"), std::string::npos);
+      EXPECT_NE(out.find("1  a"), std::string::npos);
+      EXPECT_EQ(out.find("  c "), std::string::npos);
+    }
+
+    // The Geometry stack takes the identical path.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -sphere dim=8 -ls2mesh name=m1 -sphere dim=8 -ls2mesh name=m2"
+          " -sphere dim=8 -ls2mesh name=m3 -clear vdb=* geo=0,2 -print");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("0  m2"), std::string::npos);
+      EXPECT_EQ(out.find("m1"), std::string::npos);
+      EXPECT_EQ(out.find("m3"), std::string::npos);
+    }
+}// ActionClearMultipleAges
+TEST_F(Test_vdb_tool, ActionHistogram)
+{
+    // -histogram bins the active values of a grid and renders an ASCII bar chart.
+    using namespace openvdb::vdb_tool;
+
+    // A fog volume is the important case: its interior is exactly its maximum
+    // value, and every one of those voxels lands on the histogram's upper bound.
+    // (That used to overflow math::Histogram's bin array -- see TestStats.cc.)
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=32 -ls2fog -histogram bins=4");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("4 bins over"), std::string::npos);
+      EXPECT_NE(out.find("#"), std::string::npos);// at least one bar was drawn
+      // The last bin is inclusive ("]"), every other bin half-open (")").
+      EXPECT_NE(out.find("]"), std::string::npos);
+    }
+
+    // Bin counts must sum to the reported sample total.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=32 -histogram bins=5");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("5 bins over"), std::string::npos);
+    }
+
+    // A constant-valued grid has no range to bin, and must say so rather than
+    // throwing out of math::Histogram (which requires min < max).
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=16 -forOnValues v=1 -histogram");
+      EXPECT_NE(out.find("constant value"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    // Vector grids are binned by magnitude (tools::histogram reduces a vector to
+    // val.length()), NOT skipped. The gradient of a level set is the useful case:
+    // |grad(phi)| should be ~1 for a true signed distance field, so the histogram
+    // doubles as an Eikonal-condition check.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=32 -grad -histogram vdb=0 bins=4");
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+      EXPECT_NE(out.find("(vec3s)"), std::string::npos);
+      // The summary must flag that the bins are magnitudes, not raw values.
+      EXPECT_NE(out.find("(by vector magnitude)"), std::string::npos);
+      EXPECT_NE(out.find("4 bins over"), std::string::npos);
+      EXPECT_EQ(out.find("unsupported value type"), std::string::npos);
+    }
+
+    // A genuinely unsupported value type (e.g. a point grid) is still skipped
+    // with a note rather than raising.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=16 -scatter count=64 -points2vdb -histogram vdb=0");
+      EXPECT_NE(out.find("unsupported value type"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    // An explicit range clips the data, and the summary reports how many of the
+    // active voxels actually fell inside it.
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=32 -ls2fog -histogram bins=2 min=0.9 max=1.0");
+      EXPECT_NE(out.find("2 bins over [0.9, 1]"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+    {// a range that excludes everything is reported, not silently empty
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=16 -ls2fog -histogram min=5 max=6");
+      EXPECT_NE(out.find("none of the"), std::string::npos);
+    }
+
+    // Degenerate bins/cols and an inverted range are rejected with clear errors.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere dim=16 -histogram bins=0");
+      EXPECT_NE(out.find("\"bins\" must be at least 1"), std::string::npos);
+    }
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere dim=16 -histogram cols=0");
+      EXPECT_NE(out.find("\"cols\" must be at least 1"), std::string::npos);
+    }
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere dim=16 -histogram min=1 max=0");
+      EXPECT_NE(out.find("\"min\" must be less than \"max\""), std::string::npos);
+    }
+
+    // An out-of-range age is reported like every other action's vdb= handling.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -sphere dim=16 -histogram vdb=7");
+      EXPECT_NE(out.find("is out of range"), std::string::npos);
+    }
+
+    // With no grids on the stack the action is a no-op, not an error.
+    {
+      const std::string out = runCapturingClog("vdb_tool -quiet -histogram");
+      EXPECT_NE(out.find("no grids on stack"), std::string::npos);
+      EXPECT_EQ(out.find("skipping due to"), std::string::npos);
+    }
+
+    // Per-bin rows switch std::clog to fixed/low precision; that must not leak
+    // into the next grid's summary line (whose range must match its own bin edges).
+    {
+      const std::string out = runCapturingClog(
+          "vdb_tool -quiet -sphere r=1 dim=32 name=a -sphere r=2 dim=32 name=b"
+          " -histogram vdb=* bins=2");
+      EXPECT_NE(out.find("\"a\""), std::string::npos);
+      EXPECT_NE(out.find("\"b\""), std::string::npos);
+      // Six significant digits in both summaries, i.e. not truncated to "[-0.2, 0.2]".
+      EXPECT_NE(out.find("over [-0.230769,"), std::string::npos);
+      EXPECT_NE(out.find("over [-0.461538,"), std::string::npos);
+    }
+}// ActionHistogram
+
+// Exercises the ShrinkWrap.h API directly (PolySoup, ShrinkWrapLimit, the
+// ShrinkWrap<GridType> class and the shrinkWrap() free-function overloads),
+// independent of the vdb_tool command-line action.
+TEST_F(Test_vdb_tool, ShrinkWrapClassAPI)
+{
+    using namespace openvdb::vdb_tool;
+    using GridT = openvdb::FloatGrid;
+
+    // A simple watertight quad-cube, large enough that a halfWidth=3 narrow
+    // band fits comfortably inside its bounding box for every mode/dim/voxel
+    // combination exercised below.
+    auto makeCubeSoup = []() {
+        PolySoup poly;
+        poly.vtx = {
+            openvdb::Vec3s(0, 0, 0), openvdb::Vec3s(2, 0, 0), openvdb::Vec3s(2, 2, 0), openvdb::Vec3s(0, 2, 0),
+            openvdb::Vec3s(0, 0, 2), openvdb::Vec3s(2, 0, 2), openvdb::Vec3s(2, 2, 2), openvdb::Vec3s(0, 2, 2)};
+        poly.quad = {
+            openvdb::Vec4I(0, 1, 2, 3), openvdb::Vec4I(4, 5, 6, 7), openvdb::Vec4I(0, 1, 5, 4),
+            openvdb::Vec4I(1, 2, 6, 5), openvdb::Vec4I(2, 3, 7, 6), openvdb::Vec4I(3, 0, 4, 7)};
+        return poly;
+    };
+
+    // ShrinkWrapLimit: with thres=0 it always returns erode; otherwise it ramps
+    // linearly from 1 (dx<=thres) to erode (dx>=2*thres).
+    {
+        const ShrinkWrapLimit D(8.0f, 0.0f);
+        EXPECT_FLOAT_EQ(D(0.01f), 8.0f);
+        EXPECT_FLOAT_EQ(D(100.0f), 8.0f);
+
+        const ShrinkWrapLimit D2(8.0f, 1.0f);
+        EXPECT_FLOAT_EQ(D2(0.5f), 1.0f);
+        EXPECT_FLOAT_EQ(D2(2.0f), 8.0f);
+        EXPECT_GT(D2(1.5f), 1.0f);
+        EXPECT_LT(D2(1.5f), 8.0f);
+    }
+
+    // ShrinkWrap<GridT>::getBBox()
+    {
+        const PolySoup poly = makeCubeSoup();
+        const auto bbox = ShrinkWrap<GridT>::getBBox(poly.vtx);
+        EXPECT_TRUE(bbox.isSorted());
+        EXPECT_EQ(bbox.min(), openvdb::Vec3f(0, 0, 0));
+        EXPECT_EQ(bbox.max(), openvdb::Vec3f(2, 2, 2));
+    }
+
+    // dim-based constructor + process() + LOD accessors (grid/grids/gridCount/mesh).
+    {
+        ShrinkWrap<GridT> sw(makeCubeSoup(), /*dim*/24, /*width*/3.0f);
+        EXPECT_GT(sw.minVoxelSize(), 0.0f);
+        EXPECT_GT(sw.maxVoxelSize(), sw.minVoxelSize());
+        EXPECT_FLOAT_EQ(sw.halfWidth(), 3.0f);
+
+        const ShrinkWrapLimit D(8.0f, 0.0f);
+        Spinner spin;
+        sw.process(D, &spin, /*mode*/0);
+
+        ASSERT_GT(sw.gridCount(), size_t(0));
+        ASSERT_TRUE(sw.grid(0) != nullptr);
+        EXPECT_GT(sw.grid(0)->activeVoxelCount(), openvdb::Index64(0));
+        EXPECT_EQ(sw.grids().size(), sw.gridCount());
+
+        const PolySoup &meshed = sw.mesh(0, /*adaptivity*/0.0f);
+        EXPECT_GT(meshed.vtx.size(), size_t(0));
+    }
+
+    // voxelSize-based constructor + offset() for all three offset modes.
+    for (int mode = 0; mode < 3; ++mode) {
+        ShrinkWrap<GridT> sw(makeCubeSoup(), /*voxelSize*/0.25f, /*width*/3.0f);
+        auto grid = sw.offset(sw.minVoxelSize(), mode);
+        ASSERT_TRUE(grid != nullptr) << "mode " << mode;
+        EXPECT_GT(grid->activeVoxelCount(), openvdb::Index64(0)) << "mode " << mode;
+    }
+
+    // offset() throws TypeError on an invalid mode.
+    {
+        ShrinkWrap<GridT> sw(makeCubeSoup(), 0.25f, 3.0f);
+        EXPECT_THROW(sw.offset(sw.minVoxelSize(), /*mode*/99), openvdb::TypeError);
+    }
+
+    // Constructor validation.
+    EXPECT_THROW((ShrinkWrap<GridT>(makeCubeSoup(), 64, /*width*/0.0f)), openvdb::ValueError);
+    EXPECT_THROW((ShrinkWrap<GridT>(PolySoup(), 64, 3.0f)), openvdb::ValueError);// no geometry
+    EXPECT_THROW((ShrinkWrap<GridT>(makeCubeSoup(), /*dim*/4, /*width*/3.0f)), openvdb::ArithmeticError);// dim too small
+
+    // Non-floating-point grid types are rejected at runtime by the class
+    // (the free-standing shrinkWrap() functions instead reject them at
+    // compile time via static_assert, so they're not exercised here).
+    EXPECT_THROW((ShrinkWrap<openvdb::Int32Grid>(makeCubeSoup(), 64, 3.0f)), openvdb::TypeError);
+
+    // Free function shrinkWrap(): single-grid convenience overload.
+    {
+        const ShrinkWrapLimit D(8.0f, 0.0f);
+        auto grid = shrinkWrap<GridT>(makeCubeSoup(), /*dim*/24, /*voxelSize*/0.0f, D, /*halfWidth*/3.0f);
+        ASSERT_TRUE(grid != nullptr);
+        EXPECT_EQ(grid->getGridClass(), openvdb::GRID_LEVEL_SET);
+        EXPECT_GT(grid->activeVoxelCount(), openvdb::Index64(0));
+    }
+
+    // Free function shrinkWrap(): dim + bbox LOD overload.
+    {
+        PolySoup poly = makeCubeSoup();
+        const ShrinkWrapLimit D(8.0f, 0.0f);
+        std::vector<openvdb::Vec3I> tri;// cube is quad-only
+        auto grids = shrinkWrap<GridT>(/*dim*/24, poly.bbox, poly.vtx, tri, poly.quad, D, /*halfWidth*/3.0f);
+        EXPECT_GT(grids.size(), size_t(0));
+        for (const auto &g : grids) EXPECT_GT(g->activeVoxelCount(), openvdb::Index64(0));
+    }
+
+    // Free function shrinkWrap(): minVoxelSize + bbox LOD overload.
+    {
+        PolySoup poly = makeCubeSoup();
+        const ShrinkWrapLimit D(8.0f, 0.0f);
+        std::vector<openvdb::Vec3I> tri;
+        auto grids = shrinkWrap<GridT>(/*minVoxelSize*/0.25f, poly.bbox, poly.vtx, tri, poly.quad, D, /*halfWidth*/3.0f);
+        ASSERT_GT(grids.size(), size_t(0));
+        EXPECT_NEAR(grids.front()->voxelSize()[0], 0.25, 0.05);
+    }
+}// ShrinkWrapClassAPI
+
+// Exercises the vdb_tool "-shrinkwrap" action end-to-end: the deprecated
+// "-soup2ls"/"-soup2sdf" aliases (with their one-line deprecation warning),
+// the "levels" LOD-selection option, and the sibling "-mesh2offset" action
+// (which also builds on ShrinkWrap<GridT> internally).
+TEST_F(Test_vdb_tool, ActionShrinkWrap)
+{
+    using namespace openvdb::vdb_tool;
+
+    std::remove("data/shrinkwrap_out.vdb");
+    std::remove("data/shrinkwrap_lod.vdb");
+    std::remove("data/shrinkwrap_offset.vdb");
+    std::remove("data/shrinkwrap_offset_dep.vdb");
+    std::remove("data/shrinkwrap_dep.vdb");
+    std::remove("data/shrinkwrap_nowarn.vdb");
+
+    // Basic conversion: sphere level set -> mesh -> shrink-wrapped level set.
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -sphere r=1 dim=32 -ls2mesh"
+                          " -shrinkwrap voxel=0.2 width=3 mode=0 name=out"
+                          " -write data/shrinkwrap_out.vdb");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    {
+      openvdb::io::File f("data/shrinkwrap_out.vdb");
+      f.open();
+      auto grid = openvdb::gridPtrCast<openvdb::FloatGrid>(f.readGrid(f.beginName().gridName()));
+      f.close();
+      ASSERT_TRUE(grid != nullptr);
+      EXPECT_EQ(grid->getGridClass(), openvdb::GRID_LEVEL_SET);
+      EXPECT_GT(grid->activeVoxelCount(), openvdb::Index64(0));
+    }
+    std::remove("data/shrinkwrap_out.vdb");
+
+    // levels="*" outputs the entire LOD hierarchy as multiple named grids.
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -sphere r=1 dim=32 -ls2mesh"
+                          " -shrinkwrap voxel=0.2 width=3 levels=* name=lod"
+                          " -write data/shrinkwrap_lod.vdb");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    {
+      openvdb::io::File f("data/shrinkwrap_lod.vdb");
+      f.open();
+      const auto grids = f.getGrids();
+      f.close();
+      ASSERT_TRUE(grids != nullptr);
+      EXPECT_GT(grids->size(), size_t(1));
+      for (const auto &g : *grids) EXPECT_EQ(g->getName().rfind("lod_", 0), size_t(0));
+    }
+    std::remove("data/shrinkwrap_lod.vdb");
+
+    // Sibling action -mesh2offset (formerly -soup2offset), unaffected by the
+    // ShrinkWrap rename other than internally using ShrinkWrap<GridT> instead
+    // of PolySoupToLevelSet<GridT>.
+    EXPECT_NO_THROW({
+      auto args = getArgs("vdb_tool -quiet -sphere r=1 dim=32 -ls2mesh"
+                          " -mesh2offset voxel=0.2 width=3"
+                          " -write data/shrinkwrap_offset.vdb");
+      Tool tool(int(args.size()), args.data());
+      tool.run();
+    });
+    std::remove("data/shrinkwrap_offset.vdb");
+
+    // Deprecated alias -soup2offset: still works and prints a one-line
+    // warning pointing at -mesh2offset.
+    {
+      std::ostringstream oss;
+      auto *old = std::cerr.rdbuf(oss.rdbuf());
+      EXPECT_NO_THROW({
+        auto args = getArgs("vdb_tool -quiet -sphere r=1 dim=32 -ls2mesh"
+                            " -soup2offset voxel=0.2 width=3"
+                            " -write data/shrinkwrap_offset_dep.vdb");
+        Tool tool(int(args.size()), args.data());
+        tool.run();
+      });
+      std::cerr.rdbuf(old);
+      EXPECT_NE(oss.str().find("deprecated"), std::string::npos);
+      EXPECT_NE(oss.str().find("-mesh2offset"), std::string::npos);
+    }
+    std::remove("data/shrinkwrap_offset_dep.vdb");
+
+    // Deprecated alias -soup2ls: still works and prints a one-line warning
+    // (to std::cerr) pointing at -shrinkwrap.
+    {
+      std::ostringstream oss;
+      auto *old = std::cerr.rdbuf(oss.rdbuf());
+      EXPECT_NO_THROW({
+        auto args = getArgs("vdb_tool -quiet -sphere r=1 dim=32 -ls2mesh"
+                            " -soup2ls voxel=0.2 width=3"
+                            " -write data/shrinkwrap_dep.vdb");
+        Tool tool(int(args.size()), args.data());
+        tool.run();
+      });
+      std::cerr.rdbuf(old);
+      EXPECT_NE(oss.str().find("deprecated"), std::string::npos);
+      EXPECT_NE(oss.str().find("-shrinkwrap"), std::string::npos);
+    }
+    std::remove("data/shrinkwrap_dep.vdb");
+
+    // The canonical -shrinkwrap name prints no deprecation warning.
+    {
+      std::ostringstream oss;
+      auto *old = std::cerr.rdbuf(oss.rdbuf());
+      EXPECT_NO_THROW({
+        auto args = getArgs("vdb_tool -quiet -sphere r=1 dim=32 -ls2mesh"
+                            " -shrinkwrap voxel=0.2 width=3"
+                            " -write data/shrinkwrap_nowarn.vdb");
+        Tool tool(int(args.size()), args.data());
+        tool.run();
+      });
+      std::cerr.rdbuf(old);
+      EXPECT_EQ(oss.str().find("deprecated"), std::string::npos);
+    }
+    std::remove("data/shrinkwrap_nowarn.vdb");
+}// ActionShrinkWrap
+
+TEST_F(Test_vdb_tool, ActionFailureStatus)
+{
+    bool success = true;
+    const auto out = runCapturingClog(
+        "vdb_tool -quiet -read data/nonexistent_failure_test.vdb -eval continued", &success);
+    EXPECT_FALSE(success);
+    EXPECT_NE(std::string::npos, out.find("continued"));
+    EXPECT_THROW(runCapturingClog(
+        "vdb_tool -quiet -errorOnWarning -read data/nonexistent_failure_test.vdb"),
+        std::invalid_argument);
+
+    for (const std::string scope : {"-if missing>0", "-files data/nonexistent_failure_dir",
+                                    "-for i=0", "-switch {$missing}", "-case key=x"}) {
+        EXPECT_THROW(runCapturingClog("vdb_tool -quiet " + scope + " -eval body -end"),
+                     std::invalid_argument) << scope;
+    }
+}
+
+TEST_F(Test_vdb_tool, FailedActionsPreserveStack)
+{
+    using namespace openvdb::vdb_tool;
+    std::vector<std::string> failures = {
+        "-write data/nonexistent_failure_dir/out.vdb bits=16",
+        "-write data/nonexistent_failure_dir/out.vdb vdb=0 bits=16",
+        "-write data/failure_unused.vdb codec=invalid",
+        "-forOnValues v+missing keep=true",
+        "-forOnValues v+missing keep=false"
+    };
+#ifdef VDB_TOOL_USE_NANO
+    failures.push_back("-write data/nonexistent_failure_dir/out.nvdb");
+#endif
+    for (const auto &failure : failures) {
+        bool success = true;
+        const auto out = runCapturingClog(
+            "vdb_tool -quiet -sphere dim=16 name=original " + failure +
+            " -eval str=count:{gridCount},name:{0:gridName}"
+            " -write data/recovered.vdb", &success);
+        EXPECT_FALSE(success) << failure;
+        EXPECT_NE(std::string::npos, out.find("count:1,name:original")) << out;
+        openvdb::io::File file("data/recovered.vdb");
+        file.open();
+        auto grids = file.getGrids();
+        ASSERT_EQ(1u, grids->size());
+        EXPECT_EQ("original", grids->front()->getName());
+        EXPECT_FALSE(grids->front()->saveFloatAsHalf());
+        file.close();
+        std::remove("data/recovered.vdb");
+    }
+}
+
+TEST_F(Test_vdb_tool, CsgRebuiltResults)
+{
+    using namespace openvdb;
+    auto readGrid = [](const std::string &path) {
+        io::File file(path);
+        file.open();
+        return gridPtrCast<FloatGrid>(file.readGrid(file.beginName().gridName()));
+    };
+    for (const std::string action : {"union", "intersection", "difference"}) {
+        for (const std::string voxel : {"0.25", "0.5"}) {
+            for (const std::string rebuild : {"false", "true"}) {
+                SCOPED_TRACE(action + ", voxel=" + voxel + ", rebuild=" + rebuild);
+                const std::string cmd = "vdb_tool -quiet -sphere radius=1 voxel=0.25 name=A"
+                    " -sphere radius=1 center=1,0,0 name=B voxel=" + voxel +
+                    " -" + action + " vdb=0,1 rebuild=" + rebuild;
+                bool success = false;
+                runCapturingClog(cmd + " keep=false -write data/csg_inplace.vdb", &success);
+                ASSERT_TRUE(success);
+                runCapturingClog(cmd + " keep=true -write data/csg_copy.vdb vdb=0", &success);
+                ASSERT_TRUE(success);
+                const auto actual = readGrid("data/csg_inplace.vdb");
+                const auto expected = readGrid("data/csg_copy.vdb");
+                ASSERT_TRUE(actual && expected);
+                EXPECT_EQ(action + "_B", actual->getName());
+                EXPECT_EQ(expected->transform(), actual->transform());
+                EXPECT_EQ(expected->activeVoxelCount(), actual->activeVoxelCount());
+                EXPECT_EQ(expected->evalActiveVoxelBoundingBox(), actual->evalActiveVoxelBoundingBox());
+                const auto acc = actual->getConstAccessor();
+                for (auto it = expected->cbeginValueOn(); it; ++it) {
+                    EXPECT_NEAR(*it, acc.getValue(it.getCoord()), 1.0e-5f);
+                }
+            }
+        }
+    }
+    std::remove("data/csg_inplace.vdb");
+    std::remove("data/csg_copy.vdb");
+}
+
+TEST_F(Test_vdb_tool, ConfigExpressionComments)
+{
+    using namespace openvdb::vdb_tool;
+    const std::string path = "data/expression_comments.txt";
+    {
+        std::ofstream file(path);
+        file << "vdb_tool " << Tool::version() << "\n"
+                "% full-line comment\n"
+                "calc n = 5 % 2 # inline comment\n"
+                "eval {$n}\n"
+                "for i=3,0,-1\n"
+                "  eval value:{$i},counter:{$#i} # loop counter\n"
+                "end\n"
+                "calc m = 7 % \\\n"
+                "# comment between continued lines\n"
+                "  3\n"
+                "eval {$m}\n";
+    }
+    bool success = false;
+    const auto out = runCapturingClog("vdb_tool -quiet -config " + path, &success);
+    EXPECT_TRUE(success);
+    EXPECT_EQ("1.000000\nvalue:3,counter:0\nvalue:2,counter:1\nvalue:1,counter:2\n1.000000\n", out);
+    EXPECT_EQ("eval {$#i} ", stripConfigComment("eval {$#i} # comment"));
+    EXPECT_EQ("eval '{a#b}' ", stripConfigComment("eval '{a#b}' # comment"));
+    std::remove(path.c_str());
+}
+
+TEST_F(Test_vdb_tool, LoopProgress)
+{
+    EXPECT_EQ("3\n2\n1\n", runCapturingClog("vdb_tool -quiet -for i=3,0,-1 -eval {$i} -end"));
+    EXPECT_EQ("1.000000\n0.500000\n", runCapturingClog(
+        "vdb_tool -quiet -for i=1,0,-0.5 -eval {$i} -end"));
+    EXPECT_EQ("", runCapturingClog("vdb_tool -quiet -for i=0,0 -eval unexpected -end"));
+    // Advancing beyond an int endpoint must terminate without signed overflow.
+    EXPECT_EQ("2147483646\n", runCapturingClog(
+        "vdb_tool -quiet -for i=2147483646,2147483647,2 -eval {$i} -end"));
+    EXPECT_EQ("-2147483647\n", runCapturingClog(
+        "vdb_tool -quiet -for i=-2147483647,-2147483648,-2 -eval {$i} -end"));
+    // A loop body may move the loop variable backward, e.g. to retry an iteration.
+    EXPECT_EQ("0\n1\n1\n2\n", runCapturingClog("vdb_tool -quiet -eval {0:@r} -for i=0,3 -eval {$i}"
+        " -if {$i:$r:+:1:==} -eval {$i:1:-:@i} -eval {1:@r} -end -end"));
+    for (const std::string range : {"0,2,0", "0,2,-1", "2,0,1", "0,inf,1",
+                                    "0,2,nan", "16777216,16777220,0.5"}) {
+        EXPECT_THROW(runCapturingClog("vdb_tool -quiet -for i=" + range + " -end"),
+                     std::invalid_argument) << range;
+    }
+}
+
+TEST_F(Test_vdb_tool, MalformedPly)
+{
+    using openvdb::vdb_tool::Geometry;
+    const std::string ascii = "ply\nformat ascii 1.0\n";
+    const std::string coords = "property float x\nproperty float y\nproperty float z\n";
+    const std::string face = "element face 1\nproperty list uchar int vertex_indices\nend_header\n";
+    const std::vector<std::string> malformed = {
+        ascii + "element vertex 1\nproperty float x\n",
+        ascii + "element vertex\n",
+        ascii + "element vertex -1\n",
+        ascii + "element vertex 2147483648\n",
+        ascii + "element vertex 1\nproperty float x\nend_header\n",
+        ascii + "element vertex 1\n" + coords + "end_header\n0 0\n",
+        ascii + "element vertex 1\n" + coords + face + "0 0 0\n3 0 0\n",
+        ascii + "element vertex 1\n" + coords + face + "0 0 0\n3 0 0 1\n",
+        "ply\nformat binary_little_endian 1.0\nelement vertex 1\n" + coords + "end_header\n"
+    };
+    for (const auto &data : malformed) {
+        Geometry geometry;
+        std::istringstream input(data);
+        EXPECT_THROW(geometry.readPLY(input), std::exception) << data;
+    }
+    Geometry source;
+    source.vtx() = {openvdb::Vec3s(0,0,0), openvdb::Vec3s(1,0,0), openvdb::Vec3s(0,1,0)};
+    source.tri().emplace_back(0,1,2);
+    std::ostringstream binary;
+    source.writePLY(binary, false);
+    const auto data = binary.str();
+    for (const size_t missing : {size_t(1), size_t(8), size_t(14)}) {
+        Geometry geometry;
+        std::istringstream input(data.substr(0, data.size() - missing));
+        EXPECT_THROW(geometry.readPLY(input), std::invalid_argument);
+    }
+    for (const int count : {0, 255}) {
+        auto invalid = data;
+        invalid[invalid.size() - 13] = static_cast<char>(count);// uchar before 3 int indices
+        Geometry geometry;
+        std::istringstream input(invalid);
+        EXPECT_THROW(geometry.readPLY(input), std::invalid_argument);
+    }
+
+    // PLY permits packed records whose doubles are not naturally aligned.
+    std::ostringstream packed;
+    packed << "ply\nformat binary_"
+           << (openvdb::vdb_tool::isLittleEndian() ? "little" : "big")
+           << "_endian 1.0\nelement vertex 1\nproperty uchar red\n"
+              "property double x\nproperty double y\nproperty double z\nend_header\n";
+    packed.put(char(127));
+    const double position[] = {1.25, 2.5, 3.75};
+    packed.write(reinterpret_cast<const char*>(position), sizeof(position));
+    Geometry geometry;
+    std::istringstream input(packed.str());
+    ASSERT_NO_THROW(geometry.readPLY(input));
+    ASSERT_EQ(1u, geometry.vtxCount());
+    EXPECT_EQ(openvdb::Vec3s(1.25f, 2.5f, 3.75f), geometry.vtx()[0]);
+
+    // Binary int32 coordinates are converted rather than reinterpreted as floats,
+    // both for the packed x,y,z layout and with additional properties.
+    for (const bool extra : {false, true}) {
+        std::ostringstream ints;
+        ints << "ply\nformat binary_"
+             << (openvdb::vdb_tool::isLittleEndian() ? "little" : "big")
+             << "_endian 1.0\nelement vertex 1\n"
+             << (extra ? "property uchar red\n" : "")
+             << "property int x\nproperty int32 y\nproperty int z\nend_header\n";
+        if (extra) ints.put(char(127));
+        const int32_t ijk[] = {-3, 4, 70000};
+        ints.write(reinterpret_cast<const char*>(ijk), sizeof(ijk));
+        Geometry intGeometry;
+        std::istringstream intInput(ints.str());
+        ASSERT_NO_THROW(intGeometry.readPLY(intInput)) << extra;
+        ASSERT_EQ(1u, intGeometry.vtxCount());
+        EXPECT_EQ(openvdb::Vec3s(-3.0f, 4.0f, 70000.0f), intGeometry.vtx()[0]) << extra;
+    }
+}
+
+TEST_F(Test_vdb_tool, LogPreservesStdout)
+{
+    using namespace openvdb::vdb_tool;
+    for (const bool tee : {false, true}) {
+        const std::string path = "data/diagnostics.log";
+        std::ostringstream output;
+        auto *old = std::cout.rdbuf(output.rdbuf());
+        {
+            auto args = getArgs("vdb_tool -quiet");
+            Tool tool(int(args.size()), args.data());
+            for (auto *arg : args) delete[] arg;
+            tool.startLog(path, false, tee);
+            EXPECT_EQ(output.rdbuf(), std::cout.rdbuf());
+            std::cout << "binary-data";
+            std::clog << "diagnostic-message\n";
+        }
+        std::cout.rdbuf(old);
+        EXPECT_EQ("binary-data", output.str());
+        const auto log = readFileToString(path);
+        EXPECT_NE(std::string::npos, log.find("diagnostic-message"));
+        EXPECT_EQ(std::string::npos, log.find("binary-data"));
+        std::remove(path.c_str());
+    }
+}
+
+namespace {
+
+struct CliTempDir {
+    const std::filesystem::path path = std::filesystem::temp_directory_path() /
+        ("vdb_tool_cli_" + openvdb::vdb_tool::uuid());
+    CliTempDir() {
+        if (!std::filesystem::create_directory(path))
+            throw std::runtime_error("Cannot create a unique CLI test directory");
+    }
+    ~CliTempDir() {
+        std::error_code error;
+        std::filesystem::remove_all(path, error);
+    }
+};
+
+struct CliResult {
+    int exitCode = -1;// signals and abnormal termination must not count as ordinary errors
+    bool timedOut = false;
+    std::string output, error;
+};
+
+// Launch the actual executable without a shell. File-backed streams preserve
+// binary output and avoid pipe-buffer deadlocks. Every child is waited on and
+// killed on timeout, so a CLI regression cannot hang the unit-test process.
+CliResult runCli(const std::vector<std::string>& args, const std::string& input = {},
+                 std::chrono::milliseconds timeout = std::chrono::seconds(15))
+{
+    CliTempDir dir;
+    const auto inPath = dir.path / "stdin.bin", outPath = dir.path / "stdout.bin",
+               errPath = dir.path / "stderr.txt";
+    {
+        std::ofstream stream(inPath, std::ios::binary);
+        stream.exceptions(std::ios::failbit | std::ios::badbit);
+        stream.write(input.data(), static_cast<std::streamsize>(input.size()));
+        stream.close();
+    }
+    using File = std::unique_ptr<FILE, decltype(&std::fclose)>;
+    File in(std::fopen(inPath.string().c_str(), "rb"), &std::fclose);
+    File out(std::fopen(outPath.string().c_str(), "wb"), &std::fclose);
+    File err(std::fopen(errPath.string().c_str(), "wb"), &std::fclose);
+    if (!in || !out || !err) throw std::runtime_error("Cannot open CLI test streams");
+    CliResult result;
+
+#if defined(_WIN32)
+    // Quote according to the Windows CRT argv rules, including trailing backslashes.
+    auto quote = [](const std::string& arg) {
+        std::string value = "\"";
+        size_t slashes = 0;
+        for (char c : arg) {
+            if (c == '\\') { ++slashes; continue; }
+            value.append(c == '"' ? 2 * slashes + 1 : slashes, '\\');
+            slashes = 0;
+            value += c;
+        }
+        value.append(2 * slashes, '\\');
+        return value + '"';
+    };
+    std::string command = quote(VDB_TOOL_TEST_EXECUTABLE);
+    for (const auto& arg : args) command += " " + quote(arg);
+    STARTUPINFOA startup{};
+    startup.cb = sizeof(startup);
+    startup.dwFlags = STARTF_USESTDHANDLES;
+    startup.hStdInput = reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(in.get())));
+    startup.hStdOutput = reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(out.get())));
+    startup.hStdError = reinterpret_cast<HANDLE>(_get_osfhandle(_fileno(err.get())));
+    for (HANDLE handle : {startup.hStdInput, startup.hStdOutput, startup.hStdError}) {
+        if (!SetHandleInformation(handle, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT))
+            throw std::runtime_error("Cannot inherit CLI test streams");
+    }
+    PROCESS_INFORMATION process{};
+    if (!CreateProcessA(VDB_TOOL_TEST_EXECUTABLE, command.data(), nullptr, nullptr,
+                        TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process))
+        throw std::runtime_error("Cannot launch vdb_tool: " + std::to_string(GetLastError()));
+    CloseHandle(process.hThread);
+    const DWORD wait = WaitForSingleObject(process.hProcess, static_cast<DWORD>(timeout.count()));
+    if (wait != WAIT_OBJECT_0) {
+        result.timedOut = wait == WAIT_TIMEOUT;
+        TerminateProcess(process.hProcess, 1);
+        WaitForSingleObject(process.hProcess, INFINITE);
+    }
+    DWORD code = 0;
+    const bool gotCode = GetExitCodeProcess(process.hProcess, &code) != 0;
+    CloseHandle(process.hProcess);
+    if (wait == WAIT_FAILED || !gotCode) throw std::runtime_error("Cannot wait for vdb_tool");
+    if (!result.timedOut && code <= INT_MAX) result.exitCode = static_cast<int>(code);
+#else
+    // Build argv before fork: only async-signal-safe calls are made in the child,
+    // since earlier tests may already have started TBB worker threads.
+    std::string executable = VDB_TOOL_TEST_EXECUTABLE;
+    std::vector<char*> argv{executable.data()};
+    for (const auto& arg : args) argv.push_back(const_cast<char*>(arg.c_str()));
+    argv.push_back(nullptr);
+    const int inFd = fileno(in.get()), outFd = fileno(out.get()), errFd = fileno(err.get());
+    const pid_t pid = fork();
+    if (pid < 0) throw std::runtime_error("Cannot fork vdb_tool");
+    if (pid == 0) {
+        if (dup2(inFd, STDIN_FILENO) == -1 || dup2(outFd, STDOUT_FILENO) == -1 ||
+            dup2(errFd, STDERR_FILENO) == -1) _exit(127);
+        execv(argv[0], argv.data());
+        _exit(127);
+    }
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    int status = 0;
+    for (;;) {
+        const pid_t waited = waitpid(pid, &status, WNOHANG);
+        if (waited == pid) break;
+        if (waited < 0 && errno != EINTR) throw std::runtime_error("Cannot wait for vdb_tool");
+        if (std::chrono::steady_clock::now() >= deadline) {
+            result.timedOut = true;
+            kill(pid, SIGKILL);
+            while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    if (!result.timedOut && WIFEXITED(status)) result.exitCode = WEXITSTATUS(status);
+#endif
+    in.reset();
+    out.reset();
+    err.reset();
+    result.output = openvdb::vdb_tool::readFileToString(outPath.string());
+    result.error = openvdb::vdb_tool::readFileToString(errPath.string());
+    // Normalize diagnostics across platforms, leaving binary stdout unchanged.
+    for (size_t pos = 0; (pos = result.error.find("\r\n", pos)) != std::string::npos; ++pos)
+        result.error.erase(pos, 1);
+    return result;
+}
+
+} // namespace
+
+TEST_F(Test_vdb_tool, CliFilesLoopInvalidPaths)
+{
+    CliTempDir dir;
+    const auto empty = dir.path / "empty";
+    const auto populated = dir.path / "populated";
+    ASSERT_TRUE(std::filesystem::create_directory(empty));
+    ASSERT_TRUE(std::filesystem::create_directory(populated));
+    const auto regularFile = populated / "not a directory.txt";
+    {
+        std::ofstream file(regularFile);
+        ASSERT_TRUE(file.is_open());
+        file << "test";
+    }
+    for (const std::string recursive : {"false", "true"}) {
+        for (const auto& invalid : {dir.path / "missing", regularFile}) {
+            const std::string afterPopulated = populated.string() + "," + invalid.string();
+            for (const auto& paths : {invalid.string(), empty.string() + "," + invalid.string(),
+                                      afterPopulated}) {
+                SCOPED_TRACE(paths + ", recursive=" + recursive);
+                const auto result = runCli({"-quiet", "-files", paths, "recursive=" + recursive,
+                                            "-eval", "BODY", "-end", "-eval", "AFTER"});
+                ASSERT_FALSE(result.timedOut);
+                EXPECT_EQ(1, result.exitCode) << result.error;
+                EXPECT_NE(std::string::npos, result.error.find("is not a directory")) << result.error;
+                EXPECT_NE(std::string::npos, result.error.find(invalid.string())) << result.error;
+                EXPECT_EQ(std::string::npos, result.error.find("AFTER")) << result.error;
+                if (paths == afterPopulated) {
+                    EXPECT_EQ(0u, result.error.find("BODY\n")) << result.error;
+                } else {
+                    EXPECT_EQ(std::string::npos, result.error.find("BODY")) << result.error;
+                }
+            }
+        }
+    }
+}
+
+TEST_F(Test_vdb_tool, CliFailures)
+{
+    CliTempDir dir;
+    const std::string literal = "literal \"quotes\" & trailing\\";
+    const auto echoed = runCli({"-quiet", "-eval", "str=" + literal});
+    ASSERT_FALSE(echoed.timedOut);
+    EXPECT_EQ(0, echoed.exitCode) << echoed.error;
+    EXPECT_EQ(literal + "\n", echoed.error);
+    const auto missing = (dir.path / "missing.vdb").string();
+    const auto continued = runCli({"-quiet", "-read", missing, "-eval", "CONTINUED"});
+    ASSERT_FALSE(continued.timedOut);
+    EXPECT_EQ(1, continued.exitCode) << continued.error;
+    EXPECT_NE(std::string::npos, continued.error.find("CONTINUED"));
+
+    const std::vector<std::vector<std::string>> failures = {
+        {"-quiet", "-errorOnWarning", "-read", missing, "-eval", "BODY"},
+        {"-quiet", "-if", "undefinedVariable > 0", "-eval", "BODY", "-end"},
+        {"-quiet", "-files", (dir.path / "missing-directory").string(), "-eval", "BODY", "-end"},
+        {"-quiet", "-for", "i=0,2,0", "-end"},
+        {"-quiet", "-for", "i=16777216,16777220,0.5", "-end"},
+        {"-quiet", "-for", "i=0,2", "-if", "missing > 0", "-eval", "BODY", "-end", "-end"},
+        {"-quiet", "-errorOnWarning", "-for", "i=0,2", "-read", missing, "-end"}
+    };
+    for (const auto& args : failures) {
+        const auto result = runCli(args);
+        ASSERT_FALSE(result.timedOut);
+        EXPECT_EQ(1, result.exitCode) << result.error;
+        EXPECT_EQ(std::string::npos, result.error.find("BODY")) << result.error;
+    }
+    const auto descending = runCli({"-quiet", "-for", "i=3,0,-1", "-eval", "{$i}", "-end"});
+    ASSERT_FALSE(descending.timedOut);
+    EXPECT_EQ(0, descending.exitCode) << descending.error;
+    EXPECT_EQ("3\n2\n1\n", descending.error);
+
+    const auto ply = dir.path / "truncated.ply";
+    {
+        std::ofstream file(ply);
+        file << "ply\nformat ascii 1.0\nelement vertex 1\nproperty float x\n";
+    }
+    const auto truncated = runCli({"-quiet", "-read", ply.string()});
+    ASSERT_FALSE(truncated.timedOut);
+    EXPECT_EQ(1, truncated.exitCode) << truncated.error;
+}
+
+TEST_F(Test_vdb_tool, CliBinaryStreams)
+{
+    using namespace openvdb;
+    initialize();
+    // Text-mode input can translate CRLF or stop at Ctrl-Z; output can expand LF.
+    const std::string marker = "LF\nCRLF\r\n\x1a" "after ctrl-z";
+    auto grid = FloatGrid::create();
+    grid->setName("binary_io");
+    grid->insertMeta("marker", StringMetadata(marker));
+    grid->tree().setValue(Coord(1, 2, 3), 3.25f);
+    std::ostringstream binary;
+    io::Stream stream(binary);
+    stream.setCompression(io::COMPRESS_NONE);
+    stream.write(GridPtrVec{grid});
+    ASSERT_NE(std::string::npos, binary.str().find(marker));
+
+    CliTempDir dir;
+    const auto path = (dir.path / "binary.vdb").string();
+    const auto reader = runCli({"-quiet", "-read", "stdin.vdb", "-write", path}, binary.str());
+    ASSERT_FALSE(reader.timedOut);
+    ASSERT_EQ(0, reader.exitCode) << reader.error;
+
+    // Validate stdin independently, so a second text-mode stream cannot hide corruption.
+    io::File file(path);
+    file.open();
+    const auto fromFile = gridPtrCast<FloatGrid>(file.readGrid("binary_io"));
+    ASSERT_TRUE(fromFile);
+    EXPECT_EQ(marker, fromFile->metaValue<std::string>("marker"));
+    EXPECT_EQ(3.25f, fromFile->tree().getValue(Coord(1, 2, 3)));
+    file.close();
+
+    const auto writer = runCli({"-quiet", "-read", path, "-write", "stdout.vdb"});
+    ASSERT_FALSE(writer.timedOut);
+    ASSERT_EQ(0, writer.exitCode) << writer.error;
+    EXPECT_NE(std::string::npos, writer.output.find(marker));
+    std::istringstream input(writer.output);
+    GridPtrVecPtr grids;
+    ASSERT_NO_THROW({
+        io::Stream outputStream(input);
+        grids = outputStream.getGrids();
+    });
+    ASSERT_TRUE(grids);
+    ASSERT_EQ(1u, grids->size());
+    const auto fromStdout = gridPtrCast<FloatGrid>(grids->front());
+    ASSERT_TRUE(fromStdout);
+    EXPECT_EQ(marker, fromStdout->metaValue<std::string>("marker"));
+    EXPECT_EQ(3.25f, fromStdout->tree().getValue(Coord(1, 2, 3)));
+}
+
+TEST_F(Test_vdb_tool, CliOffCrlfInput)
+{
+    const auto result = runCli({"-quiet", "-read", "stdin.off", "-write", "stdout.obj"},
+        "OFF\r\n3 1 0\r\n0 0 0\r\n1 0 0\r\n0 1 0\r\n3 0 1 2\r\n");
+    ASSERT_FALSE(result.timedOut);
+    ASSERT_EQ(0, result.exitCode) << result.error;
+    openvdb::vdb_tool::Geometry geometry;
+    std::istringstream input(result.output);
+    ASSERT_NO_THROW(geometry.readOBJ(input));
+    ASSERT_EQ(3u, geometry.vtxCount());
+    ASSERT_EQ(1u, geometry.triCount());
+    EXPECT_EQ(openvdb::Vec3f(0, 0, 0), geometry.vtx()[0]);
+    EXPECT_EQ(openvdb::Vec3f(1, 0, 0), geometry.vtx()[1]);
+    EXPECT_EQ(openvdb::Vec3f(0, 1, 0), geometry.vtx()[2]);
+    EXPECT_EQ(openvdb::Vec3I(0, 1, 2), geometry.tri()[0]);
+}
+
+TEST_F(Test_vdb_tool, OffBlankLinesAndTruncation)
+{
+    using openvdb::vdb_tool::Geometry;
+    {// blank CRLF lines, as delivered by binary stdin on Windows, and indented comments
+        Geometry geometry;
+        std::istringstream input("OFF\r\n\r\n3 1 0\r\n\r\n0 0 0\r\n  # comment\r\n1 0 0\r\n"
+                                 "0 1 0\r\n \t\r\n3 0 1 2\r\n\r\n");
+        ASSERT_NO_THROW(geometry.readOFF(input));
+        ASSERT_EQ(3u, geometry.vtxCount());
+        ASSERT_EQ(1u, geometry.triCount());
+        EXPECT_EQ(openvdb::Vec3f(1, 0, 0), geometry.vtx()[1]);
+        EXPECT_EQ(openvdb::Vec3I(0, 1, 2), geometry.tri()[0]);
+    }
+    for (const std::string data : {"OFF\n", "OFF\nx 1 0\n", "OFF\n3 1 0\n0 0 0\n1 0 0\n",
+                                   "OFF\n3 1 0\n0 0 0\n1 0\n0 1 0\n3 0 1 2\n",
+                                   "OFF\n3 1 0\n0 0 0\n1 0 0\n0 1 0\n",
+                                   "OFF\n3 1 0\n0 0 0\n1 0 0\n0 1 0\n3 0 1\n",
+                                   "OFF\n3 1 0\n0 0 0\n1 0 0\n0 1 0\nx 0 1 2\n"}) {
+        Geometry geometry;
+        std::istringstream input(data);
+        EXPECT_THROW(geometry.readOFF(input), std::invalid_argument) << data;
+    }
+    {// XYZ input with CRLF blank lines
+        Geometry geometry;
+        std::istringstream input("0 0 0\r\n\r\n1 2 3\r\n");
+        ASSERT_NO_THROW(geometry.readXYZ(input));
+        ASSERT_EQ(2u, geometry.vtxCount());
+        EXPECT_EQ(openvdb::Vec3f(1, 2, 3), geometry.vtx()[1]);
+    }
+}
+
+TEST_F(Test_vdb_tool, WriteVdbPreservesHalf)
+{
+    auto isHalf = [](const std::string &path) {
+        openvdb::io::File file(path);
+        file.open();
+        auto grids = file.getGrids();
+        file.close();
+        EXPECT_EQ(1u, grids->size());
+        return !grids->empty() && grids->front()->saveFloatAsHalf();
+    };
+    bool success = false;
+    runCapturingClog("vdb_tool -quiet -sphere dim=16 -write bits=16 data/half_in.vdb", &success);
+    ASSERT_TRUE(success);
+    ASSERT_TRUE(isHalf("data/half_in.vdb"));
+    // the default keeps the precision of the input grid
+    runCapturingClog("vdb_tool -quiet -read data/half_in.vdb -write data/half_out.vdb", &success);
+    ASSERT_TRUE(success);
+    EXPECT_TRUE(isHalf("data/half_out.vdb"));
+    // an explicit bit-width overrides it
+    runCapturingClog("vdb_tool -quiet -read data/half_in.vdb -write bits=32 data/half_out.vdb", &success);
+    ASSERT_TRUE(success);
+    EXPECT_FALSE(isHalf("data/half_out.vdb"));
+    runCapturingClog("vdb_tool -quiet -sphere dim=16 -write data/half_out.vdb", &success);
+    ASSERT_TRUE(success);
+    EXPECT_FALSE(isHalf("data/half_out.vdb"));
+    runCapturingClog("vdb_tool -quiet -sphere dim=16 -write bits=8 data/half_out.vdb", &success);
+    EXPECT_FALSE(success);
+    std::remove("data/half_in.vdb");
+    std::remove("data/half_out.vdb");
+}
+
+TEST_F(Test_vdb_tool, Sdf2UdfFailure)
+{
+    bool success = true;
+    const auto out = runCapturingClog("vdb_tool -quiet -sphere dim=16 name=original -sdf2udf"
+        " -sdf2udf keep=true -eval str=count:{gridCount},name:{0:gridName}", &success);
+    EXPECT_FALSE(success);// the second -sdf2udf fails since its input is no longer a level set
+    EXPECT_NE(std::string::npos, out.find("count:1,name:sdf2udf_original")) << out;
+    EXPECT_THROW(runCapturingClog("vdb_tool -quiet -errorOnWarning -sdf2udf"), std::invalid_argument);
+}
+
+TEST_F(Test_vdb_tool, CliLogFatalError)
+{
+    CliTempDir dir;
+    for (const std::string tee : {"true", "false"}) {
+        const auto log = (dir.path / ("fatal " + tee + ".log")).string();
+        const auto result = runCli({"-quiet", "-log", "file=" + log, "tee=" + tee, "-for", "i=0", "-end"});
+        ASSERT_FALSE(result.timedOut);
+        EXPECT_NE(0, result.exitCode);
+        const auto text = openvdb::vdb_tool::readFileToString(log);
+        EXPECT_NE(std::string::npos, text.find("ForLoop: expected two or three arguments")) << text;
+        // main() still reports the error on stderr after the log is closed, exactly once
+        const auto first = result.error.find("ForLoop: expected two or three arguments");
+        ASSERT_NE(std::string::npos, first) << result.error;
+        EXPECT_EQ(std::string::npos, result.error.find("ForLoop: expected", first + 1)) << result.error;
+    }
+}
+
+TEST_F(Test_vdb_tool, CliLoggingPipeline)
+{
+    CliTempDir dir;
+    for (const std::string tee : {"true", "false"}) {
+        const auto log = (dir.path / ("stream " + tee + ".log")).string();
+        const auto writer = runCli({"-quiet", "-log", "file=" + log, "tee=" + tee,
+                                    "-sphere", "dim=16", "-write", "stdout.vdb"});
+        ASSERT_FALSE(writer.timedOut);
+        ASSERT_EQ(0, writer.exitCode) << writer.error;
+        const auto reader = runCli({"-quiet", "-read", "stdin.vdb", "-eval", "{gridCount}"},
+                                    writer.output);
+        ASSERT_FALSE(reader.timedOut);
+        EXPECT_EQ(0, reader.exitCode) << reader.error;
+        EXPECT_EQ("1\n", reader.error);
+        EXPECT_LT(std::filesystem::file_size(log), 4096u);// binary data must not enter the log
+    }
+}
+
+TEST_F(Test_vdb_tool, CliTimeout)
+{
+    // Exercise the watchdog itself with a valid loop that cannot finish in time.
+    const auto result = runCli({"-quiet", "-for", "i=0,2147483647", "-end"}, {},
+                              std::chrono::milliseconds(100));
+    EXPECT_TRUE(result.timedOut);
+    EXPECT_EQ(-1, result.exitCode);
+}
 
 int main(int argc, char** argv)
 {

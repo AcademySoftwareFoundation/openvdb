@@ -13,7 +13,6 @@
 #include <openvdb/io/Compression.h> // for truncateRealToHalf()
 #include <openvdb/math/Math.h> // for isZero(), isExactlyEqual(), etc.
 #include <openvdb/math/BBox.h>
-#include <openvdb/util/NodeMasks.h> // for backward compatibility only (see readTopology())
 #include <openvdb/util/Assert.h>
 #include <openvdb/version.h>
 #include <tbb/parallel_for.h>
@@ -575,6 +574,7 @@ public:
     void copyToDense(const CoordBBox& bbox, DenseT& dense) const;
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     //
     // I/O
     //
@@ -584,6 +584,7 @@ public:
     void writeBuffers(std::ostream&, bool toHalf = false) const;
     void readBuffers(std::istream&, bool fromHalf = false);
     void readBuffers(std::istream&, const CoordBBox&, bool fromHalf = false);
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
     //
@@ -696,7 +697,7 @@ public:
     /// the new node in its place (i.e. ownership of the new child node is transferred
     /// to this RootNode).
     /// @return @c true (for consistency with InternalNode::addChild)
-    bool addChild(ChildType* child);
+    bool addChild(ChildNodeType* child);
 
     /// @brief Add a tile containing voxel (x, y, z) at the root level,
     /// deleting the existing branch if necessary.
@@ -1178,7 +1179,11 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
 
         struct Local {
             /// @todo Consider using a value conversion functor passed as an argument instead.
-            static inline ValueT convertValue(const OtherValueT& val) { return ValueT(val); }
+            static inline ValueT convertValue(const OtherValueT& val) {
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+                return ValueT(val);
+                OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+            }
         };
 
         self.mBackground = Local::convertValue(other.mBackground);
@@ -2343,6 +2348,8 @@ RootNode<ChildT>::copyToDense(const CoordBBox& bbox, DenseT& dense) const
 ////////////////////////////////////////
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+
 template<typename ChildT>
 inline bool
 RootNode<ChildT>::writeTopology(std::ostream& os, bool toHalf) const
@@ -2463,6 +2470,8 @@ RootNode<ChildT>::readBuffers(std::istream& is, const CoordBBox& clipBBox, bool 
     // Clip root-level tiles and prune children that were clipped.
     this->clip(clipBBox);
 }
+
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
 
 ////////////////////////////////////////
@@ -2621,7 +2630,7 @@ RootNode<ChildT>::addLeafAndCache(LeafNodeType* leaf, AccessorT& acc)
 
 template<typename ChildT>
 inline bool
-RootNode<ChildT>::addChild(ChildT* child)
+RootNode<ChildT>::addChild(ChildNodeType* child)
 {
     if (!child) return false;
     const Coord& xyz = child->origin();

@@ -6,10 +6,10 @@
 
 # Admin/General
 /.github/                                                   @kmuseth @apradhana @jmlait @idclip @danrbailey @richhones
+/.github/workflows/nanovdb.yml                              @kmuseth @apradhana
 /ci/                                                        @kmuseth @apradhana @jmlait @idclip @danrbailey @richhones
 /cmake/                                                     @kmuseth @apradhana @jmlait @idclip @danrbailey @richhones
 /doc/                                                       @kmuseth @apradhana @jmlait @idclip @danrbailey @richhones
-/pendingchanges/                                            @kmuseth @apradhana @jmlait @idclip @danrbailey @richhones
 /tsc/                                                       @kmuseth @apradhana @jmlait @idclip @danrbailey @richhones
 CODEOWNERS                                                  @kmuseth @apradhana @jmlait @idclip @danrbailey @richhones
 LICENSE                                                     @kmuseth @apradhana @jmlait @idclip @danrbailey @richhones

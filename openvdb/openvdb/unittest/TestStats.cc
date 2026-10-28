@@ -343,6 +343,31 @@ TEST_F(TestStats, testHistogram)
         for (int i=0; i<N; ++i) EXPECT_TRUE(h.add(N/2-i));
         //h.print("print-test");
     }
+    {// A sample equal to the upper bound must land in the LAST bin, not one past it.
+     // Histogram(min, max, numBins) sets mDelta = numBins/(max-min), so val == max
+     // scales to exactly numBins; the range check admits it (mMax is max plus a small
+     // epsilon), which used to index one element past the end of the bin array. This
+     // is trivially reached in practice, e.g. tools::histogram() over a fog volume
+     // whose interior is exactly its maximum value.
+        const size_t numBins = 8;
+        openvdb::math::Histogram h(0.0, 1.0, numBins);
+        EXPECT_TRUE(h.add(1.0));// the upper bound itself
+        EXPECT_EQ(uint64_t(1), h.size());
+        EXPECT_EQ(uint64_t(1), h.count(numBins-1));// counted in the last bin
+        uint64_t total = 0;
+        for (size_t i=0; i<numBins; ++i) total += h.count(i);
+        EXPECT_EQ(uint64_t(1), total);// and counted exactly once overall
+        // The lower bound still lands in the first bin, and out-of-range is rejected.
+        EXPECT_TRUE(h.add(0.0));
+        EXPECT_EQ(uint64_t(1), h.count(0));
+        EXPECT_FALSE(h.add(1.5));
+        EXPECT_FALSE(h.add(-0.5));
+    }
+    {// NaN must be rejected without undefined behaviour (converting NaN to size_t is UB)
+        openvdb::math::Histogram h(0.0, 1.0, 8);
+        EXPECT_FALSE(h.add(std::numeric_limits<double>::quiet_NaN()));
+        EXPECT_EQ(uint64_t(0), h.size());
+    }
 }
 
 namespace {

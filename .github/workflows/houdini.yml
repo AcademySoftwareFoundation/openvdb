@@ -62,7 +62,7 @@ jobs:
     if: >
       ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
           github.repository_owner == 'AcademySoftwareFoundation' }}
-    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-22.04-8c-32g-300h') || 'ubuntu-latest' }}
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-latest-8c-32g-300h') || 'ubuntu-latest' }}
     name: hou:${{ matrix.config.hou_hash }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-build:${{ matrix.config.build }}
     container:
       image: aswf/ci-base:${{ matrix.config.image }}
@@ -72,11 +72,11 @@ jobs:
     strategy:
       matrix:
         config:
+          - { cxx: clang++, image: '2026', hou_hash: '22_0', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: clang++, image: '2026', hou_hash: '22_0', build: 'Debug',   components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
+          - { cxx: g++,     image: '2026', hou_hash: '22_0', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
           - { cxx: clang++, image: '2026', hou_hash: '21_0', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
-          - { cxx: clang++, image: '2026', hou_hash: '21_0', build: 'Debug',   components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
           - { cxx: g++,     image: '2026', hou_hash: '21_0', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
-          - { cxx: clang++, image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
-          - { cxx: g++,     image: '2024', hou_hash: '20_5', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3

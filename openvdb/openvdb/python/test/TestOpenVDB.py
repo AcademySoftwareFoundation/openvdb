@@ -242,6 +242,35 @@ class TestOpenVDB(unittest.TestCase):
         self.assertEqual(0, meta["file_voxel_count"])
 
 
+    def testReadGrids(self):
+        import tempfile
+        names = ['density', 'density', 'density[1]', 'other', '', 'pair', 'pair']
+        grids = []
+        for index, name in enumerate(names):
+            grid = openvdb.FloatGrid()
+            grid.name = name
+            grid['index'] = index
+            grid.fill((0, 0, 0), (1, 1, 1), float(index), active=True)
+            grids.append(grid)
+
+        with tempfile.TemporaryDirectory() as directory:
+            filename = os.path.join(directory, 'testReadGrids.vdb')
+            openvdb.write(filename, grids)
+
+            def indices(name):
+                return [grid.metadata['index'] for grid in openvdb.readGrids(filename, name)]
+
+            self.assertEqual(indices('density'), [0, 1])
+            self.assertEqual(indices('density[1]'), [2])
+            self.assertEqual(indices('other'), [3])
+            self.assertEqual(indices(''), [4])
+            self.assertEqual(indices('pair'), [5, 6])
+            self.assertEqual(indices('missing'), [])
+
+            grid = openvdb.readGrids(filename, 'other')[0]
+            self.assertEqual(grid.getAccessor().getValue((0, 0, 0)), 3.0)
+
+
     def testGridFill(self):
         grid = openvdb.FloatGrid()
         acc = grid.getAccessor()
@@ -794,84 +823,6 @@ class TestOpenVDB(unittest.TestCase):
             self.assertTrue(98 < pmax[0] < 102)
             self.assertTrue(98 < pmax[1] < 102)
             self.assertTrue(98 < pmax[2] < 102)
-
-
-    def testConvertPolygonSoupToLevelSet(self):
-        # Test polygon soup to LOD level set conversion.
-
-        # Generate the vertices of a cube.
-        cubeVertices = [(x, y, z) for x in (0, 100) for y in (0, 100) for z in (0, 100)]
-        cubePoints = np.array(cubeVertices, dtype=np.float32)
-
-        # Generate the faces of a cube as quads.
-        cubeQuads = np.array([
-            (0, 1, 3, 2), # left
-            (0, 2, 6, 4), # front
-            (4, 6, 7, 5), # right
-            (5, 7, 3, 1), # back
-            (2, 3, 7, 6), # top
-            (0, 4, 5, 1), # bottom
-        ], dtype=np.uint32)
-
-        minVoxelSize = 2.0
-        halfWidth = 3.0
-
-        # Only scalar, floating-point grids support convertPolygonSoupToLevelSet()
-        # (and the OpenVDB module might have been compiled without DoubleGrid support).
-        for gridType in [n for n in openvdb.GridTypes
-            if n.__name__ in ('FloatGrid', 'DoubleGrid')]:
-
-            # Test dimension + bboxMin + bboxMax overload
-            bboxMin = (0.0, 0.0, 0.0)
-            bboxMax = (100.0, 100.0, 100.0)
-
-            grids_bbox1 = gridType.convertPolygonSoupToLevelSet(
-                dim=128,
-                bboxMin=bboxMin,
-                bboxMax=bboxMax,
-                points=cubePoints,
-                quads=cubeQuads,
-                halfWidth=halfWidth)
-
-            self.assertIsInstance(grids_bbox1, list)
-            self.assertGreater(len(grids_bbox1), 0)
-
-            # Verify grids have correct properties
-            for grid in grids_bbox1:
-                self.assertIsInstance(grid, gridType)
-                self.assertGreater(grid.activeVoxelCount(), 0)
-                voxelSize = grid.transform.voxelSize()[0]
-                self.assertAlmostEqual(grid.background, halfWidth * voxelSize, delta=0.01)
-
-            # Test minVoxelSize + bboxMin + bboxMax overload
-            grids_bbox2 = gridType.convertPolygonSoupToLevelSet(
-                minVoxelSize=minVoxelSize,
-                bboxMin=bboxMin,
-                bboxMax=bboxMax,
-                points=cubePoints,
-                quads=cubeQuads,
-                halfWidth=halfWidth)
-
-            self.assertIsInstance(grids_bbox2, list)
-            self.assertGreater(len(grids_bbox2), 0)
-
-            # First grid should have the specified minVoxelSize
-            if len(grids_bbox2) > 0:
-                firstVoxelSize = grids_bbox2[0].transform.voxelSize()[0]
-                self.assertAlmostEqual(firstVoxelSize, minVoxelSize, delta=0.01)
-
-            # Verify each grid has correct properties
-            for grid in grids_bbox2:
-                self.assertIsInstance(grid, gridType)
-                self.assertGreater(grid.activeVoxelCount(), 0)
-                voxelSize = grid.transform.voxelSize()[0]
-                self.assertAlmostEqual(grid.background, halfWidth * voxelSize, delta=0.01)
-
-        # Boolean-valued grids should not have convertPolygonSoupToLevelSet()
-        self.assertFalse(hasattr(openvdb.BoolGrid, 'convertPolygonSoupToLevelSet'))
-
-        # Vector-valued grids should not have convertPolygonSoupToLevelSet()
-        self.assertFalse(hasattr(openvdb.Vec3SGrid, 'convertPolygonSoupToLevelSet'))
 
 
 if __name__ == '__main__':

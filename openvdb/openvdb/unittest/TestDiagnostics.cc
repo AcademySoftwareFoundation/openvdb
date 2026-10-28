@@ -278,6 +278,16 @@ TEST_F(TestDiagnostics, testCheckLevelSet)
     EXPECT_TRUE(str.empty());
     //std::cerr << "\n" << str << std::endl;
 
+    // A sphere created with voxelSize=0.008 (dim=256, radius=1) exercises a floating-point
+    // edge case where background / voxelSize computes to just below LEVEL_SET_HALF_WIDTH
+    // due to non-representable values, which previously caused a false-positive failure.
+    {
+        FloatGrid::Ptr grid2 = tools::createLevelSetSphere<FloatGrid>(
+            1.0f, Vec3f(0), 0.008f, LEVEL_SET_HALF_WIDTH);
+        str = tools::checkLevelSet(*grid2);
+        EXPECT_TRUE(str.empty());
+    }
+
     grid->tree().setValue(Coord(0,0,0), voxelSize*(width+0.5f));
     //str = c.check();
     str = tools::checkLevelSet(*grid);

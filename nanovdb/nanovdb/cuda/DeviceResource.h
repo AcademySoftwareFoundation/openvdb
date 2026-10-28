@@ -18,44 +18,70 @@ namespace cuda {
 /// @brief Default stream-ordered device memory resource. Allocations are made
 ///        with cudaMallocAsync and freed with cudaFreeAsync via the
 ///        util::cuda wrappers.
-/// @note Exposes both the legacy static methods (allocateAsync /
-///       deallocateAsync, retained for source compatibility) and the
-///       instance methods (allocate_async / deallocate_async) that model
-///       the AsyncResource concept. The instance methods forward to the
-///       static ones, so a default-constructed instance is stateless and
-///       adds no overhead.
+/// @note Models the AsyncResource concept, which refines the synchronous
+///       Resource concept (as in CCCL's cuda::mr): the instance methods
+///       provide both the stream-ordered allocate_async / deallocate_async
+///       and the synchronous allocate / deallocate. The type is stateless,
+///       so a default-constructed instance adds no overhead. The static
+///       allocateAsync / deallocateAsync methods are deprecated.
 class DeviceResource
 {
 public:
     // cudaMalloc aligns memory to 256 bytes by default
     static constexpr size_t DEFAULT_ALIGNMENT = 256;
 
-    static void* allocateAsync(size_t bytes, size_t, cudaStream_t stream) {
+    /// @brief Stream-ordered allocation.
+    /// @param bytes number of bytes to allocate
+    /// @param stream cuda stream the allocation is ordered on
+    /// @note the alignment parameter is unnamed: cudaMallocAsync always
+    ///       256B-aligns
+    void* allocate_async(size_t bytes, size_t, cudaStream_t stream) {
         void* p = nullptr;
         cudaCheck(util::cuda::mallocAsync(&p, bytes, stream));
         return p;
     }
 
-    static void deallocateAsync(void *p, size_t, size_t, cudaStream_t stream) {
+    /// @brief Stream-ordered deallocation.
+    /// @param p pointer previously returned by allocate_async
+    /// @param stream cuda stream the deallocation is ordered on
+    void deallocate_async(void* p, size_t, size_t, cudaStream_t stream) {
         cudaCheck(util::cuda::freeAsync(p, stream));
     }
 
-    /// @brief Instance allocation entry point modelling the AsyncResource concept.
+    /// @brief Synchronous allocation; the returned memory is immediately
+    ///        valid on every stream.
     /// @param bytes number of bytes to allocate
-    /// @param alignment requested alignment (cudaMallocAsync always 256B-aligns)
-    /// @param stream cuda stream the allocation is ordered on
-    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream) {
-        return allocateAsync(bytes, alignment, stream);
+    /// @param alignment requested alignment
+    void* allocate(size_t bytes, size_t alignment) {
+        void* p = this->allocate_async(bytes, alignment, cudaStream_t(0));
+        cudaCheck(cudaStreamSynchronize(cudaStream_t(0)));
+        return p;
     }
 
-    /// @brief Instance deallocation entry point modelling the AsyncResource concept.
-    /// @param p pointer previously returned by allocate_async
-    /// @param bytes size passed to the matching allocate_async
-    /// @param alignment alignment passed to the matching allocate_async
-    /// @param stream cuda stream the deallocation is ordered on
-    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream) {
-        deallocateAsync(p, bytes, alignment, stream);
+    /// @brief Synchronous deallocation; the caller guarantees that device
+    ///        work touching the memory has completed.
+    /// @param p pointer previously returned by allocate or allocate_async
+    /// @param bytes size of the allocation in bytes
+    /// @param alignment alignment of the allocation in bytes
+    void deallocate(void* p, size_t bytes, size_t alignment) {
+        this->deallocate_async(p, bytes, alignment, cudaStream_t(0));
     }
+
+    [[deprecated("use the instance method allocate_async")]]
+    static void* allocateAsync(size_t bytes, size_t alignment, cudaStream_t stream) {
+        return DeviceResource().allocate_async(bytes, alignment, stream);
+    }
+
+    [[deprecated("use the instance method deallocate_async")]]
+    static void deallocateAsync(void *p, size_t bytes, size_t alignment, cudaStream_t stream) {
+        DeviceResource().deallocate_async(p, bytes, alignment, stream);
+    }
+
+    /// @brief Stateless: memory allocated through one instance may be
+    ///        deallocated through any other, so every two instances compare
+    ///        equal (the equality cuda::mr's resource concepts require).
+    friend bool operator==(const DeviceResource&, const DeviceResource&) { return true; }
+    friend bool operator!=(const DeviceResource&, const DeviceResource&) { return false; }
 };
 
 /// @brief Returns a program-lifetime, address-stable reference to a default
@@ -87,17 +113,362 @@ inline R& default_resource()
 ///         return resource.allocate(bytes, alignment);               // synchronous
 /// }
 /// @endcode
+/// @note AsyncResource refines the synchronous Resource concept, matching
+///       CCCL's cuda::mr: an async resource must also provide the
+///       synchronous allocate / deallocate, so is_async_resource<R> implies
+///       is_resource<R>. A synchronous-only resource (e.g. PinnedResource)
+///       models just is_resource. The synchronous methods of a stream-ordered
+///       resource are typically thin delegates (allocate_async on the null
+///       stream followed by a stream synchronize).
 template <class R, class = void>
 struct is_async_resource : std::false_type {};
 
 template <class R>
 struct is_async_resource<R, std::void_t<
     decltype(std::declval<R&>().allocate_async(size_t{0}, size_t{0}, cudaStream_t{0})),
-    decltype(std::declval<R&>().deallocate_async(std::declval<void*>(), size_t{0}, size_t{0}, cudaStream_t{0}))>>
+    decltype(std::declval<R&>().deallocate_async(std::declval<void*>(), size_t{0}, size_t{0}, cudaStream_t{0})),
+    decltype(std::declval<R&>().allocate(size_t{0}, size_t{0})),
+    decltype(std::declval<R&>().deallocate(std::declval<void*>(), size_t{0}, size_t{0}))>>
     : std::true_type {};
+
+/// @brief Detection trait: @c is_host_accessible_resource<R>::value is true
+///        iff @c R declares `static constexpr bool HOST_ACCESSIBLE = true`,
+///        i.e. its allocations are mapped into the host address space (e.g.
+///        PinnedResource). Defaults to false: allocations are device-resident.
+/// @note Unlike the void_t detections above, this checks the member's VALUE:
+///       a resource declaring HOST_ACCESSIBLE = false stays device-resident.
+template<typename R, typename = void>
+struct is_host_accessible_resource : std::false_type {};
+template<typename R>
+struct is_host_accessible_resource<R, typename std::enable_if<bool(R::HOST_ACCESSIBLE)>::type> : std::true_type {};
+
+/// @brief Companion detection: @c is_device_accessible_resource<R>::value is
+///        true iff @c R declares `static constexpr bool DEVICE_ACCESSIBLE =
+///        true`, i.e. its allocations are also valid device addresses even
+///        though they are host-accessible (e.g. ManagedResource). A handle
+///        over such a resource exposes both accessor families. Purely
+///        device-resident resources do not need the marker: not being
+///        host-accessible already implies device residency.
+template<typename R, typename = void>
+struct is_device_accessible_resource : std::false_type {};
+template<typename R>
+struct is_device_accessible_resource<R, typename std::enable_if<bool(R::DEVICE_ACCESSIBLE)>::type> : std::true_type {};
+
+/// @brief Detection trait: @c is_resource<R>::value is true iff @c R models
+///        the synchronous Resource concept, i.e. exposes
+///        allocate(size_t, size_t) and deallocate(void*, size_t, size_t).
+/// @details Use it to constrain code paths that need a resource without a
+///          stream argument, e.g. host-side allocations:
+/// @code
+/// template<typename R>
+/// void* allocate(R& resource, size_t bytes, size_t alignment)
+/// {
+///     static_assert(nanovdb::cuda::is_resource<R>::value, "R must be a synchronous resource");
+///     return resource.allocate(bytes, alignment);
+/// }
+/// @endcode
+template <class R, class = void>
+struct is_resource : std::false_type {};
+
+template <class R>
+struct is_resource<R, std::void_t<
+    decltype(std::declval<R&>().allocate(size_t{0}, size_t{0})),
+    decltype(std::declval<R&>().deallocate(std::declval<void*>(), size_t{0}, size_t{0}))>>
+    : std::true_type {};
+
+/// @brief Detection trait: @c is_equality_comparable_resource<R>::value is
+///        true iff @c R models a resource concept and provides operator==:
+///        two resources compare equal when memory allocated through one may
+///        be deallocated through the other. cuda::mr's resource concepts
+///        require it; using a resource without it is deprecated, and 14.0
+///        makes it part of NanoVDB's concepts too.
+template <class R, class = void>
+struct is_equality_comparable_resource : std::false_type {};
+
+template <class R>
+struct is_equality_comparable_resource<R, std::void_t<
+    std::enable_if_t<is_resource<R>::value || is_async_resource<R>::value>,
+    decltype(bool(std::declval<const R&>() == std::declval<const R&>()))>>
+    : std::true_type {};
+
+/// @brief The deprecation every use of a resource without operator== reports.
+#define NANOVDB_DEPRECATED_RESOURCE_WITHOUT_EQUALITY \
+    [[deprecated("this memory resource has no operator==, which NanoVDB 14.0 requires: " \
+                 "add friend bool operator==(const R&, const R&), true when memory allocated through one may be " \
+                 "deallocated through the other (always, for a stateless resource), and operator!= for cuda::mr under C++17")]]
+
+template <class R>
+struct ResourceRef;
+
+namespace detail {
+
+/// @brief The resource a buffer's memory comes from: @c R itself, or the
+///        resource a ResourceRef<R> refers to.
+template<class R>
+struct ReferencedResource { using type = R; };
+template<class R>
+struct ReferencedResource<ResourceRef<R>> { using type = R; };
+
+/// @brief Reached only through a resource without operator==, so the
+///        deprecation names the resource type at the point of use.
+/// @note A warning raised here is located in this header, so a compiler
+///       that silences warnings from system headers drops it when NanoVDB is
+///       included as one; ResourceRef(R&) in user code warns on the user's
+///       own line regardless.
+template<class R>
+NANOVDB_DEPRECATED_RESOURCE_WITHOUT_EQUALITY
+inline void resourceWithoutEquality() {}
+
+/// @brief Warns, through the deprecation above, when @c R lacks the equality
+///        that 14.0 makes part of the resource concepts. Instantiated once per
+///        resource type, so a misuse warns once however often it recurs.
+template<class R>
+inline void checkReferencedEquality()
+{
+    if constexpr (!is_equality_comparable_resource<R>::value) resourceWithoutEquality<R>();
+}
+
+/// @brief Checks the resource behind @c R (see ReferencedResource), so a
+///        resource and a ResourceRef to it share one check.
+template<class R>
+inline void checkResourceEquality() { checkReferencedEquality<typename ReferencedResource<R>::type>(); }
+
+/// @brief Tag for the ResourceRef constructor behind borrowInternal.
+struct InternalRef {};
+inline constexpr InternalRef internalRef{};
+
+}// namespace detail
+
+/// @brief CRTP base supplying the synchronous half of the resource concept in
+///        terms of the stream-ordered half, so a custom stream-ordered resource
+///        only has to write allocate_async and deallocate_async.
+/// @tparam Derived the resource deriving from this base
+/// @details A stream-ordered resource must also model the synchronous concept
+///          (is_async_resource implies is_resource), which means writing four
+///          methods where two would do. The synchronous pair is not a bare
+///          delegate: memory from allocate must be usable immediately on any
+///          stream, so the null-stream allocation has to be synchronized before
+///          it is returned. Omitting that synchronization yields memory that
+///          satisfies the concept but is not actually synchronous -- a race
+///          rather than a compile error -- so it lives here rather than being
+///          rewritten per resource.
+/// @code
+/// struct MyResource : nanovdb::cuda::SyncFromAsync<MyResource> {
+///     static constexpr size_t DEFAULT_ALIGNMENT = 256;
+///     void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream);
+///     void  deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream);
+///     // equality, as cuda::mr requires: stateless, so every instance is interchangeable
+///     friend bool operator==(const MyResource&, const MyResource&) { return true; }
+///     friend bool operator!=(const MyResource&, const MyResource&) { return false; }
+/// };
+/// @endcode
+template <class Derived>
+struct SyncFromAsync
+{
+    /// @brief Allocates @c bytes usable on any stream when this returns.
+    /// @param bytes number of bytes to allocate
+    /// @param alignment requested alignment
+    /// @note Every call synchronizes the null stream; on hot paths prefer the
+    ///       stream-ordered pair.
+    void* allocate(size_t bytes, size_t alignment)
+    {
+        void* p = static_cast<Derived&>(*this).allocate_async(bytes, alignment, cudaStream_t{0});
+        cudaCheck(cudaStreamSynchronize(cudaStream_t{0}));
+        return p;
+    }
+
+    /// @brief Frees @c p on the null stream.
+    /// @param p pointer previously returned by allocate
+    /// @param bytes size passed to the matching allocate
+    /// @param alignment alignment passed to the matching allocate
+    /// @note No synchronization here: the synchronous concept's contract is
+    ///       that the memory is already quiescent when deallocate is called.
+    void deallocate(void* p, size_t bytes, size_t alignment)
+    {
+        static_cast<Derived&>(*this).deallocate_async(p, bytes, alignment, cudaStream_t{0});
+    }
+};
+
+/// @brief Synchronous device memory resource backed by cudaMalloc/cudaFree.
+///        Models only the Resource concept: it never touches stream-ordered
+///        allocation, so it works on devices without memory-pool support
+///        (cudaDevAttrMemoryPoolsSupported == 0), where DeviceResource's
+///        cudaMallocAsync path fails by design. Pair with AsyncFromSync to
+///        drive the stream-ordered builders on such a device.
+class MallocResource
+{
+public:
+    // cudaMalloc aligns memory to 256 bytes by default
+    static constexpr size_t DEFAULT_ALIGNMENT = 256;
+
+    /// @brief Allocates @c bytes with cudaMalloc; valid on every stream when
+    ///        this returns. A zero request returns nullptr.
+    void* allocate(size_t bytes, size_t)
+    {
+        if (bytes == 0) return nullptr;
+        void* p = nullptr;
+        cudaCheck(cudaMalloc(&p, bytes));
+        return p;
+    }
+
+    /// @brief Frees @c p with cudaFree; the caller guarantees that device work
+    ///        touching the memory has completed.
+    void deallocate(void* p, size_t, size_t) { cudaCheck(cudaFree(p)); }
+
+    /// @brief Stateless: memory allocated through one instance may be
+    ///        deallocated through any other, so every two instances compare
+    ///        equal (the equality cuda::mr's resource concepts require).
+    friend bool operator==(const MallocResource&, const MallocResource&) { return true; }
+    friend bool operator!=(const MallocResource&, const MallocResource&) { return false; }
+};// MallocResource
+
+/// @brief Wrapper presenting a synchronous resource as a stream-ordered one,
+///        so it can drive components that require the AsyncResource concept
+///        (TempPool and the GPU builders).
+/// @tparam R the wrapped synchronous resource, held by value; wrap a
+///         ResourceRef<R> to borrow a stateful instance instead.
+/// @details The mirror of SyncFromAsync, and the analog of cuda::mr's
+///          synchronous_resource_adapter. allocate_async forwards to
+///          R::allocate, whose memory is immediately valid on every stream --
+///          a stronger guarantee than stream-ordering requires.
+///          deallocate_async synchronizes @c stream before R::deallocate,
+///          establishing the quiescence the synchronous contract demands.
+/// @warning Every deallocation synchronizes its stream, so expect
+///          serialization relative to a genuinely stream-ordered resource.
+///          That is the unavoidable cost of a synchronous backend under a
+///          stream-ordered algorithm; this wrapper exists so the cost is
+///          explicit and chosen by the caller -- e.g. on a device without
+///          memory-pool support -- rather than silently substituted.
+template<class R>
+struct AsyncFromSync
+{
+    static_assert(is_resource<R>::value,
+                  "AsyncFromSync requires R to model the synchronous Resource concept");
+
+    static constexpr size_t DEFAULT_ALIGNMENT = R::DEFAULT_ALIGNMENT;
+
+    /// @brief The adapter is host-accessible iff the adapted resource is.
+    static constexpr bool HOST_ACCESSIBLE = is_host_accessible_resource<R>::value;
+    static constexpr bool DEVICE_ACCESSIBLE = is_device_accessible_resource<R>::value;
+
+    R resource;
+
+    /// @brief Allocates through the synchronous resource; the result is valid
+    ///        on every stream, hence trivially valid on @c stream.
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t) { return resource.allocate(bytes, alignment); }
+
+    /// @brief Synchronizes @c stream, then frees through the synchronous
+    ///        resource -- the synchronize makes the quiescence contract hold.
+    ///        Null is a no-op and skips the synchronize.
+    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream)
+    {
+        if (p == nullptr) return;
+        cudaCheck(cudaStreamSynchronize(stream));
+        resource.deallocate(p, bytes, alignment);
+    }
+
+    /// @brief Synchronous pair, forwarding to the wrapped resource.
+    void* allocate(size_t bytes, size_t alignment) { return resource.allocate(bytes, alignment); }
+    void  deallocate(void* p, size_t bytes, size_t alignment) { resource.deallocate(p, bytes, alignment); }
+
+    /// @brief Two adapters compare equal iff their wrapped resources do;
+    ///        present only when @c R itself is equality-comparable.
+    template<class S = R, std::enable_if_t<is_equality_comparable_resource<S>::value, int> = 0>
+    friend bool operator==(const AsyncFromSync& lhs, const AsyncFromSync& rhs) { return lhs.resource == rhs.resource; }
+    template<class S = R, std::enable_if_t<is_equality_comparable_resource<S>::value, int> = 0>
+    friend bool operator!=(const AsyncFromSync& lhs, const AsyncFromSync& rhs) { return !(lhs.resource == rhs.resource); }
+};// AsyncFromSync<R>
+
+/// @brief Non-owning reference to a memory resource that is itself a resource:
+///        copying the ref shares the underlying resource rather than copying it.
+/// @tparam R the referenced resource type
+/// @details Types that hold their resource by value -- cuda::Buffer, matching
+///          cuda::buffer -- select their ownership semantics by what is placed
+///          in that slot: a concrete resource is owned as a copy, while a
+///          ResourceRef borrows. This is the same division cuda::mr draws
+///          between any_resource (owning) and resource_ref (borrowing), and the
+///          same shape as std::pmr::polymorphic_allocator over memory_resource*.
+///          Use it when a resource is stateful or long-lived and a container
+///          must allocate through *that* instance rather than a copy of it.
+/// @warning The referenced resource must outlive every use of this ref and of
+///          all copies of it, including any container holding one.
+/// @deprecated A referenced resource without operator== is deprecated;
+///             14.0 requires it.
+template <class R>
+struct ResourceRef
+{
+    static_assert(is_async_resource<R>::value || is_resource<R>::value,
+                  "ResourceRef requires R to model the AsyncResource or the Resource concept");
+
+    static constexpr size_t DEFAULT_ALIGNMENT = R::DEFAULT_ALIGNMENT;
+
+    /// @brief A reference is host-accessible iff the referenced resource is.
+    static constexpr bool HOST_ACCESSIBLE = is_host_accessible_resource<R>::value;
+    static constexpr bool DEVICE_ACCESSIBLE = is_device_accessible_resource<R>::value;
+
+    /// @brief Constructs a ref borrowing @c resource.
+    /// @param resource resource to allocate from; must outlive this ref
+    template<class S = R, std::enable_if_t<is_equality_comparable_resource<S>::value, int> = 0>
+    ResourceRef(R& resource) : mResource(&resource) {}
+
+    /// @brief Constructs a ref for NanoVDB's own components; see detail::borrowInternal.
+    ResourceRef(R& resource, detail::InternalRef) : mResource(&resource) {}
+
+    /// @brief Constructs a ref borrowing a resource without operator==.
+    /// @deprecated 14.0 requires operator== on every resource.
+    template<class S = R, std::enable_if_t<!is_equality_comparable_resource<S>::value, int> = 0>
+    NANOVDB_DEPRECATED_RESOURCE_WITHOUT_EQUALITY
+    ResourceRef(R& resource) : mResource(&resource) {}
+
+    /// @{
+    /// @brief Stream-ordered pair, present only when @c R models AsyncResource,
+    ///        so a ref over a synchronous resource does not misreport its tier.
+    template<class S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream)
+    {
+        return mResource->allocate_async(bytes, alignment, stream);
+    }
+    template<class S = R, std::enable_if_t<is_async_resource<S>::value, int> = 0>
+    void deallocate_async(void* p, size_t bytes, size_t alignment, cudaStream_t stream)
+    {
+        mResource->deallocate_async(p, bytes, alignment, stream);
+    }
+    /// @}
+
+    /// @brief Synchronous pair, forwarding to the referenced resource.
+    void* allocate(size_t bytes, size_t alignment) { return mResource->allocate(bytes, alignment); }
+    void  deallocate(void* p, size_t bytes, size_t alignment) { mResource->deallocate(p, bytes, alignment); }
+
+    /// @brief Two refs compare equal iff memory allocated through one may be
+    ///        deallocated through the other: they reference the same resource,
+    ///        or resources that compare equal. As cuda::mr::resource_ref does,
+    ///        this compares the referenced resources when @c R provides
+    ///        operator==; otherwise only identity can establish it.
+    friend bool operator==(ResourceRef lhs, ResourceRef rhs)
+    {
+        if (lhs.mResource == rhs.mResource) return true;
+        if constexpr (is_equality_comparable_resource<R>::value) return *lhs.mResource == *rhs.mResource;
+        else return false;
+    }
+    friend bool operator!=(ResourceRef lhs, ResourceRef rhs) { return !(lhs == rhs); }
+
+private:
+    R* mResource;
+};// ResourceRef<R>
+
+namespace detail {
+
+/// @brief Returns a ResourceRef to @c resource for NanoVDB's own components;
+///        constructing it does not warn.
+template<class R>
+ResourceRef<R> borrowInternal(R& resource) { return ResourceRef<R>(resource, internalRef); }
+
+}// namespace detail
 
 }
 
 } // namespace nanovdb::cuda
+
+#undef NANOVDB_DEPRECATED_RESOURCE_WITHOUT_EQUALITY
 
 #endif // end of NANOVDB_CUDA_DEVICERESOURCE_H_HAS_BEEN_INCLUDED

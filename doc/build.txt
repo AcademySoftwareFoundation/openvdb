@@ -10,6 +10,7 @@
   - @ref buildBloscSupport
   - @ref buildZLibSupport
   - @ref buildVCPKG
+  - @ref buildSimd
 - @ref buildComponents
 - @ref buildGuide
   - @ref buildBuildTypes
@@ -170,6 +171,49 @@ It is recommended to set the VCPKG_DEFAULT_TRIPLET=x64-windows environment
 variable to use 64-bit libraries by default as even on a 64-bit Windows OS,
 VCPKG builds and installs 32-bit libraries by default.
 
+@subsection buildSimd Building With Target ISA Support
+
+@warning OpenVDB does not perform host CPU ISA detection during configuration
+or build. The selected ISA is treated as a deployment target and must be chosen
+explicitly by the user.
+
+OpenVDB currently only natively supports targeted ISA selection on x86. You can
+continue to provide any flags you like via `-DCXXFLAGS`, but we recommend using
+the available options to better specify intent, when building for a specific
+x86 ISA. The following table lists the available x86 ISA controls.
+
+Build Flag                    | Description                                               |
+----------------------------- | --------------------------------------------------------- |
+`-DUSE_VCL=ON`                | Use the internal copy of Agner Fog's VCL                  |
+`-DOPENVDB_X86_INSTRSET=0`    | Unknown or unspecified                                    |
+`-DOPENVDB_X86_INSTRSET=1`    | SSE, `-msse`                                              |
+`-DOPENVDB_X86_INSTRSET=2`    | ^, SSE2, `-msse2` # Minimum on x86_64                     |
+`-DOPENVDB_X86_INSTRSET=3`    | ^, SSE3, `-msse3`                                         |
+`-DOPENVDB_X86_INSTRSET=4`    | ^, SSSE3, `-mssse3`                                       |
+`-DOPENVDB_X86_INSTRSET=5`    | ^, SSE4.1, `-msse4.1`                                     |
+`-DOPENVDB_X86_INSTRSET=6`    | ^, SSE4.2, `-msse4.2`                                     |
+`-DOPENVDB_X86_INSTRSET=7`    | ^, AVX, `-mavx`                                           |
+`-DOPENVDB_X86_INSTRSET=8`    | ^, AVX2, `-mavx2`                                         |
+`-DOPENVDB_X86_INSTRSET=9`    | ^, AVX512F, `-mavx512f`                                   |
+`-DOPENVDB_X86_INSTRSET=10`   | ^, AVX512BW/DQ/VL, `-mavx512bw` `-mavx512dq` `-mavx512vl` |
+
+The recommended configuration depends on the intended deployment target. See also the
+section on [SIMD in OpenVDB](@ref simdInOpenVDB) for more details.
+
+Deployment Target                        | Recommended Options                        |
+---------------------------------------- | -------------------------------------------|
+Maximum runtime deployment compatibility | Default configuration                      |
+Modern x86 CPUs                          | `-DOPENVDB_X86_INSTRSET=6`                 |
+Explicit SIMD on x86                     | `-DUSE_VCL=ON` `-DOPENVDB_X86_INSTRSET=6`  |
+Explicit SIMD on AVX hardware            | `-DUSE_VCL=ON` `-DOPENVDB_X86_INSTRSET=7`  |
+Explicit SIMD on AVX2 hardware           | `-DUSE_VCL=ON` `-DOPENVDB_X86_INSTRSET=8`  |
+Explicit SIMD on AVX512 hardware         | `-DUSE_VCL=ON` `-DOPENVDB_X86_INSTRSET=10` |
+
+In general, users are encouraged to target the oldest ISA that is known to be
+available on all deployment systems. Building for a newer ISA than is supported
+by the target CPU may result in illegal instruction at runtime.
+
+
 @section buildComponents OpenVDB Components
 
 The following table lists all targets (mainly library and binary components)
@@ -255,7 +299,6 @@ Package        | Description                                                    
 -------------- | --------------------------------------------------------------- | ------------------ |
 CMake          | Cross-platform family of tools designed to help build software  | All                |
 C++17 Compiler | Matching Houdini compiler and version                           | All                |
-Boost          | Components: iostreams                                           | All                |
 GoogleTest     | A unit testing framework module for C++                         | Unit Tests         |
 GLFW           | Simple API for OpenGL development                               | OpenVDB View       |
 Doxygen        | Documentation generation from C++                               | Documentation      |
@@ -299,15 +342,12 @@ Optional:
   - @b USE_DEFAULT_HOUDINI_INSTALL =`ON` # Use the above default locations if
   @b OPENVDB_HOUDINI_INSTALL_PREFIX is not specified. If `OFF`, uses the value
   of @b CMAKE_INSTALL_PREFIX.
-  - @b BOOST_ROOT =`/path/to/boost/install` # Path to boost. May not be required,
- CMake may find it automatically
 
 For example on MacOS and where the build folder has been created inside the
 OpenVDB source root:
 
 @code
-cmake -D BOOST_ROOT=/path/to/boost/install \
-      -D Houdini_ROOT=/Applications/Houdini/Houdini17.0.506/ \
+cmake -D Houdini_ROOT=/Applications/Houdini/Houdini17.0.506/ \
       -D USE_HOUDINI=ON \
       ../
 @endcode
@@ -343,7 +383,6 @@ Package        | Description                                                    
 -------------- | ---------------------------------------------------------------   | -------------------------------- |
 CMake          | Cross-platform family of tools designed to help build software    | All                              |
 C++17 Compiler | Matching Houdini compiler and version                             | All                              |
-Boost          | Components: iostreams                                             | All                              |
 ZLIB           | Compression library for disk serialization compression            | All                              |
 Blosc          | Recommended dependency for improved disk compression              | All*                             |
 GoogleTest     | A unit testing framework module for C++                           | Unit Tests                       |
@@ -358,7 +397,7 @@ LLVM           | Target-independent code generation                             
 
 * See [blosc support](@ref buildBloscSupport)
 
-At a minimum, boost, a matching C++17 compiler, ZLIB, blosc and CMake will be
+At a minimum, a matching C++17 compiler, ZLIB, blosc and CMake will be
 required. See the full [dependency list](@ref dependencies) for help with
 downloading and installing the above software.
 
@@ -386,15 +425,12 @@ Optional:
  the link for default values.
   - @b OPENVDB_MAYA_INSTALL_PREFIX =`/path/to/install/dir` # The location to
  install the Maya plugin to. Defaults to the value of `${CMAKE_INSTALL_PREFIX}/maya${Maya_VERSION}`
-  - @b BOOST_ROOT =`/path/to/boost/install` # Path to boost. May not be required,
- CMake may find it automatically
 
 For example on MacOS and where the build folder has been created inside the
 OpenVDB source root:
 
 @code
-cmake -D BOOST_ROOT=/path/to/boost/install \
-      -D Maya_ROOT=/Applications/Autodesk/maya2019/ \
+cmake -D Maya_ROOT=/Applications/Autodesk/maya2019/ \
       -D USE_MAYA=ON \
       ../
 @endcode
@@ -578,37 +614,6 @@ are otherwise required for compatibility. Although not recommended, you can
 bypass these checks with `-D DISABLE_DEPENDENCY_VERSION_CHECKS=ON` if necessary.
 Note that using older or untested dependencies may produce undesired behavior.
 Older versions in particular are not supported by OpenVDB.
-
-@b Note: Boost will produce a version error in the format: `Detected version of Boost is too old.`
-
-@subsection troubleshoot3 CMake warnings/errors in FindBoost.cmake
-
-There are a variety of potential warnings and errors that may arise from the
-version compatibility of Boost and CMake. These are related to how both Boost
-and CMake have historically been kept in sync. A common warning and error
-combination is:
-
-@code{.sh}
-  CMake Warning at ...  Imported targets not available for Boost version XXXXXX
-  ...
-  Target "..." links to target "Boost::XXX" but the target
-  was not found.  Perhaps a find_package() call is missing for an IMPORTED
-  target, or an ALIAS target is missing?
-@endcode
-
-OpenVDB uses [imported targets](https://cmake.org/cmake/help/latest/command/add_library.html#imported-libraries)
-for all its dependencies. For imported Boost compatibility, the following
-versions of CMake are required:
-
-  - Boost 1.82 requires CMake 3.27.0 or newer.
-  - Boost 1.83 requires CMake 3.27.4 or newer.
-  - Boost 1.84 requires CMake 3.28.2 or newer.
-  - Boost 1.85 requires CMake 3.29.3 or newer.
-  - Boost 1.86 requires CMake 3.30.6, 3.31.1, or newer.
-  - Boost 1.87 requires CMake 3.31.4 or newer.
-
-Use the above list to identify the version of CMake you require for your version
-of Boost. Note that this may be implemented into the OpenVDB CMake in the future.
 
 @subsection troubleshoot4 Detected VCPKG toolchain is using a mismatching triplet for OpenVDB build artifacts
 

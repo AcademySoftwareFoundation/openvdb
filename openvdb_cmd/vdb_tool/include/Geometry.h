@@ -29,6 +29,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <limits>
+#include <cstring>
 #include <cstdlib> // for std::malloc and std::free
 
 #include <tbb/parallel_for.h>
@@ -82,7 +84,6 @@
 #include "pdal/PipelineManager.hpp"
 #include "pdal/PipelineReaderJSON.hpp"
 #include "pdal/util/FileUtils.hpp"
-#include <sstream>
 #endif
 
 #if defined(_WIN32)
@@ -220,6 +221,9 @@ public:
     ///        binary buffer allocation fails, or polygons exceed the supported maximum.
     void readPLY(const std::string &fileName);
     /// @brief Read a binary or ASCII STL file (format auto-detected).
+    /// @note If the binary header overstates the triangle count, read the available
+    ///       complete records and warn that geometry may be incomplete. Partial records
+    ///       and data beyond the declared triangle count are rejected.
     /// @throw std::runtime_error if the file cannot be opened or is unexpectedly empty.
     /// @throw std::invalid_argument if the binary file is malformed, host is big-endian,
     ///        or the ASCII file contains unsupported n-gons.
@@ -391,7 +395,7 @@ struct Geometry::Header
     uint64_t size() const { return sizeof(*this) + name + sizeof(BBoxT) + sizeof(PosT)*vtx + sizeof(Vec3I)*tri + sizeof(Vec4I)*quad;}
 };// Geometry::Header
 
-size_t Geometry::writeGEO(std::ostream &os) const
+inline size_t Geometry::writeGEO(std::ostream &os) const
 {
     Header header(*this);// followed by name, bbox, vtx, tri, quad
     os.write((const char*)&header, sizeof(Header));
@@ -403,7 +407,7 @@ size_t Geometry::writeGEO(std::ostream &os) const
     return header.size();
 }// Geometry::write
 
-size_t Geometry::readGEO(std::istream &is)
+inline size_t Geometry::readGEO(std::istream &is)
 {
     Header header;
     if (!is.read((char*)&header, sizeof(Header)) || header.magic != Header::sMagic) {
@@ -423,7 +427,7 @@ size_t Geometry::readGEO(std::istream &is)
     return header.size();
 }// Geometry::read
 
-void Geometry::clear()
+inline void Geometry::clear()
 {
     mName.clear();
     mBBox = BBoxT();//invalidate BBox
@@ -432,7 +436,7 @@ void Geometry::clear()
     mQuad.clear();
 }// Geometry::clear
 
-const math::BBox<Vec3s>& Geometry::bbox() const
+inline const math::BBox<Vec3s>& Geometry::bbox() const
 {
     if (mBBox) return mBBox;// early termination if it was already computed
 #if 0
@@ -452,13 +456,13 @@ const math::BBox<Vec3s>& Geometry::bbox() const
     return mBBox;
 }// Geometry::bbox
 
-float Geometry::maxLength() const
+inline float Geometry::maxLength() const
 {
     const math::BBox<Vec3s>& bbox = this->bbox();
     return bbox.extents()[bbox.maxExtent()];
 }
 
-void Geometry::write(const std::string &fileName, bool ascii) const
+inline void Geometry::write(const std::string &fileName, bool ascii) const
 {
     switch (findFileExt(fileName, {"geo", "obj", "ply", "stl", "abc", "off"})) {
     case 1:
@@ -484,7 +488,7 @@ void Geometry::write(const std::string &fileName, bool ascii) const
     }
 }// Geometry::write
 
-void Geometry::writePLY(const std::string &fileName, bool ascii) const
+inline void Geometry::writePLY(const std::string &fileName, bool ascii) const
 {
     if (fileName == "stdout.ply") {
         //if (isatty(fileno(stdout))) throw std::invalid_argument("writePLY: stdout is not connected to the terminal!");
@@ -496,7 +500,7 @@ void Geometry::writePLY(const std::string &fileName, bool ascii) const
     }
 }// Geometry::writePLY
 
-void Geometry::writePLY(std::ostream &os, bool ascii) const
+inline void Geometry::writePLY(std::ostream &os, bool ascii) const
 {
     os << "ply\nformat ";
     if (ascii) {
@@ -536,7 +540,7 @@ void Geometry::writePLY(std::ostream &os, bool ascii) const
     }
 }// Geometry::writePLY
 
-void Geometry::writeOBJ(const std::string &fileName) const
+inline void Geometry::writeOBJ(const std::string &fileName) const
 {
     if (fileName=="stdout.obj") {
         //if (isatty(fileno(stdout))) throw std::invalid_argument("writeOBJ: stdout is not connected to the terminal!");
@@ -548,7 +552,7 @@ void Geometry::writeOBJ(const std::string &fileName) const
     }
 }// Geometry::writeOBJ
 
-void Geometry::writeOBJ(std::ostream &os) const
+inline void Geometry::writeOBJ(std::ostream &os) const
 {
     os << "# obj file created by vdb_tool\n";
     for (auto &v : mVtx)  os << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
@@ -556,7 +560,7 @@ void Geometry::writeOBJ(std::ostream &os) const
     for (auto &q : mQuad) os << "f " << q[0]+1 << " " << q[1]+1 << " " << q[2]+1 << " " << q[3]+1 << "\n";// obj is 1-based
 }// Geometry::writeOBJ
 
-void Geometry::writeOFF(const std::string &fileName) const
+inline void Geometry::writeOFF(const std::string &fileName) const
 {
     if (fileName=="stdout.off") {
         this->writeOFF(std::cout);
@@ -567,7 +571,7 @@ void Geometry::writeOFF(const std::string &fileName) const
     }
 }// Geometry::writeOFF
 
-void Geometry::writeOFF(std::ostream &os) const
+inline void Geometry::writeOFF(std::ostream &os) const
 {
     os << "OFF\n# Created by vdb_tool\n";
     os << mVtx.size() << " " << (mTri.size() + mQuad.size()) << " " << 0 << "\n";
@@ -576,7 +580,7 @@ void Geometry::writeOFF(std::ostream &os) const
     for (auto &q : mQuad) os << "4 " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << "\n";
 }// Geometry::writeOFF
 
-void Geometry::writeSTL(const std::string &fileName) const
+inline void Geometry::writeSTL(const std::string &fileName) const
 {
     if (fileName == "stdout.stl") {
         //if (isatty(fileno(stdout))) throw std::invalid_argument("writeSTL: stdout is not connected to the terminal!");
@@ -588,7 +592,7 @@ void Geometry::writeSTL(const std::string &fileName) const
     }
 }// Geometry::writeSTL
 
-void Geometry::writeSTL(std::ostream &os) const
+inline void Geometry::writeSTL(std::ostream &os) const
 {
     if (!isLittleEndian()) throw std::invalid_argument("STL file only supports little endian, but this system is big endian");
     if (!mQuad.empty()) throw std::invalid_argument("Binary STL files only supports triangles, but the mesh contains quads:. Hint: call quad2tri");
@@ -609,7 +613,7 @@ void Geometry::writeSTL(std::ostream &os) const
     }
 }// Geometry::writeSTL
 
-void Geometry::writeGEO(const std::string &fileName) const
+inline void Geometry::writeGEO(const std::string &fileName) const
 {
     if (fileName == "stdout.geo") {
         //if (isatty(fileno(stdout))) throw std::invalid_argument("writeGEO: stdout is not connected to the terminal!");
@@ -621,7 +625,7 @@ void Geometry::writeGEO(const std::string &fileName) const
     }
 }// Geometry::writeGEO
 
-void Geometry::read(const std::string &fileName, int verbose)
+inline void Geometry::read(const std::string &fileName, int verbose)
 {
     mVerbose = verbose;
     switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "vdb", "nvdb", "geo", "off", "xyz", "usd", "usda", "usdc", "usdz", "gltf", "glb"})) {
@@ -669,7 +673,7 @@ void Geometry::read(const std::string &fileName, int verbose)
     }// end switch over file extensions
 }// Geometry::read
 
-void Geometry::readOBJ(const std::string &fileName)
+inline void Geometry::readOBJ(const std::string &fileName)
 {
     if (fileName == "stdin.obj") {
         //if (isatty(fileno(stdin))) throw std::invalid_argument("readOBJ: stdin is not connected to the terminal!");
@@ -681,7 +685,7 @@ void Geometry::readOBJ(const std::string &fileName)
     }
 }// Geometry::readOBJ
 
-void Geometry::readOBJ(std::istream &is)
+inline void Geometry::readOBJ(std::istream &is)
 {
     Vec3f p;// coordinates
     Vec3s c;// color
@@ -717,7 +721,7 @@ void Geometry::readOBJ(std::istream &is)
 
 // Works with multiple file formats, e.g. ply, obj, stl, hdf, matlab, numpy, pts, ptx, e57, las, laz
 // Note, currently it only reads vertices and optionally colors
-bool Geometry::readPDAL(const std::string &fileName)
+inline bool Geometry::readPDAL(const std::string &fileName)
 {
  #if VDB_TOOL_USE_PDAL
     if (!pdal::FileUtils::fileExists(fileName)) {
@@ -774,7 +778,7 @@ bool Geometry::readPDAL(const std::string &fileName)
     return true;
 }// Geometry::readPDAL
 
-void Geometry::readOFF(const std::string &fileName)
+inline void Geometry::readOFF(const std::string &fileName)
 {
     if (fileName == "stdin.off") {
         this->readOFF(std::cin);
@@ -785,44 +789,61 @@ void Geometry::readOFF(const std::string &fileName)
     }
 }// Geometry::readOFF
 
-void Geometry::readOFF(std::istream &is)
+inline void Geometry::readOFF(std::istream &is)
 {
     // read header
     std::string line;
-    if (!std::getline(is, line) || (line != "OFF" && line != "NOFF")) {// NOFF includes normals after the x y z coordinates
+    std::getline(is, line);
+    if (!line.empty() && line.back() == '\r') line.pop_back();// CRLF on binary stdin
+    if (!is || (line != "OFF" && line != "NOFF")) {// NOFF includes normals after the x y z coordinates
         throw std::invalid_argument("Geometry::readOFF: expected header \"OFF\" but read \"" + line + "\"");
     }
 
+    // Read the next line that is neither blank nor a comment. Binary stdin keeps the
+    // CR of CRLF line endings, so a blank line can arrive as "\r".
+    auto nextLine = [&is, &line]() {
+        while (std::getline(is, line)) {
+            const size_t start = line.find_first_not_of(" \t\r");
+            if (start != std::string::npos && line[start] != '#') return true;
+        }
+        throw std::invalid_argument("Geometry::readOFF: unexpected end of file");
+    };
+
     // read vertex and face counts
     size_t vtxCount=0, faceCount=0, edgeCount=0, nGon=0;
-    while (vtxCount == 0 && std::getline(is, line)) {
-        if (line.empty() || line[0] == '#') continue;
+    nextLine();
+    {
         std::istringstream iss(line);
-        iss >> vtxCount >> faceCount >> edgeCount;
+        if (!(iss >> vtxCount >> faceCount)) {
+            throw std::invalid_argument("Geometry::readOFF: invalid vertex and face counts \"" + line + "\"");
+        }
+        iss >> edgeCount;// optional and unused
     }
 
     // read vertices
     Vec3f p;
     vtxCount += mVtx.size();
-    while (mVtx.size() < vtxCount && std::getline(is, line)) {
-        if (line.empty() || line[0] == '#') continue;
+    while (mVtx.size() < vtxCount) {
+        nextLine();
         std::istringstream iss(line);
-        iss >> p[0] >> p[1] >> p[2];
+        if (!(iss >> p[0] >> p[1] >> p[2])) {
+            throw std::invalid_argument("Geometry::readOFF: invalid vertex \"" + line + "\"");
+        }
         mVtx.push_back(p);
     }
 
     // read faces
     int f[4];
     faceCount += mTri.size() + mQuad.size();
-    while (mTri.size() + mQuad.size() < faceCount && std::getline(is, line)) {
-        if (line.empty() || line[0] == '#') continue;
+    while (mTri.size() + mQuad.size() < faceCount) {
+        nextLine();
         std::istringstream iss(line);
-        iss >> nGon;
+        if (!(iss >> nGon)) throw std::invalid_argument("Geometry::readOFF: invalid face \"" + line + "\"");
         if (nGon == 3) {
-            iss >> f[0] >> f[1] >> f[2];
+            if (!(iss >> f[0] >> f[1] >> f[2])) throw std::invalid_argument("Geometry::readOFF: invalid face \"" + line + "\"");
             mTri.emplace_back(f[0],f[1],f[2]);
         } else if (nGon == 4) {
-            iss >> f[0] >> f[1] >> f[2] >> f[3];
+            if (!(iss >> f[0] >> f[1] >> f[2] >> f[3])) throw std::invalid_argument("Geometry::readOFF: invalid face \"" + line + "\"");
             mQuad.emplace_back(f[0],f[1],f[2],f[3]);
         } else {
             throw std::invalid_argument("Geometry::readOFF: " + std::to_string(nGon) + "-gons are not supported");
@@ -831,7 +852,7 @@ void Geometry::readOFF(std::istream &is)
     mBBox = BBoxT();//invalidate BBox
 }// Geometry::readOFF
 
-void Geometry::readXYZ(const std::string &fileName)
+inline void Geometry::readXYZ(const std::string &fileName)
 {
     if (fileName == "stdin.xyz") {
         this->readXYZ(std::cin);
@@ -846,12 +867,13 @@ void Geometry::readXYZ(const std::string &fileName)
 xyz files are loosely defined as ascii files with x y z coordinates, possibly followed by rgb or normals
 Empty lines and lines beginning with # ignored
 */
-void Geometry::readXYZ(std::istream &is)
+inline void Geometry::readXYZ(std::istream &is)
 {
     std::string line;
     Vec3f p;
     while (std::getline(is, line)) {
-        if (line.empty() || line[0] == '#') continue;
+        const size_t start = line.find_first_not_of(" \t\r");// binary stdin keeps CR of CRLF
+        if (start == std::string::npos || line[start] == '#') continue;
         std::istringstream iss(line);
         if (iss >> p[0] >> p[1] >> p[2]) {
             mVtx.push_back(p);
@@ -862,7 +884,7 @@ void Geometry::readXYZ(std::istream &is)
     mBBox = BBoxT();//invalidate BBox
 }// Geometry::readXYZ
 
-void Geometry::readPLY(const std::string &fileName)
+inline void Geometry::readPLY(const std::string &fileName)
 {
     if (fileName == "stdin.ply") {
         //if (isatty(fileno(stdin))) throw std::invalid_argument("readPLY: stdin is not connected to the terminal!");
@@ -874,15 +896,16 @@ void Geometry::readPLY(const std::string &fileName)
     }
 }// Geometry::readPLY
 
-void Geometry::readPLY(std::istream &is)
+inline void Geometry::readPLY(std::istream &is)
 {
     auto tokenize_line = [&is]() {
         std::string line, token;
-        std::getline(is, line);
+        if (!std::getline(is, line))
+            throw std::invalid_argument("Geometry::readPLY: unexpected end of file");
         std::istringstream iss(line);
         std::vector<std::string> tokens;
         while (iss >> token) tokens.push_back(token);
-        if (tokens.empty()) tokens.emplace_back("comment empty");
+        if (tokens.empty()) tokens = {"comment", "empty"};
         return tokens;// move semantics
     };
     auto tokens = tokenize_line();
@@ -904,6 +927,20 @@ void Geometry::readPLY(std::istream &is)
         if ( test(i, {"uchar", "int8"}) )     return 1;
         error("vdb_tool::readPLY: unsupported type");
         return 0;
+    };
+    auto count = [&tokens, error](size_t limit) {
+        if (tokens.size() != 3) error("Geometry::readPLY: expected an element name and count");
+        size_t pos = 0;
+        const auto n = std::stoll(tokens[2], &pos);
+        if (pos != tokens[2].size() || n < 0 || static_cast<uint64_t>(n) > limit)
+            error("Geometry::readPLY: invalid element count");
+        return static_cast<size_t>(n);
+    };
+    auto readExact = [&is](void *buffer, size_t bytes) {
+        if (bytes > static_cast<size_t>(std::numeric_limits<std::streamsize>::max()))
+            throw std::invalid_argument("Geometry::readPLY: binary record is too large");
+        if (bytes && !is.read(static_cast<char*>(buffer), static_cast<std::streamsize>(bytes)))
+            throw std::invalid_argument("Geometry::readPLY: truncated binary data");
     };
 
     // check header
@@ -927,7 +964,7 @@ void Geometry::readPLY(std::istream &is)
     // header: https://www.mathworks.com/help/vision/ug/the-ply-format.html
     size_t vtxCount = 0, faceCount = 0;
     int vtxStride=0, vtxProps=0;// byte size of all vtx properties, number of vertex properties
-    struct Triplet {int offset, id, size;} xyz[3];// byte offset, id#, byte size
+    struct Triplet {int offset, id, size; bool isInt;} xyz[3] = {};// byte offset, id#, byte size, int32 vs float type
     struct Skip {int count, bytes;} faceSkip[2]={{0,0},{0,0}};// head, {faces}, tail
 
     // parse header with vertex, face and property information
@@ -936,7 +973,8 @@ void Geometry::readPLY(std::istream &is)
     while(run) {
         if ( test(0, {"element"}) ) {
             if ( test(1, {"vertex"}) ) {
-                vtxCount = std::stoll(tokens[2]);
+                vtxCount = count(std::min(mVtx.max_size(),
+                    static_cast<size_t>(std::numeric_limits<int>::max())));
                 const std::string axis[3] = {"x", "y", "z"};
                 while(true) {
                     tokens = tokenize_line();
@@ -946,15 +984,18 @@ void Geometry::readPLY(std::istream &is)
                     } else if ( test(0, {"element"}) ) {
                         break;
                     } else if ( test(0, {"property"}) ) {
-                        Triplet t{vtxStride, vtxProps++, sizeOf(1)};
+                        if (tokens.size() != 3) error("Geometry::readPLY: invalid vertex property");
+                        Triplet t{vtxStride, vtxProps++, sizeOf(1), test(1, {"int", "int32"})};
                         for (int i=0; i<3; ++i) if (test(2, {axis[i]})) xyz[i] = t;
+                        if (vtxStride > std::numeric_limits<int>::max() - t.size)
+                            error("Geometry::readPLY: vertex record is too large");
                         vtxStride += t.size;
                     }
                 }
                 for (int i=0; i<3; ++i) if (xyz[i].size!=4 && xyz[i].size!=8) error("vdb_tool::readPLY: missing "+axis[i]+
                                                                                     " vertex coordinates or unsupported size "+std::to_string(xyz[i].size));
             } else if ( test(1, {"face"}) ) {
-                faceCount = std::stoll(tokens[2]);
+                faceCount = count(mTri.max_size());
                 int n = 0;// 0 is head and 1 is tail
                 while (true) {
                     tokens = tokenize_line();
@@ -977,6 +1018,7 @@ void Geometry::readPLY(std::istream &is)
                         }
                     }
                 }
+                if (faceCount && n == 0) error("Geometry::readPLY: missing face vertex indices");
             } else if ( test(1, {"edge", "material"}) ) {
                 while(true) {
                     tokens = tokenize_line();
@@ -1000,26 +1042,32 @@ void Geometry::readPLY(std::istream &is)
     // read vertex coordinates
     mVtx.resize(vtxCount);
     if (format) {// binary
-        if (xyz[0].offset==0 && xyz[1].offset==4 && xyz[2].offset==8 && vtxStride==12) {// most common case
-            is.read((char *)(mVtx.data()), vtxCount * 3 * sizeof(float));
+        if (xyz[0].offset==0 && xyz[1].offset==4 && xyz[2].offset==8 && vtxStride==12 &&
+            !xyz[0].isInt && !xyz[1].isInt && !xyz[2].isInt) {// most common case, i.e. 3 floats
+            if (vtxCount > std::numeric_limits<size_t>::max() / (3 * sizeof(float)))
+                error("Geometry::readPLY: vertex data is too large");
+            readExact(mVtx.data(), vtxCount * 3 * sizeof(float));
             if (reverseBytes) for (Vec3f &v : mVtx) swapBytes(&v[0], 3);
         } else {
-            char *buffer = static_cast<char*>(std::malloc(vtxCount*vtxStride)), *p = buffer;// uninitialized
-            if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate buffer");
-            is.read(buffer, vtxCount*vtxStride);
+            std::vector<char> buffer(vtxStride);
             for (Vec3f &vtx : mVtx) {
+                readExact(buffer.data(), buffer.size());
                 for (int i=0; i<3; ++i) {
-                    if (xyz[i].size == 4) {
-                        float v = *(float*)(p + xyz[i].offset);
+                    if (xyz[i].isInt) {
+                        int32_t v;
+                        std::memcpy(&v, buffer.data() + xyz[i].offset, sizeof(v));
+                        vtx[i] = float(reverseBytes ? swapBytes(v) : v);
+                    } else if (xyz[i].size == 4) {
+                        float v;
+                        std::memcpy(&v, buffer.data() + xyz[i].offset, sizeof(v));
                         vtx[i] = reverseBytes ? swapBytes(v) : v;
                     } else {
-                        double v = *(double*)(p + xyz[i].offset);
+                        double v;
+                        std::memcpy(&v, buffer.data() + xyz[i].offset, sizeof(v));
                         vtx[i] = float(reverseBytes ? swapBytes(v) : v);
                     }
                 }
-                p += vtxStride;
             }
-            std::free(buffer);
         }
 
     } else {// ascii vertices
@@ -1033,55 +1081,50 @@ void Geometry::readPLY(std::istream &is)
     // read polygon vertex lists
     static const int nGon = 10;// maximum allowed nGon
     uint32_t vtx[nGon];
+    auto appendFace = [&](int n) {
+        for (int i = 0; i < n; ++i) {
+            if (vtx[i] >= vtxCount) error("Geometry::readPLY: face vertex index out of range");
+        }
+        if (n == 3) mTri.emplace_back(vtx);
+        else if (n == 4) mQuad.emplace_back(vtx);
+        else Geometry::triangulate(reinterpret_cast<const int*>(vtx), n, mTri);
+    };
     if (format) {// binary
-        char *buffer = static_cast<char*>(std::malloc(faceSkip[0].bytes + 1));// uninitialized
-        if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate buffer");
+        std::vector<char> buffer(static_cast<size_t>(faceSkip[0].bytes) + 1);
         for (size_t i=0; i<faceCount; ++i) {
-            is.read(buffer, faceSkip[0].bytes + 1);// polygon size is encoded as a single char
-            const int n = (int)buffer[faceSkip[0].bytes];// char -> int
-            switch (n) {
-            case 3:
-                is.read((char*)vtx, 3*sizeof(uint32_t));
-                if (reverseBytes) swapBytes(vtx, 3);
-                mTri.emplace_back(vtx);
-                break;
-            case 4:
-                is.read((char*)vtx, 4*sizeof(uint32_t));
-                if (reverseBytes) swapBytes(vtx, 4);
-                mQuad.emplace_back(vtx);
-                break;
-            default:
-                if (n > nGon) throw std::invalid_argument("Geometry::readPLY: binary " + std::to_string(n) + "-gons are not supported");
-                if (mVerbose) std::clog << "Geometry::readPLY: binary triangulating " << n << "-gon\n";
-                is.read((char*)vtx, n*sizeof(uint32_t));
-                if (reverseBytes) swapBytes(vtx, n);
-                Geometry::triangulate(reinterpret_cast<const int*>(vtx), n, mTri);
-                break;
-            }
+            readExact(buffer.data(), buffer.size());// polygon size is an unsigned byte
+            const int n = static_cast<unsigned char>(buffer.back());
+            if (n < 3 || n > nGon)
+                throw std::invalid_argument("Geometry::readPLY: unsupported binary polygon size " + std::to_string(n));
+            readExact(vtx, n * sizeof(uint32_t));
+            if (reverseBytes) swapBytes(vtx, n);
+            appendFace(n);
             is.ignore(faceSkip[1].bytes);
+            if (is.gcount() != faceSkip[1].bytes)
+                throw std::invalid_argument("Geometry::readPLY: truncated face properties");
         }// loop over polygons
-        std::free(buffer);
     } else {// ascii format faces
         for (size_t i=0; i<faceCount; ++i) {
             tokens = tokenize_line();
+            if (tokens.size() <= static_cast<size_t>(faceSkip[0].count))
+                error("Geometry::readPLY: missing polygon size");
             const std::string polySize = tokens[faceSkip[0].count];
             const int n = std::stoi(polySize);
             if ( n < 3 || n > nGon) throw std::invalid_argument("Geometry::readPLY: ascii " + polySize + "-gons are not supported");
-            for (int i = 0, j=1+faceSkip[0].count; i<n; ++i, ++j) vtx[i] = static_cast<uint32_t>(std::stoll(tokens[j]));
-            if (n==3) {
-                mTri.emplace_back(vtx);
-            } else if (n==4) {
-                mQuad.emplace_back(vtx);
-            } else {
-                if (mVerbose) std::clog << "Geometry::readPLY: ascii triangulating " << n << "-gon\n";
-                Geometry::triangulate(reinterpret_cast<const int*>(vtx), n, mTri);
+            if (tokens.size() < static_cast<size_t>(faceSkip[0].count + 1 + n + faceSkip[1].count))
+                error("Geometry::readPLY: truncated ascii face");
+            for (int i = 0, j=1+faceSkip[0].count; i<n; ++i, ++j) {
+                const int index = strToInt(tokens[j]);
+                if (index < 0) error("Geometry::readPLY: negative face vertex index");
+                vtx[i] = static_cast<uint32_t>(index);
             }
+            appendFace(n);
         }// loop over polygons
     }
     mBBox = BBoxT();//invalidate BBox
 }// Geometry::readPLY
 
-void Geometry::readGEO(const std::string &fileName)
+inline void Geometry::readGEO(const std::string &fileName)
 {
     if (fileName == "stdin.geo") {
         //if (isatty(fileno(stdin))) throw std::invalid_argument("readGEO: stdin is not connected to the terminal!");
@@ -1094,11 +1137,11 @@ void Geometry::readGEO(const std::string &fileName)
 }//  Geometry::readGEO
 
 // Read vertices from all PointDataGrids in the specified file
-void Geometry::readVDB(const std::string &fileName)
+inline void Geometry::readVDB(const std::string &fileName)
 {
     initialize();
     io::File file(fileName);
-    file.open();// enables delayed loading by default
+    file.open();
     GridPtrVecPtr meta = file.readAllGridMetadata();
     for (auto m : *meta) {
         if (m->isType<points::PointDataGrid>()) {
@@ -1140,7 +1183,7 @@ x,y,z are coords in meters
 i is intensity, in range -2048 to +2047
 [r g b] is optional color, and if present each part is in the range 0-255
 */
-void Geometry::readPTS(const std::string &fileName)
+inline void Geometry::readPTS(const std::string &fileName)
 {
     std::ifstream infile(fileName, std::ios::in);
     if (!infile.is_open()) throw std::runtime_error("Error opening particle file \""+fileName+"\"");
@@ -1174,19 +1217,21 @@ void Geometry::readPTS(const std::string &fileName)
 }// readPTS
 
 // Reading ASCII or binary STL file
-void Geometry::readSTL(const std::string &fileName)
+inline void Geometry::readSTL(const std::string &fileName)
 {
     std::ifstream infile(fileName, std::ios::in | std::ios::binary);
     if (!infile.is_open()) throw std::runtime_error("Geometry::readSTL: Error opening STL file \""+fileName+"\"");
     PosT xyz;
     std::array<char, 256> buffer{};
-    if (!infile.read(buffer.data(), buffer.size())) {
-        throw std::runtime_error("Geometry::readSTL: Failed to read 256B in \""+fileName+"\" so this must be an empty STL file");
+    infile.read(buffer.data(), buffer.size());
+    const std::streamsize bytesRead = infile.gcount();
+    if (infile.bad() || bytesRead == 0) {
+        throw std::runtime_error("Geometry::readSTL: Failed to read header in \""+fileName+"\"");
     }
     infile.clear();
     infile.seekg(0, std::ios_base::beg);// rewind
     auto isAscii = [&]()->bool{
-        std::string str(buffer.data(), infile.gcount());
+        std::string str(buffer.data(), static_cast<size_t>(bytesRead));
         toLowerCase(str);
         return contains(str, "solid") && contains(str, '\n') && contains(str, "facet") && contains(str, "normal");
     };
@@ -1195,12 +1240,12 @@ void Geometry::readSTL(const std::string &fileName)
         std::getline(infile, line);// read the first line, which completes the header
         std::istringstream iss;
         while(std::getline(infile, line)) {
-            std::string tmp = trim(line, " ");// remove leading (and trailing) white spaces
+            std::string tmp = trim(line);// remove leading (and trailing) whitespace
             if (tmp.compare(0, 5, "facet")==0) {
-                while (std::getline(infile, line) && trim(line, " ").compare(0, 10, "outer loop"));
+                while (std::getline(infile, line) && trim(line).compare(0, 10, "outer loop"));
                 int nGon = 0;
                 while(std::getline(infile, line)) {// loop over vertices of the facet
-                    tmp = trim(line, " ");
+                    tmp = trim(line);
                     if (tmp.compare(0, 7, "endloop")==0) break;
                     OPENVDB_ASSERT(tmp.compare(0, 6, "vertex")==0);
                     iss.clear();
@@ -1233,7 +1278,19 @@ void Geometry::readSTL(const std::string &fileName)
         uint32_t numTri;
         if (!infile.read((char*)&numTri, sizeof(numTri))) throw std::invalid_argument("Geometry::readSTL binary: Failed to read triangle count in \""+fileName+"\"");
         infile.seekg (0, infile.end);
-        if (infile.tellg() != 80 + 4 + 50*numTri) throw std::invalid_argument("Geometry::readSTL binary: Unexpected file size in \""+fileName+"\"");
+        const std::streamoff fileSize = infile.tellg();
+        // Recover only complete records when the header overstates the count.
+        // Derive the count from the size without multiplying the untrusted header count.
+        if (fileSize < 84 || (fileSize - 84) % 50 != 0 || (fileSize - 84) / 50 > numTri) {
+            throw std::invalid_argument("Geometry::readSTL binary: Unexpected file size in \""+fileName+"\"");
+        }
+        const uint32_t availableTri = static_cast<uint32_t>((fileSize - 84) / 50);
+        if (availableTri < numTri) {
+            std::clog << "Warning: Geometry::readSTL binary: header declares " << numTri
+                      << " triangles, but \"" << fileName << "\" contains " << availableTri
+                      << ". Loading available triangles; geometry may be incomplete.\n";
+            numTri = availableTri;
+        }
         infile.seekg(80 + 4, infile.beg);
         uint32_t vtxBegin = static_cast<uint32_t>(mVtx.size()), triBegin = static_cast<uint32_t>(mTri.size());
         mVtx.resize(vtxBegin + 3*numTri);
@@ -1255,7 +1312,7 @@ void Geometry::readSTL(const std::string &fileName)
 }// Geometry::readSTL
 
 #ifdef VDB_TOOL_USE_NANO
-void Geometry::readNVDB(const std::string &fileName)
+inline void Geometry::readNVDB(const std::string &fileName)
 {
     auto handle = nanovdb::io::readGrid(fileName);
     auto grid = handle.grid<uint32_t>();
@@ -1269,13 +1326,13 @@ void Geometry::readNVDB(const std::string &fileName)
     for (size_t i=n; i<mVtx.size(); ++i) mVtx[i] = *p++;// loop over points
     mBBox = BBoxT();//invalidate BBox
 #else
-void Geometry::readNVDB(const std::string&)
+inline void Geometry::readNVDB(const std::string&)
 {
     throw std::runtime_error("NanoVDB support was disabled during compilation!");
 #endif
 }// Geometry::readNVDB
 
-void Geometry::print(size_t n, std::ostream& os) const
+inline void Geometry::print(size_t n, std::ostream& os) const
 {
     os << "vtx = " << mVtx.size();
     if (auto n = mRGB.size())  os << ", rbg = " << n;
@@ -1436,7 +1493,7 @@ void AlembicReader::visit_children(Alembic::AbcGeom::IObject parent_object,
     }
 }
 
-void Geometry::readABC(const std::string &fileName)
+inline void Geometry::readABC(const std::string &fileName)
 {
     auto meshVisitor = [&](const AlembicReader::Context &context,
                            AlembicReader::Span<const int32_t*> face_counts,
@@ -1471,7 +1528,7 @@ void Geometry::readABC(const std::string &fileName)
         mBBox = BBoxT();//invalidate BBox
 }// Geometry::readABC
 
-void Geometry::writeABC(const std::string &fileName) const
+inline void Geometry::writeABC(const std::string &fileName) const
 {
     std::vector<int32_t> abcCounts;
     std::vector<int32_t> abcIndices;
@@ -1513,12 +1570,12 @@ void Geometry::writeABC(const std::string &fileName) const
 
 #else
 
-void Geometry::readABC(const std::string&)
+inline void Geometry::readABC(const std::string&)
 {
     throw std::runtime_error("Alembic read support was disabled during compilation!");
 }
 
-void Geometry::writeABC(const std::string&) const
+inline void Geometry::writeABC(const std::string&) const
 {
     throw std::runtime_error("Alembic write support was disabled during compilation!");
 }
@@ -1527,7 +1584,7 @@ void Geometry::writeABC(const std::string&) const
 
 #ifdef VDB_TOOL_USE_USD
 
-void Geometry::readUSD(const std::string &fileName)
+inline void Geometry::readUSD(const std::string &fileName)
 {
     pxr::UsdStageRefPtr stage = pxr::UsdStage::Open(fileName);
     if (!stage) {
@@ -1597,7 +1654,7 @@ void Geometry::readUSD(const std::string &fileName)
 
 #else
 
-void Geometry::readUSD(const std::string&)
+inline void Geometry::readUSD(const std::string&)
 {
     throw std::runtime_error("USD read support was disabled during compilation!");
 }
@@ -1606,7 +1663,7 @@ void Geometry::readUSD(const std::string&)
 
 #ifdef VDB_TOOL_USE_GLTF
 
-void Geometry::readGLTF(const std::string &fileName)
+inline void Geometry::readGLTF(const std::string &fileName)
 {
     tinygltf::Model model;
     tinygltf::TinyGLTF loader;
@@ -1727,7 +1784,7 @@ void Geometry::readGLTF(const std::string &fileName)
 
 #else
 
-void Geometry::readGLTF(const std::string&)
+inline void Geometry::readGLTF(const std::string&)
 {
     throw std::runtime_error("glTF read support was disabled during compilation!");
 }
@@ -1757,7 +1814,7 @@ void Geometry::transform(const math::Transform &xform)
     mBBox = BBoxT();//invalidate BBox
 }// Geometry::transform
 
-size_t Geometry::triangulateQuads()
+inline size_t Geometry::triangulateQuads()
 {
     const size_t quadCount = mQuad.size();
     if (quadCount == 0) return 0;
@@ -1784,7 +1841,7 @@ size_t Geometry::triangulateQuads()
     return 2*quadCount;// number of triangles added
 }// Geometry::triangulateQuads
 
-void Geometry::triangulate(const int *indices, std::size_t n,
+inline void Geometry::triangulate(const int *indices, std::size_t n,
                            std::vector<Vec3I> &out, int indexOffset)
 {
     if (n < 3) return;
@@ -1798,7 +1855,7 @@ void Geometry::triangulate(const int *indices, std::size_t n,
     }
 }
 
-std::vector<Vec3I> Geometry::triangulate(const std::vector<int> &nGon)
+inline std::vector<Vec3I> Geometry::triangulate(const std::vector<int> &nGon)
 {
     std::vector<Vec3I> out;
     triangulate(nGon.data(), nGon.size(), out);

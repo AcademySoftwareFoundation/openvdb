@@ -821,23 +821,26 @@ bool FastSweeping<SdfGridT, ExtValueT>::initMask(const SdfGridT &sdfGrid, const 
         OPENVDB_THROW(RuntimeError, "FastSweeping: Mask not aligned with the grid!");
     }
 
-    if (mask.getGridClass() == GRID_LEVEL_SET) {
-        using T = typename MaskTreeT::template ValueConverter<bool>::Type;
-        typename Grid<T>::Ptr tmp = sdfInteriorMask(mask);//might have active tiles
-        tmp->tree().voxelizeActiveTiles();//multi-threaded
-        MaskKernel<T> kernel(*this);
-        kernel.run(tmp->tree());//multi-threaded
-    } else {
-        if (ignoreActiveTiles || !mask.tree().hasActiveTiles()) {
-            MaskKernel<MaskTreeT> kernel(*this);
-            kernel.run(mask.tree());//multi-threaded
-        } else {
-            using T = typename MaskTreeT::template ValueConverter<ValueMask>::Type;
-            T tmp(mask.tree(), false, TopologyCopy());//multi-threaded
-            tmp.voxelizeActiveTiles(true);//multi-threaded
+    if constexpr(openvdb::is_floating_point<typename MaskTreeT::ValueType>::value)
+    {
+        if (mask.getGridClass() == GRID_LEVEL_SET) {
+            using T = typename MaskTreeT::template ValueConverter<bool>::Type;
+            typename Grid<T>::Ptr tmp = sdfInteriorMask(mask);//might have active tiles
+            tmp->tree().voxelizeActiveTiles();//multi-threaded
             MaskKernel<T> kernel(*this);
-            kernel.run(tmp);//multi-threaded
+            kernel.run(tmp->tree());//multi-threaded
+            return this->isValid();
         }
+    }
+    if (ignoreActiveTiles || !mask.tree().hasActiveTiles()) {
+        MaskKernel<MaskTreeT> kernel(*this);
+        kernel.run(mask.tree());//multi-threaded
+    } else {
+        using T = typename MaskTreeT::template ValueConverter<ValueMask>::Type;
+        T tmp(mask.tree(), false, TopologyCopy());//multi-threaded
+        tmp.voxelizeActiveTiles(true);//multi-threaded
+        MaskKernel<T> kernel(*this);
+        kernel.run(tmp);//multi-threaded
     }
     return this->isValid();
 }// FastSweeping::initMask

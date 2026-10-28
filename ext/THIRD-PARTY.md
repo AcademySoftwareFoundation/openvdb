@@ -81,9 +81,13 @@ Apache 2.0
 * VCL (c) Copyright 2012-2022 Agner Fog.
   https://github.com/vectorclass/version2
 
-  OpenVDB includes a copy of vectorclass for x86 SIMD intrinsic usage. Usage
-  of VCL is disabled by default and requires the VCL headers to be shipped with
-  OpenVDB installations. This behaviour and usage of VCL can be controlled
+  OpenVDB includes a copy of vectorclass for x86 SIMD intrinsic usage. It
+  includes the following modifications:
+    > Header guards and namespaces have been renamed or prefixed with
+      OPENVDB_VCL defines.
+    > Examples and runtime instruction set detection have been removed.
+  Use of VCL is disabled by default and requires the VCL headers to be shipped
+  with OpenVDB installations. This behaviour and usage of VCL can be controlled
   during OpenVDB configuration. See the full LICENSE terms in:
 
     vcl/openvdb/ext/vcl/LICENSE

@@ -847,7 +847,7 @@ public:
     std::string checkBackground(Real halfWidth = LEVEL_SET_HALF_WIDTH) const
     {
         const Real w = mDiagnose.grid().background() / mDiagnose.grid().voxelSize()[0];
-        if (w < halfWidth) {
+        if (w < halfWidth * (Real(1) - Real(1e-6))) {
             std::ostringstream ss;
             ss << "The background value ("<< mDiagnose.grid().background()<<") is less than "
                << halfWidth << " voxel units\n";

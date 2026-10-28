@@ -24,6 +24,7 @@ __global__ void gpu_kernel(const nanovdb::NanoGrid<float>* deviceGrid)
 }
 
 // This is called by the client code on the host
+
 extern "C" void launch_kernels(const nanovdb::NanoGrid<float>* deviceGrid,
                                const nanovdb::NanoGrid<float>* cpuGrid,
                                cudaStream_t                    stream)

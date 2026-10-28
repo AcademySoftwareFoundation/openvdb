@@ -1,6 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
+//! [openvdb_to_nanovdb_accessor]
 #include <openvdb/tools/LevelSetSphere.h> // replace with your own dependencies for generating the OpenVDB grid
 #include <nanovdb/tools/CreateNanoGrid.h> // converter from OpenVDB to NanoVDB (includes NanoVDB.h and GridManager.h)
 #include <nanovdb/io/IO.h>
@@ -39,3 +40,4 @@ int main()
     }
     return 0;
 }
+//! [openvdb_to_nanovdb_accessor]

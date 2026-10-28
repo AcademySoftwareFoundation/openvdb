@@ -138,6 +138,18 @@ readGridMetadataFromFile(const std::string& filename, const std::string& gridNam
 
 
 GridPtrVec
+readGridsFromFile(const std::string& filename, const std::string& gridName)
+{
+    io::File vdbFile(filename);
+    vdbFile.open();
+    GridPtrVecPtr grids = vdbFile.readGrids(gridName);
+    vdbFile.close();
+
+    return *grids;
+}
+
+
+GridPtrVec
 readAllGridMetadataFromFile(const std::string& filename)
 {
     io::File vdbFile(filename);
@@ -400,6 +412,13 @@ NB_MODULE(openvdb, m)
         &_openvdbmodule::readGridMetadataFromFile,
         "Read a single grid's metadata and transform (but not its tree) "
         "from a .vdb file.",
+        nb::arg("filename"), nb::arg("gridname"));
+
+    m.def("readGrids",
+        &_openvdbmodule::readGridsFromFile,
+        "Read a .vdb file and return a list of all grids whose stored name "
+        "is exactly the given name, in file order. The list is empty "
+        "if no grid has that name.",
         nb::arg("filename"), nb::arg("gridname"));
 
     m.def("readAllGridMetadata",
