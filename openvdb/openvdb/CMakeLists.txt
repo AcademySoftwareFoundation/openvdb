@@ -670,6 +670,8 @@ if(OPENVDB_CORE_STATIC)
     PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES}
   )
 
+  target_compile_features(openvdb_static PUBLIC cxx_std_17)
+
   target_link_libraries(openvdb_static
     PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
   )
@@ -716,6 +718,8 @@ if(OPENVDB_CORE_SHARED)
     PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES} -DOPENVDB_DLL
     PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES}
   )
+
+  target_compile_features(openvdb_shared PUBLIC cxx_std_17)
 
   target_link_libraries(openvdb_shared
     PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
