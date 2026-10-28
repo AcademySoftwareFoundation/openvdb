@@ -66,8 +66,8 @@ jobs:
           - { cxx: g++,       cudahostcxx: g++,     image: '2027',          build: 'Release' }
           # nvcc 13.1 does not support clang 22 as a host compiler (its front end
           # fails on clang's avx512 intrinsic headers), so use the clang 21 image.
-          - { cxx: clang++,   cudahostcxx: clang++, image: '2027-clang21.1', build: 'Release' }
-          - { cxx: clang++,   cudahostcxx: clang++, image: '2027-clang21.1', build: 'Debug' }
+          - { cxx: clang++,   cudahostcxx: clang++, image: '2027-clang21',  build: 'Release' }
+          - { cxx: clang++,   cudahostcxx: clang++, image: '2027-clang21',  build: 'Debug' }
           # clang 22 for the host code, g++ for the .cu code
           - { cxx: clang++,   cudahostcxx: g++,     image: '2027',          build: 'Release' }
       fail-fast: false
