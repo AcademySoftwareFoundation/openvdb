@@ -72,7 +72,6 @@ jobs:
         config:
           - { houdini_version: '22.0', platform: 'linux_x86_64_gcc14.2', hou_hash: '22_0' }
           - { houdini_version: '21.0', platform: 'linux_x86_64_gcc11.2', hou_hash: '21_0' }
-          - { houdini_version: '20.5', platform: 'linux_x86_64_gcc11.2', hou_hash: '20_5' }
       fail-fast: false
     container:
       image: aswf/ci-base:2027
@@ -154,13 +153,15 @@ jobs:
           - { name: 'asan',   image: '2027', build: 'asan',    components: 'core,test',                        cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF' }
           - { name: 'ubsan',  image: '2027', build: 'ubsan',   components: 'core,test',                        cmake: '-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_CXX_FLAGS="-Wno-deprecated-declarations" ' }
           - { name: 'c++20',  image: '2027', build: 'Release', components: 'core,test',                        cmake: '-DCMAKE_CXX_STANDARD=20' }
-          - { name: 'abi14',  image: '2027',           build: 'Release', components: 'core,test',              cmake: '-DOPENVDB_USE_FUTURE_ABI_14=ON -DOPENVDB_ENABLE_ASSERTS=ON' }
+          - { name: 'abi15',  image: '2027', build: 'Release', components: 'core,test',                        cmake: '-DOPENVDB_USE_FUTURE_ABI_15=ON -DOPENVDB_ENABLE_ASSERTS=ON' }
           - { name: 'conf',   image: '2027', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DCMAKE_FIND_PACKAGE_PREFER_CONFIG=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3
     - name: nanobind
       run: ./ci/install_nanobind.sh 2.5.0
+    - name: openexr
+      run: ./ci/install_exr.sh v3.5.2
     - name: build
       run: >
         ./ci/build.sh -v
@@ -400,7 +401,7 @@ jobs:
       shell: powershell
       run: |
         vcpkg update
-        vcpkg install tbb gtest
+        vcpkg install tbb gtest zstd
     - name: build
       run: >
         ./ci/build.sh -v

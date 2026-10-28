@@ -70,9 +70,9 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2027',           abi: '14', build: 'Release', cmake: '-DOPENVDB_USE_FUTURE_ABI_14=ON -DOPENVDB_ENABLE_ASSERTS=ON' }
-          - { cxx: g++,     image: '2027',           abi: '14', build: 'Release', cmake: '-DOPENVDB_USE_FUTURE_ABI_14=ON' }
-          - { cxx: clang++, image: '2027',           abi: '14', build: 'Debug',   cmake: '-DOPENVDB_USE_FUTURE_ABI_14=ON' }
+          - { cxx: clang++, image: '2027',           abi: '14', build: 'Release', cmake: '-DOPENVDB_ENABLE_ASSERTS=ON' }
+          - { cxx: g++,     image: '2027',           abi: '14', build: 'Release', cmake: '' }
+          - { cxx: clang++, image: '2027',           abi: '14', build: 'Debug',   cmake: '' }
           - { cxx: clang++, image: '2026',           abi: '13', build: 'Release', cmake: '' }
           - { cxx: clang++, image: '2025-clang19.1', abi: '12', build: 'Release', cmake: '' }
       fail-fast: false

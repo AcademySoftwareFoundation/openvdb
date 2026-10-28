@@ -929,16 +929,9 @@ void updateGridStats(NanoGrid<BuildT>* grid, StatsMode mode)
         GridStats<GridT, Stats<ValueT> > stats;
         stats.update(*grid);
     } else {
-        throw std::runtime_error("gridStats: Unsupported statistics mode.");
+        throw std::runtime_error("updateGridStats: Unsupported statistics mode.");
     }
 }// updateGridStats
-
-template<typename BuildT>
-[[deprecated("Use nanovdb::tools::updateGridStats(NanoGrid*, StatsMode) instead")]]
-void gridStats(NanoGrid<BuildT>& grid, StatsMode mode = StatsMode::Default)
-{
-    updateGridStats<BuildT>(&grid, mode);
-}
 
 //================================================================================================
 

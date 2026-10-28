@@ -1,0 +1,28 @@
+OpenVDB:
+  Removals:
+  - Removed the nodeCount() overloads that took std::vector<Index32>. Use the
+    std::vector<Index64> overloads instead.
+  - Removed the rotation members from points::EllipsoidSettings and
+    points::PcaAttributes. Use the xform members instead.
+  - Removed the out-of-core and delayed loading APIs that were deprecated in
+    removedelayedloading.txt. This includes io::MappedFile, getMappedFilePtr(),
+    setMappedFilePtr(), the File::open(bool) overloads, File::copyMaxBytes() and
+    setCopyMaxBytes(), Stream(std::istream&, bool), isOutOfCore(), the inCoreOnly
+    overloads of pointCount(), pointOffsets() and the convertPointDataGrid*()
+    functions, setStreamingMode() and prefetch().
+  - The readNonresidentBuffers(), memUsageIfLoaded(), loadData() and
+    isDataLoaded() methods are removed for ABI 14 only. They remain available
+    when building with ABI 13.
+  - Removed io::GridDescriptor::read(). Use GridDescriptor::readHeader()
+    followed by GridDescriptor::readStreamPos() instead.
+  - Removed the relational operator< and operator> on math::Vec2, Vec3 and Vec4.
+    Use math::cwiseLessThan() and math::cwiseGreaterThan() instead. The
+    OPENVDB_ENABLE_VEC_RELATIONAL_OPERATIONS CMake option has been removed.
+
+OpenVDB AX:
+  Removals:
+  - Removed the getTreeExecutionLevel() overload that returned a single value. Use
+    getTreeExecutionLevel(Index&, Index&) instead.
+  - Removed the deprecated Function setters setArgumentNames(), setDependencies(),
+    setFnAttributes(), setRetAttributes() and setParamAttributes(), along with
+    hasParamAttribute(). Use codegen::FunctionBuilder to construct functions.

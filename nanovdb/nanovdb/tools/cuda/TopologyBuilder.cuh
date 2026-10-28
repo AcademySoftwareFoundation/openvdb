@@ -19,7 +19,6 @@
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/DeviceResource.h>
-#include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/util/cuda/Morphology.cuh>
 #include <nanovdb/cuda/HandleStorage.h>
 #include <nanovdb/cuda/PinnedResource.h> // for the pinned host staging of the processed root
@@ -69,9 +68,7 @@ class TopologyBuilder
     /// @brief Device-only scratch storage, borrowing the injected resource
     ///        through a ResourceRef so all traffic reaches the caller's
     ///        instance (which may be stateful) rather than a copy. These
-    ///        buffers are never read on the host, so they use the single-space
-    ///        Buffer rather than the dual DeviceBuffer, whose host pointer and
-    ///        per-device array they would leave unused.
+    ///        buffers are never read on the host.
     using ScratchT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
     template<typename T>
     using BufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ResourceRef<ResourceT>>;
@@ -304,9 +301,7 @@ BufferT TopologyBuilder<BuildT, ResourceT>::getBuffer(const BufferT &pool, cudaS
     data()->leaf  = data()->lower + LowerT::memUsage()*data()->nodeCount[1];// lower internal nodes ends and leaf nodes begin
     data()->size  = data()->leaf  + LeafT::DataType::memUsage()*data()->nodeCount[0];// leaf nodes end and blind meta data begins
 
-    int device = 0;
-    cudaGetDevice(&device);
-    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(data()->size, &pool, device, stream); // only allocate buffer on the device
+    auto buffer = nanovdb::cuda::detail::createDeviceStorage<BufferT>(data()->size, &pool, stream);
     cudaCheck(cudaMemsetAsync(nanovdb::cuda::detail::deviceStorageData(buffer), 0, data()->size, stream));
 
     data()->d_bufferPtr = nanovdb::cuda::detail::deviceStorageData(buffer);

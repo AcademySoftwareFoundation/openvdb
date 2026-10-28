@@ -289,12 +289,6 @@ public:
     void setSettingsFromCLI(const CLI& cli);
     /// @}
 
-    ////////////////////////////////////////////////////////
-
-    /// @return  The tree execution level.
-    OPENVDB_DEPRECATED_MESSAGE("Use getTreeExecutionLevel(Index&, Index&)")
-    Index getTreeExecutionLevel() const;
-
 private:
     friend class Compiler;
 

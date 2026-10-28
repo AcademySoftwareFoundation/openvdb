@@ -19,6 +19,7 @@
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/GridHandle.h>
+#include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/tools/cuda/TopologyBuilder.cuh>
 #include <nanovdb/util/cuda/DeviceGridTraits.cuh>
 #include <nanovdb/util/cuda/Morphology.cuh>
@@ -70,9 +71,9 @@ public:
 
     /// @brief Creates a handle to the dilated grid
     /// @tparam BufferT Buffer type used for allocation of the grid handle
-    /// @param buffer prototype buffer whose resource (or create() pool) allocates the output
+    /// @param buffer prototype buffer whose resource allocates the output
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
-    template<typename BufferT = nanovdb::cuda::DualDeviceBuffer>
+    template<typename BufferT = nanovdb::cuda::Buffer<std::byte>>
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
 
