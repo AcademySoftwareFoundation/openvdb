@@ -7449,7 +7449,7 @@ TEST_F(TestNanoVDB, MultiFile)
         EXPECT_EQ(16u, handles.size());
         auto& handle = handles.front();
         EXPECT_EQ(1u, handle.gridCount());
-        EXPECT_EQ(std::string("Int32 grid"), handle.gridMetaData()->shortGridName());
+        EXPECT_EQ(std::string("Int32 grid"), handle.gridData()->mGridName);
         EXPECT_FALSE(handle.grid<float>());
         EXPECT_FALSE(handle.grid<double>());
         EXPECT_FALSE(handle.grid<int64_t>());
@@ -7496,7 +7496,7 @@ TEST_F(TestNanoVDB, MultiFile)
         auto& handle = handles[1];
         EXPECT_TRUE(handle);
         EXPECT_EQ(1u, handle.gridCount());
-        EXPECT_EQ(std::string("Int32 grid, empty"), handle.gridMetaData()->shortGridName());
+        EXPECT_EQ(std::string("Int32 grid, empty"), handle.gridData()->mGridName);
         EXPECT_FALSE(handle.grid<float>());
         EXPECT_FALSE(handle.grid<double>());
         EXPECT_FALSE(handle.grid<int64_t>());
@@ -7534,7 +7534,7 @@ TEST_F(TestNanoVDB, MultiFile)
         auto& handle = handles[3];
         EXPECT_EQ(1u, handle.gridCount());
         EXPECT_TRUE(handle);
-        EXPECT_EQ(std::string("Int64 grid"), handle.gridMetaData()->shortGridName());
+        EXPECT_EQ(std::string("Int64 grid"), handle.gridData()->mGridName);
         auto* grid = handle.grid<int64_t>();
         EXPECT_TRUE(grid);
         EXPECT_EQ(handle.gridMetaData()->indexBBox(), grid->indexBBox());
@@ -7559,7 +7559,7 @@ TEST_F(TestNanoVDB, MultiFile)
         auto& handle = handles[4];
         EXPECT_EQ(1u, handle.gridCount());
         EXPECT_TRUE(handle);
-        EXPECT_EQ(std::string("UInt8 grid"), handle.gridMetaData()->shortGridName());
+        EXPECT_EQ(std::string("UInt8 grid"), handle.gridData()->mGridName);
         auto* grid = handle.grid<uint8_t>();
         EXPECT_TRUE(grid);
         EXPECT_EQ(handle.gridMetaData()->indexBBox(), grid->indexBBox());
@@ -7582,7 +7582,7 @@ TEST_F(TestNanoVDB, MultiFile)
         auto& handle = handles[2];
         EXPECT_TRUE(handle);
         EXPECT_EQ(1u, handle.gridCount());
-        EXPECT_EQ(std::string("Float vector grid"), handle.gridMetaData()->shortGridName());
+        EXPECT_EQ(std::string("Float vector grid"), handle.gridData()->mGridName);
         auto* grid = handle.grid<nanovdb::Vec3f>();
         EXPECT_TRUE(grid);
         EXPECT_EQ(1u, grid->activeVoxelCount());
@@ -7604,7 +7604,7 @@ TEST_F(TestNanoVDB, MultiFile)
         auto& handle = handles.back();
         EXPECT_TRUE(handle);
         EXPECT_EQ(1u, handle.gridCount());
-        EXPECT_EQ(std::string("Double grid"), handle.gridMetaData()->shortGridName());
+        EXPECT_EQ(std::string("Double grid"), handle.gridData()->mGridName);
         auto* grid = handle.grid<double>();
         EXPECT_TRUE(grid);
         EXPECT_EQ(1u, grid->activeVoxelCount());
@@ -9688,6 +9688,302 @@ TEST_F(TestNanoVDB, GridHandleReadMultiGridRawBuffer)
         EXPECT_TRUE(nanovdb::tools::validateChecksum(grid, nanovdb::CheckMode::Full));
     }
 }// GridHandleReadMultiGridRawBuffer
+
+namespace {
+
+// Writes one file segment whose grids all carry the given metadata, followed by filler bytes
+std::string makeSegment(uint16_t gridCount, uint64_t gridSize, uint64_t fileSize,
+                        const std::string& name, uint32_t nameSize, size_t fillerBytes)
+{
+    std::ostringstream os(std::ios_base::out | std::ios_base::binary);
+    nanovdb::io::Segment seg;
+    seg.header.gridCount = gridCount;
+    os.write(reinterpret_cast<const char*>(&seg.header), sizeof(nanovdb::io::FileHeader));
+    for (uint16_t i = 0; i < gridCount; ++i) {
+        nanovdb::io::FileMetaData meta;
+        std::memset(&meta, 0, sizeof(meta));
+        meta.gridSize = gridSize;
+        meta.fileSize = fileSize;
+        meta.nameSize = nameSize;
+        os.write(reinterpret_cast<const char*>(&meta), sizeof(meta));
+        os.write(name.data(), name.size());
+    }
+    os << std::string(fillerBytes, 'A');
+    return os.str();
+}
+
+// Returns true if read() throws a std::runtime_error whose message contains what
+template<typename ReadT>
+bool throwsWith(ReadT&& read, const std::string& what)
+{
+    try { read(); } catch (const std::runtime_error& e) { return std::string(e.what()).find(what) != std::string::npos; }
+    return false;
+}
+
+// Returns a handle with one empty float grid named name
+nanovdb::GridHandle<> makeTinyGrid(const std::string& name)
+{
+    nanovdb::tools::build::Grid<float> src(0.0f, name);
+    return nanovdb::tools::createNanoGrid(src);
+}
+
+} // anonymous namespace
+
+// make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*ReadMalformedFile"
+TEST_F(TestNanoVDB, ReadMalformedFile)
+{
+    using namespace nanovdb;
+    auto readAll = [](const std::string& bytes) {
+        std::istringstream is(bytes, std::ios_base::in | std::ios_base::binary);
+        return io::readGrids<HostBuffer>(is);
+    };
+    auto readOne = [](const std::string& bytes, int n) {
+        std::istringstream is(bytes, std::ios_base::in | std::ios_base::binary);
+        return io::readGrid<HostBuffer>(is, n, HostBuffer());
+    };
+    auto readNamed = [](const std::string& bytes, const std::string& name) {
+        std::istringstream is(bytes, std::ios_base::in | std::ios_base::binary);
+        return io::readGrid<HostBuffer>(is, name, HostBuffer());
+    };
+    auto readMeta = [](const std::string& bytes) {
+        std::istringstream is(bytes, std::ios_base::in | std::ios_base::binary);
+        return io::readGridMetaData(is);
+    };
+    const std::string noName(1, '\0');
+
+    {// grid size smaller than a grid header
+        const std::string bytes = makeSegment(1, 16, 16, "a", 2, 8192);
+        EXPECT_THROW(readAll(bytes), std::runtime_error);
+        EXPECT_THROW(readOne(bytes, -1), std::runtime_error);
+        EXPECT_THROW(readOne(bytes, 0), std::runtime_error);
+        EXPECT_THROW(readNamed(bytes, "a"), std::runtime_error);
+        EXPECT_THROW(readMeta(bytes), std::runtime_error);
+    }
+    {// grid name without NULL termination
+        const std::string bytes = makeSegment(1, sizeof(GridData), sizeof(GridData), "abcd", 4, 8192);
+        EXPECT_THROW(readMeta(bytes), std::runtime_error);
+        EXPECT_THROW(readNamed(bytes, "abcd"), std::runtime_error);
+    }
+    {// empty grid name
+        const std::string bytes = makeSegment(1, sizeof(GridData), sizeof(GridData), "", 0, 8192);
+        EXPECT_THROW(readMeta(bytes), std::runtime_error);
+    }
+    {// grid too small for the head span that updateGridCount checksums
+        const std::string bytes = makeSegment(1, sizeof(GridData), sizeof(GridData), noName, 1, 8192);
+        EXPECT_THROW(readAll(bytes), std::runtime_error);
+        EXPECT_THROW(readOne(bytes, -1), std::runtime_error);
+        EXPECT_THROW(readOne(bytes, 0), std::runtime_error);
+    }
+    {// pre-v32.6.0 grid whose checksummed head ends at an upper-node offset past the grid
+        std::string bytes = makeSegment(1, 8192, 8192, noName, 1, 8192);
+        GridData grid;
+        std::memset(&grid, 0, sizeof(grid));// zero is a non-empty checksum
+        grid.mVersion = Version(32, 6, 0);
+        TreeData tree;
+        std::memset(&tree, 0, sizeof(tree));
+        tree.mNodeOffset[2] = int64_t(1) << 40;
+        const size_t offset = sizeof(io::FileHeader) + sizeof(io::FileMetaData) + noName.size();
+        std::memcpy(&bytes[offset], &grid, sizeof(grid));
+        std::memcpy(&bytes[offset + sizeof(grid)], &tree, sizeof(tree));
+        EXPECT_TRUE(throwsWith([&]{ readOne(bytes, 0); }, "Grid head checksum extends past the grid"));
+        EXPECT_TRUE(throwsWith([&]{ readAll(bytes); }, "Grid head checksum extends past the grid"));
+    }
+    {// a file size that hides a segment from the first pass of readGrid(is, -1)
+        const std::string fake = makeSegment(1, 8192, 8192, noName, 1, 8192);
+        std::string grid(1024, '\0');
+        std::memset(&grid[8], 0xFF, 8);// empty checksum, so updateGridCount reads no further
+        const std::string bytes = makeSegment(1, grid.size(), grid.size() + fake.size(), noName, 1, 0) + grid + fake;
+        EXPECT_TRUE(throwsWith([&]{ readOne(bytes, -1); }, "Grid sizes in stream changed between passes"));
+    }
+    {// file size large enough to wrap a stream offset
+        const std::string bytes = makeSegment(2, sizeof(GridData), uint64_t(1) << 63, noName, 1, 8192);
+        EXPECT_THROW(readMeta(bytes), std::runtime_error);
+        std::istringstream is(bytes, std::ios_base::in | std::ios_base::binary);
+        EXPECT_THROW(io::hasGrid(is, "missing"), std::runtime_error);
+    }
+    {// empty stream
+        EXPECT_TRUE(readMeta("").empty());
+        EXPECT_TRUE(readAll("").empty());
+        EXPECT_FALSE(readOne("", -1));
+        EXPECT_THROW(readOne("", 0), std::runtime_error);
+        EXPECT_THROW(readNamed("", "a"), std::runtime_error);
+    }
+    for (const std::string bytes : {std::string(4, '\0'), std::string("not a nanovdb file")}) {// shorter than a file header, or not NanoVDB
+        EXPECT_THROW(readMeta(bytes), std::runtime_error);
+        EXPECT_THROW(readAll(bytes), std::runtime_error);
+        EXPECT_THROW(readOne(bytes, -1), std::runtime_error);
+        EXPECT_THROW(readOne(bytes, 0), std::runtime_error);
+        EXPECT_THROW(readNamed(bytes, "a"), std::runtime_error);
+    }
+    {// file truncated inside a later grid, so a lookup that misses must report the damage
+        auto write = [](const std::string& name) {
+            std::ostringstream os(std::ios_base::out | std::ios_base::binary);
+            io::writeGrid(os, makeTinyGrid(name), io::Codec::NONE);
+            return os.str();
+        };
+        const std::string cut = write("b");
+        const std::string bytes = write("a") + cut.substr(0, cut.size() - 1);
+        const std::string error = "stream ends inside the grids of a segment";
+        EXPECT_TRUE(throwsWith([&]{ readNamed(bytes, "nosuch"); }, error));
+        EXPECT_TRUE(throwsWith([&]{ readNamed(bytes, "b"); }, error));
+        EXPECT_TRUE(throwsWith([&]{ readOne(bytes, 5); }, error));
+        EXPECT_TRUE(throwsWith([&]{ readOne(bytes, -1); }, error));
+        EXPECT_TRUE(throwsWith([&]{ readMeta(bytes); }, error));
+        std::istringstream is(bytes, std::ios_base::in | std::ios_base::binary);
+        EXPECT_TRUE(throwsWith([&]{ io::hasGrid(is, "nosuch"); }, error));
+        EXPECT_EQ(1u, readNamed(bytes, "a").gridCount());// the grid before the damage still reads
+        EXPECT_EQ(1u, readOne(bytes, 0).gridCount());
+    }
+    {// sizes that would size a huge allocation before the bytes they describe are read
+        const std::string name = makeSegment(1, sizeof(GridData), sizeof(GridData), noName, 0xFFFFFFF0u, 8192);
+        EXPECT_THROW(readMeta(name), std::runtime_error);
+        const std::string grid = makeSegment(1, uint64_t(1) << 60, 8192, noName, 1, 8192);
+        EXPECT_THROW(readAll(grid), std::runtime_error);
+        EXPECT_THROW(readOne(grid, -1), std::runtime_error);
+        EXPECT_THROW(readOne(grid, 0), std::runtime_error);
+    }
+#if defined(NANOVDB_USE_ZIP) || defined(NANOVDB_USE_BLOSC)
+    {// valid compressed file shorter than GridData, so the raw-buffer probe reads past its end
+#if defined(NANOVDB_USE_ZIP)
+        const io::Codec codec = io::Codec::ZIP;
+#else
+        const io::Codec codec = io::Codec::BLOSC;
+#endif
+        tools::build::Grid<float> src(0.0f, "tiny");
+        auto handle = tools::createNanoGrid(src);
+        std::ostringstream os(std::ios_base::out | std::ios_base::binary);
+        io::writeGrid(os, handle, codec);
+        const std::string bytes = os.str();
+        ASSERT_LT(bytes.size(), sizeof(GridData));
+        EXPECT_EQ(1u, readMeta(bytes).size());
+        EXPECT_EQ(1u, readAll(bytes).size());
+        EXPECT_EQ(1u, readOne(bytes, -1).gridCount());
+        EXPECT_EQ(1u, readOne(bytes, 0).gridCount());
+        EXPECT_EQ(1u, readNamed(bytes, "tiny").gridCount());
+    }
+#endif
+}// ReadMalformedFile
+
+// make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*ReadMalformedRawBuffer"
+TEST_F(TestNanoVDB, ReadMalformedRawBuffer)
+{
+    using namespace nanovdb;
+    std::string raw;
+    {
+        std::ostringstream os(std::ios_base::out | std::ios_base::binary);
+        tools::createLevelSetSphere<float>(20.0).write(os);
+        raw = os.str();
+    }
+    ASSERT_GT(raw.size(), sizeof(GridData));
+    auto header = [&](std::string& bytes) { return reinterpret_cast<GridData*>(&bytes[0]); };
+    const std::string name = header(raw)->mGridName;
+    auto toBytes = [](const GridHandle<>& handle) {
+        std::ostringstream os(std::ios_base::out | std::ios_base::binary);
+        handle.write(os);
+        return os.str();
+    };
+    auto readNamed = [](const std::string& bytes, const std::string& gridName) {
+        std::istringstream is(bytes, std::ios_base::in | std::ios_base::binary);
+        GridHandle<> handle;
+        handle.read(is, gridName);
+        return handle;
+    };
+
+    {// grid size smaller than a grid header
+        std::string bytes = raw;
+        header(bytes)->mGridSize = 16;
+        std::istringstream is0(bytes, std::ios_base::in | std::ios_base::binary);
+        EXPECT_THROW(GridHandle<>().read(is0), std::runtime_error);
+        std::istringstream is1(bytes, std::ios_base::in | std::ios_base::binary);
+        EXPECT_THROW(GridHandle<>().read(is1, 0u), std::runtime_error);
+        std::istringstream is2(bytes, std::ios_base::in | std::ios_base::binary);
+        EXPECT_THROW(GridHandle<>().read(is2, std::string(header(bytes)->mGridName)), std::runtime_error);
+    }
+    {// grid count claims more grids than the stream holds
+        std::string bytes = raw;
+        header(bytes)->mGridCount = 3;
+        std::istringstream is(bytes, std::ios_base::in | std::ios_base::binary);
+        EXPECT_THROW(GridHandle<>().read(is), std::runtime_error);
+    }
+    {// stream truncated inside the grid
+        const std::string bytes = raw.substr(0, raw.size() / 2);
+        const std::string error = "stream is shorter than its raw grid size";
+        std::istringstream is0(bytes, std::ios_base::in | std::ios_base::binary);
+        EXPECT_TRUE(throwsWith([&]{ GridHandle<>().read(is0); }, error));
+        std::istringstream is1(bytes, std::ios_base::in | std::ios_base::binary);
+        EXPECT_TRUE(throwsWith([&]{ GridHandle<>().read(is1, 0u); }, error));
+        EXPECT_TRUE(throwsWith([&]{ readNamed(bytes, name); }, error));
+    }
+    {// grid size far larger than the stream
+        std::string bytes = raw;
+        header(bytes)->mGridSize = uint64_t(1) << 60;
+        const std::string error = "stream is shorter than its raw grid size";
+        std::istringstream is0(bytes, std::ios_base::in | std::ios_base::binary);
+        EXPECT_TRUE(throwsWith([&]{ GridHandle<>().read(is0); }, error));
+        std::istringstream is1(bytes, std::ios_base::in | std::ios_base::binary);
+        EXPECT_TRUE(throwsWith([&]{ GridHandle<>().read(is1, 0u); }, error));
+        EXPECT_TRUE(throwsWith([&]{ readNamed(bytes, name); }, error));
+    }
+    {// lookup by name in a two-grid buffer, whole and truncated
+        std::vector<GridHandle<>> handles;
+        handles.push_back(makeTinyGrid("a"));
+        handles.push_back(makeTinyGrid("b"));
+        const auto merged = mergeGrids<HostBuffer, std::vector>(handles);
+        const std::string bytes = toBytes(merged);
+        EXPECT_EQ(std::string("b"), readNamed(bytes, "b").gridData()->mGridName);
+        EXPECT_TRUE(throwsWith([&]{ readNamed(bytes, "nosuch"); }, "No raw grid named"));
+        const std::string error = "stream is shorter than its raw grid size";
+        const size_t first = merged.gridSize(0);
+        EXPECT_TRUE(throwsWith([&]{ readNamed(bytes.substr(0, first + 100), "nosuch"); }, error));// inside the second header
+        EXPECT_TRUE(throwsWith([&]{ readNamed(bytes.substr(0, bytes.size() - 1), "nosuch"); }, error));// inside the last grid
+    }
+    {// lookup by name never matches a grid after the end of the chain
+        const std::string bytes = toBytes(makeTinyGrid("a")) + toBytes(makeTinyGrid("b"));
+        EXPECT_EQ(std::string("a"), readNamed(bytes, "a").gridData()->mGridName);
+        EXPECT_TRUE(throwsWith([&]{ readNamed(bytes, "b"); }, "No raw grid named"));
+    }
+    {// grid name without NULL termination
+        std::string bytes = raw;
+        std::memset(header(bytes)->mGridName, 'A', GridData::MaxNameSize);
+        std::istringstream is(bytes, std::ios_base::in | std::ios_base::binary);
+        EXPECT_THROW(GridHandle<>().read(is, std::string(GridData::MaxNameSize, 'A')), std::runtime_error);
+    }
+}// ReadMalformedRawBuffer
+
+#if defined(NANOVDB_USE_BLOSC)
+// make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*ReadMalformedBloscChunk"
+TEST_F(TestNanoVDB, ReadMalformedBloscChunk)
+{
+    using namespace nanovdb;
+    std::string bytes;
+    {
+        std::ostringstream os(std::ios_base::out | std::ios_base::binary);
+        io::writeGrid(os, tools::createLevelSetSphere<float>(20.0), io::Codec::BLOSC);
+        bytes = os.str();
+    }
+    std::istringstream metaStream(bytes, std::ios_base::in | std::ios_base::binary);
+    const auto meta = io::readGridMetaData(metaStream);
+    ASSERT_EQ(1u, meta.size());
+
+    // the first chunk's size prefix follows the file header, grid metadata and name
+    const size_t chunk = sizeof(io::FileHeader) + sizeof(io::FileMetaData) + meta[0].nameSize;
+    ASSERT_GT(bytes.size(), chunk + sizeof(uint64_t) + 16);
+    {// compressed byte count in the blosc header larger than the chunk
+        std::string bad = bytes;
+        uint32_t cbytes = 0xFFFFFFFFu;// compressed byte count sits at offset 12 of the blosc header
+        std::memcpy(&bad[chunk + sizeof(uint64_t) + 12], &cbytes, sizeof(cbytes));
+        std::istringstream is(bad, std::ios_base::in | std::ios_base::binary);
+        EXPECT_THROW(io::readGrids<HostBuffer>(is), std::runtime_error);
+    }
+    {// chunk size prefix far larger than the grid's stored bytes
+        std::string bad = bytes;
+        const uint64_t size = uint64_t(1) << 60;
+        std::memcpy(&bad[chunk], &size, sizeof(size));
+        std::istringstream is(bad, std::ios_base::in | std::ios_base::binary);
+        EXPECT_TRUE(throwsWith([&]{ io::readGrids<HostBuffer>(is); }, "Compressed chunk is larger than its grid's file size"));
+    }
+}// ReadMalformedBloscChunk
+#endif
 
 // make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*strcpy"
 TEST_F(TestNanoVDB, strcpy)
