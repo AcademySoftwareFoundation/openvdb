@@ -57,7 +57,8 @@ This will define the following variables:
 ``OpenVDB_${COMPONENT}_FOUND``
   True if the system has the named OpenVDB component.
 ``OpenVDB_USES_BLOSC``
-  True if the OpenVDB Library has been built with blosc support
+  Always True. The OpenVDB Library includes a private copy of Blosc.
+  Kept for backwards compatibility.
 ``OpenVDB_USES_ZLIB``
   True if the OpenVDB Library has been built with zlib support
 ``OpenVDB_USES_IMATH_HALF``
@@ -391,6 +392,13 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
   elseif(${COMPONENT} STREQUAL "nanovdb")
     # alias to the result of openvdb which should be handled first
     set(OpenVDB_${COMPONENT}_LIBRARY ${OpenVDB_openvdb_LIBRARY})
+    # Optional, present when NanoVDB was built with NANOVDB_USE_BLOSC. IO.h calls
+    # into this private copy of Blosc, built as a static archive
+    find_library(OpenVDB_nanovdb_blosc_LIBRARY nanovdb_blosc
+      ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}
+      PATHS ${_VDB_COMPONENT_SEARCH_DIRS}
+      PATH_SUFFIXES ${OPENVDB_LIB_PATH_SUFFIXES}
+    )
   else()
     find_library(OpenVDB_${COMPONENT}_LIBRARY ${LIB_NAME}
       ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}
@@ -401,7 +409,7 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
 
   list(APPEND OpenVDB_LIB_COMPONENTS ${OpenVDB_${COMPONENT}_LIBRARY})
   if(${COMPONENT} STREQUAL "nanovdb")
-    # nanovdb is headers-only, no lib component
+    # nanovdb is headers-only apart from its optional static Blosc archive
     if(OpenVDB_${COMPONENT}_INCLUDE_DIR)
       set(OpenVDB_${COMPONENT}_FOUND TRUE)
     else()
@@ -514,7 +522,7 @@ endif()
 # As the way we resolve optional libraries relies on library file names, use
 # the configuration options from the main CMakeLists.txt to allow users
 # to manually identify the requirements of OpenVDB builds if they know them.
-set(OpenVDB_USES_BLOSC ${USE_BLOSC})
+set(OpenVDB_USES_BLOSC ON)
 set(OpenVDB_USES_ZLIB ${USE_ZLIB})
 set(OpenVDB_USES_IMATH_HALF ${USE_IMATH_HALF})
 set(OpenVDB_DEFINITIONS)
@@ -547,7 +555,6 @@ endif()
 
 if(_OPENVDB_HAS_NEW_VERSION_HEADER)
   OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_IMATH_HALF" OpenVDB_USES_IMATH_HALF)
-  OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_BLOSC" OpenVDB_USES_BLOSC)
   OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_ZLIB" OpenVDB_USES_ZLIB)
 elseif(NOT OPENVDB_USE_STATIC_LIBS)
   # Use GetPrerequisites to see which libraries this OpenVDB lib has linked to
@@ -576,11 +583,6 @@ elseif(NOT OPENVDB_USE_STATIC_LIBS)
     set(_HAS_DEP)
     get_filename_component(PREREQUISITE ${PREREQUISITE} NAME)
 
-    string(FIND ${PREREQUISITE} "blosc" _HAS_DEP)
-    if(NOT ${_HAS_DEP} EQUAL -1)
-      set(OpenVDB_USES_BLOSC ON)
-    endif()
-
     string(FIND ${PREREQUISITE} "zlib" _HAS_DEP)
     if(NOT ${_HAS_DEP} EQUAL -1)
       set(OpenVDB_USES_ZLIB ON)
@@ -593,10 +595,6 @@ elseif(NOT OPENVDB_USE_STATIC_LIBS)
   endforeach()
 
   unset(_OPENVDB_PREREQUISITE_LIST)
-endif()
-
-if(OpenVDB_USES_BLOSC)
-  find_package(Blosc REQUIRED)
 endif()
 
 if(OpenVDB_USES_ZLIB)
@@ -634,9 +632,6 @@ endif()
 set(_OPENVDB_HIDDEN_DEPENDENCIES)
 
 if(NOT OPENVDB_USE_STATIC_LIBS)
-  if(OpenVDB_USES_BLOSC)
-    list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES Blosc::blosc)
-  endif()
   if(OpenVDB_USES_ZLIB)
     list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES ZLIB::ZLIB)
   endif()
@@ -760,12 +755,26 @@ endif()
 # OpenVDB::nanovdb
 
 if(OpenVDB_nanovdb_LIBRARY)
+  set(_OPENVDB_NANOVDB_LINK_LIBRARIES "OpenVDB::openvdb;")
+  set(_OPENVDB_NANOVDB_COMPILE_DEFINITIONS "")
+  if(OpenVDB_nanovdb_blosc_LIBRARY)
+    if(NOT TARGET OpenVDB::nanovdb_blosc)
+      add_library(OpenVDB::nanovdb_blosc STATIC IMPORTED)
+      set_target_properties(OpenVDB::nanovdb_blosc PROPERTIES
+        IMPORTED_LOCATION "${OpenVDB_nanovdb_blosc_LIBRARY}"
+        IMPORTED_LINK_INTERFACE_LANGUAGES C
+      )
+    endif()
+    set(_OPENVDB_NANOVDB_LINK_LIBRARIES "OpenVDB::openvdb;OpenVDB::nanovdb_blosc")
+    set(_OPENVDB_NANOVDB_COMPILE_DEFINITIONS "NANOVDB_USE_BLOSC")
+  endif()
   if(NOT TARGET OpenVDB::nanovdb)
     add_library(OpenVDB::nanovdb INTERFACE IMPORTED)
     set_target_properties(OpenVDB::nanovdb PROPERTIES
       IMPORTED_LOCATION "${OpenVDB_nanovdb_LIBRARY}"
       INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_nanovdb_INCLUDE_DIR}"
-      INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;"
+      INTERFACE_LINK_LIBRARIES "${_OPENVDB_NANOVDB_LINK_LIBRARIES}"
+      INTERFACE_COMPILE_DEFINITIONS "${_OPENVDB_NANOVDB_COMPILE_DEFINITIONS}"
       INTERFACE_COMPILE_FEATURES cxx_std_17
    )
   endif()

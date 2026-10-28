@@ -92,7 +92,6 @@ jobs:
           -DCMAKE_CUDA_ARCHITECTURES="80"
           -DNANOVDB_USE_OPENVDB=ON
           -DCMAKE_INSTALL_PREFIX=`pwd`
-          -DUSE_BLOSC=ON
           -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           \'
       - name: test
@@ -194,7 +193,7 @@ jobs:
           cd nanovdb/nanovdb
           mkdir .build
           cd .build
-          cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF ../
+          cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF -DNANOVDB_USE_BLOSC=OFF ../
           make -j8
           sudo make install
           ctest -V

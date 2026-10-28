@@ -35,7 +35,7 @@ option(NANOVDB_CUDA_WERROR "Treat all NVCC diagnostics as errors" ON)
 option(NANOVDB_USE_OLD_ACCESSOR "Use the old (buggy) ReadAccessor instead of the new fixed one" OFF)
 
 option(NANOVDB_USE_OPENVDB "Build with OpenVDB support" OFF)
-option(NANOVDB_USE_BLOSC "Build with BLOSC support" ${USE_BLOSC})
+option(NANOVDB_USE_BLOSC "Build with BLOSC support, using the private static nanovdb_blosc library" ON)
 option(NANOVDB_USE_ZLIB "Build with ZLIB support" ${USE_ZLIB})
 option(NANOVDB_USE_TBB "Build with TBB support" ${USE_TBB})
 option(NANOVDB_USE_MAGICAVOXEL "Build with MagicaVoxel support" OFF)
@@ -159,8 +159,25 @@ if(NANOVDB_USE_TBB AND NOT TARGET TBB::tbb)
   find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED)
 endif()
 
-if(NANOVDB_USE_BLOSC AND NOT TARGET Blosc::blosc)
-  find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
+if(NANOVDB_USE_BLOSC AND NOT TARGET nanovdb_blosc)
+  # NanoVDB compiles its own private copy of the vendored blosc/lz4
+  # sources (nanovdb_blosc.c), whose four public symbols are renamed via a
+  # source-level VDB_BLOSC_SYMBOL_PREFIX #define, so it never depends on or
+  # collides with OpenVDB's own (also renamed) copy, regardless of whether
+  # NANOVDB_USE_OPENVDB is on.
+  add_library(nanovdb_blosc STATIC
+    ${CMAKE_CURRENT_LIST_DIR}/../../ext/blosc/openvdb/ext/blosc/nanovdb_blosc.c
+  )
+  target_include_directories(nanovdb_blosc PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/../../ext/blosc/openvdb/ext/blosc
+  )
+  target_include_directories(nanovdb_blosc SYSTEM INTERFACE
+    ${CMAKE_CURRENT_LIST_DIR}/../../ext/blosc/openvdb/ext/blosc
+  )
+  # The archive may be linked into shared libraries
+  set_target_properties(nanovdb_blosc PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  # nanovdb/io/IO.h calls into this archive, so installed headers need it
+  install(TARGETS nanovdb_blosc ARCHIVE DESTINATION ${NANOVDB_INSTALL_LIBDIR})
 endif()
 
 if(NANOVDB_USE_ZLIB AND NOT TARGET ZLIB::ZLIB)
@@ -328,7 +345,7 @@ if(NANOVDB_USE_TBB)
 endif()
 
 if(NANOVDB_USE_BLOSC)
-  target_link_libraries(nanovdb INTERFACE Blosc::blosc)
+  target_link_libraries(nanovdb INTERFACE nanovdb_blosc)
   target_compile_definitions(nanovdb INTERFACE -DNANOVDB_USE_BLOSC)
 endif()
 
@@ -370,6 +387,16 @@ set(NANOVDB_INSTALL_TOOLS_DIR ${NANOVDB_INSTALL_ROOT_DIR}/tools)
 set(NANOVDB_INSTALL_TOOLS_CUDA_DIR ${NANOVDB_INSTALL_TOOLS_DIR}/cuda)
 set(NANOVDB_INSTALL_UTIL_DIR ${NANOVDB_INSTALL_ROOT_DIR}/util)
 set(NANOVDB_INSTALL_UTIL_CUDA_DIR ${NANOVDB_INSTALL_UTIL_DIR}/cuda)
+
+# nanovdb/io/IO.h includes <nanovdb_blosc.h> without a nanovdb/ prefix, so
+# install it directly in the include directory. This lets consumers of an
+# installed NanoVDB resolve it without an OpenVDB source checkout.
+if(NANOVDB_USE_BLOSC)
+  install(FILES
+    ${CMAKE_CURRENT_LIST_DIR}/../../ext/blosc/openvdb/ext/blosc/nanovdb_blosc.h
+    DESTINATION ${NANOVDB_INSTALL_INCLUDEDIR}
+  )
+endif()
 
 install(FILES ${NANOVDB_INCLUDE_FILES} DESTINATION ${NANOVDB_INSTALL_ROOT_DIR})
 install(FILES ${NANOVDB_INCLUDE_CUDA_FILES} DESTINATION ${NANOVDB_INSTALL_CUDA_DIR})
