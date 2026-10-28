@@ -80,13 +80,13 @@
 #error Include openvdb_blosc.h or nanovdb_blosc.h before vdb_blosc.h
 #endif
 
-/* lz4 is compiled directly into this translation unit so that its symbols
-   stay hidden rather than appearing in the shared library's export table -
-   override the visibility macro before lz4.h defines it. MSVC has no
-   equivalent attribute and already hides symbols not marked for export. */
-#if defined(__GNUC__) && (__GNUC__ >= 4)
-#define LZ4LIB_VISIBILITY __attribute__((visibility("hidden")))
-#endif
+/* lz4 is compiled directly into this translation unit and given internal
+   linkage. Both the openvdb and nanovdb copies include it, so external lz4
+   symbols would clash when both static libraries are linked together.
+   LZ4_PUBLISH_STATIC_FUNCTIONS makes the experimental functions use the
+   same macro, so their declarations and definitions agree on linkage. */
+#define LZ4LIB_VISIBILITY static
+#define LZ4_PUBLISH_STATIC_FUNCTIONS
 #include "lz4/lz4.h"
 #include "lz4/lz4.c"
 
