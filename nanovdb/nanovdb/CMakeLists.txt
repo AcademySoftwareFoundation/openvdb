@@ -12,6 +12,14 @@ project(NanoVDB LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 
+# The top-level OpenVDB CMakeLists sets these. Provide defaults for when
+# NanoVDB is configured on its own.
+foreach(_NANOVDB_INSTALL_DIR BINDIR LIBDIR INCLUDEDIR DOCDIR)
+  if(NOT DEFINED NANOVDB_INSTALL_${_NANOVDB_INSTALL_DIR})
+    set(NANOVDB_INSTALL_${_NANOVDB_INSTALL_DIR} ${CMAKE_INSTALL_${_NANOVDB_INSTALL_DIR}})
+  endif()
+endforeach()
+
 ###############################################################################
 
 message(STATUS "----------------------------------------------------")

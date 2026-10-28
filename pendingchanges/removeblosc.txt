@@ -21,3 +21,4 @@ NanoVDB:
   - FindOpenVDB treats libnanovdb_blosc.a as optional for the nanovdb component.
   - OPENVDB_TOOL_NANO_USE_BLOSC no longer defines NANOVDB_USE_BLOSC itself. It
     now fails configuration if NanoVDB is built without Blosc.
+  - Configuring nanovdb/nanovdb on its own now sets default install directories.
