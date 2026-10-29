@@ -163,6 +163,8 @@ if(NANOVDB_USE_BLOSC AND NOT TARGET Blosc::blosc)
   find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
 endif()
 
+# NanoVDB headers include zlib.h, so zlib is found independently of OpenVDB
+# (where it is a private dependency).
 if(NANOVDB_USE_ZLIB AND NOT TARGET ZLIB::ZLIB)
   find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
 endif()
