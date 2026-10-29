@@ -176,10 +176,8 @@ endif()
 
 list(APPEND OPENVDB_CORE_DEPENDENT_LIBS TBB::tbb)
 
-# @todo zlib should be hidden (privately linked in):
-# See FindOpenVDB.cmake
-# Zstd is a private dependency. No installed header includes zstd.h, so
-# downstream projects do not need it at compile time.
+# Zstd and zlib are private dependencies. No installed header includes headers
+# from either library, so downstream projects do not need them at compile time.
 # @warning If building against Houdini these should be picked up from the
 # Houdini installation. If a custom version of EXR is in use, be careful
 # that zlib headers/libs are not also in the same location e.g.
@@ -190,6 +188,9 @@ if(USE_ZLIB)
 endif()
 
 set(OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS "")
+if(USE_BLOSC OR USE_ZLIB)
+  list(APPEND OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS ZLIB::ZLIB)
+endif()
 if(USE_ZSTD)
   list(APPEND OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS Zstd::zstd)
 endif()
