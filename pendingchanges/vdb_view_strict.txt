@@ -1,0 +1,3 @@
+vdb_view:
+  Build:
+  - Define GL_SILENCE_DEPRECATION on macOS so vdb_view builds with OPENVDB_CXX_STRICT=ON.
