@@ -44,7 +44,7 @@ void mainMeshToGrid(
     // Download sidecar.
     const uint64_t sidecarFloats = sidecar.size() / sizeof(float);
     std::vector<float> hostSidecar(sidecarFloats);
-    cudaCheck(cudaMemcpy(hostSidecar.data(), sidecar.deviceData(),
+    cudaCheck(cudaMemcpy(hostSidecar.data(), sidecar.data(),
                          sidecar.size(), cudaMemcpyDeviceToHost));
 
     // Encode a voxel coord as a sortable int64_t key.

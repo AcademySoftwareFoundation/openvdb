@@ -25,6 +25,7 @@
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/GridHandle.h>
+#include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/tools/cuda/TopologyBuilder.cuh>
@@ -133,9 +134,9 @@ public:
 
     /// @brief Creates a handle to the output grid
     /// @tparam BufferT Buffer type used for allocation of the grid handle
-    /// @param buffer prototype buffer whose resource (or create() pool) allocates the output
+    /// @param buffer prototype buffer whose resource allocates the output
     /// @return returns a handle with a grid of type NanoGrid<BuildT>
-    template<typename BufferT = nanovdb::cuda::DualDeviceBuffer>
+    template<typename BufferT = nanovdb::cuda::Buffer<std::byte>>
     GridHandle<BufferT>
     getHandle(const BufferT &buffer = BufferT());
 
@@ -158,12 +159,12 @@ public:
     ///          - sidecar[k>0] = UDF at the k-th active voxel (in voxel units)
     ///
     /// @tparam GridBufferT    Buffer type for the output grid handle
-    /// @tparam SidecarBufferT Buffer type for the UDF sidecar (defaults to DeviceBuffer)
-    /// @param buffer          prototype buffer whose resource (or create() pool) allocates the grid
-    /// @param sidecarBuffer   prototype buffer whose resource (or create() pool) allocates the sidecar
+    /// @tparam SidecarBufferT Buffer type for the UDF sidecar (defaults to cuda::Buffer<std::byte>)
+    /// @param buffer          prototype buffer whose resource allocates the grid
+    /// @param sidecarBuffer   prototype buffer whose resource allocates the sidecar
     /// @return std::pair of grid handle and UDF sidecar buffer
-    template<typename GridBufferT    = nanovdb::cuda::DualDeviceBuffer,
-             typename SidecarBufferT = nanovdb::cuda::DualDeviceBuffer>
+    template<typename GridBufferT    = nanovdb::cuda::Buffer<std::byte>,
+             typename SidecarBufferT = nanovdb::cuda::Buffer<std::byte>>
     std::pair<GridHandle<GridBufferT>, SidecarBufferT>
     getHandleAndUDF(const GridBufferT&    buffer        = GridBufferT(),
                     const SidecarBufferT& sidecarBuffer = SidecarBufferT());
@@ -1147,7 +1148,6 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
     if (mVerbose==1) mTimer.stop();
 
     if (mVerbose==1) mTimer.start("Pruning empty leaves");
-    int device = 0; cudaGetDevice(&device);
     const uint32_t leafCount = mBuilder.data()->nodeCount[0];
     auto handle = GridHandle<GridBufferT>(std::move(gridBuffer));
     if (leafCount) {
@@ -1170,7 +1170,7 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
         handle.template deviceGrid<BuildT>());
 
     auto sidecarBuffer = nanovdb::cuda::detail::createDeviceStorage<SidecarBufferT>(
-        (activeVoxelCount + 1) * sizeof(float), &sidecarProto, device, mStream);
+        (activeVoxelCount + 1) * sizeof(float), &sidecarProto, mStream);
     auto *dSidecar = static_cast<float*>(nanovdb::cuda::detail::deviceStorageData(sidecarBuffer));
 
     if (mVerbose==1) mTimer.start("Initializing UDF sidecar");

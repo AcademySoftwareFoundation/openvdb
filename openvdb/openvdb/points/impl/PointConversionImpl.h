@@ -591,19 +591,6 @@ convertPointDataGridPosition(   PositionAttribute& positionAttribute,
 }
 
 
-template <typename PositionAttribute, typename PointDataGridT, typename FilterT>
-OPENVDB_DEPRECATED_MESSAGE("Use convertPointDataGridPosition() without inCoreOnly parameter instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-void
-convertPointDataGridPosition(   PositionAttribute& positionAttribute,
-                                const PointDataGridT& grid,
-                                const std::vector<Index64>& pointOffsets,
-                                const Index64 startOffset,
-                                const FilterT& filter,
-                                const bool /*inCoreOnly*/)
-{
-    convertPointDataGridPosition(positionAttribute, grid, pointOffsets, startOffset, filter);
-}
-
 
 ////////////////////////////////////////
 
@@ -636,21 +623,6 @@ convertPointDataGridAttribute(  TypedAttribute& attribute,
 }
 
 
-template <typename TypedAttribute, typename PointDataTreeT, typename FilterT>
-OPENVDB_DEPRECATED_MESSAGE("Use convertPointDataGridAttribute() without inCoreOnly parameter instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-void
-convertPointDataGridAttribute(  TypedAttribute& attribute,
-                                const PointDataTreeT& tree,
-                                const std::vector<Index64>& pointOffsets,
-                                const Index64 startOffset,
-                                const unsigned arrayIndex,
-                                const Index stride,
-                                const FilterT& filter,
-                                const bool /*inCoreOnly*/)
-{
-    convertPointDataGridAttribute(attribute, tree, pointOffsets, startOffset, arrayIndex, stride, filter);
-}
-
 
 ////////////////////////////////////////
 
@@ -682,20 +654,6 @@ convertPointDataGridGroup(  Group& group,
     group.finalize();
 }
 
-
-template <typename Group, typename PointDataTreeT, typename FilterT>
-OPENVDB_DEPRECATED_MESSAGE("Use convertPointDataGridGroup() without inCoreOnly parameter instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-void
-convertPointDataGridGroup(  Group& group,
-                            const PointDataTreeT& tree,
-                            const std::vector<Index64>& pointOffsets,
-                            const Index64 startOffset,
-                            const AttributeSet::Descriptor::GroupIndex index,
-                            const FilterT& filter,
-                            const bool /*inCoreOnly*/)
-{
-    convertPointDataGridGroup(group, tree, pointOffsets, startOffset, index, filter);
-}
 
 
 template<typename PositionWrapper, typename InterrupterT, typename VecT>

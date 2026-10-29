@@ -2528,25 +2528,6 @@ TEST_F(TestNanoVDB, HDDA)
             }
         }
     }
-#if 0
-  if (!this->getEnvVar( "VDB_DATA_PATH" ).empty()) {// bug when ray-tracing dragon model
-    const Vec3T eye(1563.350342,-390.161621,697.749023);
-    const Vec3T dir(-0.963871,0.048393,-0.626651);
-    RayT ray( eye, dir );
-    auto srcGrid = this->getSrcGrid();
-    auto handle = nanovdb::openToNanoVDB( *srcGrid );
-    EXPECT_TRUE( handle );
-    auto *grid = handle.grid<float>();
-    EXPECT_TRUE( grid );
-    EXPECT_TRUE( grid->isLevelSet() );
-    //ray = ray.applyMapF( map );
-    auto acc = grid->getAccessor();
-    CoordT ijk;
-    float v0;
-    EXPECT_TRUE(nanovdb::math::ZeroCrossing( ray, acc, ijk, v0 ) );
-    std::cerr << "hit with v0 =" << v0 << " background = " << grid->tree().background() << std::endl;
-  }
-#endif
 } // HDDA
 
 TEST_F(TestNanoVDB, GetDimAndActive)
@@ -7906,6 +7887,17 @@ TEST_F(TestNanoVDB, HostBuffer)
         uint8_t *data = static_cast<uint8_t*>(std::malloc(poolSize + NANOVDB_DATA_ALIGNMENT));
         ASSERT_THROW(nanovdb::HostBuffer::createPool(0, nanovdb::alignPtr(data)), std::runtime_error);
         std::free(data);
+    }
+    try {// reading one grid into a HostBuffer pool larger than the grid
+        auto pool = nanovdb::HostBuffer::createPool(1 << 27);
+        auto handle = nanovdb::io::readGrid("data/multi1.nvdb", 0, 0, pool);
+        ASSERT_TRUE(handle);
+        EXPECT_LT(handle.bufferSize(), pool.poolSize());
+        ASSERT_TRUE(handle.grid<int>());
+        EXPECT_EQ(std::string("Int32 grid"), handle.grid<int>()->gridName());
+        EXPECT_TRUE(nanovdb::tools::validateChecksum(handle.grid<int>()));
+    } catch(const std::exception& e) {
+        std::cout << "Unable to read \"data/multi1.nvdb\" for unit-test\n" << e.what() << std::endl;
     }
     try {// reading multiple grids into a HostBuffer with external memory
         const size_t poolSize = 1 << 27;// 128 MB

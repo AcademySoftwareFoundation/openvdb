@@ -124,9 +124,6 @@ public:
 
     Page() = default;
 
-    OPENVDB_DEPRECATED_MESSAGE("Always returns false. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    void load() const { }
-
     /// @brief Uncompressed bytes of the Paged data, available
     /// when the header has been read.
     long uncompressedBytes() const;
@@ -145,9 +142,6 @@ public:
     /// @brief Skip the Page buffers by seeking past the compressed data
     /// without reading or decompressing it.
     void skipBuffers(std::istream&);
-
-    OPENVDB_DEPRECATED_MESSAGE("Always returns false. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    bool isOutOfCore() const { return false; }
 
 private:
     /// @brief Convenience method to store a copy of the supplied buffer

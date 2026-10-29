@@ -39,19 +39,6 @@ namespace tools {
 template <typename ValueT>
 bool isValid(const NanoGrid<ValueT> *grid, CheckMode mode, bool verbose = false);
 
-/// @brief Return true if the specified grid passes several validation tests.
-/// @tparam ValueT Build type of the input grid
-/// @param grid Grid to validate
-/// @param detailed If true the validation test is detailed and relatively slow.
-/// @param verbose If true information about the first failed test is printed to std::cerr
-/// @note This method has been deprecated by the one defined above
-template <typename ValueT>
-[[deprecated("Use isValue(const NanoGrid<ValueT>*, CheckMode, bool) instead.")]]
-bool isValid(const NanoGrid<ValueT> &grid, bool detailed = true, bool verbose = false)
-{
-    return isValid(&grid, detailed ? CheckMode::Full : CheckMode::Half, verbose);
-}
-
 //================================================================================================
 
 /// @brief validate grid
@@ -225,20 +212,6 @@ bool validateGrids(const GridHandleT &handle, CheckMode mode, bool verbose)
 }// validateGrids
 
 }// namespace tools
-
-template<typename ValueT>
-[[deprecated("Use nanovdb:tools::checkGrid instead.")]]
-__hostdev__ char* checkGrid(const NanoGrid<ValueT> *grid, char *error, CheckMode mode = CheckMode::Full)
-{
-    return tools::checkGrid<ValueT>(grid, error, mode);
-}
-
-template <typename ValueT>
-[[deprecated("Use nanovdb:tools::isValid instead.")]]
-bool isValid(const NanoGrid<ValueT> *grid, CheckMode mode, bool verbose = false)
-{
-    return tools::isValid<ValueT>(grid, mode, verbose);
-}
 
 }// namespace nanovdb
 

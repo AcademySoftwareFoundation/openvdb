@@ -11,11 +11,7 @@ namespace openvdb {
 namespace OPENVDB_VERSION_NAME {
 namespace ax {
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
     using LeafIndexType = openvdb::Index64;
-#else
-    using LeafIndexType = openvdb::Index32;
-#endif
 
 class TestVolumeExecutable : public ::testing::Test
 {

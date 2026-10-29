@@ -34,7 +34,8 @@ if (MSVC)
 endif()
 
 # -----------------------------------------------------------------------------
-# Compiles each installed C++ header, except the deprecated forwarding headers,
+# Compiles each installed C++ header, except the deprecated forwarding headers
+# and the removed headers kept as #error tombstones,
 # as the first include of its own CUDA translation unit, so a header that does
 # not compile on its own under nvcc (a missing or cyclic include) fails the
 # build. The C headers are skipped, and tools/NanoToOpenVDB.h needs OpenVDB.
@@ -51,7 +52,7 @@ if(NANOVDB_USE_CUDA)
     if(header IN_LIST NANOVDB_HEADER_CHECK_SKIP)
       continue()
     endif()
-    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../${header}" deprecated REGEX "NANOVDB_DEPRECATED_HEADER")
+    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../${header}" deprecated REGEX "NANOVDB_DEPRECATED_HEADER|NANOVDB_REMOVED_HEADER")
     if(deprecated)
       continue()
     endif()

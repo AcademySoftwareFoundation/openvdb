@@ -387,15 +387,4 @@ void dynamicSharedMemoryLauncher(const size_t numItems, const size_t smem_size, 
 
 }// namespace nanovdb ===============================================================
 
-#if defined(__CUDACC__)// the following functions only run on the GPU!
-template<typename Func, typename... Args>
-[[deprecated("Use nanovdb::cuda::lambdaKernel instead")]]
-__global__ void cudaLambdaKernel(const size_t numItems, Func func, Args... args)
-{
-    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid >= numItems) return;
-    func(tid, args...);
-}
-#endif// __CUDACC__
-
 #endif// NANOVDB_UTIL_CUDA_UTIL_H_HAS_BEEN_INCLUDED

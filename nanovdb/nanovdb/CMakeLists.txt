@@ -12,10 +12,13 @@ project(NanoVDB LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 
-# Use the standard documentation directory for standalone builds.
-if(NOT DEFINED NANOVDB_INSTALL_DOCDIR)
-  set(NANOVDB_INSTALL_DOCDIR "${CMAKE_INSTALL_DOCDIR}")
-endif()
+# The top-level OpenVDB CMakeLists sets these. Provide defaults for when
+# NanoVDB is configured on its own.
+foreach(_NANOVDB_INSTALL_DIR BINDIR LIBDIR INCLUDEDIR DOCDIR)
+  if(NOT DEFINED NANOVDB_INSTALL_${_NANOVDB_INSTALL_DIR})
+    set(NANOVDB_INSTALL_${_NANOVDB_INSTALL_DIR} ${CMAKE_INSTALL_${_NANOVDB_INSTALL_DIR}})
+  endif()
+endforeach()
 
 include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/OpenVDBInstallLicenses.cmake")
 openvdb_install_licenses("${NANOVDB_INSTALL_DOCDIR}")
@@ -293,28 +296,11 @@ set(NANOVDB_INCLUDE_TOOLS_CUDA_FILES
 
 # NanoVDB util header files
 set(NANOVDB_INCLUDE_UTIL_FILES
-  util/CpuTimer.h
-  util/CreateNanoGrid.h
-  util/DitherLUT.h
   util/ForEach.h
-  util/GridBuilder.h
-  util/GridChecksum.h
-  util/GridStats.h
-  util/GridValidator.h
-  util/HDDA.h
-  util/HostBuffer.h
   util/Invoke.h
-  util/IO.h
-  util/NanoToOpenVDB.h
-  util/NodeManager.h
-  util/OpenToNanoVDB.h
   util/PrefixSum.h
-  util/Primitives.h
   util/Range.h
-  util/Ray.h
   util/Reduce.h
-  util/SampleFromVoxels.h
-  util/Stencils.h
   util/Timer.h
   util/Util.h
   util/MorphologyHelpers.h
@@ -323,20 +309,9 @@ set(NANOVDB_INCLUDE_UTIL_FILES
 
 # NanoVDB util/cuda header files
 set(NANOVDB_INCLUDE_UTIL_CUDA_FILES
-  util/cuda/CudaAddBlindData.cuh
-  util/cuda/CudaGridHandle.cuh
-  util/cuda/CudaIndexToGrid.cuh
-  util/cuda/CudaSignedFloodFill.cuh
   util/cuda/Timer.h
   util/cuda/CudaDeviceBuffer.h
-  util/cuda/CudaGridStats.cuh
-  util/cuda/CudaNodeManager.cuh
-  util/cuda/CudaUtils.h
   util/cuda/Util.h
-  util/cuda/CudaGridChecksum.cuh
-  util/cuda/CudaGridValidator.cuh
-  util/cuda/CudaPointsToGrid.cuh
-  util/cuda/GpuTimer.h
   util/cuda/Morphology.cuh
   util/cuda/MorphologyHelpers.cuh
   util/cuda/DeviceGridTraits.cuh

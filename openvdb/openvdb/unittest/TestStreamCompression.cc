@@ -72,6 +72,12 @@ TEST_F(TestStreamCompression, testBlosc)
             bloscDecompress(compressedBuffer.get(), 1), openvdb::RuntimeError);
 
         EXPECT_TRUE(newUncompressedBuffer);
+
+        // bitshuffle is not supported, so a header with the bitshuffle flag
+        // (0x04 in the flags byte) must be rejected
+        compressedBuffer.get()[2] |= 0x04;
+        EXPECT_THROW(bloscDecompress(compressedBuffer.get(), uncompressedBytes),
+            openvdb::RuntimeError);
     }
 
     { // one value (below minimum bytes)

@@ -748,53 +748,6 @@ struct OPENVDB_AX_API Function
 
     const SmallArgumentVector<const char*>& dependencies() const { return mDeps; }
 
-    /// Deprecated builder methods, no longer public
-
-    OPENVDB_DEPRECATED_MESSAGE("This method incorrectly returns the attributes "
-        "of the function set by the FunctionBuilder, not by the codegen. To "
-        "inspect function attributes, retrieve the created function from the "
-        "llvm::Module.")
-    inline bool hasParamAttribute(const size_t i,
-            const llvm::Attribute::AttrKind& kind) const
-    {
-        if (!mAttributes) return false;
-        const auto iter = mAttributes->mParamAttrs.find(i);
-        if (iter == mAttributes->mParamAttrs.end()) return false;
-        const auto& vec = iter->second;
-        return std::find(vec.begin(), vec.end(), kind) != vec.end();
-    }
-
-    OPENVDB_DEPRECATED_MESSAGE("Use the FunctionBuilder to construct Functions")
-    inline void setArgumentNames(std::vector<const char*> names)
-    {
-        mNames.assign(names.begin(), names.end());
-    }
-
-    OPENVDB_DEPRECATED_MESSAGE("Use the FunctionBuilder to construct Functions")
-    inline void setDependencies(std::vector<const char*> deps)
-    {
-        mDeps.assign(deps.begin(), deps.end());
-    }
-
-    OPENVDB_DEPRECATED_MESSAGE("Use the FunctionBuilder to construct Functions")
-    inline void setFnAttributes(const std::vector<llvm::Attribute::AttrKind>& in)
-    {
-        this->attrs().mFnAttrs.assign(in.begin(), in.end());
-    }
-
-    OPENVDB_DEPRECATED_MESSAGE("Use the FunctionBuilder to construct Functions")
-    inline void setRetAttributes(const std::vector<llvm::Attribute::AttrKind>& in)
-    {
-        this->attrs().mRetAttrs.assign(in.begin(), in.end());
-    }
-
-    OPENVDB_DEPRECATED_MESSAGE("Use the FunctionBuilder to construct Functions")
-    inline void setParamAttributes(const size_t i,
-            const std::vector<llvm::Attribute::AttrKind>& in)
-    {
-        this->attrs().mParamAttrs[i].assign(in.begin(), in.end());
-    }
-
 private:
     friend FunctionBuilder;
 

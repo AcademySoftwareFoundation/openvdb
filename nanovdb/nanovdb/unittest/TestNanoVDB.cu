@@ -31,7 +31,8 @@
 #include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/PinnedResource.h>
 #include <nanovdb/cuda/HandleStorage.h>
-#include <nanovdb/cuda/UnifiedBuffer.h>
+#include <nanovdb/cuda/GridHandle.cuh>
+#include <nanovdb/cuda/ManagedResource.h>
 #include <nanovdb/cuda/DeviceStreamMap.h>
 #include <nanovdb/cuda/DeviceMesh.h>
 
@@ -43,125 +44,16 @@
 #include <iomanip> // for std::setw, std::setfill
 #include <thread> // for std::thread
 #include <type_traits>
-
-// The tests of the dual-space buffers deliberately keep exercising the
-// deprecated DeviceBuffer surface until its removal; the deprecation warnings
-// are suppressed for this translation unit only. The GPU-builder tests use
-// cuda::Buffer and cuda::copyTo, as new code must.
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-#if defined(_MSC_VER)
-#pragma warning(disable : 4996)
-#endif
-#if defined(__CUDACC__)
-#pragma nv_diag_suppress 20199
-#endif
+#include <utility> // for std::declval
 
 /// @brief Single-space device storage that the GPU builders write into.
 using SingleBufT = nanovdb::cuda::Buffer<std::byte>;
+static_assert(nanovdb::BufferIsDeviceOnly<SingleBufT>::value, "device grids have no host accessors");
 
 
 namespace nanovdb {// this namespace is required by gtest
 
 namespace test {
-
-// used for testing cuda::DeviceBuffer
-void device2host(size_t count)
-{
-    const size_t size = count * sizeof(float);
-    auto buffer = nanovdb::cuda::DeviceBuffer::create(size, nullptr, false);// on device only
-    EXPECT_EQ(size, buffer.size());
-    EXPECT_FALSE(buffer.data());
-    EXPECT_TRUE(buffer.deviceData());
-    float *d_array = reinterpret_cast<float*>(buffer.deviceData());
-    constexpr unsigned int num_threads = 256;
-    unsigned int num_blocks = (static_cast<unsigned int>(count) + num_threads - 1) / num_threads;
-    nanovdb::util::cuda::lambdaKernel<<<num_blocks, num_threads>>>(count, [=] __device__ (size_t i) {d_array[i] = float(i);});
-    buffer.deviceDownload();// copy device -> host
-    EXPECT_EQ(size, buffer.size());
-    EXPECT_TRUE(buffer.data());
-    EXPECT_TRUE(buffer.deviceData());
-    float *array = reinterpret_cast<float*>(buffer.data());
-    for (size_t i=0; i<count; ++i) EXPECT_EQ(array[i], float(i));
-}// device2host
-
-void host2device(size_t count)
-{
-    const size_t size = count * sizeof(float);
-    auto hostBuffer = nanovdb::HostBuffer(size);
-    for (size_t i=0; i<count; ++i) *hostBuffer.data<float>(i) = float(i);
-
-    int dev;
-    cudaError_t err = cudaGetDevice(&dev);
-    if (err != cudaSuccess) printf("kernel cuda error: %d\n", (int)err);
-
-    auto devBuffer = nanovdb::cuda::DeviceBuffer::create(hostBuffer, dev);// on device only
-    EXPECT_EQ(size, devBuffer.size());
-    EXPECT_FALSE(devBuffer.data());
-    EXPECT_TRUE(devBuffer.deviceData());
-    float *d_array = reinterpret_cast<float*>(devBuffer.deviceData());
-    constexpr unsigned int num_threads = 256;
-    unsigned int num_blocks = (static_cast<unsigned int>(count) + num_threads - 1) / num_threads;
-
-    bool *test, *d_test;
-    cudaCheck(cudaMallocHost((void**)&test, sizeof(bool)));
-    cudaCheck(cudaMalloc((void**)&d_test, sizeof(bool)));
-    *test = true;
-    cudaCheck(cudaMemcpyAsync(d_test, test, sizeof(bool), cudaMemcpyHostToDevice));// on host only
-
-    nanovdb::util::cuda::lambdaKernel<<<num_blocks, num_threads>>>(count, [=] __device__ (size_t i) {
-        if (d_array[i] != float(i)) *d_test = false;
-        d_array[i] = float(i) + 1.0f;
-    });
-    cudaCheck(cudaMemcpy(test, d_test, sizeof(bool), cudaMemcpyDeviceToHost));
-    EXPECT_TRUE(*test);
-    cudaCheck(cudaFreeHost(test));
-    cudaCheck(cudaFree(d_test));
-    devBuffer.deviceDownload();// copy device -> host
-    EXPECT_EQ(size, devBuffer.size());
-    EXPECT_TRUE(devBuffer.data());
-    EXPECT_TRUE(devBuffer.deviceData());
-    for (size_t i=0; i<count; ++i) EXPECT_EQ(*hostBuffer.data<float>(i) + 1.0f, *devBuffer.data<float>(i));
-}// host2device
-
-// used for testing cuda::DeviceBuffer
-void host2device2host(size_t count)
-{
-    bool *test, *d_test;
-    cudaCheck(cudaMallocHost((void**)&test, sizeof(bool)));
-    cudaCheck(cudaMalloc((void**)&d_test, sizeof(bool)));
-    *test = true;
-    cudaCheck(cudaMemcpyAsync(d_test, test, sizeof(bool), cudaMemcpyHostToDevice));// on host only
-
-    const size_t size = count * sizeof(float);
-    auto buffer = nanovdb::cuda::DeviceBuffer::create(size);
-    EXPECT_EQ(size, buffer.size());
-    EXPECT_TRUE(buffer.data());
-    EXPECT_FALSE(buffer.deviceData());
-    float *array = reinterpret_cast<float*>(buffer.data());
-    for (size_t i=0; i<count; ++i) array[i] = i;
-    buffer.deviceUpload();// copy host -> device
-    EXPECT_EQ(size, buffer.size());
-    EXPECT_TRUE(buffer.data());
-    EXPECT_TRUE(buffer.deviceData());
-    float *d_array = reinterpret_cast<float*>(buffer.deviceData());
-    constexpr unsigned int num_threads = 256;
-    unsigned int num_blocks = (static_cast<unsigned int>(count) + num_threads - 1) / num_threads;
-    nanovdb::util::cuda::lambdaKernel<<<num_blocks, num_threads>>>(count, [=] __device__ (size_t i) {
-        if (d_array[i] != float(i)) *d_test = false;
-        d_array[i] = float(i) + 1.0f;
-    });
-    cudaCheck(cudaMemcpy(test, d_test, sizeof(bool), cudaMemcpyDeviceToHost));
-    EXPECT_TRUE(*test);
-    cudaCheck(cudaFreeHost(test));
-    cudaCheck(cudaFree(d_test));
-    buffer.deviceDownload();// copy device -> host
-    EXPECT_EQ(size, buffer.size());
-    EXPECT_TRUE(buffer.data());
-    EXPECT_TRUE(buffer.deviceData());
-    for (size_t i=0; i<count; ++i) EXPECT_EQ(array[i], float(i) + 1.0f);
-}// host2device2host
 
 // used to test cudaStr methods
 int signum(int val)
@@ -210,29 +102,6 @@ void cudaStr()
 }// namespace test
 
 }// namespace nanovdb
-
-TEST(TestNanoVDBCUDA, CudaDeviceBuffer)
-{
-    {
-        nanovdb::cuda::DeviceBuffer buffer;
-        EXPECT_EQ(0, buffer.deviceCount());
-        EXPECT_EQ(0, buffer.bufferCount());
-        EXPECT_EQ(0, buffer.size());
-        EXPECT_TRUE(buffer.empty());
-    }
-    {
-        nanovdb::cuda::DeviceBuffer buffer(1024);
-        int count = 0;
-        cudaGetDeviceCount(&count);
-        EXPECT_EQ(count, buffer.deviceCount());
-        EXPECT_EQ(1, buffer.bufferCount());
-        EXPECT_EQ(1024, buffer.size());
-        EXPECT_FALSE(buffer.empty());
-    }
-    nanovdb::test::device2host(1000);
-    nanovdb::test::host2device(1000);
-    nanovdb::test::host2device2host(1000);
-}
 
 TEST(TestNanoVDBCUDA, CudaStr)
 {
@@ -593,7 +462,7 @@ TEST(TestNanoVDBCUDA, Basic_CudaPointsToGrid_ValueOnIndex)
     }
 }// Basic_CudaPointsToGrid_ValueOnIndex
 
-TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_DeviceBuffer)
+TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid)
 {
     using BuildT = nanovdb::ValueOnIndex;
     nanovdb::util::Timer timer;
@@ -630,26 +499,25 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_DeviceBuffer)
     cudaCheck(cudaMemcpy(d_coords, voxels.data(), voxelSize, cudaMemcpyHostToDevice));
     //timer.stop();
 
-    timer.start("voxelsToGrid<DeviceBuffer>("+std::to_string(voxels.size())+" points)");
+    timer.start("voxelsToGrid("+std::to_string(voxels.size())+" points)");
     auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_coords, voxelCount, 1.0);
     timer.stop();
+    static_assert(std::is_same<decltype(handle), nanovdb::GridHandle<SingleBufT>>::value,
+                  "the GPU builders default to a device-only cuda::Buffer");
 
     EXPECT_TRUE(handle.deviceData());// grid only exists on the GPU
     EXPECT_TRUE(handle.deviceGrid<BuildT>());
     EXPECT_FALSE(handle.deviceGrid<int>(0));
     EXPECT_TRUE(handle.deviceGrid<BuildT>(0));
     EXPECT_FALSE(handle.deviceGrid<BuildT>(1));
-    EXPECT_FALSE(handle.data());// no grid was yet allocated on the CPU
 
     //timer.start("Allocating and copying grid from GPU to CPU");
-    auto *grid = handle.grid<BuildT>();// no grid on the CPU
-    EXPECT_FALSE(grid);
-    handle.deviceDownload();// creates a copy on the CPU
+    auto hostHandle = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(handle, cudaStream_t(0));
     EXPECT_TRUE(handle.deviceData());
-    EXPECT_TRUE(handle.data());
-    auto *data = handle.gridData();
+    EXPECT_TRUE(hostHandle.data());
+    auto *data = hostHandle.gridData();
     EXPECT_TRUE(data);
-    grid = handle.grid<BuildT>();
+    auto *grid = hostHandle.grid<BuildT>();
     EXPECT_TRUE(grid);
     EXPECT_TRUE(grid->valueCount()>0);
     EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
@@ -671,9 +539,9 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_DeviceBuffer)
 
     //timer.stop();
     cudaCheck(cudaFree(d_coords));
-}// Large_CudaPointsToGrid_DeviceBuffer
+}// Large_CudaPointsToGrid
 
-TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_UnifiedBuffer)
+TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_ManagedBuffer)
 {
     using BuildT = nanovdb::ValueOnIndex;
     nanovdb::util::Timer timer;
@@ -710,8 +578,10 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_UnifiedBuffer)
     cudaCheck(cudaMemcpy(d_coords, voxels.data(), voxelSize, cudaMemcpyHostToDevice));
     //timer.stop();
 
-    timer.start("voxelsToGrid<UnifiedBuffer>("+std::to_string(voxels.size())+" points)");
-    auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT, nanovdb::Coord*, nanovdb::cuda::UnifiedBuffer>(d_coords, voxelCount, 1.0);
+    using ManagedBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
+    timer.start("voxelsToGrid<ManagedBufT>("+std::to_string(voxels.size())+" points)");
+    auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT, nanovdb::Coord*, ManagedBufT>(d_coords, voxelCount, 1.0, ManagedBufT());
+    cudaCheck(cudaDeviceSynchronize());// the grid is read on the CPU below
     timer.stop();
 
     EXPECT_TRUE(handle.deviceData());// grid exists on the GPU
@@ -719,17 +589,11 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_UnifiedBuffer)
     EXPECT_FALSE(handle.deviceGrid<int>(0));
     EXPECT_TRUE(handle.deviceGrid<BuildT>(0));
     EXPECT_FALSE(handle.deviceGrid<BuildT>(1));
-    EXPECT_TRUE(handle.data());// grid also exists on the CPU
-
-    //timer.start("Allocating and copying grid from GPU to CPU");
-    auto *grid = handle.grid<BuildT>();// grid also exists on the CPU
-    EXPECT_TRUE(grid);
-    handle.deviceDownload();// creates a copy on the CPU
-    EXPECT_TRUE(handle.deviceData());
-    EXPECT_TRUE(handle.data());
+    EXPECT_TRUE(handle.data());// the same grid is accessible on the CPU
+    EXPECT_EQ(handle.data(), handle.deviceData());
     auto *data = handle.gridData();
     EXPECT_TRUE(data);
-    grid = handle.grid<BuildT>();
+    auto *grid = handle.grid<BuildT>();
     EXPECT_TRUE(grid);
     EXPECT_TRUE(grid->valueCount()>0);
     EXPECT_EQ(nanovdb::Vec3d(1.0), grid->voxelSize());
@@ -751,7 +615,7 @@ TEST(TestNanoVDBCUDA, Large_CudaPointsToGrid_UnifiedBuffer)
 
     //timer.stop();
     cudaCheck(cudaFree(d_coords));
-}// Large_CudaPointsToGrid_UnifiedBuffer
+}// Large_CudaPointsToGrid_ManagedBuffer
 
 /// @brief Exercises the serial per-tile sort path (< 32 tiles) in PointsToGrid.
 ///        Coordinates in [-512, 512] produce at most 2^3 = 8 upper internal node tiles
@@ -873,20 +737,20 @@ TEST(TestNanoVDBCUDA, mergeSplitGrids)
     EXPECT_EQ( 5u, handles2.size());
     //timer.restart("merging 5 host grids");
     auto mergedHandle = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles2);// merge last 5 grid handles
-    EXPECT_EQ(size2, mergedHandle.size());
+    EXPECT_EQ(size2, mergedHandle.bufferSize());
     EXPECT_FALSE(mergedHandle.isPadded());
     EXPECT_TRUE(mergedHandle.data());
     auto *gridData = mergedHandle.gridData();// first grid
     EXPECT_TRUE(gridData);
     EXPECT_EQ(5u, gridData->mGridCount);
     EXPECT_EQ(0u, gridData->mGridIndex);
-    EXPECT_EQ(handles2[0].size(), gridData->mGridSize);
+    EXPECT_EQ(handles2[0].bufferSize(), gridData->mGridSize);
     //timer.restart("unit-test host grids");
     for (int i=0; i<5; ++i){
         gridData = mergedHandle.gridData(i);
         EXPECT_TRUE(gridData);
         EXPECT_EQ(i, gridData->mGridIndex);
-        EXPECT_EQ(handles2[i].size(), gridData->mGridSize);
+        EXPECT_EQ(handles2[i].bufferSize(), gridData->mGridSize);
         EXPECT_EQ(strcmp(gridNames[i+5].c_str(), gridData->mGridName),0);
     }
 
@@ -896,27 +760,27 @@ TEST(TestNanoVDBCUDA, mergeSplitGrids)
     EXPECT_EQ(6u, handles1.size());
     //timer.restart("merging 10 host grids");
     mergedHandle = nanovdb::mergeGrids<nanovdb::HostBuffer, std::vector>(handles1);
-    EXPECT_EQ(size1 + size2, mergedHandle.size());
+    EXPECT_EQ(size1 + size2, mergedHandle.bufferSize());
     EXPECT_TRUE(mergedHandle.data());
     gridData = mergedHandle.gridData();// first grid
     EXPECT_TRUE(gridData);
     EXPECT_EQ(10u, gridData->mGridCount);
     EXPECT_EQ( 0u, gridData->mGridIndex);
-    EXPECT_EQ(handles1[0].size(), gridData->mGridSize);
+    EXPECT_EQ(handles1[0].bufferSize(), gridData->mGridSize);
 
     //timer.restart("splitting host grids");
     auto splitHandles = nanovdb::splitGrids(mergedHandle);
     //timer.restart("unit-test split grids");
     EXPECT_EQ(10u, splitHandles.size());
     for (int i=0; i<5; ++i){
-        EXPECT_EQ(handles1[i].size(), splitHandles[i].size());
+        EXPECT_EQ(handles1[i].bufferSize(), splitHandles[i].bufferSize());
         gridData = splitHandles[i].gridData();
         EXPECT_EQ(0u, gridData->mGridIndex);
         EXPECT_EQ(1u, gridData->mGridCount);
         EXPECT_EQ(strcmp(gridNames[i].c_str(), gridData->mGridName),0);
     }
     for (int i=5; i<10; ++i){
-        EXPECT_EQ(handles2[i-5].size(), splitHandles[i].size());
+        EXPECT_EQ(handles2[i-5].bufferSize(), splitHandles[i].bufferSize());
         gridData = splitHandles[i].gridData();
         EXPECT_EQ(0u, gridData->mGridIndex);
         EXPECT_EQ(1u, gridData->mGridCount);
@@ -927,54 +791,51 @@ TEST(TestNanoVDBCUDA, mergeSplitGrids)
 
 TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
 {
-    using BufferT = nanovdb::cuda::DeviceBuffer;
-    using HandleT = nanovdb::GridHandle<BufferT>;
+    using HandleT = nanovdb::GridHandle<SingleBufT>;
+    const cudaStream_t stream = 0;
     size_t size = 0;
     std::vector<HandleT> handles;
     std::vector<std::string> gridNames;
-    //nanovdb::util::Timer timer("create 10 host grids");
+    //nanovdb::util::Timer timer("create 10 host grids and copy them to the device");
     for (int radius = 100; radius<200; radius += 10) {
         gridNames.emplace_back("sphere_" + std::to_string(radius));
-        handles.emplace_back(nanovdb::tools::createLevelSetSphere<float, BufferT>(radius,nanovdb::Vec3d(0),1,3,
-                                                           nanovdb::Vec3d(0), gridNames.back()));
-        EXPECT_FALSE(handles.back().isPadded());
-        size += handles.back().bufferSize();
+        auto hostHandle = nanovdb::tools::createLevelSetSphere(radius,nanovdb::Vec3d(0),1,3,
+                                                               nanovdb::Vec3d(0), gridNames.back());
+        EXPECT_FALSE(hostHandle.isPadded());
+        size += hostHandle.bufferSize();
+        handles.push_back(nanovdb::cuda::copyTo<SingleBufT>(hostHandle, stream));
     }
-    //timer.restart("copy grids to device");
-    for (auto &h : handles) h.deviceUpload();
     EXPECT_EQ(10u, handles.size());
     //timer.restart("merging device grids");
-    auto mergedHandle = nanovdb::cuda::mergeGridHandles<BufferT, std::vector>(handles);
-    EXPECT_EQ(size, mergedHandle.size());
-    EXPECT_FALSE(mergedHandle.data());
+    auto mergedHandle = nanovdb::cuda::mergeGridHandles<SingleBufT, std::vector>(handles, stream);
+    EXPECT_EQ(size, mergedHandle.bufferSize());
     EXPECT_TRUE(mergedHandle.deviceData());
     EXPECT_FALSE(mergedHandle.isPadded());
     //timer.restart("copy grids to host");
-    mergedHandle.deviceDownload();
-    EXPECT_TRUE(mergedHandle.data());
-    EXPECT_TRUE(mergedHandle.deviceData());
-    EXPECT_FALSE(mergedHandle.isPadded());
-    auto *gridData = mergedHandle.gridData();// first grid
+    auto mergedHost = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(mergedHandle, stream);
+    EXPECT_TRUE(mergedHost.data());
+    EXPECT_FALSE(mergedHost.isPadded());
+    auto *gridData = mergedHost.gridData();// first grid
     EXPECT_TRUE(gridData);
     EXPECT_EQ(10u, gridData->mGridCount);
     EXPECT_EQ(0u, gridData->mGridIndex);
     //timer.restart("unit-test host grids");
     for (uint32_t i=0; i<10; ++i) {
-        gridData = mergedHandle.gridData(i);
+        gridData = mergedHost.gridData(i);
         EXPECT_TRUE(gridData);
         EXPECT_EQ(i, gridData->mGridIndex);
         EXPECT_EQ(strcmp(gridNames[i].c_str(), gridData->mGridName),0);
     }
     //timer.restart("splitting device grids");
-    auto splitHandles = nanovdb::cuda::splitGridHandles<BufferT, std::vector>(mergedHandle);
+    auto splitHandles = nanovdb::cuda::splitGridHandles<SingleBufT, std::vector>(mergedHandle, stream);
     //timer.restart("unit-test split grids");
     EXPECT_EQ(10u, splitHandles.size());
     for (uint32_t i=0u; i<10u; ++i) {
-        EXPECT_EQ(handles[i].size(), splitHandles[i].size());
+        EXPECT_EQ(handles[i].bufferSize(), splitHandles[i].bufferSize());
         EXPECT_FALSE(splitHandles[i].isPadded());
-        EXPECT_FALSE(splitHandles[i].gridData());
-        splitHandles[i].deviceDownload();
-        gridData = splitHandles[i].gridData();
+        EXPECT_TRUE(splitHandles[i].deviceData());
+        auto splitHost = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(splitHandles[i], stream);
+        gridData = splitHost.gridData();
         EXPECT_TRUE(gridData);
         EXPECT_EQ(0u, gridData->mGridIndex);
         EXPECT_EQ(1u, gridData->mGridCount);
@@ -985,14 +846,13 @@ TEST(TestNanoVDBCUDA, mergeSplitDeviceGrids)
 
 TEST(TestNanoVDBCUDA, voxelSetsToDeviceGrids)
 {
-    using BufferT = nanovdb::cuda::DeviceBuffer;
     nanovdb::Coord coords[3] = {nanovdb::Coord(1,2,3), nanovdb::Coord(10,20,8), nanovdb::Coord(-5,0,7)}, *d_coords = nullptr;
     ASSERT_EQ(cudaSuccess, cudaMalloc(&d_coords, sizeof(coords)));
     ASSERT_EQ(cudaSuccess, cudaMemcpy(d_coords, coords, sizeof(coords), cudaMemcpyHostToDevice));
     std::vector<std::tuple<const nanovdb::Coord* const, size_t, double>> voxelSets{{d_coords, 2, 1.0}, {d_coords + 2, 1, 0.5}};
-    auto handle = nanovdb::tools::cuda::voxelsToGrid<float, const nanovdb::Coord*, BufferT>(voxelSets);
-    ASSERT_EQ(2u, handle.gridCount());
-    handle.deviceDownload();
+    auto devHandle = nanovdb::tools::cuda::voxelsToGrid<float, const nanovdb::Coord*, SingleBufT>(voxelSets);
+    ASSERT_EQ(2u, devHandle.gridCount());
+    auto handle = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(devHandle, cudaStream_t(0));
     EXPECT_EQ(2u, handle.grid<float>(0)->activeVoxelCount());
     EXPECT_EQ(1u, handle.grid<float>(1)->activeVoxelCount());
     EXPECT_EQ(1u, handle.gridData(1)->mGridIndex);
@@ -1007,7 +867,6 @@ TEST(TestNanoVDBCUDA, mergePointGridsAligned)
     using nanovdb::Vec3f;
     using nanovdb::Point;
     using nanovdb::PointType;
-    using BufferT = nanovdb::cuda::DualDeviceBuffer;
     const std::vector<Vec3f> pointsA = {Vec3f(0.5f, 1.5f, 2.5f), Vec3f(3.0f, 3.0f, 3.0f)}, pointsB = {Vec3f(-1.0f, -2.0f, -3.0f)};
     Vec3f *d_ptsA = nullptr, *d_ptsB = nullptr;
     ASSERT_EQ(cudaSuccess, cudaMalloc(&d_ptsA, pointsA.size() * sizeof(Vec3f)));
@@ -1015,17 +874,17 @@ TEST(TestNanoVDBCUDA, mergePointGridsAligned)
     ASSERT_EQ(cudaSuccess, cudaMemcpy(d_ptsA, pointsA.data(), pointsA.size() * sizeof(Vec3f), cudaMemcpyHostToDevice));
     ASSERT_EQ(cudaSuccess, cudaMemcpy(d_ptsB, pointsB.data(), pointsB.size() * sizeof(Vec3f), cudaMemcpyHostToDevice));
 
-    std::vector<nanovdb::GridHandle<BufferT>> handles;
+    std::vector<nanovdb::GridHandle<SingleBufT>> handles;
     for (auto [d_pts, count] : {std::make_pair(d_ptsA, pointsA.size()), std::make_pair(d_ptsB, pointsB.size())}) {
         nanovdb::tools::cuda::PointsToGrid<Point> converter;
         converter.setPointType(PointType::Voxel8);
-        handles.push_back(converter.getHandle<Vec3f*, BufferT>(d_pts, count));
+        handles.push_back(converter.getHandle<Vec3f*, SingleBufT>(d_pts, count, SingleBufT()));
         EXPECT_EQ(0u, handles.back().gridSize(0) % NANOVDB_DATA_ALIGNMENT);
     }
-    auto merged = nanovdb::cuda::mergeGridHandles<BufferT, std::vector>(handles);
-    ASSERT_EQ(2u, merged.gridCount());
-    EXPECT_EQ(0u, merged.gridSize(0) % NANOVDB_DATA_ALIGNMENT);
-    merged.deviceDownload();
+    auto devMerged = nanovdb::cuda::mergeGridHandles<SingleBufT, std::vector>(handles, cudaStream_t(0));
+    ASSERT_EQ(2u, devMerged.gridCount());
+    EXPECT_EQ(0u, devMerged.gridSize(0) % NANOVDB_DATA_ALIGNMENT);
+    auto merged = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(devMerged, cudaStream_t(0));
     EXPECT_EQ(1u, merged.gridData(1)->mGridIndex);
     EXPECT_EQ(2u, merged.gridData(1)->mGridCount);
     ASSERT_NE(merged.grid<Point>(0), nullptr);
@@ -2415,7 +2274,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_Voxel8)
 
     //timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
     /////////////////////////////////////////////////////////////////////////
-    //auto handle = nanovdb::cudaPointsToGrid(d_points, pointCount, nanovdb::PointType::Voxel8);
+    //auto handle = nanovdb::tools::cuda::pointsToGrid(d_points, pointCount, 1.0, nanovdb::PointType::Voxel8);
     nanovdb::tools::cuda::PointsToGrid<BuildT> converter(pointGrid->map());
     //converter.setVerbose();
     converter.setPointType(nanovdb::PointType::Voxel8);
@@ -2540,7 +2399,7 @@ TEST(TestNanoVDBCUDA, Sphere_CudaPointsToGrid_PointID)
 
     //timer.start("Building grid on GPU from "+std::to_string(pointCount)+" points");
     /////////////////////////////////////////////////////////////////////////
-    //auto handle = nanovdb::cudaPointsToGrid(d_points, pointCount, nanovdb::PointType::Voxel8);
+    //auto handle = nanovdb::tools::cuda::pointsToGrid(d_points, pointCount, 1.0, nanovdb::PointType::PointID);
     nanovdb::tools::cuda::PointsToGrid<BuildT> converter(pointGrid->map());
     //converter.setVerbose(2);
     converter.setPointType(nanovdb::PointType::PointID);
@@ -2826,7 +2685,8 @@ TEST(TestNanoVDBCUDA, cudaIndexToGridFromMultiGridSource)
 
 TEST(TestNanoVDBCUDA, testGridHandleCopy)
 {
-    auto cudaHandle = nanovdb::tools::createLevelSetSphere<float, nanovdb::cuda::DeviceBuffer>(100);
+    using PinBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::PinnedResource>;
+    auto cudaHandle = nanovdb::tools::createLevelSetSphere(100).copy<PinBufT>();
     {
         auto *floatGrid = cudaHandle.grid<float>();
         EXPECT_TRUE(floatGrid);
@@ -3133,7 +2993,7 @@ TEST(TestNanoVDBCUDA, CudaGridChecksum)
         //cpuTimer.start("CPU GridChecksum of level set sphere");
         nanovdb::Checksum cs = nanovdb::tools::evalChecksum(grid, nanovdb::CheckMode::Partial);
         //cs(*grid);
-        //checksum2 = cs.checksum(0);// only check the checksum of grid, tree and root data
+        //checksum2 = cs.head();// only check the checksum of grid, tree and root data
         //cpuTimer.stop();
         //std::cerr << checksum2 << std::endl;
         EXPECT_EQ(checksum, cs.head());
@@ -3207,44 +3067,12 @@ TEST(TestNanoVDBCUDA, NodeManager)
         EXPECT_TRUE(d_mgr);
         EXPECT_EQ(count, countActiveVoxels(d_mgr));
     }
-    {// the dual-space overload, still the default in 13.x
-        auto dualHandle = nanovdb::tools::createLevelSetSphere<float, nanovdb::cuda::DualDeviceBuffer>(100);
-        dualHandle.deviceUpload();
-        auto handle2 = nanovdb::cuda::createNodeManager(dualHandle.deviceGrid<float>());
-        static_assert(std::is_same<decltype(handle2), nanovdb::NodeManagerHandle<nanovdb::cuda::DualDeviceBuffer>>::value,
-                      "the overload without a resource builds into the dual-space buffer");
-        auto *d_mgr = handle2.deviceMgr<float>();
-        EXPECT_TRUE(d_mgr);
-        EXPECT_EQ(count, countActiveVoxels(d_mgr));
-    }
 }// NodeManager
 
-TEST(TestNanoVDBCUDA, DualDeviceBufferUploadBookkeeping)
+TEST(TestNanoVDBCUDA, GridStats)
 {
-    // The dual-space buffer, still the default in 13.x, holds the host copy
-    // first and gains a device copy on upload.
-    using BufferT = nanovdb::cuda::DualDeviceBuffer;
-    auto floatHdl = nanovdb::tools::createLevelSetSphere<float>(20);
-    auto idxHdl = nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, nanovdb::ValueIndex, BufferT>(*floatHdl.grid<float>(), 0u, false, false, 1);
-    EXPECT_EQ(1u, idxHdl.buffer().bufferCount());
-    EXPECT_TRUE(idxHdl.buffer().data(0, cudaCpuDeviceId));
-    EXPECT_FALSE(idxHdl.buffer().data(0, 0));
-    EXPECT_FALSE(idxHdl.deviceGrid<nanovdb::ValueIndex>());
-    idxHdl.deviceUpload();
-    EXPECT_TRUE(idxHdl.deviceGrid<nanovdb::ValueIndex>());
-    EXPECT_EQ(2u, idxHdl.buffer().bufferCount());
-    EXPECT_TRUE(idxHdl.buffer().data(0, cudaCpuDeviceId));
-    EXPECT_TRUE(idxHdl.buffer().data(0, 0));
-    EXPECT_FALSE(idxHdl.deviceGrid<float>());
-}// DualDeviceBufferUploadBookkeeping
-
-
-TEST(TestNanoVDBCUDA, GridStats_UnifiedBuffer)
-{
-
-    using BufferT = nanovdb::cuda::UnifiedBuffer;
     using GridT = nanovdb::NanoGrid<float>;
-    auto handle = nanovdb::tools::createLevelSetSphere<float, BufferT>(100,
+    auto handle = nanovdb::tools::createLevelSetSphere<float>(100,
                                                                                   nanovdb::Vec3d(0),
                                                                                   1.0,
                                                                                   3.0,
@@ -3254,8 +3082,8 @@ TEST(TestNanoVDBCUDA, GridStats_UnifiedBuffer)
     EXPECT_TRUE(handle.data());
     GridT *grid = handle.grid<float>();
     EXPECT_TRUE(grid);
-    handle.deviceUpload();
-    GridT *d_grid = handle.deviceGrid<float>();
+    auto devHandle = nanovdb::cuda::copyTo<SingleBufT>(handle, cudaStream_t(0));
+    GridT *d_grid = devHandle.deviceGrid<float>();
     EXPECT_TRUE(d_grid);
 
     {// check min/max using const iterators
@@ -3347,125 +3175,74 @@ TEST(TestNanoVDBCUDA, GridStats_UnifiedBuffer)
         EXPECT_EQ(grid->tree().root().average(),      data->mAverage);
         EXPECT_EQ(grid->tree().root().stdDeviation(), data->mStdDevi);
     }
-}// GridStats_UnifiedBuffer
+}// GridStats
 
-TEST(TestNanoVDBCUDA, GridStats_DeviceBuffer)
+// A stream argument, in any spelling, selects the default-buffer
+// createNodeManager overload, never the resource-taking one.
+using DefaultNodeManagerHandleT = nanovdb::NodeManagerHandle<nanovdb::cuda::Buffer<std::byte>>;
+static_assert(std::is_same<decltype(nanovdb::cuda::createNodeManager(std::declval<const nanovdb::NanoGrid<float>*>())),
+                           DefaultNodeManagerHandleT>::value, "no stream: default buffer");
+static_assert(std::is_same<decltype(nanovdb::cuda::createNodeManager(std::declval<const nanovdb::NanoGrid<float>*>(), 0)),
+                           DefaultNodeManagerHandleT>::value, "literal 0 is a stream");
+static_assert(std::is_same<decltype(nanovdb::cuda::createNodeManager(std::declval<const nanovdb::NanoGrid<float>*>(), nullptr)),
+                           DefaultNodeManagerHandleT>::value, "nullptr is a stream");
+static_assert(std::is_same<decltype(nanovdb::cuda::createNodeManager(std::declval<const nanovdb::NanoGrid<float>*>(), std::declval<cudaStream_t&>())),
+                           DefaultNodeManagerHandleT>::value, "a cudaStream_t lvalue is a stream");
+static_assert(std::is_same<decltype(nanovdb::cuda::createNodeManager(std::declval<const nanovdb::NanoGrid<float>*>(), std::declval<nanovdb::cuda::DeviceResource&>())),
+                           nanovdb::NodeManagerHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<nanovdb::cuda::DeviceResource>>>>::value,
+              "a resource lvalue is borrowed");
+
+// Stats on a managed grid: the host updates one copy through grid(), the
+// device updates another through deviceGrid(), and each side reads back what
+// the other wrote.
+TEST(TestNanoVDBCUDA, GridStats_ManagedBuffer)
 {
-    using BufferT = nanovdb::cuda::DeviceBuffer;
-    using GridT = nanovdb::NanoGrid<float>;
-    auto handle = nanovdb::tools::createLevelSetSphere<float, BufferT>(100,
-                                                                                  nanovdb::Vec3d(0),
-                                                                                  1.0,
-                                                                                  3.0,
-                                                                                  nanovdb::Vec3d(0),
-                                                                                  "test",
-                                                                                  nanovdb::tools::StatsMode::Disable);
-    EXPECT_TRUE(handle.data());
-    GridT *grid = handle.grid<float>();
-    EXPECT_TRUE(grid);
-    handle.deviceUpload();
-    GridT *d_grid = handle.deviceGrid<float>();
-    EXPECT_TRUE(d_grid);
+    using ManagedBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
+    using DataT = nanovdb::NanoRoot<float>::DataType;
+    auto handle = nanovdb::tools::createLevelSetSphere<float>(100, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0),
+                                                              "test", nanovdb::tools::StatsMode::Disable);
+    auto refHandle = handle.copy();
+    auto *ref = refHandle.grid<float>();
+    ASSERT_TRUE(ref);
+    nanovdb::tools::updateGridStats(ref);
 
-    {// check min/max using const iterators
-        float min = std::numeric_limits<float>::max(), max = -min;
-        int n2=0, n1=0, n0=0;// check that nodes are arranged breath-first in memory
-        for (auto it2 = grid->tree().root().cbeginChild(); it2; ++it2) {
-            EXPECT_EQ(grid->tree().getFirstUpper() + n2++, &(*it2));
-            for (auto it1 = it2->cbeginChild(); it1; ++it1) {
-                EXPECT_EQ(grid->tree().getFirstLower() + n1++, &(*it1));
-                for (auto it0 = it1->cbeginChild(); it0; ++it0) {
-                    EXPECT_EQ(grid->tree().getFirstLeaf() + n0++, &(*it0));
-                    for (auto it = it0->cbeginValueOn(); it; ++it) {
-                        if (*it < min) min = *it;
-                        if (*it > max) max = *it;
-                    }
-                }// loop over child nodes of the lower internal node
-            }// loop over child nodes of the upper internal node
-        }// loop over child nodes of the root node
-        EXPECT_NE(min, grid->tree().root().minimum());
-        EXPECT_NE(max, grid->tree().root().maximum());
-        EXPECT_EQ(n2, grid->tree().nodeCount(2));
-        EXPECT_EQ(n1, grid->tree().nodeCount(1));
-        EXPECT_EQ(n0, grid->tree().nodeCount(0));
-    }
-    {
-        //nanovdb::util::Timer cpuTimer("CPU gridStats: Default = Full");
-        nanovdb::tools::updateGridStats(grid);
-        //cpuTimer.stop();
-    }
-    {// check min/max using const iterators
-        float min = std::numeric_limits<float>::max(), max = -min;
-        int n2=0, n1=0, n0=0;// check that nodes are arranged breath-first in memory
-        for (auto it2 = grid->tree().root().cbeginChild(); it2; ++it2) {
-            EXPECT_EQ(grid->tree().getFirstUpper() + n2++, &(*it2));
-            for (auto it1 = it2->cbeginChild(); it1; ++it1) {
-                EXPECT_EQ(grid->tree().getFirstLower() + n1++, &(*it1));
-                for (auto it0 = it1->cbeginChild(); it0; ++it0) {
-                    EXPECT_EQ(grid->tree().getFirstLeaf() + n0++, &(*it0));
-                    for (auto it = it0->cbeginValueOn(); it; ++it) {
-                        if (*it < min) min = *it;
-                        if (*it > max) max = *it;
-                    }
-                }// loop over child nodes of the lower internal node
-            }// loop over child nodes of the upper internal node
-        }// loop over child nodes of the root node
-        EXPECT_EQ(min, grid->tree().root().minimum());
-        EXPECT_EQ(max, grid->tree().root().maximum());
-        EXPECT_EQ(n2, grid->tree().nodeCount(2));
-        EXPECT_EQ(n1, grid->tree().nodeCount(1));
-        EXPECT_EQ(n0, grid->tree().nodeCount(0));
-    }
-    {// check min/max using non-const iterators
-        float min = std::numeric_limits<float>::max(), max = -min;
-        int n2=0, n1=0, n0=0;// check that nodes are arranged breath-first in memory
-        for (auto it2 = grid->tree().root().beginChild(); it2; ++it2) {
-            EXPECT_EQ(grid->tree().getFirstUpper() + n2++, &(*it2));
-            for (auto it1 = it2->beginChild(); it1; ++it1) {
-                EXPECT_EQ(grid->tree().getFirstLower() + n1++, &(*it1));
-                for (auto it0 = it1->beginChild(); it0; ++it0) {
-                    EXPECT_EQ(grid->tree().getFirstLeaf() + n0++, &(*it0));
-                    for (auto it = it0->beginValueOn(); it; ++it) {
-                        if (*it < min) min = *it;
-                        if (*it > max) max = *it;
-                    }
-                }// loop over child nodes of the lower internal node
-            }// loop over child nodes of the upper internal node
-        }// loop over child nodes of the root node
-        EXPECT_EQ(min, grid->tree().root().minimum());
-        EXPECT_EQ(max, grid->tree().root().maximum());
-        EXPECT_EQ(n2, grid->tree().nodeCount(2));
-        EXPECT_EQ(n1, grid->tree().nodeCount(1));
-        EXPECT_EQ(n0, grid->tree().nodeCount(0));
-    }
+    auto hostSide = nanovdb::cuda::copyTo<ManagedBufT>(handle, cudaStream_t(0));
+    auto devSide  = nanovdb::cuda::copyTo<ManagedBufT>(handle, cudaStream_t(0));
+    cudaCheck(cudaDeviceSynchronize());// the host reads and writes the managed grids below
+    auto *hostGrid = hostSide.grid<float>();
+    ASSERT_TRUE(hostGrid);
+    ASSERT_TRUE(devSide.deviceGrid<float>());
+    EXPECT_NE(ref->tree().root().minimum(), hostGrid->tree().root().minimum());// stats start disabled
 
-    {
-        //nanovdb::util::cuda::Timer gpuTimer("GPU gridStats: Default = Full");
-        nanovdb::tools::cuda::updateGridStats(d_grid);
-        //gpuTimer.stop();
-    }
-    {// check bbox and stats of device grid
-        using DataT = nanovdb::NanoRoot<float>::DataType;
+    nanovdb::tools::updateGridStats(hostGrid);
+    nanovdb::tools::cuda::updateGridStats(devSide.deviceGrid<float>());
+    cudaCheck(cudaDeviceSynchronize());
+
+    auto expectStats = [&](const DataT *data) {
+        EXPECT_EQ(ref->indexBBox(),                 data->mBBox);
+        EXPECT_EQ(ref->tree().root().background(),   data->mBackground);
+        EXPECT_EQ(ref->tree().root().minimum(),      data->mMinimum);
+        EXPECT_EQ(ref->tree().root().maximum(),      data->mMaximum);
+        EXPECT_EQ(ref->tree().root().average(),      data->mAverage);
+        EXPECT_EQ(ref->tree().root().stdDeviation(), data->mStdDevi);
+    };
+    {// the host-side update, read on the device
         std::unique_ptr<char[]> buffer(new char[sizeof(DataT)]);
-        cudaMemcpy(buffer.get(), (char*)d_grid + sizeof(nanovdb::GridData) + sizeof(nanovdb::TreeData), sizeof(DataT), cudaMemcpyDeviceToHost);
-        auto *data = (const DataT*)buffer.get();
-        EXPECT_EQ(grid->indexBBox(), data->mBBox);
-        EXPECT_EQ(grid->tree().root().background(),   data->mBackground);
-        EXPECT_EQ(grid->tree().root().minimum(),      data->mMinimum);
-        EXPECT_EQ(grid->tree().root().maximum(),      data->mMaximum);
-        EXPECT_EQ(grid->tree().root().average(),      data->mAverage);
-        EXPECT_EQ(grid->tree().root().stdDeviation(), data->mStdDevi);
+        cudaCheck(cudaMemcpy(buffer.get(), (const char*)hostSide.deviceGrid<float>() + sizeof(nanovdb::GridData) + sizeof(nanovdb::TreeData),
+                              sizeof(DataT), cudaMemcpyDeviceToHost));
+        expectStats(reinterpret_cast<const DataT*>(buffer.get()));
     }
-}// GridStats_DeviceBuffer
+    // the device-side update, read on the host
+    expectStats(devSide.grid<float>()->tree().root().data());
+}// GridStats_ManagedBuffer
 
 // make -j && ./unittest/testNanoVDB --gtest_filter="*cudaIsValid*" --gtest_repeat=10
-TEST(TestNanoVDBCUDA, cudaIsValid_DeviceBuffer)
+TEST(TestNanoVDBCUDA, cudaIsValid)
 {
-    using BufferT = nanovdb::cuda::DeviceBuffer;
     const auto mode = nanovdb::CheckMode::Full;
     using GridT = nanovdb::NanoGrid<float>;
-    nanovdb::util::Timer timer("createLevelSetSphere<DeviceBuffer>(500)");
-    auto handle = nanovdb::tools::createLevelSetSphere<float, BufferT>(500,
+    nanovdb::util::Timer timer("createLevelSetSphere(500)");
+    auto handle = nanovdb::tools::createLevelSetSphere<float>(500,
                                                                        nanovdb::Vec3d(0),
                                                                        1.0,
                                                                        3.0,
@@ -3477,58 +3254,26 @@ TEST(TestNanoVDBCUDA, cudaIsValid_DeviceBuffer)
     EXPECT_TRUE(handle.data());
     GridT *grid = handle.grid<float>();
     EXPECT_TRUE(grid);
-    handle.deviceUpload();
-    GridT *d_grid = handle.deviceGrid<float>();
+    auto devHandle = nanovdb::cuda::copyTo<SingleBufT>(handle, cudaStream_t(0));
+    GridT *d_grid = devHandle.deviceGrid<float>();
     EXPECT_TRUE(d_grid);
     const bool verbose = false;
 
-    EXPECT_TRUE(nanovdb::isValid(grid,        mode, verbose));
+    EXPECT_TRUE(nanovdb::tools::isValid(grid,        mode, verbose));
     EXPECT_TRUE(nanovdb::tools::cuda::isValid(d_grid,  mode, verbose));
 
     grid->mGridType = nanovdb::GridType::Vec3f;
-    EXPECT_FALSE(nanovdb::isValid(grid,       mode, verbose));
-    handle.deviceUpload();
+    EXPECT_FALSE(nanovdb::tools::isValid(grid,       mode, verbose));
+    cudaCheck(cudaMemcpy(d_grid, grid, handle.bufferSize(), cudaMemcpyHostToDevice));// overwrite the device grid
     EXPECT_FALSE(nanovdb::tools::cuda::isValid(d_grid, mode, verbose));
-}// cudaIsValid_DeviceBuffer
-
-TEST(TestNanoVDBCUDA, cudaIsValid_UnifiedBuffer)
-{
-    using BufferT = nanovdb::cuda::UnifiedBuffer;
-    const auto mode = nanovdb::CheckMode::Full;
-    using GridT = nanovdb::NanoGrid<float>;
-    nanovdb::util::Timer timer("createLevelSetSphere<UnifiedBuffer>(500)");
-    auto handle = nanovdb::tools::createLevelSetSphere<float, BufferT>(500,
-                                                                       nanovdb::Vec3d(0),
-                                                                       1.0,
-                                                                       3.0,
-                                                                       nanovdb::Vec3d(0),
-                                                                       "test",
-                                                                       nanovdb::tools::StatsMode::Disable,
-                                                                       mode);
-    timer.stop();
-    EXPECT_TRUE(handle.data());
-    GridT *grid = handle.grid<float>();
-    EXPECT_TRUE(grid);
-    handle.deviceUpload();
-    GridT *d_grid = handle.deviceGrid<float>();
-    EXPECT_TRUE(d_grid);
-    const bool verbose = false;
-
-    EXPECT_TRUE(nanovdb::isValid(grid,        mode, verbose));
-    EXPECT_TRUE(nanovdb::tools::cuda::isValid(d_grid,  mode, verbose));
-
-    grid->mGridType = nanovdb::GridType::Vec3f;
-    EXPECT_FALSE(nanovdb::isValid(grid,       mode, verbose));
-    handle.deviceUpload();
-    EXPECT_FALSE(nanovdb::tools::cuda::isValid(d_grid, mode, verbose));
-}// cudaIsValid_UnifiedBuffer
+}// cudaIsValid
 
 TEST(TestNanoVDBCUDA, cudaIsValid_HostBuffer)
 {
     using BufferT = nanovdb::HostBuffer;
     const auto mode = nanovdb::CheckMode::Full;
     using GridT = nanovdb::NanoGrid<float>;
-    nanovdb::util::Timer timer("createLevelSetSphere<UnifiedBuffer>(500)");
+    nanovdb::util::Timer timer("createLevelSetSphere<HostBuffer>(500)");
     auto handle = nanovdb::tools::createLevelSetSphere<float, BufferT>(500,
                                                                        nanovdb::Vec3d(0),
                                                                        1.0,
@@ -3543,7 +3288,7 @@ TEST(TestNanoVDBCUDA, cudaIsValid_HostBuffer)
     EXPECT_TRUE(grid);
 }// cudaIsValid_HostBuffer
 
-TEST(TestNanoVDBCUDA, overSizedDeviceBuffer)
+TEST(TestNanoVDBCUDA, overSizedDeviceHandle)
 {
     // create a grid in a host buffer that exactly fits the grid
     auto handle1 = nanovdb::tools::createLevelSetSphere();
@@ -3555,155 +3300,18 @@ TEST(TestNanoVDBCUDA, overSizedDeviceBuffer)
     EXPECT_TRUE(handle1.isFull());
 
     // copy grid to an oversized device buffer
-    using BufferT = nanovdb::cuda::DeviceBuffer;
-    auto overSizedBuffer = BufferT(2*gridSize, false);// only allocate the device buffer
-    cudaMemcpy(overSizedBuffer.deviceData(), handle1.data(), gridSize, cudaMemcpyHostToDevice);
+    SingleBufT overSizedBuffer(cudaStream_t(0), 2*gridSize, nanovdb::cuda::noInit);
+    cudaCheck(cudaMemcpy(overSizedBuffer.data(), handle1.data(), gridSize, cudaMemcpyHostToDevice));
 
     // construct handle from over-sized device buffer and test it
-    nanovdb::GridHandle<BufferT> handle2(std::move(overSizedBuffer));
+    nanovdb::GridHandle<SingleBufT> handle2(std::move(overSizedBuffer));
     EXPECT_EQ(1         , handle2.gridCount());
     EXPECT_EQ(  gridSize, handle2.gridSize());
     EXPECT_EQ(  gridSize, handle2.totalGridSize());
     EXPECT_EQ(2*gridSize, handle2.bufferSize());
     EXPECT_EQ(  gridSize, handle2.freeSize());
     EXPECT_FALSE(handle2.isFull());
-}// overSizedDeviceBuffer
-
-__global__ void initKernel(int N, int *x)
-{
-    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid >= N) return;
-    x[tid] = 2;
-}
-
-// make -j && ./unittest/testNanoVDB --gtest_filter="*UnifiedBuffer*" --gtest_repeat=2
-TEST(TestNanoVDBCUDA, UnifiedBuffer_basic)
-{
-    int device = 0;
-    cudaSetDevice(device);// set the default device to GPU #0
-    size_t free, total;
-    cudaMemGetInfo( &free, &total );
-    std::cout << "GPU #" << device << " memory: free = " << (free>>30) << " GB, total = " << (total>>30) << " GB\n";
-
-    cudaStream_t stream;
-    cudaCheck(cudaStreamCreate(&stream));
-    const size_t N = 1<<20, size = N*sizeof(int), capacity = 20*size;// over-allocation
-
-    nanovdb::cuda::UnifiedBuffer buffer(size, capacity);
-    EXPECT_EQ(size, buffer.size());
-    EXPECT_EQ(capacity, buffer.capacity());
-    {// set N values on the host
-        //buffer.deviceDownload(stream);
-        buffer.prefetch(0, size, cudaCpuDeviceId, stream);
-        nanovdb::util::Timer timer("Setting values on CPU with unified memory");
-        int *x = buffer.data<int>();
-        for (size_t i = 0; i < N; i++) *x++ = 1;
-        timer.stop();
-    }
-    {// resize unified buffers
-        nanovdb::util::Timer timer("resize unified buffer");
-        buffer.resize(2*size);
-        timer.stop();
-        EXPECT_EQ(2*size, buffer.size());
-        EXPECT_EQ(capacity, buffer.capacity());
-    }
-    {
-        //buffer.deviceUpload(0, stream);
-        buffer.prefetch(size, size, 0, stream);
-        nanovdb::util::cuda::Timer timer("Setting values on GPU with unified memory", stream);
-        static const int blockSize = 256, numBlocks = (N + blockSize - 1) / blockSize;
-        initKernel<<<numBlocks, blockSize, 0, stream>>>(N, buffer.data<int>(N));
-        timer.stop();
-    }
-
-    EXPECT_EQ(CUDA_SUCCESS, cudaStreamSynchronize(stream));
-    int *x = buffer.data<int>();
-    for (size_t i = 0; i < N; ++i) EXPECT_EQ(1, *x++);
-    for (size_t i = 0; i < N; ++i) EXPECT_EQ(2, *x++);
-
-    nanovdb::cuda::UnifiedBuffer otherBuffer(std::move(buffer));
-    int *y = otherBuffer.data<int>();
-    for (size_t i = 0; i < N; ++i) EXPECT_EQ(1, *y++);
-    for (size_t i = 0; i < N; ++i) EXPECT_EQ(2, *y++);
-}// UnifiedBuffer_basic
-
-TEST(TestNanoVDBCUDA, UnifiedBuffer_IO)
-{
-    //cudaSetDevice(0);// loads runtime context
-    using BufferT = nanovdb::cuda::UnifiedBuffer;
-    const size_t size = 8*(1ULL << 30);// 8 GB
-    cudaStream_t stream;
-    cudaCheck(cudaStreamCreate(&stream));
-    {
-        auto buffer = BufferT::create(size, nullptr, true, (void*)stream);
-        EXPECT_EQ(CUDA_SUCCESS, cudaStreamSynchronize(stream));
-        EXPECT_EQ(size, buffer.size());
-        EXPECT_EQ(size, buffer.capacity());
-    }
-    {// size = capacity
-        auto handle = nanovdb::io::readGrid<BufferT>("data/3_spheres.nvdb", 0);
-        auto nanoGrid = handle.grid<float>();
-        EXPECT_EQ(handle.size(), handle.buffer().capacity());
-        EXPECT_EQ(handle.buffer().size(), handle.buffer().capacity());
-        EXPECT_TRUE(nanoGrid);
-        EXPECT_EQ(1u, handle.gridCount());
-        auto *grid = handle.grid<float>();
-        EXPECT_TRUE(grid);
-        EXPECT_EQ(0u, grid->gridIndex());
-        EXPECT_EQ(1u, grid->gridCount());
-        EXPECT_TRUE(nanovdb::tools::validateChecksum(grid));
-        EXPECT_TRUE(nanovdb::tools::validateChecksum(grid, nanovdb::CheckMode::Full));
-    }
-    {// size < capacity
-        BufferT reference(0, size);
-        auto handle = nanovdb::io::readGrid<BufferT>("data/3_spheres.nvdb", 0, 0, reference);
-        auto nanoGrid = handle.grid<float>();
-        EXPECT_LT(handle.buffer().size(), handle.buffer().capacity());
-        EXPECT_EQ(size, handle.buffer().capacity());
-        EXPECT_TRUE(nanoGrid);
-        EXPECT_EQ(1u, handle.gridCount());
-        auto *grid = handle.grid<float>();
-        EXPECT_TRUE(grid);
-        EXPECT_EQ(0u, grid->gridIndex());
-        EXPECT_EQ(1u, grid->gridCount());
-        EXPECT_TRUE(nanovdb::tools::validateChecksum(grid));
-        EXPECT_TRUE(nanovdb::tools::validateChecksum(grid, nanovdb::CheckMode::Full));
-    }
-}// UnifiedBuffer_IO
-
-TEST(TestNanoVDBCUDA, UnifiedBuffer_createLevelSetSphere)
-{
-    using BufferT = nanovdb::cuda::UnifiedBuffer;
-    const int radius = 100, center = 50, width = 3, voxelSize = 1;
-    const std::string gridName("sphere_" + std::to_string(radius));
-    auto handle = nanovdb::tools::createLevelSetSphere<float, BufferT>(radius, nanovdb::Vec3d(center),
-                                                                       voxelSize, width, nanovdb::Vec3d(0), gridName);
-
-    EXPECT_TRUE(handle);
-    EXPECT_EQ(1u, handle.gridCount());
-    EXPECT_EQ(handle.size(), handle.buffer().capacity());
-    auto* meta = handle.gridMetaData();
-    EXPECT_TRUE(meta);
-    EXPECT_EQ(gridName, std::string(meta->shortGridName()));
-    EXPECT_EQ(nanovdb::GridType::Float, meta->gridType());
-    EXPECT_EQ(nanovdb::GridClass::LevelSet, meta->gridClass());
-    auto* dstGrid = handle.grid<float>();
-    EXPECT_TRUE(dstGrid);
-    EXPECT_EQ(dstGrid->gridSize(), handle.buffer().capacity());
-    EXPECT_EQ(gridName, std::string(dstGrid->gridName()));
-
-    EXPECT_TRUE(dstGrid->hasBBox());
-    EXPECT_TRUE(dstGrid->hasMinMax());
-    EXPECT_TRUE(dstGrid->hasAverage());
-    EXPECT_TRUE(dstGrid->hasStdDeviation());
-
-    EXPECT_NEAR( -3.0f, dstGrid->tree().root().minimum(), 0.04f);
-    EXPECT_NEAR(  3.0f, dstGrid->tree().root().maximum(), 0.04f);
-    EXPECT_NEAR(  0.0f, dstGrid->tree().root().average(), 0.30f);
-
-    EXPECT_EQ(nanovdb::Coord(center - radius - 2), dstGrid->indexBBox()[0]);
-    EXPECT_EQ(nanovdb::Coord(center + radius + 2), dstGrid->indexBBox()[1]);
-} // UnifiedBuffer_createLevelSetSphere
+}// overSizedDeviceHandle
 
 template<class BuildT>
 __global__ void testComputeStencilNeighborsKernel(
@@ -3760,29 +3368,29 @@ void testVoxelBlockManager()
     cudaCheck(cudaFree(deviceVoxels));
     EXPECT_TRUE((handle.deviceData())); // grid only exists on the GPU
     auto deviceGrid = handle.template deviceGrid<BuildT>();
-    EXPECT_FALSE(handle.data()); // no grid was yet allocated on the CPU
-    handle.deviceDownload();
-    EXPECT_TRUE(handle.data()); // no grid was yet allocated on the CPU
-    auto grid = handle.template grid<BuildT>();
+    auto hostHandle = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(handle, cudaStream_t(0));
+    EXPECT_TRUE(hostHandle.data());
+    auto grid = hostHandle.template grid<BuildT>();
     EXPECT_TRUE(grid);
     // Construct VBM structure
     auto vbmHandle = nanovdb::tools::cuda::buildVoxelBlockManager<Log2BlockWidth, BufferT>(
         deviceGrid);
 
     // Compute stencil neighbors
-    const size_t neighborStencilSize = nBlocks * BlockWidth * 27 * sizeof(uint64_t);
-    auto neighborStencilBuffer = nanovdb::cuda::DeviceBuffer::create(neighborStencilSize, nullptr, false);
-    EXPECT_TRUE(neighborStencilBuffer.deviceData());
+    const size_t neighborStencilCount = nBlocks * BlockWidth * 27;
+    nanovdb::cuda::Buffer<uint64_t> neighborStencilBuffer(cudaStream_t(0), neighborStencilCount, nanovdb::cuda::noInit);
+    EXPECT_TRUE(neighborStencilBuffer.data());
     testComputeStencilNeighborsKernel<<<nBlocks,BlockWidth>>>(deviceGrid,
         vbmHandle.deviceFirstLeafID(), vbmHandle.deviceJumpMap(),
-        reinterpret_cast<uint64_t*>(neighborStencilBuffer.deviceData()));
+        neighborStencilBuffer.data());
     cudaCheck(cudaGetLastError());
 
     // Verify stencil neighbors against results of standard accessors
-    neighborStencilBuffer.deviceDownload();
-    EXPECT_TRUE(neighborStencilBuffer.data());
+    std::vector<uint64_t> hostNeighborStencil(neighborStencilCount);
+    cudaCheck(cudaMemcpy(hostNeighborStencil.data(), neighborStencilBuffer.data(),
+                         neighborStencilCount * sizeof(uint64_t), cudaMemcpyDeviceToHost));
     using StencilNeighborsType = uint64_t (*)[27];
-    auto stencilNeighbors = reinterpret_cast<StencilNeighborsType>(neighborStencilBuffer.data());
+    auto stencilNeighbors = reinterpret_cast<StencilNeighborsType>(hostNeighborStencil.data());
     auto acc = grid->getAccessor();
     for (const auto& coord : voxels) {
         const auto index = acc.getValue(coord);
@@ -3797,13 +3405,13 @@ void testVoxelBlockManager()
 
 TEST(TestNanoVDBCUDA, VoxelBlockManager_ValueOnIndex)
 {
-    testVoxelBlockManager<nanovdb::ValueOnIndex,nanovdb::cuda::DeviceBuffer>();
+    testVoxelBlockManager<nanovdb::ValueOnIndex,SingleBufT>();
 }// VoxelBlockManager_ValueOnIndex
 
-TEST(TestNanoVDBCUDA, VoxelBlockManager_ValueOnIndex_UnifiedBuffer)
+TEST(TestNanoVDBCUDA, VoxelBlockManager_ValueOnIndex_ManagedBuffer)
 {
-    testVoxelBlockManager<nanovdb::ValueOnIndex,nanovdb::cuda::UnifiedBuffer>();
-}// VoxelBlockManager_ValueOnIndex_UnifiedBuffer
+    testVoxelBlockManager<nanovdb::ValueOnIndex,nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>>();
+}// VoxelBlockManager_ValueOnIndex_ManagedBuffer
 
 TEST(TestNanoVDBCUDA, DilateInjectPrune_ValueOnIndex)
 {
@@ -3814,13 +3422,12 @@ TEST(TestNanoVDBCUDA, DilateInjectPrune_ValueOnIndex)
     inputPoints.emplace_back(1,0,0); // Added nodes after dilation: 3 root, 3 upper, 3 lower, 3 leaf
     inputPoints.emplace_back(0,1,1); // Added nodes after dilation: 1 root, 1 upper, 1 lower, 1 leaf
     inputPoints.emplace_back(127,127,127); // Added nodes after dilation: 7 lower, 7 leaf
-    auto inputBuffer = nanovdb::cuda::DeviceBuffer::create( inputPoints.size() * sizeof(nanovdb::Coord), nullptr, false);
-    EXPECT_FALSE(inputBuffer.data());
-    EXPECT_TRUE(inputBuffer.deviceData());
-    cudaCheck(cudaMemcpy(inputBuffer.deviceData(), inputPoints.data(), inputPoints.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    nanovdb::cuda::Buffer<nanovdb::Coord> inputBuffer(cudaStream_t(0), inputPoints.size(), nanovdb::cuda::noInit);
+    EXPECT_TRUE(inputBuffer.data());
+    cudaCheck(cudaMemcpy(inputBuffer.data(), inputPoints.data(), inputPoints.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
     nanovdb::tools::cuda::PointsToGrid<BuildT> converter;
     converter.setChecksum(nanovdb::CheckMode::Default);
-    auto inputHandle = converter.getHandle(static_cast<nanovdb::Coord*>(inputBuffer.deviceData()), inputPoints.size(), SingleBufT());
+    auto inputHandle = converter.getHandle(inputBuffer.data(), inputPoints.size(), SingleBufT());
     EXPECT_TRUE(inputHandle.deviceGrid<BuildT>());
     auto inputGrid = inputHandle.deviceGrid<BuildT>();
 
@@ -3884,11 +3491,11 @@ TEST(TestNanoVDBCUDA, NonBlockingStreamDilate_ValueOnIndex)
     std::vector<nanovdb::Coord> pts;
     for (int i = 0; i < 64; ++i) pts.emplace_back(i * 3, (i * 7) % 40, (i * 13) % 50);
     pts.emplace_back(127, 127, 127);
-    auto inBuf = nanovdb::cuda::DeviceBuffer::create(pts.size() * sizeof(nanovdb::Coord), nullptr, false);
-    cudaCheck(cudaMemcpy(inBuf.deviceData(), pts.data(), pts.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    nanovdb::cuda::Buffer<nanovdb::Coord> inBuf(cudaStream_t(0), pts.size(), nanovdb::cuda::noInit);
+    cudaCheck(cudaMemcpy(inBuf.data(), pts.data(), pts.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
     nanovdb::tools::cuda::PointsToGrid<BuildT> conv;
     conv.setChecksum(nanovdb::CheckMode::Full);
-    auto inHandle = conv.getHandle(static_cast<nanovdb::Coord*>(inBuf.deviceData()), pts.size(), SingleBufT());
+    auto inHandle = conv.getHandle(inBuf.data(), pts.size(), SingleBufT());
     auto* inGrid = inHandle.deviceGrid<BuildT>();
     EXPECT_TRUE(inGrid);
     cudaCheck(cudaDeviceSynchronize());
@@ -3974,6 +3581,101 @@ TEST(TestNanoVDBCUDA, NonBlockingStreamSignedFloodFill)
     EXPECT_EQ(reference, candidate);
 }// NonBlockingStreamSignedFloodFill
 
+__global__ void bufferFillKernel(unsigned char *p, size_t n, unsigned char v)
+{
+    for (size_t i = blockIdx.x*(size_t)blockDim.x + threadIdx.x; i < n; i += (size_t)gridDim.x*blockDim.x) p[i] = v;
+}
+__global__ void bufferCountKernel(const unsigned char *p, size_t n, unsigned char v, unsigned long long *bad)
+{
+    for (size_t i = blockIdx.x*(size_t)blockDim.x + threadIdx.x; i < n; i += (size_t)gridDim.x*blockDim.x)
+        if (p[i] != v) atomicAdd(bad, 1ull);
+}
+
+// A write through data() on a stream other than the buffer's retained stream
+// is still in flight when the buffer is destroyed. The caller orders the free
+// after it as cuda::Buffer documents: either by making the retained stream wait
+// on the write, or by retargeting the free with set_stream. All streams are
+// non-blocking, so nothing else orders them. If the free is not ordered after
+// the write, the pool recycles the block into the next allocation and the late
+// write corrupts it.
+static void testBufferCrossStreamFreeOrdering(bool retarget)
+{
+    const size_t N = size_t(64) << 20;// large enough that a recycled block is the same address
+    const unsigned char LATE = 0xAA, VICTIM = 0x55;
+    const unsigned long long CYCLES = 400000000ull;// parks 'user' for O(100 ms)
+
+    cudaStream_t user = nullptr, owner = nullptr;
+    cudaCheck(cudaStreamCreateWithFlags(&user, cudaStreamNonBlocking));
+    cudaCheck(cudaStreamCreateWithFlags(&owner, cudaStreamNonBlocking));
+    unsigned long long *bad = nullptr;
+    cudaCheck(cudaMallocManaged(&bad, sizeof(*bad)));
+
+    {// warm-up: on a cold context the first launches serialize, which would hide the race
+        unsigned char *w = nullptr;
+        cudaCheck(cudaMallocAsync((void**)&w, N, owner));
+        streamBusyWaitKernel<<<1,1,0,user>>>(CYCLES/10);
+        bufferFillKernel<<<1024,256,0,owner>>>(w, N, 0);
+        bufferCountKernel<<<1024,256,0,owner>>>(w, N, 0, bad);
+        cudaCheck(cudaFreeAsync(w, owner));
+        cudaCheck(cudaDeviceSynchronize());
+    }
+
+    void *devPtr = nullptr;
+    cudaEvent_t written;
+    cudaCheck(cudaEventCreateWithFlags(&written, cudaEventDisableTiming));
+    {
+        nanovdb::cuda::Buffer<unsigned char> buf(owner, N, nanovdb::cuda::noInit);
+        devPtr = buf.data();
+        EXPECT_TRUE(devPtr);
+        streamBusyWaitKernel<<<1,1,0,user>>>(CYCLES);// park 'user'
+        if (devPtr) bufferFillKernel<<<1024,256,0,user>>>(buf.data(), N, LATE);
+        if (retarget) {
+            buf.set_stream(user);
+        } else {
+            cudaCheck(cudaEventRecord(written, user));
+            cudaCheck(cudaStreamWaitEvent(buf.stream(), written, 0));
+        }
+    }// destroyed here; the free is ordered after the write on 'user'
+
+    unsigned char *victim = nullptr;
+    cudaCheck(cudaMallocAsync((void**)&victim, N, owner));
+    bufferFillKernel<<<1024,256,0,owner>>>(victim, N, VICTIM);
+    cudaCheck(cudaStreamSynchronize(owner));
+
+    // Diagnostics only: with a correctly ordered free the pool cannot hand the
+    // block out again until 'user' has drained.
+    const bool stillPending = (cudaStreamQuery(user) == cudaErrorNotReady);
+    cudaGetLastError();// clear the cudaErrorNotReady left by the query above
+    const bool recycled = (victim == devPtr);
+
+    cudaCheck(cudaStreamSynchronize(user));// let the late write land
+    *bad = 0;
+    bufferCountKernel<<<1024,256,0,owner>>>(victim, N, VICTIM, bad);
+    cudaCheck(cudaStreamSynchronize(owner));
+    const unsigned long long clobbered = *bad;
+
+    cudaCheck(cudaFreeAsync(victim, owner));
+    cudaCheck(cudaStreamSynchronize(owner));
+    cudaCheck(cudaEventDestroy(written));
+    cudaCheck(cudaFree(bad));
+    cudaCheck(cudaStreamDestroy(user));
+    cudaCheck(cudaStreamDestroy(owner));
+
+    EXPECT_EQ(0u, clobbered) << "device memory was freed while another stream still had work in "
+                                "flight (block recycled: " << recycled
+                             << ", work still pending when it was reused: " << stillPending << ")";
+}// testBufferCrossStreamFreeOrdering
+
+TEST(TestNanoVDBCUDA, BufferFreeOrderedByEventWait)
+{
+    testBufferCrossStreamFreeOrdering(/*retarget=*/false);
+}// BufferFreeOrderedByEventWait
+
+TEST(TestNanoVDBCUDA, BufferFreeOrderedBySetStream)
+{
+    testBufferCrossStreamFreeOrdering(/*retarget=*/true);
+}// BufferFreeOrderedBySetStream
+
 // Regression test: the grid-name copy must not over-read the source string.
 // It previously copied a fixed MaxNameSize bytes from the (possibly shorter)
 // std::string, over-reading host heap into the grid; now it copies only
@@ -3984,12 +3686,12 @@ TEST(TestNanoVDBCUDA, GridName_CudaPointsToGrid)
     using BuildT = nanovdb::ValueOnIndex;
     const std::vector<nanovdb::Coord> pts{ {0, 0, 0}, {1, 2, 3} };
     auto build = [&](const std::string& name) {
-        auto buf = nanovdb::cuda::DeviceBuffer::create(pts.size() * sizeof(nanovdb::Coord), nullptr, false);
-        cudaCheck(cudaMemcpy(buf.deviceData(), pts.data(), pts.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+        nanovdb::cuda::Buffer<nanovdb::Coord> buf(cudaStream_t(0), pts.size(), nanovdb::cuda::noInit);
+        cudaCheck(cudaMemcpy(buf.data(), pts.data(), pts.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
         nanovdb::tools::cuda::PointsToGrid<BuildT> conv;
         conv.setGridName(name);
         conv.setChecksum(nanovdb::CheckMode::Full);
-        auto h = conv.getHandle(static_cast<nanovdb::Coord*>(buf.deviceData()), pts.size(), SingleBufT());
+        auto h = conv.getHandle(buf.data(), pts.size(), SingleBufT());
         auto hostH = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(h, cudaStream_t(0));
         return std::string(hostH.template grid<BuildT>()->gridName());
     };
@@ -4019,206 +3721,16 @@ TEST(TestNanoVDBCUDA, DeterministicOutput_CudaPointsToGrid)
     std::vector<nanovdb::Coord> pts;
     for (int i = 0; i < 256; ++i) pts.emplace_back((i * 5) % 97, (i * 11) % 53, (i * 17) % 71);
     auto buildChecksum = [&]() {
-        auto buf = nanovdb::cuda::DeviceBuffer::create(pts.size() * sizeof(nanovdb::Coord), nullptr, false);
-        cudaCheck(cudaMemcpy(buf.deviceData(), pts.data(), pts.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+        nanovdb::cuda::Buffer<nanovdb::Coord> buf(cudaStream_t(0), pts.size(), nanovdb::cuda::noInit);
+        cudaCheck(cudaMemcpy(buf.data(), pts.data(), pts.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
         nanovdb::tools::cuda::PointsToGrid<BuildT> conv;
         conv.setChecksum(nanovdb::CheckMode::Full);
-        auto h = conv.getHandle(static_cast<nanovdb::Coord*>(buf.deviceData()), pts.size(), SingleBufT());
+        auto h = conv.getHandle(buf.data(), pts.size(), SingleBufT());
         auto hostH = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(h, cudaStream_t(0));
         return hostH.template grid<BuildT>()->mChecksum.full();
     };
     EXPECT_EQ(buildChecksum(), buildChecksum());
 }// DeterministicOutput_CudaPointsToGrid
-
-// Smoke test: repeated allocate/use/free on a non-blocking stream must complete without error.
-// Note this is only a smoke test - DeviceBufferMultiStreamFreeOrdering below is what actually
-// discriminates a premature free (compute-sanitizer memcheck on this path is a further gate).
-TEST(TestNanoVDBCUDA, DeviceBufferNonBlockingStreamLifetime)
-{
-    cudaStream_t stream = nullptr;
-    cudaCheck(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
-    for (int i = 0; i < 16; ++i) {
-        auto buf = nanovdb::cuda::DeviceBuffer::create(size_t(1) << 20, nullptr, 0, stream);// 1 MiB on stream
-        EXPECT_TRUE(buf.deviceData());
-        cudaCheck(cudaMemsetAsync(buf.deviceData(), i & 0xff, buf.size(), stream));
-        // buf is destroyed here and must free on 'stream' (still alive).
-    }
-    cudaCheck(cudaStreamSynchronize(stream));
-    cudaCheck(cudaStreamDestroy(stream));
-    EXPECT_EQ(cudaSuccess, cudaGetLastError());
-}// DeviceBufferNonBlockingStreamLifetime
-
-__global__ void deviceBufferFillKernel(unsigned char *p, size_t n, unsigned char v)
-{
-    for (size_t i = blockIdx.x*(size_t)blockDim.x + threadIdx.x; i < n; i += (size_t)gridDim.x*blockDim.x) p[i] = v;
-}
-__global__ void deviceBufferCountKernel(const unsigned char *p, size_t n, unsigned char v, unsigned long long *bad)
-{
-    for (size_t i = blockIdx.x*(size_t)blockDim.x + threadIdx.x; i < n; i += (size_t)gridDim.x*blockDim.x)
-        if (p[i] != v) atomicAdd(bad, 1ull);
-}
-
-// Shared body of the two free-ordering regression tests below. A device-only buffer is used on
-// purpose: it owns no pinned host memory, so clear()'s cudaFreeHost (which implicitly
-// synchronizes) cannot mask a premature free. A second stream 'user' is parked behind a
-// busy-wait with a write to the buffer's raw pointer queued behind it, then the buffer is
-// destroyed. If the free is not ordered after 'user', the allocator recycles the block into the
-// next allocation and the late write corrupts it.
-//
-// The two scenarios cover the two distinct ways the free can be ordered:
-//  - blocking 'user', write NOT registered: the free, issued on the legacy default stream, is
-//    implicitly ordered after all blocking streams. Freeing on any other single stream (e.g.
-//    the buffer's most recently used one) would drop that and fail here.
-//  - non-blocking 'user', write registered via recordUse: no implicit ordering exists for
-//    non-blocking streams, so only the recorded event orders the free. Freeing on the default
-//    stream without the event fails here.
-static void testDeviceBufferFreeOrdering(bool nonBlockingUser, bool registerUse)
-{
-    const size_t N = size_t(64) << 20;// large enough that a recycled block is the same address
-    const unsigned char LATE = 0xAA, VICTIM = 0x55;
-    const unsigned long long CYCLES = 400000000ull;// parks 'user' for O(100 ms)
-
-    cudaStream_t user = nullptr, other = nullptr;
-    if (nonBlockingUser) {
-        cudaCheck(cudaStreamCreateWithFlags(&user, cudaStreamNonBlocking));
-    } else {
-        cudaCheck(cudaStreamCreate(&user));
-    }
-    cudaCheck(cudaStreamCreate(&other));
-    unsigned long long *bad = nullptr;
-    cudaCheck(cudaMallocManaged(&bad, sizeof(*bad)));
-
-    {// warm-up: on a cold context the first launches serialize, which would hide the race
-        unsigned char *w = nullptr;
-        cudaCheck(cudaMallocAsync((void**)&w, N, other));
-        streamBusyWaitKernel<<<1,1,0,user>>>(CYCLES/10);
-        deviceBufferFillKernel<<<1024,256,0,other>>>(w, N, 0);
-        deviceBufferCountKernel<<<1024,256,0,other>>>(w, N, 0, bad);
-        cudaCheck(cudaFreeAsync(w, other));
-        cudaCheck(cudaDeviceSynchronize());
-    }
-
-    void *devPtr = nullptr;
-    {
-        auto buf = nanovdb::cuda::DeviceBuffer::create(N, nullptr, 0, other);// device-only
-        devPtr = buf.deviceData(0);
-        ASSERT_TRUE(devPtr);
-        streamBusyWaitKernel<<<1,1,0,user>>>(CYCLES);// park 'user'
-        deviceBufferFillKernel<<<1024,256,0,user>>>((unsigned char*)devPtr, N, LATE);
-        if (registerUse) buf.recordUse(0, user);// raw-pointer use: tell the buffer about it
-    }// destroyed here; the free must be ordered after 'user' as well as 'other'
-
-    unsigned char *victim = nullptr;
-    cudaCheck(cudaMallocAsync((void**)&victim, N, other));
-    deviceBufferFillKernel<<<1024,256,0,other>>>(victim, N, VICTIM);
-    cudaCheck(cudaStreamSynchronize(other));
-
-    // Diagnostics only. These are deliberately NOT preconditions: with a correctly ordered free
-    // the allocator cannot hand this block out again until 'user' has drained, so observing
-    // "not recycled" or "no longer pending" here is the fix working, not a reason to skip.
-    const bool stillPending = (cudaStreamQuery(user) == cudaErrorNotReady);
-    cudaGetLastError();// clear the cudaErrorNotReady left by the query above
-    const bool recycled = (victim == devPtr);
-
-    cudaCheck(cudaStreamSynchronize(user));// let the late write land
-    *bad = 0;
-    deviceBufferCountKernel<<<1024,256>>>(victim, N, VICTIM, bad);
-    cudaCheck(cudaDeviceSynchronize());
-    const unsigned long long clobbered = *bad;
-
-    cudaCheck(cudaFreeAsync(victim, other));
-    cudaCheck(cudaStreamSynchronize(other));
-    cudaCheck(cudaFree(bad));
-    cudaCheck(cudaStreamDestroy(user));
-    cudaCheck(cudaStreamDestroy(other));
-
-    EXPECT_EQ(0u, clobbered) << "device memory was freed while another stream still had work in "
-                                "flight (block recycled: " << recycled
-                             << ", work still pending when it was reused: " << stillPending << ")";
-}// testDeviceBufferFreeOrdering
-
-TEST(TestNanoVDBCUDA, DeviceBufferMultiStreamFreeOrdering)
-{
-    testDeviceBufferFreeOrdering(/*nonBlockingUser=*/false, /*registerUse=*/false);
-}// DeviceBufferMultiStreamFreeOrdering
-
-TEST(TestNanoVDBCUDA, DeviceBufferNonBlockingFreeOrdering)
-{
-    testDeviceBufferFreeOrdering(/*nonBlockingUser=*/true, /*registerUse=*/true);
-}// DeviceBufferNonBlockingFreeOrdering
-
-TEST(TestNanoVDBCUDA, DeviceBufferChainedRecordUse)
-{
-    // Regression: recordUse re-records the single per-device tracking event, and re-recording
-    // MOVES an event. Two non-blocking streams recording uses in sequence must therefore CHAIN
-    // (the second record first waits on the first capture); otherwise the second record
-    // discards the only coverage of the first stream's in-flight work and the free races it.
-    // Same shape as testDeviceBufferFreeOrdering, with the late writer recorded FIRST and an
-    // idle second stream recorded after it.
-    const size_t N = size_t(64) << 20;
-    const unsigned char LATE = 0xAA, VICTIM = 0x55;
-    const unsigned long long CYCLES = 400000000ull;// parks 'userA' for O(100 ms)
-
-    cudaStream_t userA = nullptr, userB = nullptr, other = nullptr;
-    cudaCheck(cudaStreamCreateWithFlags(&userA, cudaStreamNonBlocking));
-    cudaCheck(cudaStreamCreateWithFlags(&userB, cudaStreamNonBlocking));
-    cudaCheck(cudaStreamCreate(&other));
-    unsigned long long *bad = nullptr;
-    cudaCheck(cudaMallocManaged(&bad, sizeof(*bad)));
-
-    {// warm-up (see testDeviceBufferFreeOrdering)
-        unsigned char *w = nullptr;
-        cudaCheck(cudaMallocAsync((void**)&w, N, other));
-        streamBusyWaitKernel<<<1,1,0,userA>>>(CYCLES/10);
-        deviceBufferFillKernel<<<1024,256,0,other>>>(w, N, 0);
-        deviceBufferCountKernel<<<1024,256,0,other>>>(w, N, 0, bad);
-        cudaCheck(cudaFreeAsync(w, other));
-        cudaCheck(cudaDeviceSynchronize());
-    }
-
-    void *devPtr = nullptr;
-    {
-        auto buf = nanovdb::cuda::DeviceBuffer::create(N, nullptr, 0, other);// device-only
-        devPtr = buf.deviceData(0);
-        ASSERT_TRUE(devPtr);
-        streamBusyWaitKernel<<<1,1,0,userA>>>(CYCLES);// park 'userA'
-        deviceBufferFillKernel<<<1024,256,0,userA>>>((unsigned char*)devPtr, N, LATE);
-        buf.recordUse(0, userA);// covers the in-flight write...
-        buf.recordUse(0, userB);// ...and must NOT be discarded by a later record
-    }// destroyed here; the free must still be ordered after 'userA'
-
-    unsigned char *victim = nullptr;
-    cudaCheck(cudaMallocAsync((void**)&victim, N, other));
-    deviceBufferFillKernel<<<1024,256,0,other>>>(victim, N, VICTIM);
-    cudaCheck(cudaStreamSynchronize(other));
-
-    const bool stillPending = (cudaStreamQuery(userA) == cudaErrorNotReady);
-    cudaGetLastError();// clear the cudaErrorNotReady left by the query above
-    const bool recycled = (victim == devPtr);
-
-    cudaCheck(cudaStreamSynchronize(userA));// let the late write land
-    *bad = 0;
-    deviceBufferCountKernel<<<1024,256>>>(victim, N, VICTIM, bad);
-    cudaCheck(cudaDeviceSynchronize());
-    const unsigned long long clobbered = *bad;
-
-    cudaCheck(cudaFreeAsync(victim, other));
-    cudaCheck(cudaStreamSynchronize(other));
-    cudaCheck(cudaFree(bad));
-    cudaCheck(cudaStreamDestroy(userA));
-    cudaCheck(cudaStreamDestroy(userB));
-    cudaCheck(cudaStreamDestroy(other));
-
-    // Detection relies on the pool recycling the freed block into 'victim' (stream-ordered
-    // pools recycle WITH the dependency attached, so recycling is expected even with a
-    // correctly ordered free). If it did not recycle, the chain was never exercised -- make
-    // that visible instead of a vacuous pass.
-    if (!recycled) GTEST_SKIP() << "allocator did not recycle the block; ordering not exercised";
-
-    EXPECT_EQ(0u, clobbered) << "a later recordUse on another stream discarded the tracking "
-                                "event covering in-flight work (block recycled: " << recycled
-                             << ", work still pending when it was reused: " << stillPending << ")";
-}// DeviceBufferChainedRecordUse
 
 TEST(TestNanoVDBCUDA, RefineCoarsen_ValueOnIndex)
 {
@@ -4230,13 +3742,12 @@ TEST(TestNanoVDBCUDA, RefineCoarsen_ValueOnIndex)
     inputPoints.emplace_back(4,0,0); // Refinement will introduce extra leaf
     inputPoints.emplace_back(0,64,0); // Refinement will introduce extra lower node
     inputPoints.emplace_back(0,0,2048); // Refinement will introduce extra upper node (and root tile)
-    auto inputBuffer = nanovdb::cuda::DeviceBuffer::create( inputPoints.size() * sizeof(nanovdb::Coord), nullptr, false);
-    EXPECT_FALSE(inputBuffer.data());
-    EXPECT_TRUE(inputBuffer.deviceData());
-    cudaCheck(cudaMemcpy(inputBuffer.deviceData(), inputPoints.data(), inputPoints.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    nanovdb::cuda::Buffer<nanovdb::Coord> inputBuffer(cudaStream_t(0), inputPoints.size(), nanovdb::cuda::noInit);
+    EXPECT_TRUE(inputBuffer.data());
+    cudaCheck(cudaMemcpy(inputBuffer.data(), inputPoints.data(), inputPoints.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
     nanovdb::tools::cuda::PointsToGrid<BuildT> converter;
     converter.setChecksum(nanovdb::CheckMode::Default);
-    auto inputHandle = converter.getHandle(static_cast<nanovdb::Coord*>(inputBuffer.deviceData()), inputPoints.size(), SingleBufT());
+    auto inputHandle = converter.getHandle(inputBuffer.data(), inputPoints.size(), SingleBufT());
     EXPECT_TRUE(inputHandle.deviceGrid<BuildT>());
     auto inputGrid = inputHandle.deviceGrid<BuildT>();
 
@@ -4279,14 +3790,12 @@ TEST(TestNanoVDBCUDA, MergeGrids_ValueOnIndex)
         for (int j = 0; j <= 2; j++)
             for (int k = 0; k <= 2; k++)
                 inputPointsA.emplace_back(i-1, j*8-1, k*128); // 4 upper, 12 lower, 18 leaf nodes
-    auto inputBufferA = nanovdb::cuda::DeviceBuffer::create( inputPointsA.size() * sizeof(nanovdb::Coord), nullptr, false);
-    EXPECT_FALSE(inputBufferA.data());
-    EXPECT_TRUE(inputBufferA.deviceData());
-    cudaCheck(cudaMemcpy(inputBufferA.deviceData(), inputPointsA.data(), inputPointsA.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
-    auto inputHandleA = nanovdb::tools::cuda::voxelsToGrid<BuildT>(static_cast<nanovdb::Coord*>(inputBufferA.deviceData()), inputPointsA.size());
+    nanovdb::cuda::Buffer<nanovdb::Coord> inputBufferA(cudaStream_t(0), inputPointsA.size(), nanovdb::cuda::noInit);
+    EXPECT_TRUE(inputBufferA.data());
+    cudaCheck(cudaMemcpy(inputBufferA.data(), inputPointsA.data(), inputPointsA.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    auto inputHandleA = nanovdb::tools::cuda::voxelsToGrid<BuildT>(inputBufferA.data(), inputPointsA.size());
     EXPECT_TRUE(inputHandleA.deviceGrid<BuildT>());
     auto inputGridA = inputHandleA.deviceGrid<BuildT>();
-    EXPECT_FALSE(inputHandleA.grid<BuildT>());
 
     // Create the second input grid for the merge op
     std::vector<nanovdb::Coord> inputPointsB;
@@ -4294,14 +3803,12 @@ TEST(TestNanoVDBCUDA, MergeGrids_ValueOnIndex)
         for (int j = 0; j <= 2; j++)
             for (int k = 0; k <= 2; k++)
                 inputPointsB.emplace_back(i, j*8-1, (k-1)*128); // 4 upper, 6 lower, 9 leaf nodes
-    auto inputBufferB = nanovdb::cuda::DeviceBuffer::create( inputPointsB.size() * sizeof(nanovdb::Coord), nullptr, false);
-    EXPECT_FALSE(inputBufferB.data());
-    EXPECT_TRUE(inputBufferB.deviceData());
-    cudaCheck(cudaMemcpy(inputBufferB.deviceData(), inputPointsB.data(), inputPointsB.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
-    auto inputHandleB = nanovdb::tools::cuda::voxelsToGrid<BuildT>(static_cast<nanovdb::Coord*>(inputBufferB.deviceData()), inputPointsB.size());
+    nanovdb::cuda::Buffer<nanovdb::Coord> inputBufferB(cudaStream_t(0), inputPointsB.size(), nanovdb::cuda::noInit);
+    EXPECT_TRUE(inputBufferB.data());
+    cudaCheck(cudaMemcpy(inputBufferB.data(), inputPointsB.data(), inputPointsB.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    auto inputHandleB = nanovdb::tools::cuda::voxelsToGrid<BuildT>(inputBufferB.data(), inputPointsB.size());
     EXPECT_TRUE(inputHandleB.deviceGrid<BuildT>());
     auto inputGridB = inputHandleB.deviceGrid<BuildT>();
-    EXPECT_FALSE(inputHandleB.grid<BuildT>());
 
     // Perform the merge operation
     nanovdb::tools::cuda::MergeGrids<BuildT> merger( inputGridA, inputGridB );
@@ -4337,14 +3844,13 @@ TEST(TestNanoVDBCUDA, MergeGridsNary_ValueOnIndex)
                 ptsC.emplace_back(i + 4096, j,         k);
             }
 
-    auto buildGrid = [](const std::vector<Coord>& pts, nanovdb::cuda::DeviceBuffer& buf) {
-        buf = nanovdb::cuda::DeviceBuffer::create(pts.size() * sizeof(Coord), nullptr, false);
-        cudaCheck(cudaMemcpy(buf.deviceData(), pts.data(), pts.size() * sizeof(Coord),
+    auto buildGrid = [](const std::vector<Coord>& pts, nanovdb::cuda::Buffer<Coord>& buf) {
+        buf = nanovdb::cuda::Buffer<Coord>(cudaStream_t(0), pts.size(), nanovdb::cuda::noInit);
+        cudaCheck(cudaMemcpy(buf.data(), pts.data(), pts.size() * sizeof(Coord),
                              cudaMemcpyHostToDevice));
-        return nanovdb::tools::cuda::voxelsToGrid<BuildT>(
-            static_cast<Coord*>(buf.deviceData()), pts.size());
+        return nanovdb::tools::cuda::voxelsToGrid<BuildT>(buf.data(), pts.size());
     };
-    nanovdb::cuda::DeviceBuffer bufA, bufB, bufC;
+    nanovdb::cuda::Buffer<Coord> bufA, bufB, bufC;
     auto hA = buildGrid(ptsA, bufA); auto gA = hA.deviceGrid<BuildT>();
     auto hB = buildGrid(ptsB, bufB); auto gB = hB.deviceGrid<BuildT>();
     auto hC = buildGrid(ptsC, bufC); auto gC = hC.deviceGrid<BuildT>();
@@ -4380,38 +3886,34 @@ TEST(TestNanoVDBCUDA, MergeGridsNary_ValueOnIndex)
 TEST(TestNanoVDBCUDA, GridHandle_from_HostBuffer)
 {
     using namespace nanovdb;
-    using BufferT = nanovdb::cuda::DeviceBuffer;
     auto hostHandle = tools::createLevelSetSphere<float>(100, Vec3d(0),1,3, Vec3d(0), "test");
 
-    int dev;
-    cudaError_t err = cudaGetDevice(&dev);
-    EXPECT_EQ(err, cudaSuccess);
     cudaStream_t stream;
     cudaCheck(cudaStreamCreate(&stream));
 
     {// longer version
-        auto devBuffer = BufferT::create(hostHandle.buffer(), dev, stream);
+        SingleBufT devBuffer(stream, hostHandle.bufferSize(), nanovdb::cuda::noInit);
+        cudaCheck(cudaMemcpyAsync(devBuffer.data(), hostHandle.data(), hostHandle.bufferSize(), cudaMemcpyHostToDevice, stream));
         EXPECT_EQ(hostHandle.bufferSize(), devBuffer.size());
-        auto devHandle = GridHandle<BufferT>(std::move(devBuffer));
+        auto devHandle = GridHandle<SingleBufT>(std::move(devBuffer));
 
         // testing
         EXPECT_EQ(hostHandle.bufferSize(), devHandle.bufferSize());
         EXPECT_EQ(devBuffer.size(), 0);
-        devHandle.deviceDownload(stream);
-        for (uint64_t i=0; i<hostHandle.bufferSize(); ++i) {
-            EXPECT_EQ(*hostHandle.buffer().data<char>(i), *devHandle.buffer().data<char>(i));
-        }
+        auto copyHandle = nanovdb::cuda::copyTo<HostBuffer>(devHandle, stream);
+        ASSERT_EQ(hostHandle.bufferSize(), copyHandle.bufferSize());
+        EXPECT_EQ(0, std::memcmp(hostHandle.data(), copyHandle.data(), hostHandle.bufferSize()));
     }
     {// compact version
-        auto devHandle = GridHandle<BufferT>(BufferT::create(hostHandle.buffer(), dev, stream));
+        auto devHandle = nanovdb::cuda::copyTo<SingleBufT>(hostHandle, stream);
 
         // testing
         EXPECT_EQ(hostHandle.bufferSize(), devHandle.bufferSize());
-        devHandle.deviceDownload(stream);
-        for (uint64_t i=0; i<hostHandle.bufferSize(); ++i) {
-            EXPECT_EQ(*hostHandle.buffer().data<char>(i), *devHandle.buffer().data<char>(i));
-        }
+        auto copyHandle = nanovdb::cuda::copyTo<HostBuffer>(devHandle, stream);
+        ASSERT_EQ(hostHandle.bufferSize(), copyHandle.bufferSize());
+        EXPECT_EQ(0, std::memcmp(hostHandle.data(), copyHandle.data(), hostHandle.bufferSize()));
     }
+    cudaCheck(cudaStreamDestroy(stream));
 }
 
 TEST(TestNanoVDBCUDA, MeshToGrid_EmptyMesh)
@@ -4454,18 +3956,18 @@ TEST(TestNanoVDBCUDA, MeshToGrid_UnitTetrahedron)
     auto nTriangles = hostTriangles.size();
 
     // Upload points and triangles to device
-    auto pointsBuf = nanovdb::cuda::DeviceBuffer::create(nPoints * sizeof(nanovdb::Vec3f), nullptr, false);
-    ASSERT_TRUE(pointsBuf.deviceData());
-    cudaCheck(cudaMemcpy(pointsBuf.deviceData(), hostPoints.data(),
+    nanovdb::cuda::Buffer<nanovdb::Vec3f> pointsBuf(cudaStream_t(0), nPoints, nanovdb::cuda::noInit);
+    ASSERT_TRUE(pointsBuf.data());
+    cudaCheck(cudaMemcpy(pointsBuf.data(), hostPoints.data(),
                          nPoints * sizeof(nanovdb::Vec3f), cudaMemcpyHostToDevice));
 
-    auto trisBuf = nanovdb::cuda::DeviceBuffer::create(nTriangles * sizeof(nanovdb::Vec3i), nullptr, false);
-    ASSERT_TRUE(trisBuf.deviceData());
-    cudaCheck(cudaMemcpy(trisBuf.deviceData(), hostTriangles.data(),
+    nanovdb::cuda::Buffer<nanovdb::Vec3i> trisBuf(cudaStream_t(0), nTriangles, nanovdb::cuda::noInit);
+    ASSERT_TRUE(trisBuf.data());
+    cudaCheck(cudaMemcpy(trisBuf.data(), hostTriangles.data(),
                          nTriangles * sizeof(nanovdb::Vec3i), cudaMemcpyHostToDevice));
 
-    auto dPoints = static_cast<const nanovdb::Vec3f*>(pointsBuf.deviceData());
-    auto dTriangles = static_cast<const nanovdb::Vec3i*>(trisBuf.deviceData());
+    const nanovdb::Vec3f* dPoints = pointsBuf.data();
+    const nanovdb::Vec3i* dTriangles = trisBuf.data();
 
     // Uniform-scale map: world = dx * index
     const double dx = 0.1;
