@@ -124,7 +124,11 @@ if("openvdb_ax" IN_LIST OpenVDB_FIND_COMPONENTS)
     if(OpenVDB_FIND_QUIETLY OR NOT OpenVDB_FIND_REQUIRED_openvdb_ax)
       list(APPEND _openvdb_find_arguments QUIET)
     endif()
-    find_package(LLVM @MINIMUM_LLVM_VERSION@ CONFIG ${_openvdb_find_arguments})
+
+    # LLVM needs the same major and minor version that AX was built with
+    include("${CMAKE_CURRENT_LIST_DIR}/OpenVDBAXDependencies.cmake")
+    find_package(LLVM ${_openvdb_ax_llvm_version} CONFIG ${_openvdb_find_arguments})
+    unset(_openvdb_ax_llvm_version)
     unset(_openvdb_find_arguments)
 
     if(LLVM_FOUND)

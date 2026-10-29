@@ -391,3 +391,12 @@ install(EXPORT OpenVDBAXTargets
   NAMESPACE OpenVDB::
   DESTINATION ${OPENVDB_INSTALL_LIBDIR}/cmake/OpenVDB
 )
+
+# LLVM only accepts the same major and minor version that AX was built with
+file(CONFIGURE
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/OpenVDBAXDependencies.cmake
+  CONTENT "set(_openvdb_ax_llvm_version \"${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}\")\n")
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/OpenVDBAXDependencies.cmake
+  DESTINATION ${OPENVDB_INSTALL_LIBDIR}/cmake/OpenVDB
+)
