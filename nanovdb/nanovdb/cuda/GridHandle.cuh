@@ -370,11 +370,26 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, cudaStream_t strea
     std::vector<GridData*> dst;
     dst.reserve(gridCount);
     uint32_t counter = 0u;
+    const int current = util::cuda::currentDevice();
     for (auto &h : handles) {
         const void *src = h.deviceData();
+        // Stream-ordered (pool) allocations are only accessible from their own
+        // device, even with peer access, so copies from another device's memory
+        // must be peer copies rather than plain device-to-device copies.
+        int srcDevice = current;
+        cudaPointerAttributes attr;
+        if (cudaPointerGetAttributes(&attr, src) != cudaSuccess) {
+            (void)cudaGetLastError();
+        } else if (attr.type == cudaMemoryTypeDevice && attr.device >= 0) {
+            srcDevice = attr.device;
+        }
         for (auto &m : h.metaData()) {
             dst.push_back(util::PtrAdd<GridData>(detail::deviceStorageData(buffer), meta[counter++].offset));
-            cudaCheck(cudaMemcpyAsync(dst.back(), util::PtrAdd(src, m.offset), m.size, cudaMemcpyDeviceToDevice, stream));
+            if (srcDevice != current) {
+                cudaCheck(cudaMemcpyPeerAsync(dst.back(), current, util::PtrAdd(src, m.offset), srcDevice, m.size, stream));
+            } else {
+                cudaCheck(cudaMemcpyAsync(dst.back(), util::PtrAdd(src, m.offset), m.size, cudaMemcpyDeviceToDevice, stream));
+            }
         }
     }
     detail::rewriteGridCounts(dst, 1u, gridCount, stream);
