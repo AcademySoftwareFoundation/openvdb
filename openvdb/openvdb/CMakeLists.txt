@@ -132,6 +132,10 @@ if(USE_IMATH_HALF)
   endif()
 endif()
 
+if(USE_ZSTD)
+  find_package(Zstd ${MINIMUM_ZSTD_VERSION} REQUIRED)
+endif()
+
 if(USE_BLOSC)
   # Find Blosc libraries
   find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
@@ -198,8 +202,8 @@ endif()
 
 list(APPEND OPENVDB_CORE_DEPENDENT_LIBS TBB::tbb)
 
-# Blosc and zlib are hidden dependencies (not exposed in headers). Blosc is
-# still linked publicly, see FindOpenVDB.cmake. Zlib is linked privately.
+# Zstd and zlib are private dependencies. No installed header includes zstd.h, so
+# downstream projects do not need it at compile time.
 # @warning If building against Houdini these should be picked up from the
 # Houdini installation. If a custom version of EXR is in use, be careful
 # that zlib/blosc headers/libs are not also in the same location e.g.
@@ -212,6 +216,9 @@ endif()
 set(OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS "")
 if(USE_BLOSC OR USE_ZLIB)
   list(APPEND OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS ZLIB::ZLIB)
+endif()
+if(USE_ZSTD)
+  list(APPEND OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS Zstd::zstd)
 endif()
 
 if(UNIX)
@@ -242,6 +249,9 @@ if(USE_ZLIB)
   if(USE_BLOSC)
     set(OPENVDB_USE_BLOSC 1)
   endif()
+endif()
+if(USE_ZSTD)
+  set(OPENVDB_USE_ZSTD 1)
 endif()
 if(USE_EXPLICIT_INSTANTIATION)
   set(OPENVDB_USE_EXPLICIT_INSTANTIATION 1)
@@ -712,7 +722,7 @@ if(OPENVDB_CORE_SHARED)
     PRIVATE ${OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS}
   )
 
-  # If zlib is linked statically, stop its symbols being
+  # If zlib or zstd are linked statically, stop their symbols being
   # re-exported from the shared library, where they could clash with another
   # copy loaded in the same process. Windows DLLs only export marked symbols.
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")

@@ -984,13 +984,6 @@ __hostdev__ typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 3, false
 
 }// namespace math
 
-template<int Order, typename TreeOrAccT, bool UseCache = true>
-[[deprecated("Use nanovdb::math::createSampler instead")]]
-__hostdev__ math::SampleFromVoxels<TreeOrAccT, Order, UseCache> createSampler(const TreeOrAccT& acc)
-{
-    return math::SampleFromVoxels<TreeOrAccT, Order, UseCache>(acc);
-}
-
 } // namespace nanovdb
 
 #endif // NANOVDB_SAMPLE_FROM_VOXELS_H_HAS_BEEN_INCLUDED

@@ -48,8 +48,7 @@ struct StreamHolder<true> { cudaStream_t mStream = 0; };
 /// @tparam R memory resource, either stream-ordered (AsyncResource concept,
 ///         see is_async_resource) or synchronous (Resource concept, see
 ///         is_resource). When @c R provides both interfaces the stream-ordered
-///         one is used. A resource without operator== is deprecated; 14.0
-///         requires it.
+///         one is used. The resource must provide operator==.
 /// @details With a stream-ordered resource the Buffer retains the stream of
 ///          the most recent allocation (or the one supplied via set_stream)
 ///          and orders its deallocation on that stream. Buffer is move-only.
@@ -70,6 +69,10 @@ class Buffer : private detail::StreamHolder<is_async_resource<R>::value>
 {
     static_assert(is_async_resource<R>::value || is_resource<R>::value,
                   "Buffer requires R to model the AsyncResource or the Resource concept");
+    static_assert(is_equality_comparable_resource<R>::value,
+                  "a memory resource needs operator==: add friend bool operator==(const R&, const R&), true when memory "
+                  "allocated through one may be deallocated through the other (always, for a stateless resource), "
+                  "and operator!= for cuda::mr under C++17");
     static_assert(std::is_trivially_copyable<T>::value,
                   "Buffer requires a trivially copyable T: elements are copied bytewise and never constructed or destroyed");
 
@@ -198,11 +201,7 @@ public:
 
     /// @brief D-tor. A stream-ordered resource frees on the retained stream;
     ///        a synchronous resource frees immediately.
-    ~Buffer()
-    {
-        detail::checkResourceEquality<R>();
-        this->destroy();
-    }
+    ~Buffer() { this->destroy(); }
 
     /// @brief Returns the retained stream, i.e. the stream the buffer's memory
     ///        will be freed on.
@@ -257,24 +256,6 @@ public:
         else {
             this->mStream = stream; // no reallocation: set_stream semantics
         }
-    }
-
-    /// @brief Resizes the buffer to @c count elements on @c stream.
-    /// @deprecated Use resize(stream, count).
-    /// @note Accepts every count the size_t parameter of the old signature
-    ///       accepted, converted the same way. resize(0, 0) resolves to this
-    ///       overload; resize(cudaStream_t(0), 0) is the stream-first spelling.
-    /// @throw std::runtime_error if a floating-point @c count is negative or exceeds size_t
-    template<typename CountT = size_t, typename S = R,
-             std::enable_if_t<std::is_convertible<CountT, size_t>::value && is_async_resource<S>::value, int> = 0>
-    [[deprecated("use resize(stream, count)")]]
-    void resize(CountT count, cudaStream_t stream)
-    {
-        if constexpr (std::is_floating_point<CountT>::value) {
-            if (!(count >= CountT(0) && double(count) < 18446744073709551616.0))
-                throw std::runtime_error("Buffer::resize: count out of range");
-        }
-        this->resize(stream, static_cast<size_t>(count));
     }
 
     /// @brief Resizes the buffer to @c count elements through the synchronous
@@ -332,11 +313,6 @@ public:
         mData = nullptr;
         mSize = 0;
     }
-
-    /// @brief Frees the buffer memory (if any) and resets to the empty state.
-    /// @deprecated Use destroy(): the handles now dispatch to it directly.
-    [[deprecated("Use cuda::Buffer::destroy instead")]]
-    void clear() { this->destroy(); }
 
     /// @brief Frees the buffer memory (if any) on @c stream and resets to the
     ///        empty state. @c stream becomes the retained stream.
@@ -454,11 +430,6 @@ public:
         mData = nullptr;
         mSize = 0;
     }
-
-    /// @brief Detaches the view.
-    /// @deprecated Use destroy(): the handles now dispatch to it directly.
-    [[deprecated("Use cuda::BufferView::destroy instead")]]
-    void clear() { this->destroy(); }
 }; // BufferView<T> class
 
 } // namespace cuda
@@ -484,7 +455,6 @@ struct BufferTraits;
 template<typename T, typename R>
 struct BufferTraits<cuda::Buffer<T, R>>
 {
-    static constexpr bool hasDeviceDual   = false;
     // Device-resident storage; the byte-addressed requirement is enforced by
     // the single-space GridHandle constructor, so trait queries stay
     // answerable for any element type.

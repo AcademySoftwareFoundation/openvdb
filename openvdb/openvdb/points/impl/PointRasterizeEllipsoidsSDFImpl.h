@@ -675,10 +675,7 @@ rasterizeEllipsoids(const PointDataGridT& points,
         return GridPtrVec(1, surface);
     }
 
-    // deprecated, to remove, should always use xform
-OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-    const auto& attr = settings.rotation.empty() ? settings.xform : settings.rotation;
-OPENVDB_NO_DEPRECATION_WARNING_END
+    const auto& attr = settings.xform;
 
     // Get attributes
     const EllipseIndicies indices(leaf->attributeSet().descriptor(),
@@ -799,10 +796,7 @@ rasterizeEllipsoids(const PointDataGridT& points,
 {
     if (const auto leaf = points.constTree().cbeginLeaf()) {
         const auto& desc = leaf->attributeSet().descriptor();
-        // deprecated, to remove, should always use xform
-OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-        const auto& attr = settings.rotation.empty() ? settings.xform : settings.rotation;
-OPENVDB_NO_DEPRECATION_WARNING_END
+        const auto& attr = settings.xform;
         const size_t idx = desc.find(attr);
         if (idx != points::AttributeSet::INVALID_POS) {
             if (typeNameAsString<math::Mat3s>() == desc.valueType(idx)) {

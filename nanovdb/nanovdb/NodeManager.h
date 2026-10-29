@@ -65,12 +65,6 @@ class NodeManagerHandle
         return mGridType == toGridType<BuildT>() ? (const NodeManager<BuildT>*)mBuffer.data() : nullptr;
     }
 
-    template<typename BuildT, typename U = BufferT>
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, const NodeManager<BuildT>*>::type
-    getDeviceMgr() const {
-        return mGridType == toGridType<BuildT>() ? (const NodeManager<BuildT>*)mBuffer.deviceData() : nullptr;
-    }
-
     template <typename T>
     static T* no_const(const T* ptr) { return const_cast<T*>(ptr); }
 
@@ -138,20 +132,6 @@ public:
     template<typename BuildT>
     NodeManager<BuildT>* mgr() { return no_const(this->template getMgr<BuildT>()); }
 
-    /// @brief Return a const pointer to the NodeManager encoded in this NodeManagerHandle on the device, e.g. GPU
-    ///
-    /// @warning Note that the return pointer can be NULL if the template parameter does not match the specified grid!
-    template<typename BuildT, typename U = BufferT>
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, const NodeManager<BuildT>*>::type
-    deviceMgr() const { return this->template getDeviceMgr<BuildT>(); }
-
-    /// @brief Return a const pointer to the NodeManager encoded in this NodeManagerHandle on the device, e.g. GPU
-    ///
-    /// @warning Note that the return pointer can be NULL if the template parameter does not match the specified grid!
-    template<typename BuildT, typename U = BufferT>
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, NodeManager<BuildT>*>::type
-    deviceMgr() { return no_const(this->template getDeviceMgr<BuildT>()); }
-
     //@{
     /// @brief Return a pointer to the NodeManager of a single-space device buffer
     /// @warning Note that the return pointer can be NULL if the template parameter does not match the specified grid!
@@ -164,42 +144,6 @@ public:
     typename util::enable_if<BufferHasDeviceSingle<U>::value, NodeManager<BuildT>*>::type
     deviceMgr() { return no_const(static_cast<const NodeManagerHandle*>(this)->template deviceMgr<BuildT>()); }
     //@}
-
-    /// @brief Upload the NodeManager to the device, e.g. from CPU to GPU
-    ///
-    /// @note This method is only available if the buffer supports devices
-    /// @deprecated Build the node manager on the device with cuda::createNodeManager(deviceGrid, resource).
-    template<typename U = BufferT>
-    [[deprecated("node-manager storage is moving to cuda::Buffer<std::byte>: build the node manager on the device with cuda::createNodeManager(deviceGrid, resource) (cuda/NodeManager.cuh)")]]
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
-    deviceUpload(void* deviceGrid, void* stream = nullptr, bool sync = true)
-    {
-        assert(deviceGrid);
-        auto *data = reinterpret_cast<NodeManagerData*>(mBuffer.data());
-        void *tmp = data->mGrid;
-        data->mGrid = deviceGrid;
-        NANOVDB_SUPPRESS_DEPRECATION_BEGIN
-        mBuffer.deviceUpload(stream, sync);
-        NANOVDB_SUPPRESS_DEPRECATION_END
-        data->mGrid = tmp;
-    }
-
-    /// @brief Download the NodeManager to from the device, e.g. from GPU to CPU
-    ///
-    /// @note This method is only available if the buffer supports devices
-    /// @deprecated Build the node manager on the host with createNodeManager.
-    template<typename U = BufferT>
-    [[deprecated("node-manager storage is moving to cuda::Buffer<std::byte>: build the node manager on the host with createNodeManager (NodeManager.h)")]]
-    typename util::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
-    deviceDownload(void* stream = nullptr, bool sync = true)
-    {
-        auto *data = reinterpret_cast<NodeManagerData*>(mBuffer.data());
-        void *tmp = data->mGrid;
-        NANOVDB_SUPPRESS_DEPRECATION_BEGIN
-        mBuffer.deviceDownload(stream, sync);
-        NANOVDB_SUPPRESS_DEPRECATION_END
-        data->mGrid = tmp;
-    }
 };// NodeManagerHandle
 
 /// @brief This class allows for sequential access to nodes in a NanoVDB tree

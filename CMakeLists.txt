@@ -52,9 +52,9 @@ endif()
 
 ###### Version
 
-set(OpenVDB_MAJOR_VERSION 13)
-set(OpenVDB_MINOR_VERSION 1)
-set(OpenVDB_PATCH_VERSION 1)
+set(OpenVDB_MAJOR_VERSION 14)
+set(OpenVDB_MINOR_VERSION 0)
+set(OpenVDB_PATCH_VERSION 0)
 set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}")
 
 project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
@@ -80,10 +80,6 @@ option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library. Turns ON if USE_NANOVDB
 # Global options
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_ENABLE_ASSERTS "Build with asserts in OpenVDB code enabled" OFF)
-option(OPENVDB_ENABLE_VEC_RELATIONAL_OPERATIONS [=[
-Enabled deprecated relational < and > operators on Vector types. This option
-will be switched to OFF and the feature will be subsequently removed in future
-releases.]=] ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
@@ -119,6 +115,9 @@ know it to be required.]=] ON)
 option(USE_ZLIB [=[
 Use zlib while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
 openvdb build configuration to decide on zlib support. ZLib can only be disabled if Blosc is also disabled. ]=] ON)
+option(USE_ZSTD [=[
+Build the openvdb core library with Zstd support. This is a private dependency of shared builds.
+If OPENVDB_BUILD_CORE is OFF, the setting is read from the installed openvdb version.h instead.]=] ON)
 option(USE_LOG4CPLUS [=[
 Deprecated, has no effect. OpenVDB no longer depends on log4cplus. See openvdb::logging::Sink
 for the replacement API.]=] OFF)
@@ -337,6 +336,7 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
     cmake/FindOpenEXR.cmake
     cmake/FindOpenVDB.cmake
     cmake/FindTBB.cmake
+    cmake/FindZstd.cmake
     cmake/OpenVDBGLFW3Setup.cmake
     cmake/OpenVDBHoudiniSetup.cmake
     cmake/OpenVDBMayaSetup.cmake
@@ -447,6 +447,7 @@ if(USE_STATIC_DEPENDENCIES)
   set(BLOSC_USE_STATIC_LIBS ON)
   set(OPENEXR_USE_STATIC_LIBS ON)
   set(TBB_USE_STATIC_LIBS ON)
+  set(ZSTD_USE_STATIC_LIBS ON)
   set(JEMALLOC_USE_STATIC_LIBS ON)
   set(GTEST_USE_STATIC_LIBS ON)
   # @todo  glfw needs custom support.

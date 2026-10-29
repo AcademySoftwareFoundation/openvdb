@@ -320,11 +320,7 @@ Checksum evalChecksum(const NanoGrid<ValueT> *grid, CheckMode mode)
         if (mode == CheckMode::Full) cs.tail() = crc32Tail(grid, lut.get());
     }
     return cs;
-}// checksum(const NanoGrid*, CheckMode)
-
-template <typename ValueT>
-[[deprecated("Use evalChecksum(const NanoGrid<ValueT> *grid, CheckMode mode) instead")]]
-Checksum checksum(const NanoGrid<ValueT> *grid, CheckMode mode){return evalChecksum(grid, mode);}
+}// evalChecksum(const NanoGrid*, CheckMode)
 
 inline Checksum evalChecksum(const GridData *gridData, CheckMode mode)
 {
@@ -337,13 +333,6 @@ inline Checksum evalChecksum(const GridData *gridData, CheckMode mode)
     }
     return cs;
 }// evalChecksum(GridData *data, CheckMode mode)
-
-[[deprecated("Use evalChecksum(const NanoGrid*, CheckMode) instead")]]
-inline Checksum checksum(const GridData *gridData, CheckMode mode){return evalChecksum(gridData, mode);}
-
-template <typename ValueT>
-[[deprecated("Use checksum(const NanoGrid*, CheckMode) instead")]]
-Checksum checksum(const NanoGrid<ValueT> &grid, CheckMode mode){return checksum(&grid, mode);}
 
 // ----------------------------> validateChecksum <--------------------------------------
 
@@ -377,10 +366,6 @@ inline bool validateChecksum(const GridData *gridData, CheckMode mode)
     }
 }//  bool validateChecksum(const GridData *gridData, CheckMode mode)
 
-template <typename ValueT>
-[[deprecated("Use validateChecksum(const NanoGrid*, CheckMode) instead")]]
-bool validateChecksum(const NanoGrid<ValueT> &grid, CheckMode mode){return validateChecksum(&grid, mode);}
-
 // ----------------------------> updateChecksum <--------------------------------------
 
 /// @brief
@@ -392,11 +377,6 @@ void updateChecksum(NanoGrid<ValueT> *grid, CheckMode mode){grid->mChecksum = ev
 
 template <typename ValueT>
 void updateChecksum(NanoGrid<ValueT> *grid){grid->mChecksum = evalChecksum(grid, grid->mChecksum.mode());}
-
-// deprecated method that takes a reference vs a pointer
-template <typename ValueT>
-[[deprecated("Use updateChecksum(const NanoGrid*, CheckMode) instead")]]
-void updateChecksum(NanoGrid<ValueT> &grid, CheckMode mode){updateChecksum(&grid, mode);}
 
 // ----------------------------> updateGridCount <--------------------------------------
 

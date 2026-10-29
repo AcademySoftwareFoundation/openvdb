@@ -1436,11 +1436,6 @@ size_t VolumeExecutable::getActiveTileStreamingGrainSize() const
     return mSettings->mGrainSizes.get().second;
 }
 
-Index VolumeExecutable::getTreeExecutionLevel() const
-{
-    return mSettings->mTreeExecutionLevel.get().first;
-}
-
 void VolumeExecutable::setAttributeBindings(const AttributeBindings& bindings)
 {
     for (const auto& binding : bindings.axToDataMap()) {
