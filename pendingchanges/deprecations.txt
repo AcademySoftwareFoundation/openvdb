@@ -15,9 +15,6 @@ OpenVDB:
     when building with ABI 13.
   - Removed io::GridDescriptor::read(). Use GridDescriptor::readHeader()
     followed by GridDescriptor::readStreamPos() instead.
-  - Removed the relational operator< and operator> on math::Vec2, Vec3 and Vec4.
-    Use math::cwiseLessThan() and math::cwiseGreaterThan() instead. The
-    OPENVDB_ENABLE_VEC_RELATIONAL_OPERATIONS CMake option has been removed.
 
 OpenVDB AX:
   Removals:

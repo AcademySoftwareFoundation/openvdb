@@ -148,6 +148,14 @@
 #cmakedefine OPENVDB_ENABLE_ASSERTS
 #endif
 
+/* Denotes whether Vec2, Vec3 and Vec4 less than and greater than operators are
+  enabled. These will be removed in a future release, whereby this define will
+  become defunct
+*/
+#ifndef OPENVDB_ENABLE_VEC_RELATIONAL_OPERATIONS
+#cmakedefine OPENVDB_ENABLE_VEC_RELATIONAL_OPERATIONS
+#endif
+
 /* Denotes whether VDB was built with VCL support */
 #ifndef OPENVDB_USE_VCL
 #cmakedefine OPENVDB_USE_VCL
