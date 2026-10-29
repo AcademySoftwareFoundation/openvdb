@@ -362,7 +362,7 @@ void buildVoxelBlockManager(
         handle.blockCount() * JumpMapLength * sizeof(uint64_t), stream));
 
     using Traits = util::cuda::DeviceGridTraits<ValueOnIndex>;
-    const uint32_t lowerCount = Traits::getTreeData(d_grid).mNodeCount[1];
+    const uint32_t lowerCount = Traits::getTreeData(d_grid, stream).mNodeCount[1];
     using Op = BuildVoxelBlockManagerFunctor<Log2BlockWidth>;
     util::cuda::operatorKernel<Op>
         <<<dim3(lowerCount, Op::SlicesPerLowerNode, 1), Op::MaxThreadsPerBlock, 0, stream>>>(
@@ -402,7 +402,7 @@ buildVoxelBlockManager(
 
     using Traits = util::cuda::DeviceGridTraits<ValueOnIndex>;
     if (!firstOffset) firstOffset = 1;
-    if (!lastOffset)  lastOffset  = Traits::getActiveVoxelCount(d_grid);
+    if (!lastOffset)  lastOffset  = Traits::getActiveVoxelCount(d_grid, stream);
     if (lastOffset < firstOffset) {// empty grid: an empty handle, through the pool's resource when one is needed
         if constexpr (BufferIsDefaultConstructible<BufferT>::value) {
             return nanovdb::tools::VoxelBlockManagerHandle<BufferT>{};

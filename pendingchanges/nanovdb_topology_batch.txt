@@ -1,0 +1,5 @@
+NanoVDB:
+
+  Improvements:
+  - Added batched CUDA topology construction through tools::cuda::TopologyBuilder, allowing multiple independent grids to share one allocation and one set of build passes while preserving existing single-grid behavior.
+

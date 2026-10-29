@@ -12,8 +12,8 @@
              to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NVIDIA_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
-#define NVIDIA_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <cub/cub.cuh>
 
@@ -116,8 +116,7 @@ GridHandle<BufferT>
 DilateGrid<BuildT, ResourceT>::getHandle(const BufferT &pool)
 {
     // Copy TreeData from GPU -> CPU
-    cudaStreamSynchronize(mStream);
-    mSrcTreeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid);
+    mSrcTreeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid, mStream);
 
     // Ensure that the input grid contains no tile values
     if (mSrcTreeData.mTileCount[2] || mSrcTreeData.mTileCount[1] || mSrcTreeData.mTileCount[0])
@@ -138,8 +137,6 @@ DilateGrid<BuildT, ResourceT>::getHandle(const BufferT &pool)
     // Enumerate tree nodes
     if (mVerbose==1) mTimer.restart("Count dilated tree nodes");
     mBuilder.countNodes(mStream);
-
-    cudaStreamSynchronize(mStream);
 
     // Allocate new device grid buffer for dilated result
     if (mVerbose==1) mTimer.restart("Allocating dilated grid buffer");
@@ -182,26 +179,14 @@ void DilateGrid<BuildT, ResourceT>::dilateRoot()
 {
     // This method conservatively and speculatively dilates the root tiles, to accommodate
     // any new root nodes that might be introduced by the dilation operation.
-    // The index-space bounding box of each tile is examined, and if it is within a 1-pixel of
-    // intersecting any of the 26-connected neighboring root tiles, those are preemptively
-    // introduced into the root topology.
+    // The index-space bounding box of each upper node is expanded by one voxel, and every
+    // root tile it overlaps (at most the 26-connected neighbors) is preemptively introduced
+    // into the root topology.
     // (As of the present implementation this presumes a maximum of 1-voxel radius in dilation)
     // Root tiles that were preemptively introduced, but end up having no active contents will
     // be pruned in later stages of processing.
 
-    int device = 0;
-    cudaGetDevice(&device);
-
-    std::map<uint64_t, typename RootT::DataType::Tile> dilatedTiles;
-
-    // This encoding scheme mirrors the one used in PointsToGrid; note that it is different from Tile::key
-    auto coordToKey = [](const Coord &ijk)->uint64_t{
-        // Note: int32_t has a range of -2^31 to 2^31 - 1 whereas uint32_t has a range of 0 to 2^32 - 1
-        static constexpr int64_t kOffset = 1 << 31;
-        return (uint64_t(uint32_t(int64_t(ijk[2]) + kOffset) >> 12)      ) | // z is the lower 21 bits
-            (uint64_t(uint32_t(int64_t(ijk[1]) + kOffset) >> 12) << 21) | // y is the middle 21 bits
-            (uint64_t(uint32_t(int64_t(ijk[0]) + kOffset) >> 12) << 42); //  x is the upper 21 bits
-    };// coordToKey lambda functor
+    topology::detail::ProcessedTileMap<RootT> tiles;
 
     if (mSrcTreeData.mVoxelCount) { // If the input grid is not empty
         // Make a host copy of the source topology RootNode *and* the Upper Nodes (needed for BBox'es)
@@ -212,33 +197,16 @@ void DilateGrid<BuildT, ResourceT>::dilateRoot()
         cudaCheck(cudaMemcpyAsync(srcRootAndUpperBuffer.data(), deviceSrcRoot, rootAndUpperSize, cudaMemcpyDeviceToHost, mStream));
         auto srcRootAndUpper = static_cast<RootT*>(srcRootAndUpperBuffer.data());
 
-        // For each original root tile, consider adding those tiles in its 26-connected neighborhood
         for (uint32_t t = 0; t < srcRootAndUpper->tileCount(); t++) {
             auto srcUpper = srcRootAndUpper->getChild(srcRootAndUpper->tile(t));
             const auto dilatedBBox = srcUpper->bbox().expandBy(1); // TODO: update/specialize if larger dilation neighborhoods are used
-
-            static constexpr int32_t rootTileDim = UpperT::DIM; // 4096
-            for (int di = -rootTileDim; di <= rootTileDim; di += rootTileDim)
-            for (int dj = -rootTileDim; dj <= rootTileDim; dj += rootTileDim)
-            for (int dk = -rootTileDim; dk <= rootTileDim; dk += rootTileDim) {
-                auto testBBox = nanovdb::CoordBBox::createCube(srcUpper->origin().offsetBy(di,dj,dk), rootTileDim);
-                auto sortKey = coordToKey(testBBox.min()); // key used in the radix sort, in accordance with PointsToGrid
-                auto tileKey = RootT::CoordToKey(testBBox.min()); // encoding used in the NanoVDB tile
-                if (testBBox.hasOverlap(dilatedBBox) & (dilatedTiles.count(sortKey) == 0)) {
-                    typename RootT::Tile neighborTile{tileKey}; // Only the key value is needed; child pointer & value will be unused
-                    dilatedTiles.emplace(sortKey, neighborTile);
-                }
-            }
+            topology::detail::insertProcessedTiles<RootT>(tiles, dilatedBBox);
         }
     }
 
     // Package the new root topology into a RootNode plus Tile list; upload to the GPU
-    uint64_t rootSize = RootT::memUsage(dilatedTiles.size());
-    auto dilatedRootPtr = mBuilder.allocateProcessedRoot(rootSize);
-    dilatedRootPtr->mTableSize = dilatedTiles.size();
-    uint32_t t = 0;
-    for (const auto& [key, tile] : dilatedTiles)
-        *dilatedRootPtr->tile(t++) = tile;
+    auto rootPtr = mBuilder.allocateProcessedRootTiles(static_cast<uint32_t>(tiles.size()));
+    topology::detail::packProcessedRoot(tiles, rootPtr);
     mBuilder.uploadProcessedRoot(mStream);
 }// DilateGrid<BuildT, ResourceT>::dilateRoot
 
@@ -313,4 +281,4 @@ void DilateGrid<BuildT, ResourceT>::dilateLeafNodes()
 
 }// namespace nanovdb
 
-#endif // NVIDIA_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED
+#endif // NANOVDB_TOOLS_CUDA_DILATEGRID_CUH_HAS_BEEN_INCLUDED

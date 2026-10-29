@@ -13,8 +13,8 @@
              to only include it in .cu files (or other .cuh files)
 */
 
-#ifndef NVIDIA_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
-#define NVIDIA_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
+#ifndef NANOVDB_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
+#define NANOVDB_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <cub/cub.cuh>
 #include <algorithm>
@@ -292,7 +292,6 @@ GridHandle<BufferT> MeshToGrid<BuildT, ResourceT>::getHandle(const BufferT &buff
     // Count nodes at all levels from the filled masks
     if (mVerbose==1) mTimer.start("Counting nodes");
     mBuilder.countNodes(mStream);
-    cudaStreamSynchronize(mStream); // node counts written async; sync before reading or passing to getBuffer
     if (mVerbose==1) mTimer.stop();
 
     // Allocate output grid buffer
@@ -872,9 +871,7 @@ void MeshToGrid<BuildT, ResourceT>::buildRasterizedRoot()
     // Build the root node on CPU: one tile per unique root origin.
     // Only the NanoVDB tile key is set here; child pointers and values are
     // filled by TopologyBuilder's subsequent pipeline stages.
-    uint64_t rootSize = RootT::memUsage(tileCount);
-    auto *rootPtr = mBuilder.allocateProcessedRoot(rootSize);
-    rootPtr->mTableSize = tileCount;
+    auto *rootPtr = mBuilder.allocateProcessedRootTiles(tileCount);
     rootPtr->mBackground = typename RootT::ValueType{};
 
     if (tileCount) {
@@ -1111,7 +1108,6 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
 
     if (mVerbose==1) mTimer.start("Counting nodes");
     mBuilder.countNodes(mStream);
-    cudaStreamSynchronize(mStream);
     if (mVerbose==1) mTimer.stop();
 
     if (mVerbose==1) mTimer.start("Allocating grid buffer");
@@ -1167,7 +1163,7 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
     const float voxelSize = (float)mMap.getVoxelSize()[0];
 
     const uint64_t activeVoxelCount = util::cuda::DeviceGridTraits<BuildT>::getActiveVoxelCount(
-        handle.template deviceGrid<BuildT>());
+        handle.template deviceGrid<BuildT>(), mStream);
 
     auto sidecarBuffer = nanovdb::cuda::detail::createDeviceStorage<SidecarBufferT>(
         (activeVoxelCount + 1) * sizeof(float), &sidecarProto, mStream);
@@ -1219,4 +1215,4 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
 
 } // namespace nanovdb
 
-#endif // NVIDIA_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
+#endif // NANOVDB_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
