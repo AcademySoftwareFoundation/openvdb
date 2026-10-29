@@ -1915,9 +1915,9 @@ public:
 
     // ---- mixed Vec3 / Coord (3D) ----
     /// @brief Add an integer @c Coord to this vector (component-wise).
-    __hostdev__ [[nodiscard]] constexpr Vec3  operator+(const Coord& ijk) const noexcept { return Vec3(this->mVec[0] + ijk[0], this->mVec[1] + ijk[1], this->mVec[2] + ijk[2]); }
+    __hostdev__ [[nodiscard]] constexpr Vec3  operator+(const Coord& ijk) const noexcept { return Vec3(this->mVec[0] + T(ijk[0]), this->mVec[1] + T(ijk[1]), this->mVec[2] + T(ijk[2])); }
     /// @brief Subtract an integer @c Coord from this vector (component-wise).
-    __hostdev__ [[nodiscard]] constexpr Vec3  operator-(const Coord& ijk) const noexcept { return Vec3(this->mVec[0] - ijk[0], this->mVec[1] - ijk[1], this->mVec[2] - ijk[2]); }
+    __hostdev__ [[nodiscard]] constexpr Vec3  operator-(const Coord& ijk) const noexcept { return Vec3(this->mVec[0] - T(ijk[0]), this->mVec[1] - T(ijk[1]), this->mVec[2] - T(ijk[2])); }
     /// @brief In-place component-wise addition of an integer @c Coord.
     __hostdev__ constexpr Vec3& operator+=(const Coord& ijk) noexcept {
         this->mVec[0] += T(ijk[0]); this->mVec[1] += T(ijk[1]); this->mVec[2] += T(ijk[2]);

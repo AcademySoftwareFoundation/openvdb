@@ -1486,7 +1486,8 @@ struct Map
     template<typename Vec3T>
     __hostdev__ constexpr Vec3T applyInverseMap(const Vec3T& xyz) const
     {
-        return math::matMult(mInvMatD, Vec3T(xyz[0] - mVecD[0], xyz[1] - mVecD[1], xyz[2] - mVecD[2]));
+        using ValueT = std::decay_t<decltype(xyz[0])>;
+        return math::matMult(mInvMatD, Vec3T(ValueT(xyz[0] - mVecD[0]), ValueT(xyz[1] - mVecD[1]), ValueT(xyz[2] - mVecD[2])));
     }
 
     /// @brief Apply the inverse affine mapping to a vector using 32bit floating point arithmetics.
