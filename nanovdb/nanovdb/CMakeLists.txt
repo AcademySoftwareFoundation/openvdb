@@ -41,8 +41,10 @@ option(NANOVDB_BUILD_PYTHON_MODULE "Build the nanovdb Python module" OFF)
 
 option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" OFF)
 option(NANOVDB_USE_CUDA "Build with CUDA support" OFF)
+option(NANOVDB_USE_NCCL "Build with NCCL support in cuda/DeviceMesh.h (requires CUDA)" OFF)
 option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
 option(NANOVDB_CUDA_WERROR "Treat all NVCC diagnostics as errors" ON)
+option(NANOVDB_FETCH_CCCL "Clone CCCL NANOVDB_CCCL_TAG instead of using the CUDA toolkit's CCCL" OFF)
 option(NANOVDB_USE_OLD_ACCESSOR "Use the old (buggy) ReadAccessor instead of the new fixed one" OFF)
 
 option(NANOVDB_USE_OPENVDB "Build with OpenVDB support" OFF)
@@ -67,6 +69,13 @@ if(NANOVDB_USE_OPENVDB)
     If you are linking NanoVDB against OpenVDB, then you
     need to use TBB, (i.e. -DNANOVDB_USE_TBB=ON).")
   endif()
+endif()
+
+if(NANOVDB_USE_NCCL AND NOT NANOVDB_USE_CUDA)
+  message(FATAL_ERROR "Invalid CMake build configuration:
+    NANOVDB_USE_NCCL : [ON]
+    NANOVDB_USE_CUDA : [OFF]
+  NCCL support requires CUDA, (i.e. -DNANOVDB_USE_CUDA=ON).")
 endif()
 
 
@@ -178,27 +187,35 @@ if(NANOVDB_USE_CUDA)
     endif()
   endif()
 
-  find_package(CUDAToolkit)
+  find_package(CUDAToolkit ${MINIMUM_CUDA_VERSION} REQUIRED)
 
+  # NanoVDB uses the CCCL a parent project provides, then the CUDA toolkit's
+  # CCCL, and clones the pinned NANOVDB_CCCL_TAG release only when neither
+  # exists or NANOVDB_FETCH_CCCL is set.
+  set(NANOVDB_CCCL_TAG "v3.4.2" CACHE STRING "Git tag of the CCCL release to fetch")
+  if(NOT TARGET CCCL::CCCL AND NOT NANOVDB_FETCH_CCCL)
+    # CCCL's version file only accepts its own major version, so the minimum
+    # is checked here
+    find_package(CCCL CONFIG QUIET
+      HINTS "${CUDAToolkit_TARGET_DIR}/lib/cmake" "${CUDAToolkit_LIBRARY_DIR}/cmake")
+    if(CCCL_FOUND AND MINIMUM_CCCL_VERSION AND CCCL_VERSION VERSION_LESS MINIMUM_CCCL_VERSION)
+      message(FATAL_ERROR "NanoVDB requires CCCL ${MINIMUM_CCCL_VERSION} or newer, but found "
+        "${CCCL_VERSION} at ${CCCL_DIR}. Set CCCL_DIR to a newer CCCL, or set "
+        "NANOVDB_FETCH_CCCL=ON to clone CCCL ${NANOVDB_CCCL_TAG}.")
+    endif()
+  endif()
+  if(NOT TARGET CCCL::CCCL)
+    include(../../cmake/CPM.cmake)
+    CPMAddPackage(
+        NAME CCCL
+        GITHUB_REPOSITORY nvidia/cccl
+        GIT_TAG ${NANOVDB_CCCL_TAG}
+    )
+  endif()
 
-  include(../../cmake/CPM.cmake)
-
-  # Clones CCCL from GitHub and makes the exported cmake targets available.
-  # Pinned to a release so an upstream commit cannot change what CI builds;
-  # bump it deliberately.
-  set(NANOVDB_CCCL_TAG "v3.4.2" CACHE STRING "Git tag of the CCCL release to build against")
-  CPMAddPackage(
-      NAME CCCL
-      GITHUB_REPOSITORY nvidia/cccl
-      GIT_TAG ${NANOVDB_CCCL_TAG}
-  )
-
-  # Installed consumers need a CCCL with the same major version
-  string(REGEX MATCH "^v?([0-9]+)" _nanovdb_cccl_major "${NANOVDB_CCCL_TAG}")
-  set(NANOVDB_CCCL_MAJOR_VERSION ${CMAKE_MATCH_1})
-  unset(_nanovdb_cccl_major)
-
-  find_package(NCCL)
+  if(NANOVDB_USE_NCCL)
+    find_package(NCCL REQUIRED)
+  endif()
 endif()
 
 if(NANOVDB_USE_OPENVDB)
@@ -374,6 +391,12 @@ add_library(NanoVDB::nanovdb ALIAS nanovdb)
 target_include_directories(nanovdb INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
   $<INSTALL_INTERFACE:${NANOVDB_INSTALL_INCLUDEDIR}>)
+# NANOVDB_INCLUDE_DIR names the directory holding the nanovdb/ headers, so
+# consumers can bundle them without parsing the include generator expressions.
+# NanoVDBConfig.cmake sets it on the imported target.
+get_filename_component(_nanovdb_include_dir "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+set_target_properties(nanovdb PROPERTIES NANOVDB_INCLUDE_DIR "${_nanovdb_include_dir}")
+unset(_nanovdb_include_dir)
 target_compile_features(nanovdb INTERFACE cxx_std_17)
 # NanoVDB's CUDA headers launch __device__ lambdas, so nvcc consumers need
 # --extended-lambda
@@ -427,15 +450,11 @@ endif()
 
 if(NANOVDB_USE_CUDA)
   target_compile_definitions(nanovdb INTERFACE -DNANOVDB_USE_CUDA)
-  if(NOT CMAKE_CUDA_ARCHITECTURES)
-    target_compile_options(nanovdb INTERFACE
-      "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:-arch=sm_75>")
-  endif()
 
   # Add CUDA includes to any C++ units which use NanoVDB
   target_link_libraries(nanovdb INTERFACE CCCL::CCCL CUDA::cudart)
 
-  if(NCCL_FOUND)
+  if(NANOVDB_USE_NCCL)
     target_compile_definitions(nanovdb INTERFACE -DNANOVDB_USE_NCCL)
     target_link_libraries(nanovdb INTERFACE NCCL::NCCL)
   endif()
@@ -502,6 +521,7 @@ configure_package_config_file(
   ${CMAKE_CURRENT_LIST_DIR}/../../cmake/config/NanoVDBConfig.cmake.in
   ${CMAKE_CURRENT_BINARY_DIR}/NanoVDBConfig.cmake
   INSTALL_DESTINATION ${NANOVDB_CMAKE_INSTALL_DIR}
+  PATH_VARS NANOVDB_INSTALL_INCLUDEDIR
 )
 
 write_basic_package_version_file(
@@ -519,7 +539,7 @@ set(NANOVDB_CMAKE_FILES
 if(NANOVDB_USE_TBB)
   list(APPEND NANOVDB_CMAKE_FILES ${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindTBB.cmake)
 endif()
-if(NANOVDB_USE_CUDA AND NCCL_FOUND)
+if(NANOVDB_USE_NCCL)
   list(APPEND NANOVDB_CMAKE_FILES ${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindNCCL.cmake)
 endif()
 

@@ -12,10 +12,15 @@
 #                            path, the NANOVDB_USE_* definitions NanoVDB was
 #                            configured with, and their link dependencies.
 #
+# Target properties:
+#   NANOVDB_INCLUDE_DIR      Directory holding the nanovdb/ headers. The
+#                            in-tree NanoVDB::nanovdb target sets it too.
+#
 # Variables:
 #   NanoVDB_VERSION          The major version tracks the ABI and file format,
 #                            so only installs with the requested major version
 #                            are accepted.
+#   NanoVDB_INCLUDE_DIR      Same as the NANOVDB_INCLUDE_DIR target property.
 
 @PACKAGE_INIT@
 
@@ -56,11 +61,21 @@ if(@NANOVDB_USE_ZLIB@)
 endif()
 
 if(@NANOVDB_USE_CUDA@)
-  _nanovdb_find_dependency(CUDAToolkit)
-  # The CUDA toolkit ships CCCL outside the default search path
-  _nanovdb_find_dependency(CCCL @NANOVDB_CCCL_MAJOR_VERSION@ CONFIG
-    HINTS "${CUDAToolkit_TARGET_DIR}/lib/cmake" "${CUDAToolkit_LIBRARY_DIR}/cmake")
-  if("@NCCL_FOUND@")
+  _nanovdb_find_dependency(CUDAToolkit @MINIMUM_CUDA_VERSION@)
+  # The CUDA toolkit ships CCCL outside the default search path. CCCL's version
+  # file only accepts its own major version, so the minimum is checked here.
+  if(NOT TARGET CCCL::CCCL)
+    _nanovdb_find_dependency(CCCL CONFIG
+      HINTS "${CUDAToolkit_TARGET_DIR}/lib/cmake" "${CUDAToolkit_LIBRARY_DIR}/cmake")
+    if("@MINIMUM_CCCL_VERSION@" AND CCCL_VERSION VERSION_LESS "@MINIMUM_CCCL_VERSION@")
+      set(CMAKE_MODULE_PATH ${_nanovdb_original_module_path})
+      set(NanoVDB_NOT_FOUND_MESSAGE
+        "NanoVDB requires CCCL @MINIMUM_CCCL_VERSION@ or newer, but found ${CCCL_VERSION} at ${CCCL_DIR}.")
+      set(NanoVDB_FOUND FALSE)
+      return()
+    endif()
+  endif()
+  if(@NANOVDB_USE_NCCL@)
     _nanovdb_find_dependency(NCCL)
   endif()
 endif()
@@ -76,5 +91,8 @@ unset(_nanovdb_original_module_path)
 unset(_nanovdb_find_arguments)
 
 include("${CMAKE_CURRENT_LIST_DIR}/NanoVDBTargets.cmake")
+
+set_and_check(NanoVDB_INCLUDE_DIR "@PACKAGE_NANOVDB_INSTALL_INCLUDEDIR@")
+set_target_properties(NanoVDB::nanovdb PROPERTIES NANOVDB_INCLUDE_DIR "${NanoVDB_INCLUDE_DIR}")
 
 check_required_components(NanoVDB)
