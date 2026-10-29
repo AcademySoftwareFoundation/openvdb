@@ -51,10 +51,6 @@ if(@NANOVDB_USE_TBB@)
   _nanovdb_find_dependency(TBB @MINIMUM_TBB_VERSION@ COMPONENTS tbb)
 endif()
 
-if(@NANOVDB_USE_BLOSC@)
-  _nanovdb_find_dependency(Blosc @MINIMUM_BLOSC_VERSION@)
-endif()
-
 if(@NANOVDB_USE_ZLIB@)
   _nanovdb_find_dependency(ZLIB @MINIMUM_ZLIB_VERSION@)
 endif()

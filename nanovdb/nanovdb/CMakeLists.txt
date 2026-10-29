@@ -223,13 +223,15 @@ if(NANOVDB_USE_BLOSC AND NOT TARGET nanovdb_blosc)
   target_include_directories(nanovdb_blosc PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/../../ext/blosc/openvdb/ext/blosc
   )
+  # The installed header is found through the nanovdb include directory
   target_include_directories(nanovdb_blosc SYSTEM INTERFACE
-    ${CMAKE_CURRENT_LIST_DIR}/../../ext/blosc/openvdb/ext/blosc
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/../../ext/blosc/openvdb/ext/blosc>
   )
   # The archive may be linked into shared libraries
   set_target_properties(nanovdb_blosc PROPERTIES POSITION_INDEPENDENT_CODE ON)
   # nanovdb/io/IO.h calls into this archive, so installed headers need it
-  install(TARGETS nanovdb_blosc ARCHIVE DESTINATION ${NANOVDB_INSTALL_LIBDIR})
+  install(TARGETS nanovdb_blosc EXPORT NanoVDBTargets
+    ARCHIVE DESTINATION ${NANOVDB_INSTALL_LIBDIR})
 endif()
 
 # NanoVDB headers include zlib.h, so zlib is found independently of OpenVDB
@@ -506,9 +508,6 @@ set(NANOVDB_CMAKE_FILES
   ${CMAKE_CURRENT_BINARY_DIR}/NanoVDBConfigVersion.cmake)
 if(NANOVDB_USE_TBB)
   list(APPEND NANOVDB_CMAKE_FILES ${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindTBB.cmake)
-endif()
-if(NANOVDB_USE_BLOSC)
-  list(APPEND NANOVDB_CMAKE_FILES ${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindBlosc.cmake)
 endif()
 if(NANOVDB_USE_CUDA AND NCCL_FOUND)
   list(APPEND NANOVDB_CMAKE_FILES ${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindNCCL.cmake)
