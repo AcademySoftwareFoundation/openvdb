@@ -140,6 +140,45 @@ inline void readPointDataAttributeData(const std::vector<LeafT*>& leaves,
     }
 }
 
+/// Throws an IoError if a voxel offset could index past the end of an attribute array
+/// or if an array was not read. Offsets and array sizes are separate values in the file.
+template <typename LeafT>
+inline void validateReadOffsets(const LeafT& leaf)
+{
+    const Index lastOffset(leaf.getValue(LeafT::SIZE-1));
+    for (Index index = 0; index < LeafT::SIZE; ++index) {
+        if (Index(leaf.getValue(index)) > lastOffset) {
+            OPENVDB_THROW(IoError, "PointDataGrid voxel offset " << Index(leaf.getValue(index))
+                << " exceeds the last voxel offset " << lastOffset << ".");
+        }
+    }
+
+    const points::AttributeSet& attributeSet = leaf.attributeSet();
+    for (size_t attributeIndex = 0; attributeIndex < attributeSet.size(); ++attributeIndex) {
+        const points::AttributeArray* array = attributeSet.getConst(attributeIndex);
+        if (array->flags() & points::AttributeArray::PARTIALREAD) {
+            OPENVDB_THROW(IoError, "PointDataGrid attribute array was not read.");
+        }
+        if (lastOffset > array->size()) {
+            OPENVDB_THROW(IoError, "PointDataGrid voxel offset " << lastOffset
+                << " exceeds attribute array size " << array->size() << ".");
+        }
+    }
+}
+
+/// Throw if any leaf declares more attributes than the pass count allows to be read,
+/// as unread arrays keep a placeholder buffer but report the size from the file
+template <typename LeafT>
+inline void validatePointDataAttributeCount(const std::vector<LeafT*>& leaves, Index attributes)
+{
+    for (const auto* leaf : leaves) {
+        if (leaf->attributeSet().size() > attributes) {
+            OPENVDB_THROW(IoError, "PointDataGrid declares " << leaf->attributeSet().size()
+                << " attributes, but only " << attributes << " can be read.");
+        }
+    }
+}
+
 template <typename LeafT>
 inline void skipPointDataAttributeSizes(const std::vector<LeafT*>& leaves,
     std::istream& is, Index attributeIndex,
@@ -359,6 +398,7 @@ struct PointDataCodec final: public TopologyCodec<GridT>
 
         // Pass 1: read descriptor and attribute metadata
         internal::readPointDataDescriptors(leaves, is);
+        internal::validatePointDataAttributeCount(leaves, attributes);
 
         // Build set of attribute indices to skip based on pointAttributeNames.
         // An empty pointAttributeNames means no filtering (read all attributes).
@@ -419,6 +459,10 @@ struct PointDataCodec final: public TopologyCodec<GridT>
                 leaf->dropAttributes(dropPositions,
                     leaf->attributeSet().descriptor(), filteredDescriptor);
             }
+        }
+
+        for (const auto* leaf : leaves) {
+            internal::validateReadOffsets(*leaf);
         }
 
         // PointDataGrid uses multiple passes, so clip after reading

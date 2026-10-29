@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <cstring> // for std::memcmp()
 #include <fstream>
 #include <numeric> // for std::iota()
 
@@ -398,3 +399,76 @@ TestStreamCompression::testPagedStreams()
 }
 
 TEST_F(TestStreamCompression, testPagedStreams) { testPagedStreams(); }
+
+
+TEST_F(TestStreamCompression, testPagedStreamsInvalid)
+{
+    // a 1024-byte compressible payload
+    std::vector<uint8_t> values(1024);
+    for (size_t i = 0; i < values.size(); ++i)  values[i] = uint8_t(i % 16);
+
+    size_t compressedBytes = 0;
+    std::unique_ptr<char[]> compressedBuffer = bloscCompress(
+        reinterpret_cast<const char*>(values.data()), values.size(), compressedBytes);
+    ASSERT_TRUE(compressedBuffer);
+    ASSERT_TRUE(compressedBytes > 0);
+
+    // write a page header followed by the compressed payload
+    auto writePage = [&](int headerCompressedBytes, int headerUncompressedBytes) {
+        std::ostringstream ostr(std::ios_base::binary);
+        ostr.write(reinterpret_cast<const char*>(&headerCompressedBytes), sizeof(int));
+        ostr.write(reinterpret_cast<const char*>(&headerUncompressedBytes), sizeof(int));
+        ostr.write(compressedBuffer.get(), compressedBytes);
+        return ostr.str();
+    };
+
+    // read a single handle of handleBytes from the page
+    auto readPage = [&](const std::string& data, std::streamsize handleBytes) {
+        std::istringstream istr(data, std::ios_base::binary);
+        PagedInputStream sizeStream(istr);
+        sizeStream.setSizeOnly(true);
+        PageHandle::Ptr handle = sizeStream.createHandle(handleBytes);
+        PagedInputStream dataStream(istr);
+        dataStream.read(handle, handleBytes, false);
+        return handle->read();
+    };
+
+    const int valueBytes = int(values.size());
+
+    { // valid page
+        const std::string data = writePage(int(compressedBytes), valueBytes);
+        std::unique_ptr<char[]> buffer;
+        EXPECT_NO_THROW(buffer = readPage(data, valueBytes));
+        ASSERT_TRUE(buffer);
+        EXPECT_EQ(0, std::memcmp(buffer.get(), values.data(), values.size()));
+    }
+
+    { // handle larger than the page
+        const std::string data = writePage(int(compressedBytes), valueBytes);
+        EXPECT_THROW(readPage(data, 16384), IoError);
+    }
+
+    { // page header advertises more uncompressed bytes than the payload decodes to
+        const std::string data = writePage(int(compressedBytes), 1 << 20);
+        EXPECT_THROW(readPage(data, 16384), RuntimeError);
+    }
+
+    { // zero or negative sizes in the page header
+        std::string data = writePage(0, valueBytes);
+        EXPECT_THROW(readPage(data, valueBytes), IoError);
+        data = writePage(int(compressedBytes), 0);
+        EXPECT_THROW(readPage(data, valueBytes), IoError);
+        data = writePage(int(compressedBytes), -1);
+        EXPECT_THROW(readPage(data, valueBytes), IoError);
+    }
+
+    { // page header advertises fewer compressed bytes than the blosc header reports
+        const std::string data = writePage(OPENVDB_BLOSC_MIN_HEADER_LENGTH, valueBytes);
+        EXPECT_THROW(readPage(data, valueBytes), IoError);
+    }
+
+    { // compressed page smaller than a blosc header
+        const std::string data = writePage(4, valueBytes);
+        EXPECT_THROW(readPage(data, valueBytes), IoError);
+    }
+}
