@@ -40,7 +40,8 @@ None is checked by the operator; all must be guaranteed by how the input is buil
    it can only be seeded by finer nodes of *neighboring* nodes across its faces. If those neighbors offer
    only childless slots, nothing seeds it; its parent treats it as a wall, so its slots stay unlabeled.
    `needsRootPropagation` (`mRootMask.size() > mUpperInteriorMasks.size()`) also assumes every upper node
-   lies inside the active bbox, which holds when no upper node is empty.
+   lies inside the active bbox, which holds when no upper node is empty. (The sparse root proposal at the
+   end of these notes removes both `needsRootPropagation` and the dense root array.)
 
    *Which builders guarantee it:*
    - `TopologyBuilder` alone does **not**. It drops upper nodes with no lower child (`countNodes`), but
@@ -550,3 +551,249 @@ break 2(b) take up to 27 (leaf) and 46 (lower). To be confirmed.
 - The future unit test should include, as ConnectedComponents' does, a run on a non-blocking stream, a
   check that the outputs stay valid after the operator is destroyed, and an injected resource that sees
   every allocation.
+
+## Proposal 2026-10-29: sparse root propagation (replaces the dense root-tile array)
+
+Agreed in review, for implementation. It replaces `mRootMask`, `mRootTileMin`, `mRootTileDims`,
+`needsRootPropagation`, `RootWallFunctor` and `RootPropagationFunctor` with per-entry face flags and a
+sparse expansion over root keys. The expansion code is not pretty (sorts, sentinels, set operations),
+but it is contained in one function, the new stage 4; stages 1-3 change by one store.
+
+### What is wrong with the dense root-tile array
+
+`initializeMasks()` takes the index bbox of the active voxels (the root's `mBBox`), quantizes it to
+root-tile coordinates (`>> NanoUpper::TOTAL`, i.e. 4096-voxel tiles), and allocates and zeroes one byte
+per root-tile position in that box (`mRootMask`). Stages 1-3 write a 1 into it for every absent position
+they seed; stage 4 marks the positions that hold an upper node as walls, floods the rest with Jacobi
+sweeps in a single block, copies the box to the host and collects the 1s into `mRootInteriorTileOrigins`.
+This is correct under preconditions 1-4. Not padding the box is also correct: the flood only spreads
+interior, and by precondition 3 nothing outside the active bbox is interior. The problems are elsewhere:
+
+1. **`needsRootPropagation` is decided before anything is known.** It is computed before stage 1, as
+   `mRootMask.size() > mUpperInteriorMasks.size()`: the box has more positions than there are upper nodes.
+   Every upper node holds an active voxel (precondition 1), so the upper nodes occupy `upperCount`
+   distinct positions of the box, and the test says "the box has at least one absent position". That is
+   a capacity fact, not a determination: whether interior root tiles have to be *introduced* is an output
+   of the hierarchy, known only once stage 3 has seeded (or not seeded) the root. The test is true for
+   almost every curved band. Example: a band that touches all eight 4096^3 octants around the origin
+   except [-4096, -1]^3, which is fully exterior: the box is 2 x 2 x 2 = 8 positions, `upperCount` is 7,
+   so the test is true, but no face ever seeds the missing octant. Stage 4 then runs for nothing (walls
+   and scratch allocations, a wall kernel, a flood that stops after one sweep, a device-to-host copy and
+   a sync, a host scan). It only skips stage 4 when the box has no hole at all (a band inside one root
+   tile, or one that fills all eight octants), and in exactly those cases a test made after stage 3 would
+   skip it too, so the early test buys nothing.
+2. **The array is sized by the extent of the band, not by the interior, and allocated up front.**
+   Scattered inputs pay for the space between their pieces. Two tiny closed objects (valid input, which
+   seed nothing at the root) at (-1M, -1M, -1M) and (+1M, +1M, +1M): 1M = 2^20 voxels = 256 tiles, so the
+   box is 512^3 = 134M positions, 128 MB allocated and zeroed (384 MB with stage 4's `walls` and `next`,
+   which the early test does not avoid). At +/-2M it is 1024^3 (1 GB per array); at +/-4M, 2048^3 = 8.6G
+   positions exceeds `MaxRootPositionCount` (`INT_MAX - 1`) and `PropagateSign` throws on valid input.
+3. **The flood scans the whole box every sweep**, exterior and walls included, in one block.
+4. **It trusts the root's `mBBox`.** A grid whose bbox was not computed (e.g. built with stats and bbox
+   disabled) or is stale gives a wrong box: an empty box silently skips the root stage, a small one drops
+   interior positions and walls.
+5. **Formal race:** the seeds are plain byte stores from many warps (all store 1); see "Still open".
+
+At realistic sizes the dense map is fine (+/-256K voxels is 128^3 = 2M positions, 2 MB per array), and
+for a closed band the box is tiny (see the cost argument below). The proposal is about not paying for
+extent at all, and about deciding the root stage from what the hierarchy actually delivered.
+
+### Facts the proposal relies on
+
+All under preconditions 1-4.
+
+- **F1. Seeds land only on absent positions, and a seeded position is interior.** `seedAcrossFace` writes
+  a root seed only when `probeTerminalSlot` stops at the root, i.e. the root table has no entry there.
+  The seeding node's face toward it is inside and has no active voxel across it, so by the reference
+  labeling (face-adjacent inactive voxels share a label) the absent tile is interior.
+- **F2. Every root seed crosses a face of a root-table entry.** A seeding node (leaf, lower or upper) lies
+  in some upper node U, and the neighbor across its face lies outside U (it is in an absent tile). So the
+  node's face lies on U's face, and the seeded tile is U's face neighbor across that same face. Hence all
+  root seeds are recorded exactly by 6 bits per root-table entry: "the absent tile across my face f is
+  interior".
+- **F3. Face-adjacent absent tiles share a label.** Neither contains an active voxel, so the shared face
+  has inactive voxels on both sides. In particular, every absent neighbor of an interior absent tile is
+  interior, unconditionally: no signs or masks need to be consulted at the root level.
+- **F4. Seeding is complete at the root** ("Hierarchy completeness", *Root*, above): every connected set of
+  interior absent tiles borders an upper node whose face toward it is all inside and seeds it. So interior
+  root tiles exist if and only if stages 1-3 set at least one flag.
+- **F5. The interior is enclosed, within the hull of the root table.** By precondition 3 every interior
+  tile lies in the root-tile box of the active voxels. Under preconditions 1 and 4 every root entry is an
+  upper node with an active voxel and every active voxel lies in an entry, so that box is exactly the
+  bounding box of the root-table entries' tile coordinates (the "hull"). It can be computed from the table
+  itself, with no reliance on `mBBox`.
+
+### Data and stages 1-3
+
+```cpp
+// One word per root-table entry; bit f (Face: minusX, plusX, minusY, plusY, minusZ, plusZ) is set if the
+// absent root tile across face f of this entry is interior.
+BufferT<uint32_t> mRootFaceSeeds; // size = root table size (= upperCount under precondition 4), zeroed
+```
+
+- Allocated and zeroed in `initializeMasks()`, in place of `mRootMask`. Size: the root table, typically
+  tens to a few thousand entries, independent of the extent.
+- In the root branch of `seedAcrossFace` (today: `rootMask[rootTileIndex(p, tileDims)] = 1`), set
+  `atomicOr(&rootFaceSeeds[entry], 1u << face)` instead. `face` is the face the node is crossing (F2:
+  the same face of the enclosing entry). Different nodes of one entry set different bits of the same
+  word, so the store must be atomic (CUDA has no byte `atomicOr`, hence a 32-bit word per entry). This
+  also closes the formal-race item.
+- `entry` is the index of the root-table entry enclosing the seeding node:
+  `root.probeTile(origin) - root.tile(0)` with the seeding node's origin. NanoVDB's root `probe` is a
+  linear scan of the table, as in `probeTerminalSlot` today; it runs only for root seeds. (Using the
+  upper node's id instead is possible if upper nodes are laid out in table order; that holds for
+  `TopologyBuilder` output as far as we know but is not guaranteed by NanoVDB, so it would need checking.)
+- `mRootTileMin`, `mRootTileDims`, `rootTilePosition`, `rootTileIndex`, `MaxRootPositionCount` and the
+  bounds check in `seedAcrossFace` go away.
+
+### Stage 4: decide, then expand
+
+**Decide.** After stage 3, copy `mRootFaceSeeds` to the host (a few KB at most) and test whether any bit
+is set. If none is, there is no interior root tile (F4): stage 4 ends, `mRootInteriorTileOrigins` stays
+empty, and no further scratch is allocated. This is the overwhelmingly common case; its only costs are
+the flag array and this copy, whose sync takes the place of `propagate()`'s final
+`cudaStreamSynchronize` (which then finds nothing left to wait for). The readback *is* the test; no
+separate device flag or reduction is needed.
+
+**Expand.** Otherwise, grow the set of root tiles in rounds, all on the GPU:
+
+- *Round 1.* Every existing entry emits its own key plus, for each set flag, the key of its neighbor
+  across that face; unused slots get a sentinel (e.g. `UINT64_MAX`, which sorts last). So 7 slots per
+  entry (5 in the 2D example below). Compact the sentinels away, sort, remove duplicates (two entries can
+  flag the same tile). The result is the existing entries plus the seeds, sorted and unique; this is the
+  new candidate table. By F1, every key that is not an original entry is a new interior tile.
+- *Flags are consumed.* After an entry has emitted, its flags are cleared to 0. A tile that enters the
+  table in round k enters with **all six flags set** (`0x3F`): by F3 every absent neighbor of it is
+  interior, and a neighbor that already exists is merged away by the deduplication. Nothing is tested
+  per face (a new tile has no nodes and no voxels whose faces could be tested).
+- *Round k + 1* is the same operation on the new table: every entry emits itself plus its flagged
+  neighbors (only the tiles added in round k have flags), then compact, sort, deduplicate.
+- *Stop* when a round adds no tile, i.e. no entry has a flag set.
+- *Output:* the final table minus the original entries, i.e. all tiles added in some round. These are
+  exactly the interior absent tiles: sound by F1 and F3 (every added tile is interior), complete by F4
+  and F3 (every interior component is seeded, and the rounds spread through it).
+
+**Refinement (same result, less work).** Do not re-emit and re-sort the whole table each round.
+- Round 1: the original entries need not emit themselves. Emit only the flagged neighbors (6 slots per
+  entry, mostly sentinels), compact, sort, unique: these are the seeds, absent by construction (F1), so
+  no comparison with the table is needed. They are the first frontier; merge them into the table.
+- Round k + 1: every frontier tile emits all 6 neighbors (no sentinels at all); sort and unique those;
+  `set_difference` against the table (sorted) gives the new tiles, i.e. the next frontier; `merge` them
+  into the table.
+- Per round this costs about 6 x |frontier| keys plus a linear merge, instead of re-sorting the table.
+
+**Keys.** Use one key for every list, with an inverse, e.g. the biased encoding of
+`topology::detail::tileSortKey` (`TopologyBuilder.cuh`: tile coordinates biased by 2^19 per axis, x high,
+y middle, z low, so tiles sort by coordinate with negatives first, as `TopologyBuilder` lays out the
+table), plus a decoder. Do not use the key stored in the tile (`RootData::CoordToKey`), whose fields
+are unbiased two's complement, and do not assume the table is already sorted in any order: build the
+original key list from the tiles' origins and sort it (table-size, cheap). Neighbors are computed on
+tile coordinates (decode, +/-1 on one axis, check the hull, encode), never by key arithmetic.
+
+**Guard.** Under the preconditions the rounds terminate on their own (F5: the interior is enclosed by
+table entries). If the input breaks precondition 2 or 3, wrongly seeded tiles can belong to the
+unbounded exterior and the rounds would never stop. So every added tile is checked against the hull of
+the original table (F5): a tile outside it means a broken precondition: assert in debug, and stop (or
+throw) in release. This keeps termination guaranteed; it does not detect every broken input (a wrong
+seed in an enclosed exterior pocket fills that pocket and stops inside the hull). Checking the hull
+before encoding also keeps every key within the representable range.
+
+**Syncs.** The host needs each round's frontier size to size the next round, so one small readback per
+round (e.g. the count that `cub::DeviceSelect` writes). Building blocks: `cub::DeviceSelect::If`
+(sentinels), `cub::DeviceRadixSort::SortKeys`, `cub::DeviceSelect::Unique`, and a merge and a set
+difference on sorted keys (`thrust::merge` / `thrust::set_difference`, or their cub counterparts).
+
+**Output format.** `mRootInteriorTileOrigins` is the decoded list of added tiles. Since the rounds produce
+them sorted, return them sorted (or return the sorted keys as well): the sanitized level-set convention
+inserts interior root tiles into the root table, and a sorted list is exactly what that insertion
+needs.
+
+### Example in 2D
+
+Root-tile coordinates (x right, y up); 2D faces are -x, +x, -y, +y (4 flags, 5 slots per entry in round
+1 of the plain scheme). `[ ]` is a root-table entry (an upper node holding part of the band); an arrow
+inside marks a set seed flag and points across that face. Letters are absent interior tiles; `.` is
+absent exterior.
+
+```
+            x=0   x=1   x=2   x=3   x=4   x=5
+    y=4     [ ]   [v]   [v]   [v]   [ ]    .
+    y=3     [>]    a     b     c    [<]    .
+    y=2     [>]    d     e     f    [<]   [ ]
+    y=1     [>]    g     h     i    [<]   [ ]
+    y=0     [ ]   [^]   [^]   [^]   [ ]   [ ]
+```
+
+- The table has 19 entries. The 12 that face the hole have one flag each; the four ring corners touch
+  the hole only diagonally and have none. (4,3) and (4,4) face the exterior tiles (5,3) and (5,4), and
+  (5,2) faces (5,3): no flags, since those faces are outside.
+- Today's code: the box is the hull, 6 x 5 = 30 positions, against 19 upper nodes, so
+  `needsRootPropagation` is true. It would still be true with the hole filled in by band tiles
+  (30 > 28), because of the exterior notch (5,3), (5,4): the false positive above, in 2D.
+- *Round 1* emits 12 neighbor keys: a, b, c, d, f, g, h, i, where a, c, g and i are each emitted twice
+  (a by (0,3) and (1,4), and so on). After sort and unique, 8 new tiles; the table has 27 entries. e is
+  not seeded: all four of its neighbors are absent, so no band tile touches it.
+- *Round 2*: the 8 new tiles emit their 4 neighbors each (32 keys). After sort and unique, everything but
+  e is already in the table (band tiles or round-1 tiles): one new tile, e; 28 entries.
+- *Round 3*: e emits b, d, f and h, all in the table. Nothing is added: stop.
+- Output: a-i (9 tiles). The exterior notch was never touched. Every added tile is inside the hull
+  x in [0, 5], y in [0, 4].
+
+The flattened candidate table, as drawn on the whiteboard (flags after each round):
+
+| Entries | After round 1 | After round 2 |
+| :-- | :-- | :-- |
+| the 12 band tiles that had a flag | consumed (0) | 0 |
+| the 7 band tiles that never had one (ring corners, (5,0)-(5,2)) | 0 | 0 |
+| a, b, c, d, f, g, h, i (added in round 1) | all faces | consumed (0) |
+| e (added in round 2) | (not yet in the table) | all faces |
+
+The guard in this picture: if the ring had a gap at (4,3) and the hole were still seeded, round 2 would
+add (4,3), round 3 (5,3), and round 4 (5,4) and (6,3); (6,3) is outside the hull, so the expansion stops
+and asserts.
+
+### Cost
+
+- **Common case (no interior root tile):** one allocation of table-size words (bytes to kilobytes), one
+  copy of it to the host, no other scratch, no root kernels. Today: an allocation the size of the band's
+  box, plus a stage 4 that the early test fails to skip most of the time.
+- **With interior root tiles:** the number of rounds is the depth of the interior in tiles (about its
+  radius), one small sync each; the total work is about the number of interior tiles, times 6, plus the
+  merges.
+- **The linear number of rounds is not a concern.** A deep cavity needs a closed band around it. For a
+  cavity D tiles across, the band covers about D^2 tiles, each holding about 4096^2 x (band width)
+  active voxels; at D = 8 that is already 10^9-10^10 active voxels, around what fits on a GPU, and the
+  band cost O(D^2) work (D = diameter) with a far larger constant to build. So there are at most a
+  handful of rounds (D / 2 <= 4-8) and well under a millisecond of syncs, and the root work (O(D^3) tile
+  operations, a few hundred keys) is negligible next to the band's O(D^2 x 4096^2) voxels (ratio about
+  D / 1.7 x 10^7).
+- Today's Jacobi flood also needs a number of sweeps proportional to the depth, but each sweep scans the
+  whole box; the rounds only touch the frontier.
+
+### Alternatives considered
+
+- **Keep the dense array, decide after stage 3.** Fixes the false positive of `needsRootPropagation`, not
+  the extent problem (allocation, `INT_MAX` throw).
+- **Dense array sized by the seeds.** Record seeds as face bits per upper node (F2), and after stage 3
+  allocate the dense array over the bbox of the seeds only. Correct because an interior component's bbox
+  equals the bbox of its seeds: a position of the component that is extreme along +x has a +x neighbor
+  that is neither in the component (it is extreme) nor exterior absent (F3), so it is an upper node, whose
+  face toward it is all inside (lemma, 2(b)), so the position is seeded; likewise for the other five
+  directions. Sized by the interior, but still a dense flood over a box.
+- **Host BFS.** Copy the flags and the table keys to the host and expand with a hash set. Simpler code,
+  fine at these sizes; the GPU version was preferred so that only a size per round crosses to the host.
+- **Count, scan, then emit** (as in MeshToUDF), to allocate exactly the emitted keys instead of 7 (or 6)
+  slots per entry. Not worth it: the expansion per entry is a fixed bound of 6 over a table-size array
+  (56 bytes per entry with 8-byte keys), and counting adds a scan and a sync per round to save a few
+  kilobytes. MeshToUDF needs it because its per-triangle output is large and unbounded. With the
+  refinement, only round 1 has sentinels at all.
+
+### What this changes elsewhere in these notes
+
+- Precondition 3's "restricting the root flood to the root tiles that cover the active bbox" becomes the
+  guard (F5), and the hull is computed from the table rather than read from `mBBox`.
+- The root sweep-bound assert ((W - 1) + (H - 1) + (D - 1)) goes away with the Jacobi root flood; the
+  guard bounds the rounds instead.
+- The "Formal races" item under "Still open" is closed by the atomic flag store.
+- Root value tiles (precondition 4(b)) are unchanged: such a tile is an original entry, so it is never
+  added (and `probeTerminalSlot` still asserts on it).
