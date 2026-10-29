@@ -6,6 +6,7 @@
 #include "StreamCompression.h"
 #include <openvdb/util/logging.h>
 #include <openvdb/util/Assert.h>
+#include <limits>
 #include <map>
 #include <vector>
 #include <openvdb_blosc.h>
@@ -212,6 +213,20 @@ bloscDecompress(const char* buffer, const size_t expectedBytes, const bool resiz
 }
 
 
+void
+bloscValidateCompressedBytes(const char* buffer, const size_t bufferBytes)
+{
+    if (bufferBytes < OPENVDB_BLOSC_MIN_HEADER_LENGTH) {
+        OPENVDB_THROW(IoError, "Compressed buffer is smaller than the Blosc header.");
+    }
+    size_t uncompressedBytes, compressedBytes, blockSize;
+    openvdb_blosc_cbuffer_sizes(buffer, &uncompressedBytes, &compressedBytes, &blockSize);
+    if (compressedBytes > bufferBytes) {
+        OPENVDB_THROW(IoError, "Compressed buffer is smaller than its Blosc header reports.");
+    }
+}
+
+
 ////////////////////////////////////////
 
 
@@ -226,6 +241,10 @@ Page::uncompressedBytes() const
 const char*
 Page::buffer(const int index) const
 {
+    // page sizes that do not match the attribute sizes in a file can leave a page unread
+    if (!mData) {
+        OPENVDB_THROW(IoError, "Paged attribute data has not been read.");
+    }
     return mData.get() + index;
 }
 
@@ -239,13 +258,18 @@ Page::readHeader(std::istream& is)
     int compressedSize;
     is.read(reinterpret_cast<char*>(&compressedSize), sizeof(int));
 
+    if (compressedSize == 0 || compressedSize == std::numeric_limits<int>::min()) {
+        OPENVDB_THROW(IoError, "Invalid compressed page size for VDB file format.");
+    }
+
     int uncompressedSize;
     // if uncompressed, read the (compressed) size of the page
     if (compressedSize > 0)     is.read(reinterpret_cast<char*>(&uncompressedSize), sizeof(int));
     else                        uncompressedSize = -compressedSize;
 
-    OPENVDB_ASSERT(compressedSize != 0);
-    OPENVDB_ASSERT(uncompressedSize != 0);
+    if (uncompressedSize <= 0) {
+        OPENVDB_THROW(IoError, "Invalid uncompressed page size for VDB file format.");
+    }
 
     mInfo->compressedBytes = compressedSize;
     mInfo->uncompressedBytes = uncompressedSize;
@@ -306,12 +330,19 @@ Page::copy(const std::unique_ptr<char[]>& temp, int pageSize)
 void
 Page::decompress(const std::unique_ptr<char[]>& temp)
 {
+    OPENVDB_ASSERT(mInfo);
+
+    bloscValidateCompressedBytes(temp.get(), static_cast<size_t>(mInfo->compressedBytes));
+
     size_t uncompressedBytes = bloscUncompressedSize(temp.get());
     size_t tempBytes = uncompressedBytes;
     tempBytes += uncompressedBytes;
     mData.reset(new char[tempBytes]);
 
-    bloscDecompress(mData.get(), uncompressedBytes, tempBytes, temp.get());
+    // page handles index the data using the uncompressed size from the page header,
+    // so the decompressed size must match it
+    const size_t expectedBytes = static_cast<size_t>(mInfo->uncompressedBytes);
+    bloscDecompress(mData.get(), expectedBytes, tempBytes, temp.get());
 }
 
 
@@ -367,6 +398,12 @@ PagedInputStream::createHandle(std::streamsize n)
         mByteIndex = 0;
     }
 
+    // a handle must lie within a single page, as PageHandle::read() copies from the page
+    // buffer, which holds at least the uncompressed bytes from the page header
+    if (n <= 0 || n > std::streamsize(mUncompressedBytes - mByteIndex)) {
+        OPENVDB_THROW(IoError, "Paged attribute data does not fit in the page.");
+    }
+
     // TODO: C++14 introduces std::make_unique
     PageHandle::Ptr pageHandle(new PageHandle(mPage, mByteIndex, int(n)));
 
@@ -389,6 +426,10 @@ PagedInputStream::read(PageHandle::Ptr& pageHandle, std::streamsize n, bool dela
         mByteIndex = 0;
     }
 
+    if (n <= 0 || n > std::streamsize(mUncompressedBytes - mByteIndex)) {
+        OPENVDB_THROW(IoError, "Paged attribute data does not fit in the page.");
+    }
+
     mByteIndex += int(n);
 }
 
@@ -404,6 +445,10 @@ PagedInputStream::skip(PageHandle::Ptr& pageHandle, std::streamsize n)
         mUncompressedBytes = static_cast<int>(page.uncompressedBytes());
         page.skipBuffers(*mIs);
         mByteIndex = 0;
+    }
+
+    if (n <= 0 || n > std::streamsize(mUncompressedBytes - mByteIndex)) {
+        OPENVDB_THROW(IoError, "Paged attribute data does not fit in the page.");
     }
 
     mByteIndex += int(n);

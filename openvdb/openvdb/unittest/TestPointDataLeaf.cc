@@ -1031,6 +1031,8 @@ TEST_F(TestPointDataLeaf, testIO)
     leaf.setOffsetOn(1, 10);
     leaf.setOffsetOn(4, 20);
     leaf.setOffsetOn(7, 5);
+    // reading rejects offsets that exceed the point count (the last offset)
+    leaf.setOffsetOnly(LeafType::SIZE - 1, 20);
 
     // manually change some values in the density array
 
@@ -1284,6 +1286,8 @@ TEST_F(TestPointDataLeaf, testTreeIO)
     leaf.setOffsetOn(1, 10);
     leaf.setOffsetOn(4, 20);
     leaf.setOffsetOn(7, 5);
+    // reading rejects offsets that exceed the point count (the last offset)
+    leaf.setOffsetOnly(LeafType::SIZE - 1, 20);
 
     TypedAttributeArray<float>& attr =
         TypedAttributeArray<float>::cast(leaf.attributeArray("density"));
