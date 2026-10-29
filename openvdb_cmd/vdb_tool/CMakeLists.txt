@@ -32,7 +32,7 @@ option(OPENVDB_BUILD_VDB_TOOL_UNITTESTS "Build unit tests" OFF)
 
 option(OPENVDB_TOOL_USE_NANO "Compile with NanoVDB support" OFF)
 option(OPENVDB_TOOL_NANO_USE_ZIP "Compile NanoVDB with zip compression support. Requires OPENVDB_TOOL_USE_NANO=ON to have effect" ON)
-option(OPENVDB_TOOL_NANO_USE_BLOSC "Compile NanoVDB with Blosc compression support. Requires OPENVDB_TOOL_USE_NANO=ON to have effect" ON)
+option(OPENVDB_TOOL_NANO_USE_BLOSC "Require NanoVDB to be built with Blosc compression support. Requires OPENVDB_TOOL_USE_NANO=ON to have effect" ON)
 option(OPENVDB_TOOL_USE_PNG "Compile with PNG support" OFF)
 option(OPENVDB_TOOL_USE_EXR "Compile with EXR support" OFF)
 option(OPENVDB_TOOL_USE_JPG "Compile with JPG support" OFF)
@@ -63,12 +63,9 @@ if(OPENVDB_TOOL_USE_NANO)
     find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
     target_link_libraries(vdb_tool_common INTERFACE ZLIB::ZLIB)
   endif()
-  if(OPENVDB_TOOL_NANO_USE_BLOSC)
-    target_compile_definitions(vdb_tool_common INTERFACE "NANOVDB_USE_BLOSC")
-    find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
-    target_link_libraries(vdb_tool_common INTERFACE blosc)
-  endif()
   #target_include_directories(vdb_tool_common INTERFACE ${PROJECT_SOURCE_DIR}/../nanovdb/)
+  # Blosc support comes from the nanovdb target, which links nanovdb_blosc and
+  # defines NANOVDB_USE_BLOSC, so only check here that it is available.
   if(NOT OPENVDB_BUILD_NANOVDB)
     find_package(OpenVDB COMPONENTS nanovdb)
     if(NOT OpenVDB_nanovdb_FOUND OR NOT OpenVDB_FOUND)
@@ -77,9 +74,22 @@ if(OPENVDB_TOOL_USE_NANO)
         " Either set OPENVDB_CMAKE_PATH to <OpenVDB install path>/lib/cmake/OpenVDB"
         " or please pass -DUSE_NANOVDB=ON as a cmake argument.")
     endif()
+    if(OPENVDB_TOOL_NANO_USE_BLOSC AND NOT TARGET OpenVDB::nanovdb_blosc)
+      message(FATAL_ERROR
+        " OPENVDB_TOOL_NANO_USE_BLOSC is ON but the installed NanoVDB was built"
+        " without Blosc. Rebuild NanoVDB with -DNANOVDB_USE_BLOSC=ON or pass"
+        " -DOPENVDB_TOOL_NANO_USE_BLOSC=OFF.")
+    endif()
     set(NANOVDB_LIB OpenVDB::nanovdb)
     target_include_directories(vdb_tool_common INTERFACE ${OPENVDB_nanovdb_INCLUDE_DIR})
   else()
+    # NanoVDB is configured after this directory, so NANOVDB_USE_BLOSC is only
+    # defined here if set by the user. When not defined it defaults to ON.
+    if(OPENVDB_TOOL_NANO_USE_BLOSC AND DEFINED NANOVDB_USE_BLOSC AND NOT NANOVDB_USE_BLOSC)
+      message(FATAL_ERROR
+        " OPENVDB_TOOL_NANO_USE_BLOSC is ON but NANOVDB_USE_BLOSC is OFF."
+        " Pass -DNANOVDB_USE_BLOSC=ON or -DOPENVDB_TOOL_NANO_USE_BLOSC=OFF.")
+    endif()
     set(NANOVDB_LIB nanovdb)
   endif()
   target_link_libraries(vdb_tool_common INTERFACE ${NANOVDB_LIB})

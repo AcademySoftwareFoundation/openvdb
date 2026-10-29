@@ -11,6 +11,9 @@ cmake_minimum_required(VERSION 3.24)
 
 project(OpenVDBCore LANGUAGES CXX)
 
+# Needed to compile the vendored blosc/lz4 C sources
+enable_language(C)
+
 include(GNUInstallDirs)
 include(${CMAKE_SOURCE_DIR}/cmake/OpenVDBUtils.cmake)
 
@@ -136,36 +139,7 @@ if(USE_ZSTD)
   find_package(Zstd ${MINIMUM_ZSTD_VERSION} REQUIRED)
 endif()
 
-if(USE_BLOSC)
-  # Find Blosc libraries
-  find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
-  if(Blosc_VERSION)
-    if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BLOSC_VERSION)
-      if(${Blosc_VERSION} VERSION_LESS FUTURE_MINIMUM_BLOSC_VERSION)
-        message(DEPRECATION "Support for Blosc versions < ${FUTURE_MINIMUM_BLOSC_VERSION} "
-          "is deprecated and will be removed.")
-      endif()
-    endif()
-    # Print a warning if using of the blosc versions with regression issues
-    # with Blosc 1.5.0 caches.
-    if((Blosc_VERSION VERSION_GREATER_EQUAL 1.11.0 AND
-        Blosc_VERSION VERSION_LESS 1.14.0) OR
-       (Blosc_VERSION VERSION_GREATER_EQUAL 1.16.0 AND
-        Blosc_VERSION VERSION_LESS 1.16.2))
-      message(WARNING "The following Blosc versions are incompatible with the "
-        "recommended builds of OpenVDB: [1.11.0 -> 1.14.0) [1.16.0, 1.16.1]. "
-        "Found Blosc version '${Blosc_VERSION}' which falls in this range. We "
-        "strongly recommend using the new future minimum version '${FUTURE_MINIMUM_BLOSC_VERSION}'")
-    endif()
-  endif()
-else()
-  message(WARNING "Blosc support is disabled. It is strongly recommended to "
-    "enable blosc for optimal builds of OpenVDB and to support compatible "
-    "serialization of other OpenVDB installations."
-  )
-endif()
-
-if(USE_BLOSC OR USE_ZLIB)
+if(USE_ZLIB)
   if(USE_STATIC_DEPENDENCIES)
     set(_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
     if(MSVC)
@@ -202,15 +176,15 @@ endif()
 
 list(APPEND OPENVDB_CORE_DEPENDENT_LIBS TBB::tbb)
 
-# Zstd and zlib are private dependencies. No installed header includes zstd.h, so
-# downstream projects do not need it at compile time.
+# Zstd and zlib are private dependencies. No installed header includes headers
+# from either library, so downstream projects do not need them at compile time.
 # @warning If building against Houdini these should be picked up from the
 # Houdini installation. If a custom version of EXR is in use, be careful
-# that zlib/blosc headers/libs are not also in the same location e.g.
+# that zlib headers/libs are not also in the same location e.g.
 # /usr/local
 
-if(USE_BLOSC)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Blosc::blosc)
+if(USE_ZLIB)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS ZLIB::ZLIB)
 endif()
 
 set(OPENVDB_CORE_PRIVATE_DEPENDENT_LIBS "")
@@ -246,13 +220,11 @@ if(USE_IMATH_HALF)
 endif()
 if(USE_ZLIB)
   set(OPENVDB_USE_ZLIB 1)
-  if(USE_BLOSC)
-    set(OPENVDB_USE_BLOSC 1)
-  endif()
 endif()
 if(USE_ZSTD)
   set(OPENVDB_USE_ZSTD 1)
 endif()
+set(OPENVDB_USE_BLOSC 1)
 if(USE_EXPLICIT_INSTANTIATION)
   set(OPENVDB_USE_EXPLICIT_INSTANTIATION 1)
 endif()
@@ -569,6 +541,9 @@ list(APPEND OPENVDB_LIBRARY_MATH_INCLUDE_FILES
 list(APPEND OPENVDB_LIBRARY_SOURCE_FILES
   ${CMAKE_SOURCE_DIR}/ext/imath/openvdb/math/Half.cc)
 
+list(APPEND OPENVDB_LIBRARY_SOURCE_FILES
+  ${CMAKE_SOURCE_DIR}/ext/blosc/openvdb/ext/blosc/openvdb_blosc.c)
+
 ##########################################################################
 
 # Configure auto-generation of explicit template definition translation units
@@ -670,6 +645,10 @@ if(OPENVDB_CORE_STATIC)
     target_include_directories(openvdb_static SYSTEM PUBLIC ${CMAKE_SOURCE_DIR}/ext/vcl)
   endif()
 
+  target_include_directories(openvdb_static PRIVATE
+    ${CMAKE_SOURCE_DIR}/ext/blosc/openvdb/ext/blosc
+  )
+
   target_compile_definitions(openvdb_static
     PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES} -DOPENVDB_STATICLIB
     PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES}
@@ -712,6 +691,10 @@ if(OPENVDB_CORE_SHARED)
     target_include_directories(openvdb_shared SYSTEM PUBLIC ${CMAKE_SOURCE_DIR}/ext/vcl)
   endif()
 
+  target_include_directories(openvdb_shared PRIVATE
+    ${CMAKE_SOURCE_DIR}/ext/blosc/openvdb/ext/blosc
+  )
+
   target_compile_definitions(openvdb_shared
     PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES} -DOPENVDB_DLL
     PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES}
@@ -750,6 +733,9 @@ endif()
 ##########################################################################
 
 # Installation
+
+include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/OpenVDBInstallLicenses.cmake")
+openvdb_install_licenses("${OPENVDB_INSTALL_DOCDIR}")
 
 if(OPENVDB_CORE_STATIC)
   install(TARGETS openvdb_static
