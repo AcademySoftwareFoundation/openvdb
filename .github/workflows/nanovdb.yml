@@ -193,7 +193,9 @@ jobs:
           cd nanovdb/nanovdb
           mkdir .build
           cd .build
-          cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF -DNANOVDB_USE_BLOSC=OFF ../
+          cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF -DNANOVDB_USE_BLOSC=OFF -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install ../
           make -j8
-          sudo make install
+          make install
           ctest -V
+      - name: test_install
+        run: ./ci/test_nanovdb_install.sh ${{ github.workspace }}/install
