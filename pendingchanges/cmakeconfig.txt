@@ -19,3 +19,9 @@ NanoVDB:
   - NanoVDB::nanovdb adds --extended-lambda to CUDA sources compiled with nvcc,
     which NanoVDB's CUDA headers require.
   - nanovdb/putil/IO.h, the PNanoVDB file I/O helpers, is now installed.
+  - With NANOVDB_USE_CUDA=ON, NanoVDB uses the CUDA toolkit's CCCL and clones
+    CCCL only when the toolkit has none or NANOVDB_FETCH_CCCL=ON. NanoVDB
+    requires CUDA 12.0 and CCCL 2.8 or newer, and the CMake Config-file
+    accepts any CCCL that meets that minimum.
+  - NanoVDB::nanovdb sets the NANOVDB_INCLUDE_DIR target property to the
+    directory holding the nanovdb/ headers.
