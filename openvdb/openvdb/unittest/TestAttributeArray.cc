@@ -16,7 +16,9 @@
 #include <atomic>
 
 #include <cstdio> // for std::remove()
+#include <cstring> // for std::memcpy()
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <iostream>
 
@@ -1251,6 +1253,117 @@ TEST_F(TestAttributeArray, testAttributeHandle)
         EXPECT_EQ(float(11), array->get(6));
     }
 }
+
+TEST_F(TestAttributeArray, testReadInvalidSizes)
+{
+    using AttributeArrayF = TypedAttributeArray<float>;
+
+    // metadata layout: Index64 bytes, uint8 flags, uint8 serialization flags, Index size
+    const size_t bytesOffset = 0;
+    const size_t sizeOffset = sizeof(Index64) + 2*sizeof(uint8_t);
+
+    const Index count = 4096;
+    AttributeArrayF attrA(count);
+    for (Index i = 0; i < count; ++i)   attrA.set(i, float(i));
+
+    std::ostringstream ostr(std::ios_base::binary);
+    attrA.write(ostr); // no blosc compression, so data is stored uncompressed
+    const std::string valid = ostr.str();
+
+    { // unmodified data reads successfully
+        AttributeArrayF attrB;
+        std::istringstream istr(valid, std::ios_base::binary);
+        EXPECT_NO_THROW(attrB.read(istr));
+        EXPECT_TRUE(attrA == attrB);
+    }
+
+    { // byte count smaller than the array size
+        std::string data = valid;
+        Index64 bytes = /*flags*/sizeof(Int16) + /*size*/sizeof(Index) + /*one value*/sizeof(float);
+        std::memcpy(&data[bytesOffset], &bytes, sizeof(Index64));
+
+        AttributeArrayF attrB;
+        std::istringstream istr(data, std::ios_base::binary);
+        EXPECT_THROW(attrB.read(istr), IoError);
+    }
+
+    { // byte count smaller than the metadata
+        std::string data = valid;
+        Index64 bytes = 1;
+        std::memcpy(&data[bytesOffset], &bytes, sizeof(Index64));
+
+        AttributeArrayF attrB;
+        std::istringstream istr(data, std::ios_base::binary);
+        EXPECT_THROW(attrB.read(istr), IoError);
+    }
+
+    { // element count larger than the data
+        std::string data = valid;
+        Index size = count + 1;
+        std::memcpy(&data[sizeOffset], &size, sizeof(Index));
+
+        AttributeArrayF attrB;
+        std::istringstream istr(data, std::ios_base::binary);
+        EXPECT_THROW(attrB.read(istr), IoError);
+    }
+
+    { // zero element count
+        std::string data = valid;
+        Index size = 0;
+        std::memcpy(&data[sizeOffset], &size, sizeof(Index));
+
+        AttributeArrayF attrB;
+        std::istringstream istr(data, std::ios_base::binary);
+        EXPECT_THROW(attrB.read(istr), IoError);
+    }
+
+    { // element count multiplied by the stride overflows
+        AttributeArrayF attrC(/*n=*/2, /*strideOrTotalSize=*/2);
+        std::ostringstream ostrC(std::ios_base::binary);
+        attrC.write(ostrC);
+        std::string data = ostrC.str();
+
+        Index size = std::numeric_limits<Index>::max();
+        std::memcpy(&data[sizeOffset], &size, sizeof(Index));
+
+        AttributeArrayF attrB;
+        std::istringstream istr(data, std::ios_base::binary);
+        EXPECT_THROW(attrB.read(istr), IoError);
+    }
+
+    { // blosc compressed data with a header that reports more bytes than are stored
+        AttributeArrayF attrD(count);
+        for (Index i = 0; i < count; ++i)   attrD.set(i, float(i % 16));
+
+        std::ostringstream ostrD(std::ios_base::binary);
+        io::setDataCompression(ostrD, io::COMPRESS_BLOSC);
+        attrD.write(ostrD);
+        std::string data = ostrD.str();
+
+        Index64 bytes;
+        std::memcpy(&bytes, &data[bytesOffset], sizeof(Index64));
+        const size_t compressedBytes = bytes - sizeof(Int16) - sizeof(Index);
+        // the blosc buffer follows the metadata and a one byte compression flag
+        const size_t bufferOffset = data.size() - compressedBytes;
+        EXPECT_EQ(uint8_t(data[bufferOffset - 1]), uint8_t(1));
+
+        { // unmodified data reads successfully
+            AttributeArrayF attrB;
+            std::istringstream istr(data, std::ios_base::binary);
+            EXPECT_NO_THROW(attrB.read(istr));
+            EXPECT_TRUE(attrD == attrB);
+        }
+
+        // the blosc header stores the compressed size as a 32-bit value at byte 12
+        int32_t reportedBytes = int32_t(compressedBytes + 1024);
+        std::memcpy(&data[bufferOffset + 12], &reportedBytes, sizeof(int32_t));
+
+        AttributeArrayF attrB;
+        std::istringstream istr(data, std::ios_base::binary);
+        EXPECT_THROW(attrB.read(istr), IoError);
+    }
+}
+
 
 TEST_F(TestAttributeArray, testStrided)
 {

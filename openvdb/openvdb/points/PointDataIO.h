@@ -73,6 +73,7 @@ readCompressedValues(   std::istream& is, PointDataIndex32* destBuf, Index destC
             // decompress into the destination buffer
             std::unique_ptr<char[]> bloscBuffer(new char[int(bytes16)]);
             is.read(bloscBuffer.get(), bytes16);
+            compression::bloscValidateCompressedBytes(bloscBuffer.get(), size_t(bytes16));
             std::unique_ptr<char[]> buffer = bloscDecompress(   bloscBuffer.get(),
                                                                 destBytes,
                                                                 /*resize=*/false);

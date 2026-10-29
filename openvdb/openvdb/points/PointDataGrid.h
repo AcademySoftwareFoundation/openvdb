@@ -976,6 +976,37 @@ PointDataLeafNode<T, Log2Dim>::setOffsetOnly(Index offset, const ValueType& val)
 
 #if OPENVDB_ABI_VERSION_NUMBER < 14
 
+namespace internal {
+
+/// Throws an IoError if a voxel offset could index past the end of an attribute array
+/// or if an array was not read. Offsets and array sizes are separate values in the file.
+template <typename LeafT>
+inline void validateReadOffsets(const LeafT& leaf)
+{
+    // offsets may be 64-bit, so compare them without narrowing
+    const Index64 lastOffset(leaf.getValue(LeafT::SIZE-1));
+    for (Index index = 0; index < LeafT::SIZE; ++index) {
+        if (Index64(leaf.getValue(index)) > lastOffset) {
+            OPENVDB_THROW(IoError, "PointDataGrid voxel offset " << Index64(leaf.getValue(index))
+                << " exceeds the last voxel offset " << lastOffset << ".");
+        }
+    }
+
+    const AttributeSet& attributeSet = leaf.attributeSet();
+    for (size_t attributeIndex = 0; attributeIndex < attributeSet.size(); ++attributeIndex) {
+        const AttributeArray* array = attributeSet.getConst(attributeIndex);
+        if (array->flags() & AttributeArray::PARTIALREAD) {
+            OPENVDB_THROW(IoError, "PointDataGrid attribute array was not read.");
+        }
+        if (lastOffset > array->size()) {
+            OPENVDB_THROW(IoError, "PointDataGrid voxel offset " << lastOffset
+                << " exceeds attribute array size " << array->size() << ".");
+        }
+    }
+}
+
+} // namespace internal
+
 template<typename T, Index Log2Dim>
 inline void
 PointDataLeafNode<T, Log2Dim>::readTopology(std::istream& is, bool fromHalf)
@@ -1089,7 +1120,8 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
     const Index pass(static_cast<uint16_t>(meta->pass()));
     const Index maximumPass(static_cast<uint16_t>(meta->pass() >> 16));
 
-    const Index attributes = (maximumPass - 4) / 2;
+    // the pass count comes from the file, so guard against unsigned underflow
+    const Index attributes = maximumPass >= 4 ? (maximumPass - 4) / 2 : 0;
 
     if (pass == 0) {
         // pass 0 - voxel data sizes
@@ -1132,6 +1164,11 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
             }
         }
         mAttributeSet->readMetadata(is);
+        // arrays beyond the pass count would never be read
+        if (mAttributeSet->size() > attributes) {
+            OPENVDB_THROW(IoError, "PointDataGrid declares " << mAttributeSet->size()
+                << " attributes, but only " << attributes << " can be read.");
+        }
     }
     else if (pass < (attributes + 2)) {
         // pass 2...n+2 - attribute uniform values
@@ -1182,6 +1219,11 @@ PointDataLeafNode<T, Log2Dim>::readBuffers(std::istream& is, const CoordBBox& /*
         // pass 2n+3 - cleanup last paged stream
         const Index attributeIndex = pass - attributes - 4;
         Local::destroyPagedStream(meta->auxData(), attributeIndex);
+    }
+
+    // all data for this leaf has been read after the last pass of the grid
+    if (pass + 1 == maximumPass) {
+        internal::validateReadOffsets(*this);
     }
 }
 

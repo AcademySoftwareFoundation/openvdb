@@ -4,7 +4,330 @@
 
 @htmlonly <a name="v14_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 14.0.0</B> - <I>In development</I>
+<B>Version 14.0.0</B> - <I>October 29, 2026</I>
+
+@par
+<BLOCKQUOTE>
+This version introduces ABI changes relative to older major releases, so to
+preserve ABI compatibility it might be necessary to define the macro
+<TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>, where, for example,
+<I>N</I> is 13 for Houdini&nbsp;22.0. See the ABI Changes section below.
+</BLOCKQUOTE>
+
+@par
+Highlights:
+- ABI=14 removes the tree level I/O methods and the out-of-core state from
+  the grid, tree, node and point attribute classes. Serialization now goes
+  only through the new @c openvdb::codecs framework introduced in 13.2.
+- OpenVDB has fewer external dependencies. Blosc is no longer an external
+  dependency and has now been vendored into the core library. Log4cplus has
+  been removed and replaced by a logging sink API. Zlib is now a private
+  dependency.
+- Added CMake Config files for OpenVDB so downstream projects can more
+  easily depend on OpenVDB, NanoVDB and AX.
+- The NanoVDB GPU tools now build into single-space, device-only buffers by
+  default. The dual-space buffers and the forwarding headers and function
+  names deprecated since OpenVDB&nbsp;12.0 are removed.
+- Minimum dependency versions now track CY2025 of the VFX Reference Platform.
+
+@par
+Security Fixes:
+- Reading a PointDataGrid now throws an @c IoError, instead of reading or
+  writing out of bounds later, when the file has an attribute byte count
+  smaller than the attribute array, a page size that does not match its
+  compressed data, voxel offsets beyond the end of the attribute arrays, or
+  a pass count too small to read every attribute array.
+  <I>[Reported&nbsp;by&nbsp;Anthropic&nbsp;and&nbsp;Ada&nbsp;Logics]</I>
+
+@par
+ABI Changes:
+- The minimum supported ABI is now 12. Support for ABI=11, which is used by
+  Houdini&nbsp;20.5, has been removed. ABI=12 and ABI=13 are deprecated and
+  print a message when used.
+- With ABI=14 the Tree I/O methods are no longer compiled. This removes
+  @c readTopology(), @c writeTopology(), @c readBuffers() and
+  @c writeBuffers() (and their helpers) from @c GridBase, @c Grid,
+  @c TreeBase, @c Tree, @c RootNode, @c InternalNode and the @c LeafNode
+  variants. Use the @vdblink::io::File io::File@endlink and
+  @vdblink::io::Stream io::Stream@endlink classes, which serialize through the
+  @c openvdb::codecs framework. These methods remain available when building
+  with ABI=13 or lower.
+- With ABI=14 @vdblink::tree::LeafBuffer tree::LeafBuffer@endlink no longer
+  holds the deprecated atomic and spin mutex members, which reduces the size of
+  @c tree::LeafBuffer.
+- With ABI=14 @vdblink::points::AttributeArray points::AttributeArray@endlink
+  no longer holds the out-of-core flag.
+- With ABI=14 the out-of-core methods @c readNonresidentBuffers(),
+  @c memUsageIfLoaded(), @c loadData() and @c isDataLoaded() are removed. They
+  remain available, as deprecated, when building with ABI=13.
+- The NanoVDB grid layout and file format are unchanged.
+
+@par
+OpenVDB:
+- New features:
+  - Added @c openvdb::logging::Sink and the functions @c addSink,
+    @c removeSink and @c findSink to route log messages into a host
+    application. A @c ConsoleSink that writes to @c std::cerr is installed by
+    default.
+
+- Improvements:
+  - Added the <TT>-debug</TT>, <TT>-info</TT>, <TT>-warn</TT>,
+    <TT>-error</TT> and <TT>-fatal</TT> flags to @c vdb_ax, @c vdb_lod,
+    @c vdb_print, @c vdb_render and @c vdb_view.
+
+- API Changes:
+  - Removed @c logging::setProgramName.
+  - Blosc is no longer an external dependency. A reduced copy of Blosc, which
+    writes with LZ4 and can still decode BloscLZ, is now part of the OpenVDB
+    core library, with all symbols renamed so they cannot clash with any
+    other Blosc in the same process. @c Archive::hasBloscCompression() and
+    @c compression::bloscCanCompress() always return true.
+  - Added @c compression::bloscValidateCompressedBytes() to check a Blosc
+    header against the number of bytes read before decompressing.
+
+- Removals:
+  - Removed the @c nodeCount() overloads that took
+    <TT>std::vector&lt;Index32&gt;</TT>. Use the
+    <TT>std::vector&lt;Index64&gt;</TT> overloads instead.
+  - Removed the @c rotation members from
+    @vdblink::points::EllipsoidSettings points::EllipsoidSettings@endlink and
+    @vdblink::points::PcaAttributes points::PcaAttributes@endlink. Use the
+    @c xform members instead.
+  - Removed the out-of-core and delayed loading APIs that were deprecated in
+    13.2. This includes @c io::MappedFile, @c getMappedFilePtr(),
+    @c setMappedFilePtr(), the @c File::open(bool) overloads,
+    @c File::copyMaxBytes() and @c setCopyMaxBytes(),
+    <TT>Stream(std::istream&, bool)</TT>, @c isOutOfCore(), the @c inCoreOnly
+    overloads of @c pointCount(), @c pointOffsets() and the
+    @c convertPointDataGrid*() functions, @c setStreamingMode() and
+    @c prefetch().
+  - Removed @c io::GridDescriptor::read(). Use
+    @c GridDescriptor::readHeader() followed by
+    @c GridDescriptor::readStreamPos() instead.
+
+- Build:
+  - Minimum versions now track VFX Reference Platform CY2025: MSVC&nbsp;19.36,
+    OpenEXR&nbsp;3.3, TBB&nbsp;2021, Python&nbsp;3.11, nanobind&nbsp;2.5.0 and
+    GoogleTest&nbsp;1.12. The recommended GCC is 14.2.
+  - New future minimums are C++20, GCC&nbsp;14.2, OpenEXR&nbsp;3.4,
+    TBB&nbsp;2022 and Python&nbsp;3.13.
+  - Dropped support for TBB&nbsp;2020.3.
+  - CMake now fails if the nanobind version is below the minimum.
+  - Removed the Log4cplus dependency. The @c USE_LOG4CPLUS CMake option is
+    deprecated and has no effect.
+  - Removed the <TT>FindBlosc.cmake</TT> module and the @c BLOSC_ROOT,
+    @c BLOSC_INCLUDEDIR and @c BLOSC_LIBRARYDIR inputs. The @c USE_BLOSC
+    option is deprecated and has no effect.
+  - OpenVDB core now compiles C sources, so the C language is enabled.
+  - Zlib is now a private dependency of the OpenVDB core library. No
+    installed header includes <TT>zlib.h</TT>, so downstream projects no longer
+    need zlib at compile time. On Linux the shared library no longer re-exports
+    statically linked zlib symbols.
+  - Added Zstd as an optional dependency of the OpenVDB core library, with
+    the new @c USE_ZSTD CMake option (ON by default), a
+    <TT>FindZstd.cmake</TT> module and a minimum version of 1.5.2. Zstd is a
+    private dependency and no installed header includes <TT>zstd.h</TT>. The
+    @c OPENVDB_USE_ZSTD define in <TT>version.h</TT> records whether it was
+    enabled.
+  - Added an OpenVDB CMake Config-file, so downstream projects can use
+    <TT>find_package(OpenVDB CONFIG)</TT> and link against
+    @c OpenVDB::openvdb. The @c openvdb_ax component provides
+    @c OpenVDB::openvdb_ax and requires LLVM. The @c nanovdb component
+    provides @c OpenVDB::nanovdb.
+  - Include directories of the core library targets now use build and
+    install interface generator expressions, so installed targets no longer
+    reference paths in the source or build tree.
+
+@par
+OpenVDB AX:
+- Improvements:
+  - Removed the legacy code for LLVM versions older than 16, including
+    <TT>codegen/LegacyIR.h</TT>.
+
+- Removals:
+  - Removed the @c getTreeExecutionLevel() overload that returned a single
+    value. Use <TT>getTreeExecutionLevel(Index&, Index&)</TT> instead.
+  - Removed the deprecated @c Function setters @c setArgumentNames(),
+    @c setDependencies(), @c setFnAttributes(), @c setRetAttributes() and
+    @c setParamAttributes(), along with @c hasParamAttribute(). Use
+    @c codegen::FunctionBuilder to construct functions.
+
+- Build:
+  - The minimum LLVM version is now 18.0.0.
+
+@par
+Houdini:
+- Improvements:
+  - Log messages can be forwarded to the Houdini Universal Log under the
+    source name "OpenVDB". Error and Fatal messages are reported as warnings
+    with a prefix.
+
+- API Changes:
+  - @c startLogForwarding, @c stopLogForwarding and @c isLogForwarding no
+    longer take an @c OP_OpTypeId.
+  - Log forwarding is no longer started automatically. Enable it with the new
+    @c OPENVDB_HOUDINI_LOG_FORWARDING CMake option or by calling
+    @c startLogForwarding.
+
+@par
+NanoVDB:
+- API Changes:
+  - NanoVDB version is now 32.11.0. The grid ABI and file format are
+    unchanged. The minor version reflects the API changes below.
+  - The GPU tools build into <TT>nanovdb::cuda::Buffer&lt;std::byte&gt;</TT>
+    by default, in place of the removed dual-space buffer. A call that does not
+    pass a buffer now returns a
+    <TT>GridHandle&lt;cuda::Buffer&lt;std::byte&gt;&gt;</TT> that holds its
+    grids on the device only. Read the grids with @c deviceGrid(), and use
+    @c cuda::copyTo to copy them to a host handle. This covers @c pointsToGrid,
+    @c voxelsToGrid, @c PointsToGrid, @c IndexToGrid, @c indexToGrid and the
+    device @c createNanoGrid, @c addBlindData, @c MeshToGrid and its distance
+    sidecar, @c DilateGrid, @c MergeGrids, @c PruneGrid, @c RefineGrid,
+    @c CoarsenGrid and @c buildVoxelBlockManager. @c DistributedPointsToGrid
+    builds into
+    <TT>cuda::Buffer&lt;std::byte, cuda::ManagedResource&gt;</TT> by default.
+  - Memory resources must provide @c operator==. @c cuda::Buffer and
+    @c cuda::ResourceRef over a resource without it fail to compile, where 13.2
+    warned.
+  - @c VoxelBlockManagerHandle::hostFirstLeafID and @c hostJumpMap are
+    unavailable for a device-only buffer, like @c GridHandle::data.
+    @c DistributedPointsToGrid::getHandle and @c getBuffer reject, at compile
+    time, a buffer that is not both host and device accessible.
+  - The @c GridHandle buffer move constructor is now a single non-template
+    constructor. Constructing a @c GridHandle from anything other than a
+    @c BufferT rvalue is now a compile error.
+
+- Removals:
+  - Removed the dual-space buffers deprecated in 13.1 and 13.2:
+    @c cuda::DualDeviceBuffer, @c cuda::DualUnifiedBuffer and their aliases
+    @c cuda::DeviceBuffer, @c cuda::UnifiedBuffer and @c CudaDeviceBuffer,
+    together with @c BufferTraits::hasDeviceDual. A @c GridHandle over a buffer
+    whose @c BufferTraits still declares @c hasDeviceDual fails to compile. The
+    headers <TT>nanovdb/cuda/DeviceBuffer.h</TT>,
+    <TT>nanovdb/cuda/UnifiedBuffer.h</TT> and
+    <TT>nanovdb/util/cuda/CudaDeviceBuffer.h</TT> remain for one release as
+    <TT>\#error</TT> messages naming the replacement.
+  - Removed the dual-space handle surface: @c GridHandle::deviceUpload,
+    @c deviceDownload and <TT>deviceData(int)</TT>,
+    @c NodeManagerHandle::deviceUpload and @c deviceDownload, the dual-space
+    overloads of @c VoxelBlockManagerHandle::deviceFirstLeafID and
+    @c deviceJumpMap, the dual-space overloads of @c cuda::createNodeManager,
+    @c cuda::mergeGridHandles and @c cuda::splitGridHandles, and the older
+    @c cudaCreateNodeManager, @c mergeDeviceGrids and @c splitDeviceGrids,
+    which only accepted dual-space buffers. Use @c cuda::copyTo,
+    <TT>cuda::createNodeManager(deviceGrid)</TT> or
+    <TT>cuda::createNodeManager(deviceGrid, resource)</TT>, and the
+    single-space @c cuda::mergeGridHandles and @c cuda::splitGridHandles.
+  - Removed @c cuda::detail::HandleFactory. Use @c GridHandle::adopt and
+    @c GridHandle::metaData.
+  - Removed the static @c cuda::DeviceResource::allocateAsync and
+    @c deallocateAsync. Use the instance methods @c allocate_async and
+    @c deallocate_async.
+  - Removed <TT>cuda::Buffer::resize(count, stream)</TT>. Use
+    <TT>resize(stream, count)</TT>. Removed @c cuda::Buffer::clear and
+    @c cuda::BufferView::clear. Use @c destroy.
+  - Removed the forwarding headers that were deprecated since OpenVDB&nbsp;12.0,
+    when NanoVDB reorganized its headers into <TT>math/</TT>, <TT>tools/</TT>
+    and <TT>io/</TT>: <TT>nanovdb/util/CpuTimer.h</TT>,
+    <TT>CreateNanoGrid.h</TT>, <TT>DitherLUT.h</TT>, <TT>GridBuilder.h</TT>,
+    <TT>GridChecksum.h</TT>, <TT>GridStats.h</TT>, <TT>GridValidator.h</TT>,
+    <TT>HDDA.h</TT>, <TT>HostBuffer.h</TT>, <TT>IO.h</TT>,
+    <TT>NanoToOpenVDB.h</TT>, <TT>NodeManager.h</TT>, <TT>OpenToNanoVDB.h</TT>,
+    <TT>Primitives.h</TT>, <TT>Ray.h</TT>, <TT>SampleFromVoxels.h</TT> and
+    <TT>Stencils.h</TT>, and <TT>nanovdb/util/cuda/CudaAddBlindData.cuh</TT>,
+    <TT>CudaGridChecksum.cuh</TT>, <TT>CudaGridHandle.cuh</TT>,
+    <TT>CudaGridStats.cuh</TT>, <TT>CudaGridValidator.cuh</TT>,
+    <TT>CudaIndexToGrid.cuh</TT>, <TT>CudaNodeManager.cuh</TT>,
+    <TT>CudaPointsToGrid.cuh</TT>, <TT>CudaSignedFloodFill.cuh</TT>,
+    <TT>CudaUtils.h</TT> and <TT>GpuTimer.h</TT>. Include the headers they
+    named instead.
+  - Removed the forms deprecated since OpenVDB&nbsp;12.0 in favor of the
+    namespaced API: @c nanovdb::cudaPointsToGrid, @c cudaVoxelsToGrid,
+    @c cudaIndexToGrid, @c cudaCreateNanoGrid, @c cudaAddBlindData,
+    @c cudaSignedFloodFill, @c cudaGridStats, @c cudaIsValid and
+    @c cudaLambdaKernel (use the @c nanovdb::tools::cuda and
+    @c nanovdb::util::cuda functions), the aliases @c nanovdb::Ray, @c Rgba8,
+    @c BBoxR, @c CpuTimer, @c GpuTimer, @c Range1D, @c Range2D and @c Range3D
+    (use the @c nanovdb::math and @c nanovdb::util types), @c nanovdb::forEach,
+    @c reduce, @c invoke, @c prefixSum, @c FindLowestOn, @c FindHighestOn and
+    @c CountOn (use the @c nanovdb::util functions), @c nanovdb::checkGrid,
+    <TT>nanovdb::isValid(const NanoGrid*, CheckMode, bool)</TT>,
+    @c nanovdb::nanoToOpenVDB and @c nanovdb::createSampler (use the
+    @c nanovdb::tools and @c nanovdb::math functions), @c tools::checksum (use
+    @c tools::evalChecksum), <TT>tools::isValid(const NanoGrid&, bool
+    detailed, bool)</TT> (pass a pointer and a @c CheckMode), the forms of
+    @c tools::validateChecksum and @c tools::updateChecksum that take a grid by
+    reference (pass a pointer), @c tools::gridStats (use
+    @c tools::updateGridStats), @c mapToGridType and @c mapToGridClass (use
+    @c toGridType and @c toGridClass), @c Checksum::checksum and
+    @c Checksum::isPartial (use @c full, @c head, @c tail and @c isHalf), and
+    @c Grid::blindData (use @c Grid::getBlindData).
+  - Removed @c GridHandle::size, deprecated since OpenVDB&nbsp;12.1. Use
+    @c GridHandle::bufferSize.
+  - Removed @c math::ZeroCrossing and @c math::ZeroCrossingNode, deprecated
+    since OpenVDB&nbsp;13.1. Use @c math::zeroCrossing and
+    @c math::zeroCrossingNode.
+  - <TT>nanovdb/cmd/updateFiles.sh</TT> and <TT>updateFiles.py</TT> now rewrite
+    every removed header and the renamed functions above. Calls that must
+    change from a grid reference to a pointer, calls to @c cudaPointsToGrid
+    that relied on its default voxel size, and the removed members
+    (@c GridHandle::size, @c Grid::blindData, @c Checksum::checksum) still need
+    a manual edit, as does @c nanovdb::isValid, whose name the scripts can't
+    tell apart from the <TT>nanovdb::isValid(GridType, GridClass)</TT> that
+    remains.
+
+- Fixes:
+  - Read BloscLZ-compressed <TT>.nvdb</TT> files written by Warp when
+    @c NANOVDB_USE_BLOSC is enabled. This preserves support for existing Warp
+    files without requiring changes to Warp or its Python imports.
+  - Fixed @c tools::build::ValueAccessor::setValue on bool grids, which stored
+    true regardless of the value once the leaf node was cached.
+  - @c NANOVDB_OFFSETOF now uses the standard @c offsetof instead of
+    subtracting null pointers, which is undefined behavior.
+  - Fixed a link failure with clang when nvcc uses g++ as the host compiler.
+
+- Build:
+  - Added a NanoVDB CMake Config-file, so downstream projects can use
+    <TT>find_package(NanoVDB CONFIG)</TT> and link against
+    @c NanoVDB::nanovdb, which carries the configured @c NANOVDB_USE_*
+    definitions and dependencies. The OpenVDB Config-file provides
+    @c OpenVDB::nanovdb through its @c nanovdb component.
+  - Standalone NanoVDB builds now install headers to the
+    @c CMAKE_INSTALL_PREFIX include directory instead of <TT>/nanovdb</TT>.
+  - @c NanoVDB::nanovdb adds <TT>--extended-lambda</TT> to CUDA sources
+    compiled with nvcc, which NanoVDB's CUDA headers require.
+  - <TT>nanovdb/putil/IO.h</TT>, the PNanoVDB file I/O helpers, is now
+    installed.
+  - @c NANOVDB_USE_BLOSC and @c OPENVDB_TOOL_NANO_USE_BLOSC remain and now
+    default to ON. NanoVDB no longer searches for an external Blosc. When
+    enabled, it builds its own copy of the vendored Blosc as the static
+    @c nanovdb_blosc target.
+  - With @c NANOVDB_USE_BLOSC enabled, <TT>nanovdb_blosc.h</TT> is installed
+    alongside <TT>NanoVDB.h</TT>, and <TT>libnanovdb_blosc.a</TT> is installed
+    to the NanoVDB library directory. The @c nanovdb target links it and
+    defines @c NANOVDB_USE_BLOSC.
+  - @c FindOpenVDB treats <TT>libnanovdb_blosc.a</TT> as optional for the
+    @c nanovdb component.
+  - @c OPENVDB_TOOL_NANO_USE_BLOSC no longer defines @c NANOVDB_USE_BLOSC
+    itself. It now fails configuration if NanoVDB is built without Blosc.
+  - Configuring <TT>nanovdb/nanovdb</TT> on its own now sets default install
+    directories.
+  - NanoVDB, its unit tests and its command-line tools now build with
+    @c OPENVDB_CXX_STRICT=ON under Clang/AppleClang. Fixed implicit-conversion,
+    unused-parameter, unused-function and deprecated-copy warnings under the
+    project's strict warning configuration, which includes
+    <TT>-Wconversion -Werror -Wno-sign-conversion</TT>.
+  - The static functions in <TT>CNanoVDB.h</TT> and <TT>io/IO.h</TT> are now
+    @c static @c inline.
+  - <TT>-Winvalid-offsetof</TT> is suppressed privately for the NanoVDB
+    layout-test target under Clang/AppleClang. The existing GCC suppression is
+    unchanged.
+  - The macOS NanoVDB CI jobs now build with @c OPENVDB_CXX_STRICT=ON.
+
+@par
+Python:
+- API Changes:
+  - Removed @c openvdb.setProgramName.
 
 
 @htmlonly <a name="v13_2_0_changes"></a>@endhtmlonly

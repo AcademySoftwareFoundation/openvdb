@@ -45,4 +45,9 @@ endif()
 
 target_compile_definitions(vdb_view PRIVATE -DGL_GLEXT_PROTOTYPES=1)
 
+# Apple deprecated OpenGL in macOS 10.14, which fails strict (-Werror) builds
+if(APPLE)
+  target_compile_definitions(vdb_view PRIVATE GL_SILENCE_DEPRECATION)
+endif()
+
 install(TARGETS vdb_view RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR})
