@@ -16,3 +16,6 @@ NanoVDB:
     OpenVDB Config-file provides OpenVDB::nanovdb through its nanovdb component.
   - Standalone NanoVDB builds now install headers to the CMAKE_INSTALL_PREFIX
     include directory instead of /nanovdb.
+  - NanoVDB::nanovdb adds --extended-lambda to CUDA sources compiled with nvcc,
+    which NanoVDB's CUDA headers require.
+  - nanovdb/putil/IO.h, the PNanoVDB file I/O helpers, is now installed.

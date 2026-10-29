@@ -364,13 +364,21 @@ set(NANOVDB_INCLUDE_UTIL_CUDA_FILES
   util/cuda/Rasterization.cuh
 )
 
+# NanoVDB putil header files
+set(NANOVDB_INCLUDE_PUTIL_FILES
+  putil/IO.h
+)
+
 add_library(nanovdb INTERFACE)
 add_library(NanoVDB::nanovdb ALIAS nanovdb)
 target_include_directories(nanovdb INTERFACE
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
   $<INSTALL_INTERFACE:${NANOVDB_INSTALL_INCLUDEDIR}>)
 target_compile_features(nanovdb INTERFACE cxx_std_17)
+# NanoVDB's CUDA headers launch __device__ lambdas, so nvcc consumers need
+# --extended-lambda
 target_compile_options(nanovdb INTERFACE
+  "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:--extended-lambda>"
   "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wno-invalid-offsetof>"
   "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/bigobj>")
 
@@ -453,6 +461,7 @@ set(NANOVDB_INSTALL_TOOLS_DIR ${NANOVDB_INSTALL_ROOT_DIR}/tools)
 set(NANOVDB_INSTALL_TOOLS_CUDA_DIR ${NANOVDB_INSTALL_TOOLS_DIR}/cuda)
 set(NANOVDB_INSTALL_UTIL_DIR ${NANOVDB_INSTALL_ROOT_DIR}/util)
 set(NANOVDB_INSTALL_UTIL_CUDA_DIR ${NANOVDB_INSTALL_UTIL_DIR}/cuda)
+set(NANOVDB_INSTALL_PUTIL_DIR ${NANOVDB_INSTALL_ROOT_DIR}/putil)
 
 # nanovdb/io/IO.h includes <nanovdb_blosc.h> without a nanovdb/ prefix, so
 # install it directly in the include directory. This lets consumers of an
@@ -472,6 +481,7 @@ install(FILES ${NANOVDB_INCLUDE_TOOLS_FILES} DESTINATION ${NANOVDB_INSTALL_TOOLS
 install(FILES ${NANOVDB_INCLUDE_TOOLS_CUDA_FILES} DESTINATION ${NANOVDB_INSTALL_TOOLS_CUDA_DIR})
 install(FILES ${NANOVDB_INCLUDE_UTIL_FILES} DESTINATION ${NANOVDB_INSTALL_UTIL_DIR})
 install(FILES ${NANOVDB_INCLUDE_UTIL_CUDA_FILES} DESTINATION ${NANOVDB_INSTALL_UTIL_CUDA_DIR})
+install(FILES ${NANOVDB_INCLUDE_PUTIL_FILES} DESTINATION ${NANOVDB_INSTALL_PUTIL_DIR})
 
 ###############################################################################
 # CMake package config (find_package(NanoVDB CONFIG))
