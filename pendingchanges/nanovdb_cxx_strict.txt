@@ -8,7 +8,3 @@ NanoVDB:
   - The static functions in CNanoVDB.h and io/IO.h are now static inline.
   - -Winvalid-offsetof is suppressed privately for the NanoVDB layout-test target under Clang/AppleClang. The existing GCC suppression is unchanged.
   - The macOS NanoVDB CI jobs now build with OPENVDB_CXX_STRICT=ON.
-
-vdb_tool:
-  Build:
-  - Link Blosc through its imported CMake target, fixing "library 'blosc' not found" link errors when the libraries are not on the default linker search path.
