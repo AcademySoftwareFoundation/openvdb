@@ -1,3 +1,3 @@
 NanoVDB:
   Fixes:
-  - Fixed cuda::mergeGridHandles failing with "invalid argument" when a source handle lives on another device. Device buffers are allocated from per-device stream-ordered memory pools, which other devices cannot access, so these handles are now copied with cudaMemcpyPeerAsync.
+  - Fixed cuda::mergeGridHandles failing with "invalid argument" when a source handle lives on another device. Device buffers are allocated from per-device stream-ordered memory pools, which by default are accessible only from their owning device (cudaDeviceEnablePeerAccess does not change that; only cudaMemPoolSetAccess does), so these handles are now copied with cudaMemcpyPeerAsync.

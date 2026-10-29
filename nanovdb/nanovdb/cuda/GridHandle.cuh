@@ -373,9 +373,10 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, cudaStream_t strea
     const int current = util::cuda::currentDevice();
     for (auto &h : handles) {
         const void *src = h.deviceData();
-        // Stream-ordered (pool) allocations are only accessible from their own
-        // device, even with peer access, so copies from another device's memory
-        // must be peer copies rather than plain device-to-device copies.
+        // By default, stream-ordered (pool) allocations are accessible only from
+        // their owning device: cudaDeviceEnablePeerAccess does not change that,
+        // only cudaMemPoolSetAccess does. Copies from another device's memory are
+        // therefore peer copies rather than plain device-to-device copies.
         int srcDevice = current;
         cudaPointerAttributes attr;
         if (cudaPointerGetAttributes(&attr, src) != cudaSuccess) {
