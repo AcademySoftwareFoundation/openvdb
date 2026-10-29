@@ -733,6 +733,9 @@ endif()
 
 # Installation
 
+include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/OpenVDBInstallLicenses.cmake")
+openvdb_install_licenses("${OPENVDB_INSTALL_DOCDIR}")
+
 if(OPENVDB_CORE_STATIC)
   install(TARGETS openvdb_static
     RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR}

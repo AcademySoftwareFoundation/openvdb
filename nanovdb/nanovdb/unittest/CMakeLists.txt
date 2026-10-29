@@ -77,6 +77,12 @@ add_executable(nanovdb_test_nanovdb "TestNanoVDB.cc")
 target_link_libraries(nanovdb_test_nanovdb PRIVATE nanovdb GTest::GTest GTest::Main)
 add_test(nanovdb_unit_test nanovdb_test_nanovdb)
 
+if(NANOVDB_USE_BLOSC)
+  add_executable(nanovdb_test_blosc "TestBlosc.cc")
+  target_link_libraries(nanovdb_test_blosc PRIVATE nanovdb GTest::GTest GTest::Main)
+  add_test(nanovdb_blosc_unit_test nanovdb_test_blosc)
+endif()
+
 # -----------------------------------------------------------------------------
 
 if(NANOVDB_USE_CUDA)

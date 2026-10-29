@@ -20,6 +20,9 @@ foreach(_NANOVDB_INSTALL_DIR BINDIR LIBDIR INCLUDEDIR DOCDIR)
   endif()
 endforeach()
 
+include("${CMAKE_CURRENT_LIST_DIR}/../../cmake/OpenVDBInstallLicenses.cmake")
+openvdb_install_licenses("${NANOVDB_INSTALL_DOCDIR}")
+
 ###############################################################################
 
 message(STATUS "----------------------------------------------------")
