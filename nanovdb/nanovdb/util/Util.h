@@ -157,8 +157,13 @@ typedef unsigned long long uint64_t;
 #define NANOVDB_SUPPRESS_DEPRECATION_END NANOVDB_SUPPRESS_DEPRECATION_NVCC_END
 #endif
 
-// A portable implementation of offsetof - unfortunately it doesn't work with static_assert
-#define NANOVDB_OFFSETOF(CLASS, MEMBER) ((int)(size_t)((char*)&((CLASS*)0)->MEMBER - (char*)0))
+// Byte offset of MEMBER in CLASS, cast to int. Uses the standard offsetof (or its compiler builtin
+// under NVRTC, which lacks <stddef.h>) since subtracting null pointers is undefined behavior
+#ifdef __CUDACC_RTC__
+#define NANOVDB_OFFSETOF(CLASS, MEMBER) ((int)__builtin_offsetof(CLASS, MEMBER))
+#else
+#define NANOVDB_OFFSETOF(CLASS, MEMBER) ((int)offsetof(CLASS, MEMBER))
+#endif
 
 namespace nanovdb {// =================================================================
 
@@ -242,7 +247,7 @@ __hostdev__ inline char* strcpy(char* dst, int num, int bas = 10)
     if (num == 0) dst[len++] = '0';
     for (int abs = num < 0 && bas == 10 ? -num : num; abs; abs /= bas) {
         const int rem = abs % bas;
-        dst[len++] = rem > 9 ? rem - 10 + 'a' : rem + '0';
+        dst[len++] = static_cast<char>(rem > 9 ? rem - 10 + 'a' : rem + '0');
     }
     if (num < 0) dst[len++] = '-';// append '-' if negative
     for (char *a = dst, *b = a + len - 1; a < b; ++a, --b) {// reverse dst

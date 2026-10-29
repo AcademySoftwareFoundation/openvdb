@@ -671,9 +671,9 @@ public:
     __hostdev__ [[nodiscard]] constexpr uint32_t hash() const noexcept { return ((1 << Log2N) - 1) & (mVec[0] * 73856093 ^ mVec[1] * 19349669 ^ mVec[2] * 83492791); }
 
     /// @brief Return the octant of this Coord
-    __hostdev__ [[nodiscard]] constexpr uint8_t octant() const noexcept { return (uint8_t(bool(mVec[0] & (1u << 31)))) |
-                                                (uint8_t(bool(mVec[1] & (1u << 31))) << 1) |
-                                                (uint8_t(bool(mVec[2] & (1u << 31))) << 2); }
+    __hostdev__ [[nodiscard]] constexpr uint8_t octant() const noexcept { return uint8_t((uint8_t(bool(mVec[0] & (1u << 31)))) |
+                                                        (uint8_t(bool(mVec[1] & (1u << 31))) << 1) |
+                                                        (uint8_t(bool(mVec[2] & (1u << 31))) << 2)); }
 
     /// @brief Return a single precision floating-point vector of this coordinate
     __hostdev__ [[nodiscard]] inline constexpr Vec3<float> asVec3s() const noexcept;
@@ -1915,9 +1915,9 @@ public:
 
     // ---- mixed Vec3 / Coord (3D) ----
     /// @brief Add an integer @c Coord to this vector (component-wise).
-    __hostdev__ [[nodiscard]] constexpr Vec3  operator+(const Coord& ijk) const noexcept { return Vec3(this->mVec[0] + ijk[0], this->mVec[1] + ijk[1], this->mVec[2] + ijk[2]); }
+    __hostdev__ [[nodiscard]] constexpr Vec3  operator+(const Coord& ijk) const noexcept { return Vec3(this->mVec[0] + T(ijk[0]), this->mVec[1] + T(ijk[1]), this->mVec[2] + T(ijk[2])); }
     /// @brief Subtract an integer @c Coord from this vector (component-wise).
-    __hostdev__ [[nodiscard]] constexpr Vec3  operator-(const Coord& ijk) const noexcept { return Vec3(this->mVec[0] - ijk[0], this->mVec[1] - ijk[1], this->mVec[2] - ijk[2]); }
+    __hostdev__ [[nodiscard]] constexpr Vec3  operator-(const Coord& ijk) const noexcept { return Vec3(this->mVec[0] - T(ijk[0]), this->mVec[1] - T(ijk[1]), this->mVec[2] - T(ijk[2])); }
     /// @brief In-place component-wise addition of an integer @c Coord.
     __hostdev__ constexpr Vec3& operator+=(const Coord& ijk) noexcept {
         this->mVec[0] += T(ijk[0]); this->mVec[1] += T(ijk[1]); this->mVec[2] += T(ijk[2]);
@@ -2000,13 +2000,13 @@ public:
     template<typename T1>
     __hostdev__ [[nodiscard]] friend constexpr Vec3 operator*(T1 scalar, const Vec3& vec) noexcept
     {
-        return Vec3(scalar * vec[0], scalar * vec[1], scalar * vec[2]);
+        return Vec3(T(scalar * vec[0]), T(scalar * vec[1]), T(scalar * vec[2]));
     }
     /// @brief Scalar-on-the-left division (hidden friend).
     template<typename T1>
     __hostdev__ [[nodiscard]] friend constexpr Vec3 operator/(T1 scalar, const Vec3& vec) noexcept
     {
-        return Vec3(scalar / vec[0], scalar / vec[1], scalar / vec[2]);
+        return Vec3(T(scalar / vec[0]), T(scalar / vec[1]), T(scalar / vec[2]));
     }
 }; // Vec3<T>
 
@@ -2220,9 +2220,10 @@ __hostdev__ [[nodiscard]] inline constexpr Vec3T matMult(const double* mat, cons
     const double x = static_cast<double>(xyz[0]);
     const double y = static_cast<double>(xyz[1]);
     const double z = static_cast<double>(xyz[2]);
-    return Vec3T(x * mat[0] + (y * mat[1] + z * mat[2]),
-                 x * mat[3] + (y * mat[4] + z * mat[5]),
-                 x * mat[6] + (y * mat[7] + z * mat[8]));
+    using ValueT = std::decay_t<decltype(xyz[0])>;
+    return Vec3T(ValueT(x * mat[0] + (y * mat[1] + z * mat[2])),
+                 ValueT(x * mat[3] + (y * mat[4] + z * mat[5])),
+                 ValueT(x * mat[6] + (y * mat[7] + z * mat[8])));
 }
 
 /// @brief Multiply a 3x3 matrix to a 3d vector and add another 3d vector using 32bit floating point arithmetics
@@ -2256,9 +2257,10 @@ __hostdev__ [[nodiscard]] inline constexpr Vec3T matMult(const double* mat, cons
     const double x = static_cast<double>(xyz[0]);
     const double y = static_cast<double>(xyz[1]);
     const double z = static_cast<double>(xyz[2]);
-    return Vec3T(x * mat[0] + (y * mat[1] + (z * mat[2] + vec[0])),
-                 x * mat[3] + (y * mat[4] + (z * mat[5] + vec[1])),
-                 x * mat[6] + (y * mat[7] + (z * mat[8] + vec[2])));
+    using ValueT = std::decay_t<decltype(xyz[0])>;
+    return Vec3T(ValueT(x * mat[0] + (y * mat[1] + (z * mat[2] + vec[0]))),
+                 ValueT(x * mat[3] + (y * mat[4] + (z * mat[5] + vec[1]))),
+                 ValueT(x * mat[6] + (y * mat[7] + (z * mat[8] + vec[2]))));
 }
 
 /// @brief Multiply the transposed of a 3x3 matrix and a 3d vector using 32bit floating point arithmetics
@@ -2290,9 +2292,10 @@ __hostdev__ [[nodiscard]] inline constexpr Vec3T matMultT(const double* mat, con
     const double x = static_cast<double>(xyz[0]);
     const double y = static_cast<double>(xyz[1]);
     const double z = static_cast<double>(xyz[2]);
-    return Vec3T(x * mat[0] + (y * mat[3] + z * mat[6]),
-                 x * mat[1] + (y * mat[4] + z * mat[7]),
-                 x * mat[2] + (y * mat[5] + z * mat[8]));
+    using ValueT = std::decay_t<decltype(xyz[0])>;
+    return Vec3T(ValueT(x * mat[0] + (y * mat[3] + z * mat[6])),
+                 ValueT(x * mat[1] + (y * mat[4] + z * mat[7])),
+                 ValueT(x * mat[2] + (y * mat[5] + z * mat[8])));
 }
 
 /// @brief Multiply the transpose of a 3x3 matrix by @a xyz and add @a vec (32-bit floats).
@@ -2318,9 +2321,10 @@ __hostdev__ [[nodiscard]] inline constexpr Vec3T matMultT(const double* mat, con
     const double x = static_cast<double>(xyz[0]);
     const double y = static_cast<double>(xyz[1]);
     const double z = static_cast<double>(xyz[2]);
-    return Vec3T(x * mat[0] + (y * mat[3] + (z * mat[6] + vec[0])),
-                 x * mat[1] + (y * mat[4] + (z * mat[7] + vec[1])),
-                 x * mat[2] + (y * mat[5] + (z * mat[8] + vec[2])));
+    using ValueT = std::decay_t<decltype(xyz[0])>;
+    return Vec3T(ValueT(x * mat[0] + (y * mat[3] + (z * mat[6] + vec[0]))),
+                 ValueT(x * mat[1] + (y * mat[4] + (z * mat[7] + vec[1]))),
+                 ValueT(x * mat[2] + (y * mat[5] + (z * mat[8] + vec[2]))));
 }
 
 // ----------------------------> BBox <-------------------------------------

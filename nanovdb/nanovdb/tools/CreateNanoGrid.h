@@ -857,7 +857,7 @@ struct CreateNanoGrid<SrcGridT>::OrderedBlindMetaData
                          const std::string& type,// used to derive GridType of blind data
                          GridBlindDataClass dataClass,
                          size_t i, size_t valueCount, size_t valueSize)
-        : metaData(new GridBlindMetaData(0, valueCount, valueSize, this->mapToSemantics(name), dataClass, this->mapToType(type)))
+        : metaData(new GridBlindMetaData(0, valueCount, static_cast<uint32_t>(valueSize), this->mapToSemantics(name), dataClass, this->mapToType(type)))
         , order(i)// sorted id of meta data
     {
         if (!metaData->setName(name.c_str())) throw std::runtime_error("blind data name exceeds character limit");
@@ -868,7 +868,7 @@ struct CreateNanoGrid<SrcGridT>::OrderedBlindMetaData
                          GridBlindDataClass dataClass,
                          GridType dataType,
                          size_t i, size_t valueCount, size_t valueSize)
-        : metaData(new GridBlindMetaData(0, valueCount, valueSize, dataSemantic, dataClass, dataType))
+        : metaData(new GridBlindMetaData(0, valueCount, static_cast<uint32_t>(valueSize), dataSemantic, dataClass, dataType))
         , order(i)// sorted id of meta data
     {
         if (!metaData->setName(name.c_str())) throw std::runtime_error("blind data name exceeds character limit");
@@ -1061,7 +1061,7 @@ CreateNanoGrid<SrcGridT>::preProcess(OracleT oracle)
     math::DitherLUT lut(mDitherOn);
     util::forEach(0, leafCount, 4, [&](const util::Range1D &r) {
         for (auto i=r.begin(); i!=r.end(); ++i) {
-            const auto &srcLeaf = mSrcNodeAcc.template node<0>(i);
+            const auto &srcLeaf = mSrcNodeAcc.template node<0>(static_cast<uint32_t>(i));
             float &min = mCodec[i].min = std::numeric_limits<float>::max();
             float &max = mCodec[i].max = -min;
             for (int j=0; j<512; ++j) {
@@ -1073,13 +1073,13 @@ CreateNanoGrid<SrcGridT>::preProcess(OracleT oracle)
             uint8_t &logBitWidth = mCodec[i].log2 = 0;// 0,1,2,3,4 => 1,2,4,8,16 bits
             while (range > 0.0f && logBitWidth < 4u) {
                 const uint32_t mask = (uint32_t(1) << (uint32_t(1) << logBitWidth)) - 1u;
-                const float encode  = mask/range;
-                const float decode  = range/mask;
+                const float encode  = float(mask)/range;
+                const float decode  = range/float(mask);
                 int j = 0;
                 do {
                     const float exact = srcLeaf.getValue(j);//data[j];// exact value
                     const uint32_t code = uint32_t(encode*(exact - min) + lut(j));
-                    const float approx = code * decode + min;// approximate value
+                    const float approx = float(code) * decode + min;// approximate value
                     j += oracle(exact, approx) ? 1 : 513;
                 } while(j < 512);
                 if (j == 512) break;
@@ -1109,8 +1109,8 @@ CreateNanoGrid<SrcGridT>::preProcess(OracleT oracle)
         float avg = 0.0f;
         for (uint32_t i=0; i<=5; ++i) {
             if (uint32_t n = counters[i]) {
-                avg += n * float(1 << i);
-                printf("%2i bits: %6u leaf nodes, i.e. %4.1f%%\n",1<<i, n, 100.0f*n/float(leafCount));
+                avg += float(n) * float(1 << i);
+                printf("%2i bits: %6u leaf nodes, i.e. %4.1f%%\n",1<<i, n, 100.0f*float(n)/float(leafCount));
             }
         }
         printf("%4.1f bits per value on average\n", avg/float(leafCount));
@@ -1137,7 +1137,7 @@ CreateNanoGrid<SrcGridT>::countTileValues(uint64_t valueCount)
     mValIdx[LEVEL].resize(mSrcNodeAcc.nodeCount(LEVEL) + 1, stats);// minimum 1 entry
     util::forEach(1, mValIdx[LEVEL].size(), 8, [&](const util::Range1D& r){
         for (auto i = r.begin(); i!=r.end(); ++i) {
-            auto &srcNode = mSrcNodeAcc.template node<LEVEL>(i-1);
+            auto &srcNode = mSrcNodeAcc.template node<LEVEL>(static_cast<uint32_t>(i-1));
             if constexpr(BuildTraits<DstBuildT>::is_onindex) {// resolved at compile time
                 mValIdx[LEVEL][i] += srcNode.getValueMask().countOn();
             } else {
@@ -1176,7 +1176,7 @@ CreateNanoGrid<SrcGridT>::countValues()
         util::forEach(1, mValIdx[0].size(), 8, [&](const util::Range1D& r) {
             for (auto i = r.begin(); i != r.end(); ++i) {
                 mValIdx[0][i] = stats;
-                mValIdx[0][i] += mSrcNodeAcc.template node<0>(i-1).getValueMask().countOn();
+                mValIdx[0][i] += mSrcNodeAcc.template node<0>(static_cast<uint32_t>(i-1)).getValueMask().countOn();
             }
         });
     }
@@ -1195,7 +1195,7 @@ CreateNanoGrid<SrcGridT>::preProcess(uint32_t channels)
     const uint64_t valueCount = this->template countValues<DstBuildT>();
     mLeafNodeSize = mSrcNodeAcc.nodeCount(0)*NanoLeaf<DstBuildT>::DataType::memUsage();
 
-    uint32_t order = mBlindMetaData.size();
+    size_t order = mBlindMetaData.size();
     char str[16];
     for (uint32_t i=0; i<channels; ++i) {
         mBlindMetaData.emplace("channel_" + std::to_string(i),
@@ -1227,7 +1227,7 @@ CreateNanoGrid<SrcGridT>::processLeafs()
     util::forEach(0, mSrcNodeAcc.nodeCount(0), 8, [&](const util::Range1D& r) {
         auto *dstLeaf = this->template dstNode<DstBuildT,0>(r.begin());
         for (auto i = r.begin(); i != r.end(); ++i, ++dstLeaf) {
-            auto &srcLeaf = mSrcNodeAcc.template node<0>(i);
+            auto &srcLeaf = mSrcNodeAcc.template node<0>(static_cast<uint32_t>(i));
             if (DstDataT::padding()>0u) {
                 util::memzero(dstLeaf, DstDataT::memUsage());
             } else {
@@ -1269,7 +1269,7 @@ CreateNanoGrid<SrcGridT>::processLeafs()
         const uint8_t flags  = mIncludeStats ? 16u : 0u;// 4th bit indicates stats
         DstDataT *dstLeaf = this->template dstNode<DstBuildT,0>(r.begin());// fixed size
         for (auto i = r.begin(); i != r.end(); ++i, ++dstLeaf) {
-            auto &srcLeaf = mSrcNodeAcc.template node<0>(i);
+            auto &srcLeaf = mSrcNodeAcc.template node<0>(static_cast<uint32_t>(i));
             dstLeaf->mBBoxMin = srcLeaf.origin(); // copy origin of node
             dstLeaf->mBBoxDif[0] = dstLeaf->mBBoxDif[1] = dstLeaf->mBBoxDif[2] = 0u;
             dstLeaf->mFlags = flags;
@@ -1312,7 +1312,7 @@ CreateNanoGrid<SrcGridT>::processLeafs()
     util::forEach(0, mSrcNodeAcc.nodeCount(0), 8, [&](const util::Range1D& r) {
         auto *dstLeaf = this->template dstNode<DstBuildT,0>(r.begin());
         for (auto i = r.begin(); i != r.end(); ++i, ++dstLeaf) {
-            auto &srcLeaf = mSrcNodeAcc.template node<0>(i);
+            auto &srcLeaf = mSrcNodeAcc.template node<0>(static_cast<uint32_t>(i));
             if (DstDataT::padding()>0u) {
                 util::memzero(dstLeaf, DstDataT::memUsage());
             } else {
@@ -1338,7 +1338,7 @@ CreateNanoGrid<SrcGridT>::processLeafs()
     util::forEach(0, mSrcNodeAcc.nodeCount(0), 8, [&](const util::Range1D& r) {
         auto *dstLeaf = this->template dstNode<DstBuildT,0>(r.begin());
         for (auto i = r.begin(); i != r.end(); ++i, ++dstLeaf) {
-            auto &srcLeaf = mSrcNodeAcc.template node<0>(i);
+            auto &srcLeaf = mSrcNodeAcc.template node<0>(static_cast<uint32_t>(i));
             if (DstDataT::padding()>0u) {
                 util::memzero(dstLeaf, DstDataT::memUsage());
             } else {
@@ -1378,7 +1378,7 @@ CreateNanoGrid<SrcGridT>::processLeafs()
     util::forEach(0, mSrcNodeAcc.nodeCount(0), 8, [&](const util::Range1D& r) {
         auto *dstLeaf = this->template dstNode<DstBuildT,0>(r.begin());
         for (auto i = r.begin(); i != r.end(); ++i, ++dstLeaf) {
-            auto &srcLeaf = mSrcNodeAcc.template node<0>(i);
+            auto &srcLeaf = mSrcNodeAcc.template node<0>(static_cast<uint32_t>(i));
             if (DstDataT::padding()>0u) {
                 util::memzero(dstLeaf, DstDataT::memUsage());
             } else {
@@ -1407,9 +1407,9 @@ CreateNanoGrid<SrcGridT>::processLeafs()
             if (util::is_same<Fp4, DstBuildT>::value) {// resolved at compile-time
                 for (uint32_t j=0; j<128u; ++j) {
                     auto tmp = quantize();
-                    *code++  = quantize() << 4 | tmp;
+                    *code++  = static_cast<ArrayT>(quantize() << 4 | tmp);
                     tmp      = quantize();
-                    *code++  = quantize() << 4 | tmp;
+                    *code++  = static_cast<ArrayT>(quantize() << 4 | tmp);
                 }
             } else {
                 for (uint32_t j=0; j<128u; ++j) {
@@ -1434,15 +1434,15 @@ CreateNanoGrid<SrcGridT>::processLeafs()
     math::DitherLUT lut(mDitherOn);
     util::forEach(0, mSrcNodeAcc.nodeCount(0), 8, [&](const util::Range1D& r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
-            auto &srcLeaf = mSrcNodeAcc.template node<0>(i);
+            auto &srcLeaf = mSrcNodeAcc.template node<0>(static_cast<uint32_t>(i));
             auto *dstLeaf = this->template dstNode<DstBuildT,0>(i);
             dstLeaf->mBBoxMin = srcLeaf.origin(); // copy origin of node
             dstLeaf->mBBoxDif[0] = dstLeaf->mBBoxDif[1] = dstLeaf->mBBoxDif[2] = 0u;
             const uint8_t logBitWidth = mCodec[i].log2;
-            dstLeaf->mFlags = logBitWidth << 5;// pack logBitWidth into 3 MSB of mFlag
+            dstLeaf->mFlags = static_cast<uint8_t>(logBitWidth << 5);// pack logBitWidth into 3 MSB of mFlag
             dstLeaf->mValueMask = srcLeaf.getValueMask(); // copy value mask
             const float min = mCodec[i].min, max = mCodec[i].max;
-            dstLeaf->init(min, max, uint8_t(1) << logBitWidth);
+            dstLeaf->init(min, max, static_cast<uint8_t>(1u << logBitWidth));
             // perform quantization relative to the values in the current leaf node
             uint32_t offset = 0;
             float encode = 0.0f;
@@ -1468,7 +1468,7 @@ CreateNanoGrid<SrcGridT>::processLeafs()
                         auto a = quantize();
                         a     |= quantize() << 2;
                         a     |= quantize() << 4;
-                        *dst++ = quantize() << 6 | a;
+                        *dst++ = static_cast<uint8_t>(quantize() << 6 | a);
                     }
                 }
                 break;
@@ -1476,9 +1476,9 @@ CreateNanoGrid<SrcGridT>::processLeafs()
                     encode = 15.0f/(max - min);
                     for (int j=0; j<128; ++j) {
                         auto a = quantize();
-                        *dst++ = quantize() << 4 | a;
+                        *dst++ = static_cast<uint8_t>(quantize() << 4 | a);
                         a      = quantize();
-                        *dst++ = quantize() << 4 | a;
+                        *dst++ = static_cast<uint8_t>(quantize() << 4 | a);
                     }
                 }
                 break;
@@ -1532,7 +1532,7 @@ CreateNanoGrid<SrcGridT>::processInternalNodes()
     util::forEach(0, nodeCount, 4, [&](const util::Range1D& r) {
         auto *dstNode = this->template dstNode<DstBuildT,LEVEL>(r.begin());
         for (auto i = r.begin(); i != r.end(); ++i, ++dstNode) {
-            auto &srcNode  = mSrcNodeAcc.template node<LEVEL>(i);
+            auto &srcNode  = mSrcNodeAcc.template node<LEVEL>(static_cast<uint32_t>(i));
             uint64_t childID = dstNode->mFlags;
             if (DstNodeT::DataType::padding()>0u) {
                 util::memzero(dstNode, DstNodeT::memUsage());
@@ -1575,14 +1575,14 @@ CreateNanoGrid<SrcGridT>::processInternalNodes()
         auto *dstNode = this->template dstNode<DstBuildT,LEVEL>(0);
         for (uint64_t i=0; i<nodeCount; ++i) {
             dstNode[i].mFlags = childCount;
-            childCount += mSrcNodeAcc.template node<LEVEL>(i).getChildMask().countOn();
+            childCount += mSrcNodeAcc.template node<LEVEL>(static_cast<uint32_t>(i)).getChildMask().countOn();
         }
     }
 
     util::forEach(0, nodeCount, 4, [&](const util::Range1D& r) {
         auto *dstNode = this->template dstNode<DstBuildT,LEVEL>(r.begin());
         for (auto i = r.begin(); i != r.end(); ++i, ++dstNode) {
-            auto &srcNode  = mSrcNodeAcc.template node<LEVEL>(i);
+            auto &srcNode  = mSrcNodeAcc.template node<LEVEL>(static_cast<uint32_t>(i));
             uint64_t childID = dstNode->mFlags;
             dstNode->mFlags = 0u;
             dstNode->mBBox[0]   = srcNode.origin(); // copy origin of node
@@ -1706,12 +1706,12 @@ void CreateNanoGrid<SrcGridT>::processTree()
 
     // Count number of active leaf level tiles
     dstTree->mTileCount[0] = util::reduce(util::Range1D(0,nodeCount[1]), uint32_t(0), [&](const util::Range1D &r, uint32_t sum){
-        for (auto i=r.begin(); i!=r.end(); ++i) sum += mSrcNodeAcc.template node<1>(i).getValueMask().countOn();
+        for (auto i=r.begin(); i!=r.end(); ++i) sum += mSrcNodeAcc.template node<1>(static_cast<uint32_t>(i)).getValueMask().countOn();
         return sum;}, std::plus<uint32_t>());
 
     // Count number of active lower internal node tiles
     dstTree->mTileCount[1] = util::reduce(util::Range1D(0,nodeCount[2]), uint32_t(0), [&](const util::Range1D &r, uint32_t sum){
-        for (auto i=r.begin(); i!=r.end(); ++i) sum += mSrcNodeAcc.template node<2>(i).getValueMask().countOn();
+        for (auto i=r.begin(); i!=r.end(); ++i) sum += mSrcNodeAcc.template node<2>(static_cast<uint32_t>(i)).getValueMask().countOn();
         return sum;}, std::plus<uint32_t>());
 
     // Count number of active upper internal node tiles
@@ -1720,7 +1720,7 @@ void CreateNanoGrid<SrcGridT>::processTree()
 
     // Count number of active voxels
     dstTree->mVoxelCount = util::reduce(util::Range1D(0, nodeCount[0]), uint64_t(0), [&](const util::Range1D &r, uint64_t sum){
-        for (auto i=r.begin(); i!=r.end(); ++i) sum += mSrcNodeAcc.template node<0>(i).getValueMask().countOn();
+        for (auto i=r.begin(); i!=r.end(); ++i) sum += mSrcNodeAcc.template node<0>(static_cast<uint32_t>(i)).getValueMask().countOn();
         return sum;}, std::plus<uint64_t>());
 
     dstTree->mVoxelCount += uint64_t(dstTree->mTileCount[0]) <<  9;// = 3 * 3
@@ -1786,7 +1786,7 @@ CreateNanoGrid<SrcGridT>::postProcess()
             dstData1->mMaximum = dstData1->mValues[511u];
             dstData0 = dstData1;
         }
-        for (size_t i = 0, n = dstGrid->blindDataCount(); i < n; ++i, ++metaData) {
+        for (uint32_t i = 0, n = dstGrid->blindDataCount(); i < n; ++i, ++metaData) {
             if constexpr(util::is_same<openvdb::tools::PointIndexGrid, SrcGridT>::value) {
                 if (metaData->mDataClass != GridBlindDataClass::IndexArray) continue;
                 if (metaData->mDataType == GridType::UInt32) {
@@ -1795,7 +1795,7 @@ CreateNanoGrid<SrcGridT>::postProcess()
                         auto *dstLeaf = this->template dstNode<DstBuildT,0>(r.begin());
                         for (auto j = r.begin(); j != r.end(); ++j, ++dstLeaf) {
                             uint32_t* p = blindData + dstLeaf->mMinimum;
-                            for (uint32_t idx : mSrcNodeAcc.template node<0>(j).indices()) *p++ = idx;
+                            for (uint32_t idx : mSrcNodeAcc.template node<0>(static_cast<uint32_t>(j)).indices()) *p++ = idx;
                         }
                     });
                 }
@@ -1901,18 +1901,18 @@ CreateNanoGrid<SrcGridT>::copyValues(SrcValueT *buffer)
         copyNodeValues(root, buffer + 1u);
         util::forEach(0, mSrcNodeAcc.nodeCount(2), 1, [&](const util::Range1D& r) {
             for (auto i = r.begin(); i!=r.end(); ++i) {
-                copyNodeValues(mSrcNodeAcc.template node<2>(i), buffer + mValIdx[2][i]);
+                copyNodeValues(mSrcNodeAcc.template node<2>(static_cast<uint32_t>(i)), buffer + mValIdx[2][i]);
             }
         });
         util::forEach(0, mSrcNodeAcc.nodeCount(1), 1, [&](const util::Range1D& r) {
             for (auto i = r.begin(); i!=r.end(); ++i) {
-                copyNodeValues(mSrcNodeAcc.template node<1>(i), buffer + mValIdx[1][i]);
+                copyNodeValues(mSrcNodeAcc.template node<1>(static_cast<uint32_t>(i)), buffer + mValIdx[1][i]);
             }
         });
     }
     util::forEach(0, mSrcNodeAcc.nodeCount(0), 4, [&](const util::Range1D& r) {
         for (auto i = r.begin(); i!=r.end(); ++i) {
-            copyNodeValues(mSrcNodeAcc.template node<0>(i), buffer + mValIdx[0][i]);
+            copyNodeValues(mSrcNodeAcc.template node<0>(static_cast<uint32_t>(i)), buffer + mValIdx[0][i]);
         }
     });
 }// CreateNanoGrid::copyValues<ValueIndex or ValueOnIndex>
@@ -1940,7 +1940,7 @@ CreateNanoGrid<SrcGridT>::countPoints() const
 {
     static_assert(util::is_same<T, SrcGridT>::value, "expected default template parameter");
     return util::reduce(0, mSrcNodeAcc.nodeCount(0), 8, uint64_t(0), [&](auto &r, uint64_t sum) {
-        for (auto i=r.begin(); i!=r.end(); ++i) sum += mSrcNodeAcc.template node<0>(i).getLastValue();
+        for (auto i=r.begin(); i!=r.end(); ++i) sum += mSrcNodeAcc.template node<0>(static_cast<uint32_t>(i)).getLastValue();
         return sum;}, std::plus<uint64_t>());
 }// CreateNanoGrid::countPoints<PointIndexGrid or PointDataGrid>
 
@@ -1954,7 +1954,7 @@ CreateNanoGrid<SrcGridT>::copyPointAttribute(size_t attIdx, AttT *attPtr)
     util::forEach(0, mSrcNodeAcc.nodeCount(0), 16, [&](const auto& r) {
         auto *dstLeaf = this->template dstNode<DstBuildT,0>(r.begin());
         for (auto i = r.begin(); i != r.end(); ++i, ++dstLeaf) {
-            auto& srcLeaf = mSrcNodeAcc.template node<0>(i);
+            auto& srcLeaf = mSrcNodeAcc.template node<0>(static_cast<uint32_t>(i));
             HandleT handle(srcLeaf.constAttributeArray(attIdx));
             AttT *p = attPtr + dstLeaf->mMinimum;
             for (auto iter = srcLeaf.beginIndexOn(); iter; ++iter) *p++ = handle.get(*iter);

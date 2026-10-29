@@ -17,9 +17,10 @@ int main()
         const float background = 5.0f;
         const int size = 500;
         auto func = [&](const Coord &ijk){
-            float v = 40.0f + 50.0f*(cos(ijk[0]*0.1f)*sin(ijk[1]*0.1f) +
-                                     cos(ijk[1]*0.1f)*sin(ijk[2]*0.1f) +
-                                     cos(ijk[2]*0.1f)*sin(ijk[0]*0.1f));
+            const Vec3f p(ijk);
+            float v = 40.0f + 50.0f*(cos(p[0]*0.1f)*sin(p[1]*0.1f) +
+                                     cos(p[1]*0.1f)*sin(p[2]*0.1f) +
+                                     cos(p[2]*0.1f)*sin(p[0]*0.1f));
             v = math::Max(v, Vec3f(ijk).length() - size);// CSG intersection with a sphere
             return v > background ? background : v < -background ? -background : v;// clamp value
         };

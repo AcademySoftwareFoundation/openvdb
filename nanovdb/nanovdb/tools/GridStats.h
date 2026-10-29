@@ -732,8 +732,9 @@ inline void GridStats<GridT, StatsT>::
 {
     data->setMin(s.min());
     data->setMax(s.max());
-    data->setAvg(s.avg());
-    data->setDev(s.std());
+    using FloatT = typename RootT::FloatType;// statistics type shared by all nodes in the tree
+    data->setAvg(static_cast<FloatT>(s.avg()));
+    data->setDev(static_cast<FloatT>(s.std()));
 }
 
 //================================================================================================
