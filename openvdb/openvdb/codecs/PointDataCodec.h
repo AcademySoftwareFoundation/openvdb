@@ -145,10 +145,11 @@ inline void readPointDataAttributeData(const std::vector<LeafT*>& leaves,
 template <typename LeafT>
 inline void validateReadOffsets(const LeafT& leaf)
 {
-    const Index lastOffset(leaf.getValue(LeafT::SIZE-1));
+    // offsets may be 64-bit, so compare them without narrowing
+    const Index64 lastOffset(leaf.getValue(LeafT::SIZE-1));
     for (Index index = 0; index < LeafT::SIZE; ++index) {
-        if (Index(leaf.getValue(index)) > lastOffset) {
-            OPENVDB_THROW(IoError, "PointDataGrid voxel offset " << Index(leaf.getValue(index))
+        if (Index64(leaf.getValue(index)) > lastOffset) {
+            OPENVDB_THROW(IoError, "PointDataGrid voxel offset " << Index64(leaf.getValue(index))
                 << " exceeds the last voxel offset " << lastOffset << ".");
         }
     }
