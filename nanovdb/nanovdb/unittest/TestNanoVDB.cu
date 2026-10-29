@@ -3875,6 +3875,109 @@ TEST(TestNanoVDBCUDA, VoxelBlockManager_ValueOnIndex_UnifiedBuffer)
     testVoxelBlockManager<nanovdb::ValueOnIndex,nanovdb::cuda::UnifiedBuffer>();
 }// VoxelBlockManager_ValueOnIndex_UnifiedBuffer
 
+template<int Log2BlockWidth>
+void testVoxelBlockManagerBatch()
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
+    constexpr uint64_t BlockWidth = VBM::BlockWidth, JumpMapLength = VBM::JumpMapLength;
+
+    // Grids of varied size and sparsity, one of them exactly 512 voxels, with empty grids at
+    // the start, in the middle and at the end of the batch.
+    std::mt19937 rng(747);
+    auto makeVoxels = [&](const nanovdb::CoordBBox &bbox, double keep) {
+        std::bernoulli_distribution d(keep);
+        std::vector<nanovdb::Coord> voxels;
+        for (auto it = bbox.begin(); it; ++it) if (d(rng)) voxels.push_back(*it);
+        return voxels;
+    };
+    const std::vector<std::vector<nanovdb::Coord>> voxelSets = {
+        {},
+        makeVoxels(nanovdb::CoordBBox::createCube(125, 145), 1.0),
+        makeVoxels(nanovdb::CoordBBox::createCube(-40, 40), 0.05),
+        {},
+        makeVoxels(nanovdb::CoordBBox::createCube(0, 7), 1.0),
+        makeVoxels(nanovdb::CoordBBox::createCube(1000, 1100), 0.3),
+        {},
+    };
+    const uint32_t gridCount = uint32_t(voxelSets.size());
+
+    std::vector<nanovdb::GridHandle<nanovdb::cuda::DualDeviceBuffer>> handles;
+    std::vector<nanovdb::tools::cuda::VoxelBlockManagerBatchEntry> entries(gridCount);
+    uint32_t leafCount = 0;
+    uint64_t blockCount = 0;
+    for (uint32_t g = 0; g < gridCount; ++g) {
+        const auto &voxels = voxelSets[g];
+        entries[g] = {nullptr, voxels.size(), blockCount, leafCount};
+        if (voxels.empty()) continue;
+        nanovdb::Coord *deviceVoxels;
+        cudaCheck(cudaMalloc(&deviceVoxels, voxels.size() * sizeof(nanovdb::Coord)));
+        cudaCheck(cudaMemcpy(deviceVoxels, voxels.data(), voxels.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+        handles.push_back(nanovdb::tools::cuda::voxelsToGrid<BuildT>(deviceVoxels, voxels.size()));
+        cudaCheck(cudaFree(deviceVoxels));
+        auto &handle = handles.back();
+        handle.deviceDownload();
+        const auto *grid = handle.template grid<BuildT>();
+        ASSERT_TRUE(grid);
+        EXPECT_EQ(voxels.size(), grid->activeVoxelCount());
+        entries[g].grid = handle.template deviceGrid<BuildT>();
+        leafCount  += grid->tree().nodeCount(0);
+        blockCount += (voxels.size() + BlockWidth - 1) / BlockWidth;
+    }
+
+    // Garbage-fill the outputs so unwritten firstLeafID entries and an unzeroed jumpMap show.
+    nanovdb::tools::cuda::VoxelBlockManagerBatchEntry *d_entries;
+    uint32_t *d_firstLeafID;
+    uint64_t *d_jumpMap;
+    cudaCheck(cudaMalloc(&d_entries, gridCount * sizeof(entries[0])));
+    cudaCheck(cudaMalloc(&d_firstLeafID, blockCount * sizeof(uint32_t)));
+    cudaCheck(cudaMalloc(&d_jumpMap, blockCount * JumpMapLength * sizeof(uint64_t)));
+    cudaCheck(cudaMemcpy(d_entries, entries.data(), gridCount * sizeof(entries[0]), cudaMemcpyHostToDevice));
+    cudaCheck(cudaMemset(d_firstLeafID, 0xff, blockCount * sizeof(uint32_t)));
+    cudaCheck(cudaMemset(d_jumpMap, 0xab, blockCount * JumpMapLength * sizeof(uint64_t)));
+
+    cudaStream_t stream;
+    cudaCheck(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+    nanovdb::tools::cuda::buildVoxelBlockManagerBatch<Log2BlockWidth>(
+        d_entries, gridCount, leafCount, blockCount, d_firstLeafID, d_jumpMap, stream);
+    cudaCheck(cudaGetLastError());
+    cudaCheck(cudaStreamSynchronize(stream));
+    cudaCheck(cudaStreamDestroy(stream));
+
+    std::vector<uint32_t> firstLeafID(blockCount);
+    std::vector<uint64_t> jumpMap(blockCount * JumpMapLength);
+    cudaCheck(cudaMemcpy(firstLeafID.data(), d_firstLeafID, blockCount * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+    cudaCheck(cudaMemcpy(jumpMap.data(), d_jumpMap, jumpMap.size() * sizeof(uint64_t), cudaMemcpyDeviceToHost));
+
+    // Each grid's slice must match the single-grid build bitwise.
+    for (uint32_t g = 0; g < gridCount; ++g) {
+        if (!entries[g].voxelCount) continue;
+        auto single = nanovdb::tools::cuda::buildVoxelBlockManager<Log2BlockWidth>(
+            const_cast<nanovdb::NanoGrid<BuildT>*>(entries[g].grid));
+        const uint64_t nBlocks = single.blockCount();
+        std::vector<uint32_t> refFirstLeafID(nBlocks);
+        std::vector<uint64_t> refJumpMap(nBlocks * JumpMapLength);
+        cudaCheck(cudaMemcpy(refFirstLeafID.data(), single.deviceFirstLeafID(), nBlocks * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+        cudaCheck(cudaMemcpy(refJumpMap.data(), single.deviceJumpMap(), refJumpMap.size() * sizeof(uint64_t), cudaMemcpyDeviceToHost));
+        for (uint64_t b = 0; b < nBlocks; ++b) {
+            EXPECT_EQ(refFirstLeafID[b], firstLeafID[entries[g].blockBase + b]) << "grid " << g << " block " << b;
+        }
+        for (uint64_t w = 0; w < refJumpMap.size(); ++w) {
+            EXPECT_EQ(refJumpMap[w], jumpMap[entries[g].blockBase * JumpMapLength + w]) << "grid " << g << " word " << w;
+        }
+    }
+
+    cudaCheck(cudaFree(d_entries));
+    cudaCheck(cudaFree(d_firstLeafID));
+    cudaCheck(cudaFree(d_jumpMap));
+}
+
+TEST(TestNanoVDBCUDA, VoxelBlockManagerBatch_ValueOnIndex)
+{
+    testVoxelBlockManagerBatch<7>();
+    testVoxelBlockManagerBatch<9>();
+}// VoxelBlockManagerBatch_ValueOnIndex
+
 TEST(TestNanoVDBCUDA, DilateInjectPrune_ValueOnIndex)
 {
     using BuildT = nanovdb::ValueOnIndex;

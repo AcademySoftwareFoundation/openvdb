@@ -8,6 +8,10 @@ NanoVDB:
     The cached count is a launch-sizing hint only: the kernel reads the authoritative
     leaf count from the device-resident tree and iterates with a grid-stride loop, so
     a stale cache cannot cause out-of-bounds access or wrong output.
+  - Added tools::cuda::buildVoxelBlockManagerBatch, which builds the VoxelBlockManagers
+    of a batch of grids into shared arrays with one memset and one kernel launch and
+    no host synchronization. Each grid's slice is byte-identical to its single-grid
+    build; grids are described by VoxelBlockManagerBatchEntry records.
   API Changes:
   - VoxelBlockManagerHandle gained an optional trailing leafCount constructor
     parameter and leafCount()/setLeafCount() accessors (defaulted; existing callers

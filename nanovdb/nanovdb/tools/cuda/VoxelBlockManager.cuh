@@ -17,6 +17,8 @@
       of an OnIndexGrid, independent of occupancy.  This file provides:
       - buildVoxelBlockManager (device): constructs the firstLeafID array and
         jumpMap on the GPU from a device-resident NanoGrid.
+      - buildVoxelBlockManagerBatch (device): builds the VBMs of a batch of grids
+        into shared arrays with one kernel launch and no host synchronization.
       - decodeInverseMap (device): per-slot, thread-local decode of one inverse
         map entry (sequential active-voxel index -> leaf ID + intra-leaf voxel
         offset) into registers; no shared memory or synchronization, callable
@@ -274,6 +276,50 @@ struct BuildVoxelBlockManagerFunctor
     static constexpr int MaxThreadsPerBlock = 128;
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
+    /// @brief Record one leaf in the VBM covering [firstOffset, lastOffset]: the leaf becomes
+    /// the firstLeafID of every block whose first slot it holds, and marks the jumpMap bit of
+    /// the slot where it starts when that slot is not a block's first.
+    static void __device__
+    buildLeaf(
+        const NanoGrid<ValueOnIndex> *grid,
+        uint32_t leafIndex,
+        uint64_t firstOffset,
+        uint64_t lastOffset,
+        uint64_t nBlocks,
+        uint32_t *firstLeafID,
+        uint64_t *jumpMap)
+    {
+        const auto& leaf = grid->tree().getFirstNode<0>()[leafIndex];
+        const uint64_t leafFirstOffset = leaf.data()->firstOffset();
+        const uint64_t leafValueCount = leaf.data()->valueCount();
+        const uint64_t leafLastOffset = leafFirstOffset + leafValueCount - 1;
+
+        if ( ( leafFirstOffset > lastOffset ) || (leafLastOffset < firstOffset) ) return;
+
+        uint64_t lastBlock = (leafLastOffset - firstOffset) >> Log2BlockWidth;
+        if (lastBlock > nBlocks - 1) lastBlock = nBlocks - 1;
+        const uint64_t firstBlock = (leafFirstOffset < firstOffset) ? 0 :
+            (leafFirstOffset - firstOffset) >> Log2BlockWidth;
+
+        // For all but the first block touched, mark the firstLeaf as being this one
+        for ( uint64_t b = lastBlock; b > firstBlock; --b )
+            firstLeafID[b] = leafIndex;
+        if (leafFirstOffset < firstOffset) { firstLeafID[0] = leafIndex; return; }
+
+        const auto offsetInBlock = (leafFirstOffset - 1) & (BlockWidth - 1);
+        if ( !offsetInBlock ) {
+            // If the first leaf starts exactly at the beginning of a
+            // block, register it in mFirstLeaf too
+            firstLeafID[firstBlock] = leafIndex;
+        } else {
+            // Otherwise, mark it in the jumpMap
+            // The specific uint64_t in the jumpMap to be marked is at element offset (offsetInBlock>>6), i.e. offsetBlock/64
+            // and bit offset (offsetInBlock & 0x3f), i.e. offsetInBlock%64
+            util::atomicOr(&jumpMap[firstBlock * JumpMapLength + (offsetInBlock>>6)],
+                           UINT64_C(1) << (offsetInBlock & 0x3f));
+        }
+    }
+
     void __device__
     operator()(
         uint64_t firstOffset,
@@ -291,39 +337,66 @@ struct BuildVoxelBlockManagerFunctor
         for (uint64_t tID = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
              tID < leafCount; tID += stride)
         {
-            const uint32_t leafIndex = uint32_t(tID);
-            const auto& leaf = grid->tree().getFirstNode<0>()[leafIndex];
-            const uint64_t leafFirstOffset = leaf.data()->firstOffset();
-            const uint64_t leafValueCount = leaf.data()->valueCount();
-            const uint64_t leafLastOffset = leafFirstOffset + leafValueCount - 1;
-
-            if ( ( leafFirstOffset > lastOffset ) || (leafLastOffset < firstOffset) ) continue;
-
-            uint64_t lastBlock = (leafLastOffset - firstOffset) >> Log2BlockWidth;
-            if (lastBlock > nBlocks - 1) lastBlock = nBlocks - 1;
-            const uint64_t firstBlock = (leafFirstOffset < firstOffset) ? 0 :
-                (leafFirstOffset - firstOffset) >> Log2BlockWidth;
-
-            // For all but the first block touched, mark the firstLeaf as being this one
-            for ( uint64_t b = lastBlock; b > firstBlock; --b )
-                firstLeafID[b] = leafIndex;
-            if (leafFirstOffset < firstOffset) { firstLeafID[0] = leafIndex; continue; }
-
-            const auto offsetInBlock = (leafFirstOffset - 1) & (BlockWidth - 1);
-            if ( !offsetInBlock ) {
-                // If the first leaf starts exactly at the beginning of a
-                // block, register it in mFirstLeaf too
-                firstLeafID[firstBlock] = leafIndex;
-            } else {
-                // Otherwise, mark it in the jumpMap
-                // The specific uint64_t in the jumpMap to be marked is at element offset (offsetInBlock>>6), i.e. offsetBlock/64
-                // and bit offset (offsetInBlock & 0x3f), i.e. offsetInBlock%64
-                util::atomicOr(&jumpMap[firstBlock * JumpMapLength + (offsetInBlock>>6)],
-                               UINT64_C(1) << (offsetInBlock & 0x3f));
-            }
+            buildLeaf(grid, uint32_t(tID), firstOffset, lastOffset, nBlocks, firstLeafID, jumpMap);
         }
     }
 
+};
+
+/// @brief One grid of a batched VoxelBlockManager build (see buildVoxelBlockManagerBatch).
+///        Each grid's VBM covers its full active range [1, voxelCount] and occupies blocks
+///        [blockBase, blockBase + ceil(voxelCount / BlockWidth)) of the batch's shared
+///        firstLeafID and jumpMap arrays. Its leaves are batch-wide leaves
+///        [leafBase, leafBase + leafCount).
+struct VoxelBlockManagerBatchEntry
+{
+    const NanoGrid<ValueOnIndex> *grid; // device pointer; never read when the grid has no leaves
+    uint64_t voxelCount;                // active voxels in the grid (its VBM's lastOffset)
+    uint64_t blockBase;                 // exclusive prefix sum of the grids' block counts
+    uint32_t leafBase;                  // exclusive prefix sum of the grids' leaf counts
+};
+
+/// @brief Builds the VBMs of a batch of grids, one thread per leaf across the batch. Each
+///        thread finds its grid from the leaf bases, then records its leaf exactly as the
+///        single-grid build does, into that grid's slice of the shared arrays.
+template<int Log2BlockWidth>
+struct BuildVoxelBlockManagerBatchFunctor
+{
+    using Single = BuildVoxelBlockManagerFunctor<Log2BlockWidth>;
+
+    static constexpr int MaxThreadsPerBlock = Single::MaxThreadsPerBlock;
+    static constexpr int MinBlocksPerMultiprocessor = Single::MinBlocksPerMultiprocessor;
+
+    void __device__
+    operator()(
+        const VoxelBlockManagerBatchEntry *entries,
+        uint32_t gridCount,
+        uint32_t leafCount,
+        uint32_t *firstLeafID,
+        uint64_t *jumpMap)
+    {
+        const uint64_t stride = uint64_t(gridDim.x) * blockDim.x;
+        for (uint64_t tID = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+             tID < leafCount; tID += stride)
+        {
+            // The last grid whose leaf base does not exceed tID; grids without leaves share
+            // their successor's base and are skipped that way.
+            uint32_t lo = 0, hi = gridCount;
+            while (lo < hi) {
+                const uint32_t mid = (lo + hi) >> 1;
+                if (entries[mid].leafBase <= tID) lo = mid + 1; else hi = mid;
+            }
+            const VoxelBlockManagerBatchEntry &entry = entries[lo - 1];
+            const uint32_t leafIndex = uint32_t(tID) - entry.leafBase;
+            if (!entry.voxelCount || leafIndex >= entry.grid->tree().nodeCount(0)) continue;
+            NANOVDB_ASSERT(entry.grid->isSequential());
+
+            const uint64_t nBlocks = (entry.voxelCount + Single::BlockWidth - 1) >> Log2BlockWidth;
+            Single::buildLeaf(entry.grid, leafIndex, 1, entry.voxelCount, nBlocks,
+                              firstLeafID + entry.blockBase,
+                              jumpMap + entry.blockBase * Single::JumpMapLength);
+        }
+    }
 };
 
 /// @brief Rebuild a VoxelBlockManager in-place using a pre-allocated handle.
@@ -442,6 +515,45 @@ buildVoxelBlockManager(
 
     buildVoxelBlockManager<Log2BlockWidth>(d_grid, handle, stream);
     return handle;
+}
+
+/// @brief Build the VoxelBlockManagers of a batch of grids with one memset and one kernel
+///        launch, into caller-allocated arrays. Fully stream-asynchronous: nothing is read
+///        back from the device. Grid g's VBM is identical to what buildVoxelBlockManager
+///        produces for it alone (firstOffset 1, lastOffset voxelCount) and sits at blocks
+///        [entries[g].blockBase, ...) of the shared arrays; decode it with the usual
+///        per-grid calls on firstLeafID + blockBase and jumpMap + blockBase * JumpMapLength.
+/// @tparam Log2BlockWidth  Log2 of the number of active voxels per VBM block
+/// @param d_entries      Device array of gridCount entries. The leaf and block bases must be
+///                       exclusive prefix sums of the grids' exact leaf counts and of
+///                       ceil(voxelCount / BlockWidth); empty grids repeat their successor's bases.
+/// @param gridCount      Number of grids in the batch
+/// @param leafCount      Total leaves in the batch
+/// @param blockCount     Total blocks in the batch: the size of d_firstLeafID, and of d_jumpMap
+///                       in units of JumpMapLength words
+/// @param d_firstLeafID  Device array of blockCount entries; every entry is written
+/// @param d_jumpMap      Device array of blockCount * JumpMapLength words; zeroed, then built
+/// @param stream         CUDA stream (default 0)
+template<int Log2BlockWidth>
+void buildVoxelBlockManagerBatch(
+    const VoxelBlockManagerBatchEntry* d_entries,
+    uint32_t                           gridCount,
+    uint32_t                           leafCount,
+    uint64_t                           blockCount,
+    uint32_t*                          d_firstLeafID,
+    uint64_t*                          d_jumpMap,
+    cudaStream_t                       stream = 0)
+{
+    using Op = BuildVoxelBlockManagerBatchFunctor<Log2BlockWidth>;
+
+    if (!blockCount) return;
+    cudaCheck(cudaMemsetAsync(d_jumpMap, 0,
+        blockCount * Op::Single::JumpMapLength * sizeof(uint64_t), stream));
+    if (!gridCount || !leafCount) return;
+
+    util::cuda::operatorKernel<Op>
+        <<<util::cuda::blocksPerGrid(leafCount, Op::MaxThreadsPerBlock), Op::MaxThreadsPerBlock, 0, stream>>>(
+            d_entries, gridCount, leafCount, d_firstLeafID, d_jumpMap);
 }
 
 } // namespace tools::cuda
