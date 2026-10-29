@@ -435,12 +435,6 @@ struct Arguments
 
     void AddArg(llvm::Value* val, const ArgInfo& type)
     {
-#if LLVM_VERSION_MAJOR <= 15
-        [[maybe_unused]] llvm::Type* base = val->getType();
-        while (base->isPointerTy()) base = base->getContainedType(0);
-        OPENVDB_ASSERT_MESSAGE((base == type.GetUnderlyingType()),
-            "Base type of val does not match stored underlying type");
-#endif
         mArgs.emplace_back(val);
         mTypes.emplace_back(type);
     }
@@ -579,18 +573,6 @@ printSignature(std::ostream& os,
                const llvm::ArrayRef<const char*>& names = {},
                const bool axTypes = false);
 
-
-#if LLVM_VERSION_MAJOR <= 15
-OPENVDB_DEPRECATED_MESSAGE("Switch to AX's internal ArgInfo types for LLVM 16 onwards")
-OPENVDB_AX_API void
-printSignature(std::ostream& os,
-               const std::vector<llvm::Type*>& types,
-               const llvm::Type* returnType,
-               const char* name = nullptr,
-               const std::vector<const char*>& names = {},
-               const bool axTypes = false);
-#endif
-
 ///////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -618,21 +600,7 @@ struct OPENVDB_AX_API Function
     /// @brief  Populate a vector of ArgInfos which describe this function
     ///         signature. This method is used by Function::create,
     ///         Function::print and Function::match.
-    /// @note   The variant that takes a vector of ArgInfos is optional with
-    ///         LLVM 15 for compatibility but must be implemented with newer
-    ///         versions.
-#if LLVM_VERSION_MAJOR <= 15
-    virtual ArgInfo types(ArgInfoVector&, llvm::LLVMContext&) const
-    {
-        OPENVDB_THROW(AXCodeGenError,
-            std::string("New AX API for function arguments has been called but has not "
-            "been implemented by function: ") + this->symbol());
-    }
-    OPENVDB_DEPRECATED_MESSAGE("Switch to AX's internal ArgInfo types for LLVM 16 onwards")
-    virtual llvm::Type* types(std::vector<llvm::Type*>&, llvm::LLVMContext&) const = 0;
-#else
     virtual ArgInfo types(ArgInfoVector&, llvm::LLVMContext&) const = 0;
-#endif
 
     /// @brief   Converts and creates this AX function into a llvm Function.
     /// @details This method uses the result from Function::types() to construct
@@ -696,15 +664,6 @@ struct OPENVDB_AX_API Function
     ///
     /// @param args    The llvm Value arguments to call this function with
     /// @param B       The llvm IRBuilder
-    /// @param cast    Whether to allow implicit casting of arguments
-#if LLVM_VERSION_MAJOR <= 15
-    OPENVDB_DEPRECATED_MESSAGE("Function::call which takes llvm::Value's and "
-        "supports casting is incompatible with LLVM 16+ and will be removed.")
-    virtual llvm::Value*
-    call(const std::vector<llvm::Value*>& args,
-         llvm::IRBuilder<>& B,
-         const bool cast) const;
-#endif
     /// From LLVM 16 onwards, this version of call does not support argument
     /// casting. This must be performed using the NativeArguments struct
     virtual llvm::Value*
@@ -753,10 +712,6 @@ struct OPENVDB_AX_API Function
     /// @param inputs  The input types
     /// @param C       The LLVM Context
     virtual SignatureMatch match(const ArgInfoVector& inputs, llvm::LLVMContext& C) const;
-#if LLVM_VERSION_MAJOR <= 15
-    OPENVDB_DEPRECATED_MESSAGE("Switch to AX's internal ArgInfo types for LLVM 16 onwards")
-    virtual SignatureMatch match(const std::vector<llvm::Type*>& inputs, llvm::LLVMContext& C) const;
-#endif
 
     /// @brief  The number of arguments that this function has
     inline size_t size() const { return mSize; }
@@ -792,68 +747,6 @@ struct OPENVDB_AX_API Function
             const bool axTypes = true) const;
 
     const SmallArgumentVector<const char*>& dependencies() const { return mDeps; }
-
-    /// Deprecated builder methods, no longer public
-
-    OPENVDB_DEPRECATED_MESSAGE("This method incorrectly returns the attributes "
-        "of the function set by the FunctionBuilder, not by the codegen. To "
-        "inspect function attributes, retrieve the created function from the "
-        "llvm::Module.")
-    inline bool hasParamAttribute(const size_t i,
-            const llvm::Attribute::AttrKind& kind) const
-    {
-        if (!mAttributes) return false;
-        const auto iter = mAttributes->mParamAttrs.find(i);
-        if (iter == mAttributes->mParamAttrs.end()) return false;
-        const auto& vec = iter->second;
-        return std::find(vec.begin(), vec.end(), kind) != vec.end();
-    }
-
-    OPENVDB_DEPRECATED_MESSAGE("Use the FunctionBuilder to construct Functions")
-    inline void setArgumentNames(std::vector<const char*> names)
-    {
-        mNames.assign(names.begin(), names.end());
-    }
-
-    OPENVDB_DEPRECATED_MESSAGE("Use the FunctionBuilder to construct Functions")
-    inline void setDependencies(std::vector<const char*> deps)
-    {
-        mDeps.assign(deps.begin(), deps.end());
-    }
-
-    OPENVDB_DEPRECATED_MESSAGE("Use the FunctionBuilder to construct Functions")
-    inline void setFnAttributes(const std::vector<llvm::Attribute::AttrKind>& in)
-    {
-        this->attrs().mFnAttrs.assign(in.begin(), in.end());
-    }
-
-    OPENVDB_DEPRECATED_MESSAGE("Use the FunctionBuilder to construct Functions")
-    inline void setRetAttributes(const std::vector<llvm::Attribute::AttrKind>& in)
-    {
-        this->attrs().mRetAttrs.assign(in.begin(), in.end());
-    }
-
-    OPENVDB_DEPRECATED_MESSAGE("Use the FunctionBuilder to construct Functions")
-    inline void setParamAttributes(const size_t i,
-            const std::vector<llvm::Attribute::AttrKind>& in)
-    {
-        this->attrs().mParamAttrs[i].assign(in.begin(), in.end());
-    }
-
-protected:
-
-#if LLVM_VERSION_MAJOR <= 15
-    /// @brief  Cast the provided arguments to the given type as supported by
-    ///         implicit casting of function types. If the types already match
-    ///         OR if a cast cannot be performed, nothing is done to the argument.
-    /// @todo   This should really be generalized out for Function::call and
-    ///         Function::match to both use. However, due to SRET functions,
-    ///         this logic must be performed somewhere in the Function class
-    ///         hierarchy and not in FunctionGroup
-    static void cast(std::vector<llvm::Value*>& args,
-                const std::vector<llvm::Type*>& types,
-                llvm::IRBuilder<>& B);
-#endif
 
 private:
     friend FunctionBuilder;
@@ -1025,41 +918,6 @@ public:
         printSignature(os, current, ret, name, names, axTypes);
     }
 
-#if LLVM_VERSION_MAJOR <= 15
-    /// @note  Bring in deprecated type methods
-    using Function::types;
-
-    /// @note  This is deprecated! Omitting the warning as it invokes the
-    ///   parent function which is also deprecated. Use NativeArguments to
-    ///   perform argument casting
-    Function::SignatureMatch match(const std::vector<llvm::Type*>& args,
-            llvm::LLVMContext& C) const override
-    {
-        // append return type and right rotate
-        std::vector<llvm::Type*> inputs(args);
-        inputs.emplace_back(LLVMType<SRetType*>::get(C));
-        std::rotate(inputs.rbegin(), inputs.rbegin() + 1, inputs.rend());
-        return DerivedFunction::match(inputs, C);
-    }
-
-    /// @note  This is deprecated! Omitting the warning as it invokes the
-    ///   parent function which is also deprecated. Use NativeArguments to
-    ///   perform argument casting
-    llvm::Value*
-    call(const std::vector<llvm::Value*>& args,
-         llvm::IRBuilder<>& B,
-         const bool cast) const override
-    {
-        // append return value and right rotate
-        std::vector<llvm::Value*> inputs(args);
-        llvm::Type* sret = LLVMType<SRetType>::get(B.getContext());
-        inputs.emplace_back(insertStaticAlloca(B, sret));
-        std::rotate(inputs.rbegin(), inputs.rbegin() + 1, inputs.rend());
-        DerivedFunction::call(inputs, B, cast);
-        return inputs.front();
-    }
-#endif
-
 protected:
     /// @brief  Forward all arguments to the derived class
     template <typename ...Args>
@@ -1080,22 +938,12 @@ struct CFunctionBase : public Function
     inline void setConstantFold(bool on) { mConstantFold = on; }
     inline bool hasConstantFold() const { return mConstantFold; }
 
-#if LLVM_VERSION_MAJOR <= 15
-    OPENVDB_DEPRECATED
-    inline virtual llvm::Value* fold(
-        const std::vector<llvm::Value*>&,
-        llvm::LLVMContext&) const
-    {
-        return nullptr;
-    }
-#else
     inline virtual llvm::Value* fold(
         const llvm::ArrayRef<llvm::Value*>&,
         llvm::LLVMContext&) const
     {
         return nullptr;
     }
-#endif
 
 protected:
     CFunctionBase(const size_t size,
@@ -1159,11 +1007,7 @@ struct CFunction : public CFunctionBase
         return Function::call(args, B);
     }
 
-#if LLVM_VERSION_MAJOR <= 15
-    llvm::Constant* fold(const std::vector<llvm::Value*>& args, llvm::LLVMContext& C) const override final
-#else
     llvm::Constant* fold(const llvm::ArrayRef<llvm::Value*>& args, llvm::LLVMContext& C) const override final
-#endif
     {
         if (!this->hasConstantFold()) return nullptr;
         SmallArgumentVector<llvm::Constant*> constants;
@@ -1174,26 +1018,6 @@ struct CFunction : public CFunctionBase
         // no guarantee that fold() will be able to cast all arguments
         return ConstantFolder<SignatureT>::fold(constants, *mFunction, C);
     }
-
-#if LLVM_VERSION_MAJOR <= 15
-    inline llvm::Type* types(std::vector<llvm::Type*>& types, llvm::LLVMContext& C) const override
-    {
-        return llvmTypesFromSignature<SignatureT>(C, &types);
-    }
-
-    /// @note  This is deprecated! Omitting the warning as it invokes the
-    ///   parent function which is also deprecated. Use NativeArguments to
-    ///   perform argument casting
-    llvm::Value*
-    call(const std::vector<llvm::Value*>& args,
-         llvm::IRBuilder<>& B,
-         const bool cast) const override
-    {
-        llvm::Value* result = this->fold(args, B.getContext());
-        if (result) return result;
-        return Function::call(args, B, cast);
-    }
-#endif
 
 private:
     SignatureT* mFunction;
@@ -1256,15 +1080,6 @@ struct OPENVDB_AX_API IRFunctionBase : public Function
 
     Value call(const Arguments& args, llvm::IRBuilder<>&) const override;
 
-#if LLVM_VERSION_MAJOR <= 15
-    // @note  This is deprecated! Omitting the warning as it invokes the
-    //   parent function which is also deprecated
-    llvm::Value*
-    call(const std::vector<llvm::Value*>& args,
-         llvm::IRBuilder<>& B,
-         const bool cast) const override;
-#endif
-
 protected:
 
     // @todo This should ideally live in FunctionGroup::execute, but the return
@@ -1292,14 +1107,9 @@ protected:
             // onwards)
             if (result->getType()->isPointerTy())
             {
-#if LLVM_VERSION_MAJOR <= 15
-                (void)this;
-                return Value(result, result->getType()->getPointerElementType());
-#else
                 ArgInfoVector unused;
                 ArgInfo r = this->types(unused, result->getContext());
                 return Value(result, r.GetUnderlyingType());
-#endif
             }
             else {
                 // otherwise, can we introspec the type directly
@@ -1346,14 +1156,6 @@ struct IRFunction : public IRFunctionBase
     {
         return llvmArgTypesFromSignature<SignatureT>(C, &types);
     }
-
-#if LLVM_VERSION_MAJOR <= 15
-    inline llvm::Type*
-    types(std::vector<llvm::Type*>& types, llvm::LLVMContext& C) const override
-    {
-        return llvmTypesFromSignature<SignatureT>(C, &types);
-    }
-#endif
 };
 
 /// @brief  Represents a concrete C function binding with the first argument as
@@ -1464,44 +1266,6 @@ struct OPENVDB_AX_API FunctionGroup
     inline const FunctionList& list() const { return mFunctionList; }
     const char* name() const { return mName; }
     const char* doc() const { return mDoc; }
-
-#if LLVM_VERSION_MAJOR <= 15
-    /// @warning  Does not support detecting Ambiguous functions (returns Implicit
-    ///   in these cases).
-    OPENVDB_DEPRECATED_MESSAGE("Switch to AX's internal ArgInfo types for LLVM 16 onwards")
-    const Function*
-    match(const std::vector<llvm::Type*>& types,
-          llvm::LLVMContext& C,
-          Function::SignatureMatch* type = nullptr) const;
-
-    OPENVDB_DEPRECATED_MESSAGE("FunctionGroup::execute which takes llvm::Value's and "
-        "supports argument matching/casting is incompatible with LLVM 16+ and will be "
-        "removed.")
-    llvm::Value*
-    execute(const std::vector<llvm::Value*>& args,
-            llvm::IRBuilder<>& B) const;
-
-    /// @brief  Given a vector of llvm values, find the best possible function
-    ///         signature, generate and execute the function body. Returns the
-    ///         Function that was selected and executed or a nullptr if no
-    ///         valid match was found. Sets the result variable to the return
-    ///         value of the function (nullptr if void). If no match is found,
-    ///         the result variable if left unset.
-    /// @note   This function will throw if no valid return is provided by the
-    ///         matched declaration implementation.
-    ///
-    /// @param args     A vector of values representing the function arguments
-    /// @param B        The current llvm IRBuilder
-    /// @param result   The result to set. nullptr on void return.
-    /// @return The matched function. nullptr if no match was found
-    OPENVDB_DEPRECATED_MESSAGE("FunctionGroup::execute which takes llvm::Value's and "
-        "supports argument matching/casting is incompatible with LLVM 16+ and will be "
-        "removed.")
-    const Function*
-    execute(const std::vector<llvm::Value*>& args,
-            llvm::IRBuilder<>& B,
-            llvm::Value*& result) const;
-#endif
 
 private:
     const char* mName;

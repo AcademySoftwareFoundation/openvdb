@@ -8,6 +8,7 @@
 ///        the tools::cuda builders (PointsToGrid, the TopologyBuilder consumers,
 ///        IndexToGrid, GridStats, SignedFloodFill, addBlindData, ConnectedComponents).
 
+#include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/DeviceResource.h>
 #include <nanovdb/cuda/PinnedResource.h>
 #include <nanovdb/cuda/TempPool.h>
@@ -28,20 +29,6 @@
 #include <gtest/gtest.h>
 
 #include <vector>
-
-// Most of these tests deliberately keep exercising the deprecated dual-space
-// DeviceBuffer surface until its removal; the deprecation warnings are
-// suppressed for this translation unit only. New code must use
-// cuda::Buffer and cuda::copyTo instead.
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-#if defined(_MSC_VER)
-#pragma warning(disable : 4996)
-#endif
-#if defined(__CUDACC__)
-#pragma nv_diag_suppress 20199
-#endif
 
 
 // Named rather than anonymous: gtest marks each test class's static test_info_
@@ -369,7 +356,7 @@ TEST(TestMemoryResource, PointsToGrid_PointEncodedWithCustomResource)
 ///        The default resource is fine for this setup step; the CountingResource
 ///        of the op under test only observes that op's scratch.
 template<typename BuildT>
-static nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer>
+static nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>>
 buildGrid(const std::vector<nanovdb::Coord>& voxels)
 {
     nanovdb::Coord* d_voxels = nullptr;
@@ -381,14 +368,13 @@ buildGrid(const std::vector<nanovdb::Coord>& voxels)
     return handle;
 }
 
-static nanovdb::GridHandle<nanovdb::cuda::DeviceBuffer>
+static nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>>
 buildIndexGrid(const std::vector<nanovdb::Coord>& voxels) { return buildGrid<nanovdb::ValueOnIndex>(voxels); }
 
 TEST(TestMemoryResource, DilateGrid_InjectedResourceSeam)
 {
-    // The dilated grid handle's output buffer goes through BufferT::create, and the
-    // dual-space mProcessedRoot / builder mData go through DeviceBuffer -- none of these
-    // is observed by the CountingResource; only the builder's stream-ordered scratch is.
+    // The dilated grid handle's output buffer allocates through its own default
+    // resource, so the CountingResource observes only the builder's stream-ordered scratch.
     auto src = buildIndexGrid({{0,0,0},{1,2,3},{4,4,4}});
     auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
     ASSERT_NE(d_srcGrid, nullptr);
@@ -407,8 +393,7 @@ TEST(TestMemoryResource, DilateGrid_InjectedResourceSeam)
 
 TEST(TestMemoryResource, MergeGrids_InjectedResourceSeam)
 {
-    // As above, the merged handle's output buffer and the dual-space mProcessedRoot / mData
-    // go through DeviceBuffer and are not counted -- only the builder's scratch is.
+    // As above, only the builder's scratch is counted, not the merged handle's output buffer.
     auto srcA = buildIndexGrid({{0,0,0},{1,1,1}});
     auto srcB = buildIndexGrid({{5,5,5},{6,6,6}});
     auto* gridA = srcA.deviceGrid<nanovdb::ValueOnIndex>();
@@ -432,7 +417,7 @@ TEST(TestMemoryResource, PruneGrid_InjectedResourceSeam)
 {
     // Voxels are kept within a single 8^3 leaf, so the source grid has exactly one leaf
     // and the retain-mask sidecar is a single all-on Mask<3>. As above, only the builder's
-    // scratch is counted; the output buffer and dual-space mProcessedRoot / mData are not.
+    // scratch is counted, not the output buffer.
     auto src = buildIndexGrid({{0,0,0},{1,1,1},{2,2,2}});
     auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
     ASSERT_NE(d_srcGrid, nullptr);
@@ -458,8 +443,7 @@ TEST(TestMemoryResource, PruneGrid_InjectedResourceSeam)
 
 TEST(TestMemoryResource, RefineGrid_InjectedResourceSeam)
 {
-    // As above, only the builder's scratch is counted; the output buffer and dual-space
-    // mProcessedRoot / mData go through DeviceBuffer and are not.
+    // As above, only the builder's scratch is counted, not the output buffer.
     auto src = buildIndexGrid({{0,0,0},{1,2,3},{4,4,4}});
     auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
     ASSERT_NE(d_srcGrid, nullptr);
@@ -479,8 +463,7 @@ TEST(TestMemoryResource, RefineGrid_InjectedResourceSeam)
 TEST(TestMemoryResource, CoarsenGrid_InjectedResourceSeam)
 {
     // Voxels span a 2x2x2 block of leaves (leaf DIM = 8) so coarsening is non-degenerate.
-    // As above, only the builder's scratch is counted; the output buffer and dual-space
-    // mProcessedRoot / mData go through DeviceBuffer and are not.
+    // As above, only the builder's scratch is counted, not the output buffer.
     auto src = buildIndexGrid({{0,0,0},{8,0,0},{0,8,0},{0,0,8},{8,8,0},{8,0,8},{0,8,8},{8,8,8}});
     auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
     ASSERT_NE(d_srcGrid, nullptr);
@@ -589,7 +572,7 @@ TEST(TestMemoryResource, AddBlindData_InjectedResourceSeam)
     // The free function routes through the per-type default resource instance.
     auto& res = nanovdb::cuda::default_resource<CountingResource>();
     const int a0 = res.allocs, d0 = res.deallocs;
-    auto handle = nanovdb::tools::cuda::addBlindData<float, float, nanovdb::cuda::DeviceBuffer, CountingResource>(
+    auto handle = nanovdb::tools::cuda::addBlindData<float, float, nanovdb::cuda::Buffer<std::byte>, CountingResource>(
         d_grid, d_blind, 8);
     ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
     EXPECT_TRUE(handle.deviceData());

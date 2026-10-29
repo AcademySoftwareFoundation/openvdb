@@ -1,0 +1,24 @@
+OpenVDB:
+  API changes:
+  - Blosc is no longer an external dependency. A reduced copy of Blosc with LZ4
+    is now part of the OpenVDB core library, with all symbols renamed so they
+    cannot clash with any other Blosc in the same process. Archive::hasBloscCompression()
+    and compression::bloscCanCompress() always return true.
+
+  Build:
+  - Removed the FindBlosc.cmake module and the BLOSC_ROOT, BLOSC_INCLUDEDIR and
+    BLOSC_LIBRARYDIR inputs. The USE_BLOSC option is deprecated and has no effect.
+  - OpenVDB core now compiles C sources, so the C language is enabled.
+
+NanoVDB:
+  Build:
+  - NANOVDB_USE_BLOSC and OPENVDB_TOOL_NANO_USE_BLOSC remain and now default to ON.
+    NanoVDB no longer searches for an external Blosc. When enabled, it builds its
+    own copy of the vendored Blosc as the static nanovdb_blosc target.
+  - With NANOVDB_USE_BLOSC enabled, nanovdb_blosc.h is installed alongside
+    NanoVDB.h, and libnanovdb_blosc.a is installed to the NanoVDB library
+    directory. The nanovdb target links it and defines NANOVDB_USE_BLOSC.
+  - FindOpenVDB treats libnanovdb_blosc.a as optional for the nanovdb component.
+  - OPENVDB_TOOL_NANO_USE_BLOSC no longer defines NANOVDB_USE_BLOSC itself. It
+    now fails configuration if NanoVDB is built without Blosc.
+  - Configuring nanovdb/nanovdb on its own now sets default install directories.

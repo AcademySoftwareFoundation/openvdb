@@ -332,7 +332,6 @@ inline FunctionGroup::UniquePtr axgetvoxelpws(const FunctionOptions& op)
         llvm::Type* voidstar = LLVMType<void*>::get(B.getContext());
         llvm::Value* transform = extractArgument(compute, "transforms");
         llvm::Value* wi = extractArgument(compute, "write_index");
-        OPENVDB_ASSERT(AssertOpaquePtrs(transform, voidstar));
 
         transform = B.CreateGEP(voidstar, transform, wi);
         transform = B.CreateLoad(voidstar, transform);

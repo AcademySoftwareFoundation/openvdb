@@ -306,7 +306,7 @@ auto byName = nanovdb::io::readGrid("multi_grid.nvdb", "density");
 // Single grid
 nanovdb::io::writeGrid("out.nvdb", handle);
 
-// With compression (requires NANOVDB_USE_BLOSC=ON at build time)
+// With compression (requires NANOVDB_USE_BLOSC=ON at build time, the default)
 nanovdb::io::writeGrid("out.nvdb", handle, nanovdb::io::Codec::BLOSC);
 
 // Multiple grids
@@ -604,14 +604,14 @@ it was built from, so `mgr<T>()` is usable on the host only if that grid is
 managed too: a manager built over a device-only grid points into device
 memory, and traversing it on the host faults.
 
-<!-- teachme:stale-ok — the renamed and deprecated names below are shown deliberately as counter-examples -->
+<!-- teachme:stale-ok — the removed names below are shown deliberately as counter-examples -->
 > Heads up: older docs and examples reference
 > `#include <nanovdb/util/cuda/CudaDeviceBuffer.h>` and the type
 > `CudaDeviceBuffer`, or `#include <nanovdb/cuda/DeviceBuffer.h>` and
-> `cuda::DeviceBuffer`. These are the old *dual* buffers, which kept a host
+> `cuda::DeviceBuffer`. These were the old *dual* buffers, which kept a host
 > copy and a device copy moved by `deviceUpload()` / `deviceDownload()`.
-> They are deprecated in favour of `cuda::Buffer<std::byte>` with
-> `cuda::copyTo`, and are removed in OpenVDB 14.0.
+> OpenVDB 14.0 removed them: use `cuda::Buffer<std::byte>` with
+> `cuda::copyTo` instead.
 
 ### GPU NodeManager
 
@@ -953,10 +953,9 @@ There's also `nanovdb/tools/GridBuilder.h` (CPU) for fine-grained
 construction.
 
 Every GPU builder takes an optional output-buffer argument whose *type*
-picks where the result lives. Pass `nanovdb::cuda::Buffer<std::byte>()`
-to get a device handle. In OpenVDB 13.x the default is still the
-deprecated dual buffer; 14.0 makes `cuda::Buffer<std::byte>` the default,
-so passing it explicitly works on both.
+picks where the result lives. The default, `nanovdb::cuda::Buffer<std::byte>`,
+gives a device handle; pass a `cuda::Buffer<std::byte, cuda::ManagedResource>()`
+instead for grids readable on both the host and the device.
 
 The free functions also have a *resource form*: pass a stream (and
 optionally a memory resource) instead of a buffer, and the result is a

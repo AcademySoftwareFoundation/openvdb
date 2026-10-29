@@ -39,6 +39,11 @@ else()
   set(OPENVDB_LIB openvdb)
 endif()
 
+# OpenVDBConfig provides OpenVDB::openvdb to installed consumers
+set(OPENVDB_AX_EXPORTED_OPENVDB_LIB
+  $<BUILD_INTERFACE:${OPENVDB_LIB}>
+  $<INSTALL_INTERFACE:OpenVDB::openvdb>)
+
 # Configure grammar target
 
 set(OPENVDB_AX_GRAMMAR_DIR ${CMAKE_CURRENT_BINARY_DIR}/openvdb_ax/grammar)
@@ -102,13 +107,7 @@ find_library(found_LLVM LLVM HINTS ${LLVM_LIBRARY_DIRS})
 
 if(found_LLVM)
   set(LLVM_LIBS "LLVM")
-elseif(LLVM_PACKAGE_VERSION VERSION_LESS 16)
-  # Builds against LLVM 15 and earlier use MCJIT
-  llvm_map_components_to_libnames(_llvm_libs
-    native core executionengine support mcjit passes)
-  set(LLVM_LIBS "${_llvm_libs}")
 else()
-  # Builds against LLVM 16 and later use LLJIT/ORC
   llvm_map_components_to_libnames(_llvm_libs
     native core executionengine support orcjit orcshared orctargetprocess passes)
   set(LLVM_LIBS "${_llvm_libs}")
@@ -247,9 +246,17 @@ endif()
 # Configure shared settings
 
 set(OPENVDB_AX_CORE_DEPENDENT_LIBS
-  ${OPENVDB_LIB}
+  ${OPENVDB_AX_EXPORTED_OPENVDB_LIB}
   ${LLVM_LIBS}
 )
+
+# Installed consumers get the LLVM include directories from OpenVDBConfig
+set(OPENVDB_AX_BUILD_LLVM_INCLUDE_DIRS "")
+foreach(_openvdb_ax_llvm_include_dir ${LLVM_INCLUDE_DIRS})
+  list(APPEND OPENVDB_AX_BUILD_LLVM_INCLUDE_DIRS
+    $<BUILD_INTERFACE:${_openvdb_ax_llvm_include_dir}>)
+endforeach()
+unset(_openvdb_ax_llvm_include_dir)
 
 set(OPENVDB_AX_PUBLIC_DEFINES ${LLVM_DEFINITIONS})
 set(OPENVDB_AX_PRIVATE_DEFINES "")
@@ -289,10 +296,12 @@ if(OPENVDB_AX_STATIC)
   target_compile_definitions(openvdb_ax_static PUBLIC ${OPENVDB_AX_PUBLIC_DEFINES})
   target_compile_definitions(openvdb_ax_static PRIVATE ${OPENVDB_AX_PRIVATE_DEFINES})
   target_compile_options(openvdb_ax_static PUBLIC ${OPENVDB_AX_PUBLIC_OPTIONS})
-  target_include_directories(openvdb_ax_static PUBLIC ../)
+  target_include_directories(openvdb_ax_static PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
+    $<INSTALL_INTERFACE:${OPENVDB_INSTALL_INCLUDEDIR}>)
   target_include_directories(openvdb_ax_static PRIVATE  ../../openvdb_cmd/vdb_ax)
   target_include_directories(openvdb_ax_static
-    SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
+    SYSTEM PUBLIC ${OPENVDB_AX_BUILD_LLVM_INCLUDE_DIRS}
   )
 
   if(OPENVDB_BUILD_AX_GRAMMAR)
@@ -323,10 +332,12 @@ if(OPENVDB_AX_SHARED)
   target_compile_definitions(openvdb_ax_shared PUBLIC ${OPENVDB_AX_PUBLIC_DEFINES} -DOPENVDB_AX_DLL)
   target_compile_definitions(openvdb_ax_shared PRIVATE ${OPENVDB_AX_PRIVATE_DEFINES})
   target_compile_options(openvdb_ax_shared PUBLIC ${OPENVDB_AX_PUBLIC_OPTIONS})
-  target_include_directories(openvdb_ax_shared PUBLIC ../)
+  target_include_directories(openvdb_ax_shared PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/..>
+    $<INSTALL_INTERFACE:${OPENVDB_INSTALL_INCLUDEDIR}>)
   target_include_directories(openvdb_ax_shared PRIVATE  ../../openvdb_cmd/vdb_ax)
   target_include_directories(openvdb_ax_shared
-    SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
+    SYSTEM PUBLIC ${OPENVDB_AX_BUILD_LLVM_INCLUDE_DIRS}
   )
 
   if(OPENVDB_BUILD_AX_GRAMMAR)
@@ -358,6 +369,7 @@ install(FILES ${OPENVDB_AX_COMPILER_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL
 
 if(OPENVDB_AX_STATIC)
   install(TARGETS openvdb_ax_static
+    EXPORT OpenVDBAXTargets
     RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR}
     LIBRARY DESTINATION ${OPENVDB_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${OPENVDB_INSTALL_LIBDIR}
@@ -366,8 +378,25 @@ endif()
 
 if(OPENVDB_AX_SHARED)
   install(TARGETS openvdb_ax_shared
+    EXPORT OpenVDBAXTargets
     RUNTIME DESTINATION ${OPENVDB_INSTALL_BINDIR}
     LIBRARY DESTINATION ${OPENVDB_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${OPENVDB_INSTALL_LIBDIR}
   )
 endif()
+
+# The targets are loaded by OpenVDBConfig.cmake with the openvdb_ax component
+
+install(EXPORT OpenVDBAXTargets
+  NAMESPACE OpenVDB::
+  DESTINATION ${OPENVDB_INSTALL_LIBDIR}/cmake/OpenVDB
+)
+
+# LLVM only accepts the same major and minor version that AX was built with
+file(CONFIGURE
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/OpenVDBAXDependencies.cmake
+  CONTENT "set(_openvdb_ax_llvm_version \"${LLVM_VERSION_MAJOR}.${LLVM_VERSION_MINOR}\")\n")
+
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/OpenVDBAXDependencies.cmake
+  DESTINATION ${OPENVDB_INSTALL_LIBDIR}/cmake/OpenVDB
+)

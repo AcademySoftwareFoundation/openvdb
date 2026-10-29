@@ -19,11 +19,8 @@
 #include <openvdb/version.h>
 #include <openvdb/Grid.h>
 
-#include <llvm/Config/llvm-config.h>
 
 #include <unordered_map>
-
-struct TestVolumeExecutableAcc;
 
 /// @cond OPENVDB_DOCS_INTERNAL
 namespace llvm {
@@ -292,15 +289,8 @@ public:
     void setSettingsFromCLI(const CLI& cli);
     /// @}
 
-    ////////////////////////////////////////////////////////
-
-    /// @return  The tree execution level.
-    OPENVDB_DEPRECATED_MESSAGE("Use getTreeExecutionLevel(Index&, Index&)")
-    Index getTreeExecutionLevel() const;
-
 private:
     friend class Compiler;
-    friend struct ::TestVolumeExecutableAcc;
 
     /// @brief Constructor, expected to be invoked by the compiler. Should not
     ///   be invoked directly.
@@ -317,26 +307,14 @@ private:
     ///   after compilation but can be used during construction of the exe to
     ///   infer some pre/post processing optimisations.
     VolumeExecutable(
-#if LLVM_VERSION_MAJOR <= 15
-        const std::shared_ptr<const llvm::LLVMContext>& context,
-        const std::shared_ptr<const llvm::ExecutionEngine>& engine,
-#else
         const std::shared_ptr<const llvm::orc::LLJIT>& mExecutionEngine,
-#endif
         const AttributeRegistry::ConstPtr& accessRegistry,
         const CustomData::ConstPtr& customData,
         const std::unordered_map<std::string, uint64_t>& functions,
         const ast::Tree& tree);
 
 private:
-#if LLVM_VERSION_MAJOR <= 15
-    // The Context and ExecutionEngine must exist _only_ for object lifetime
-    // management. The ExecutionEngine must be destroyed before the Context
-    const std::shared_ptr<const llvm::LLVMContext> mContext;
-    const std::shared_ptr<const llvm::ExecutionEngine> mExecutionEngine;
-#else
     const std::shared_ptr<const llvm::orc::LLJIT> mExecutionEngine;
-#endif
     const AttributeRegistry::ConstPtr mAttributeRegistry;
     const CustomData::ConstPtr mCustomData;
     const std::unordered_map<std::string, uint64_t> mFunctionAddresses;

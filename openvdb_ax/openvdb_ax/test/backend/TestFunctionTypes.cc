@@ -3,7 +3,6 @@
 
 #include "util.h"
 
-#include <openvdb_ax/codegen/LegacyIR.h>
 #include <openvdb_ax/codegen/FunctionTypes.h>
 
 #include <gtest/gtest.h>
@@ -18,48 +17,6 @@
 
 /// @brief  Dummy derived IR function which implemented types and
 ///         forwards on the generator
-#if LLVM_VERSION_MAJOR <= 15
-struct TestIRFunction : public openvdb::ax::codegen::IRFunctionBase
-{
-    static_assert(std::has_virtual_destructor
-        <openvdb::ax::codegen::IRFunctionBase>::value,
-        "Base class destructor is not virtual");
-    TestIRFunction(const openvdb::ax::codegen::ArgInfoVector& types,
-          openvdb::ax::codegen::ArgInfo ret,
-          const std::string& symbol,
-          const openvdb::ax::codegen::IRFunctionBase::GeneratorArgumentsCb& gen)
-        : openvdb::ax::codegen::IRFunctionBase(symbol, gen, types.size())
-        , mTypes(types)
-        , mRet([&]() {
-            ret.SetIsReturn();
-            return ret;
-        }())
-        , mLLVMTypes([&]() {
-            std::vector<llvm::Type*> sig;
-            for (auto& type : types) sig.emplace_back(type.GetType());
-            return sig;
-        }())
-        , mLLVMRet(ret.GetType()) {}
-    ~TestIRFunction() override = default;
-
-    llvm::Type* types(std::vector<llvm::Type*>& types, llvm::LLVMContext&) const override
-    {
-        types = mLLVMTypes;
-        return mLLVMRet;
-    }
-    openvdb::ax::codegen::ArgInfo types(
-        openvdb::ax::codegen::ArgInfoVector& types,
-        llvm::LLVMContext&) const override
-    {
-        types = mTypes;
-        return mRet;
-    }
-    const openvdb::ax::codegen::ArgInfoVector mTypes;
-    const openvdb::ax::codegen::ArgInfo mRet;
-    const std::vector<llvm::Type*> mLLVMTypes;
-    llvm::Type* mLLVMRet;
-};
-#else
 struct TestIRFunction final : public openvdb::ax::codegen::IRFunctionBase
 {
     static_assert(std::has_virtual_destructor
@@ -86,7 +43,6 @@ struct TestIRFunction final : public openvdb::ax::codegen::IRFunctionBase
     const openvdb::ax::codegen::ArgInfoVector mTypes;
     const openvdb::ax::codegen::ArgInfo mRet;
 };
-#endif
 
 
 /// @brief  static function to test c binding addresses
@@ -141,11 +97,7 @@ finalizeFunction(llvm::IRBuilder<>& B, llvm::Function* F = nullptr)
 
 inline auto getNumArgFromCallInst(llvm::CallInst* CI)
 {
-#if LLVM_VERSION_MAJOR >= 14
     return CI->arg_size();
-#else
-    return CI->getNumArgOperands();
-#endif
 }
 
 
@@ -187,14 +139,6 @@ TEST_F(TestFunctionTypes, testLLVMTypesFromSignature)
     ASSERT_TRUE(types[1]->isIntegerTy(64));
     ASSERT_TRUE(types[2]->isPointerTy());
 
-#if LLVM_VERSION_MAJOR <= 15
-    type = types[2]->getPointerElementType();
-    ASSERT_TRUE(type);
-    ASSERT_TRUE(type->isArrayTy());
-    type = type->getArrayElementType();
-    ASSERT_TRUE(type);
-    ASSERT_TRUE(type->isFloatTy());
-#endif
 }
 
 TEST_F(TestFunctionTypes, testArgInfoTypesFromSignature)
@@ -266,14 +210,6 @@ TEST_F(TestFunctionTypes, testLLVMFunctionTypeFromSignature)
     ASSERT_TRUE(ftype->getParamType(1)->isIntegerTy(64));
     ASSERT_TRUE(ftype->getParamType(2)->isPointerTy());
 
-#if LLVM_VERSION_MAJOR <= 15
-    llvm::Type* type = ftype->getParamType(2)->getPointerElementType();
-    ASSERT_TRUE(type);
-    ASSERT_TRUE(type->isArrayTy());
-    type = type->getArrayElementType();
-    ASSERT_TRUE(type);
-    ASSERT_TRUE(type->isFloatTy());
-#endif
 }
 
 TEST_F(TestFunctionTypes, testPrintSignature)
@@ -285,15 +221,9 @@ TEST_F(TestFunctionTypes, testPrintSignature)
     unittest_util::LLVMState state;
     llvm::LLVMContext& C = state.context();
 
-#if LLVM_VERSION_MAJOR <= 15
-    std::vector<llvm::Type*> types;
-    const llvm::Type* vt = llvm::Type::getVoidTy(C);
-    const llvm::Type* int64t = llvm::Type::getInt64Ty(C);
-#else
     ArgInfoVector types;
     const ArgInfo vt(llvm::Type::getVoidTy(C));
     const ArgInfo int64t(llvm::Type::getInt64Ty(C));
-#endif
 
     std::ostringstream os;
 
@@ -331,19 +261,11 @@ TEST_F(TestFunctionTypes, testPrintSignature)
     ASSERT_EQ(std::string("void 1(i32; i64 two)"), os.str());
     os.str("");
 
-#if LLVM_VERSION_MAJOR <= 15
-    types.emplace_back(llvm::Type::getInt8PtrTy(C));
-#else
     types.emplace_back(llvm::Type::getInt8Ty(C), 1);
-#endif
     types.emplace_back(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3));
 
     printSignature(os, types, int64t, "test", {"", "two"}, true);
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_EQ(std::string("int64 test(int32; int64 two; i8*; vec3i)"), os.str());
-#else
     ASSERT_EQ(std::string("int64 test(int32; int64 two; ptr; vec3i)"), os.str());
-#endif
     os.str("");
 
     types.clear();
@@ -364,11 +286,7 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     llvm::LLVMContext& C = state.context();
     llvm::Module& M = state.module();
 
-#if LLVM_VERSION_MAJOR <= 15
-    std::vector<llvm::Type*> types;
-#else
     ArgInfoVector types;
-#endif
 
     std::ostringstream os;
 
@@ -378,17 +296,11 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     // test types
     auto type = test->types(types, C);
     ASSERT_EQ(size_t(1), types.size());
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_TRUE(types[0]->isIntegerTy(32));
-    ASSERT_TRUE(type);
-    ASSERT_TRUE(type->isVoidTy());
-#else
     ASSERT_TRUE(types[0].GetType()->isIntegerTy(32));
     ASSERT_TRUE(types[0].IsNative());
     ASSERT_TRUE(!types[0].IsReturn());
     ASSERT_TRUE(type.IsVoid());
     ASSERT_TRUE(type.IsReturn());
-#endif
 
     // test various getters
     ASSERT_EQ(std::string("ax.test"), std::string(test->symbol()));
@@ -448,12 +360,7 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     // test types
     type = test->types(types, C);
     ASSERT_EQ(size_t(0), types.size());
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_TRUE(type);
-    ASSERT_TRUE(type->isIntegerTy(32));
-#else
     ASSERT_TRUE(type.GetType()->isIntegerTy(32));
-#endif
     // test various getters
     ASSERT_EQ(std::string("ax.empty.test"), std::string(test->symbol()));
     ASSERT_EQ(size_t(0), test->size());
@@ -504,16 +411,6 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
 
     type = test->types(types, state.context());
     ASSERT_EQ(size_t(6), types.size());
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_TRUE(type);
-    ASSERT_TRUE(type->isIntegerTy(16));
-    ASSERT_TRUE(types[0]->isIntegerTy(1));
-    ASSERT_TRUE(types[1]->isIntegerTy(16));
-    ASSERT_TRUE(types[2]->isIntegerTy(32));
-    ASSERT_TRUE(types[3]->isIntegerTy(64));
-    ASSERT_TRUE(types[4]->isFloatTy());
-    ASSERT_TRUE(types[5]->isDoubleTy());
-#else
     ASSERT_TRUE(type.GetType()->isIntegerTy(16));
     ASSERT_TRUE(types[0].GetType()->isIntegerTy(1));
     ASSERT_TRUE(types[1].GetType()->isIntegerTy(16));
@@ -521,7 +418,6 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     ASSERT_TRUE(types[3].GetType()->isIntegerTy(64));
     ASSERT_TRUE(types[4].GetType()->isFloatTy());
     ASSERT_TRUE(types[5].GetType()->isDoubleTy());
-#endif
 
     // test create detached
     function = test->create(C);
@@ -575,15 +471,6 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
 
     type = test->types(types, C);
     ASSERT_EQ(size_t(6), types.size());
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_TRUE(type->isIntegerTy(32));
-    ASSERT_TRUE(types[0] == llvm::PointerType::get(llvm::Type::getInt1Ty(C), 0));
-    ASSERT_TRUE(types[1] == llvm::PointerType::get(llvm::Type::getInt16Ty(C), 0));
-    ASSERT_TRUE(types[2] == llvm::PointerType::get(llvm::Type::getInt32Ty(C), 0));
-    ASSERT_TRUE(types[3] == llvm::PointerType::get(llvm::Type::getInt64Ty(C), 0));
-    ASSERT_TRUE(types[4] == llvm::PointerType::get(llvm::Type::getFloatTy(C), 0));
-    ASSERT_TRUE(types[5] == llvm::PointerType::get(llvm::Type::getDoubleTy(C), 0));
-#else
     ASSERT_TRUE(type.GetType()->isIntegerTy(32));
     ASSERT_TRUE(types[0].GetUnderlyingType()->isIntegerTy(1));
     ASSERT_TRUE(types[1].GetUnderlyingType()->isIntegerTy(16));
@@ -597,7 +484,6 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     ASSERT_TRUE(types[3].NumPtrs() == 1);
     ASSERT_TRUE(types[4].NumPtrs() == 1);
     ASSERT_TRUE(types[5].NumPtrs() == 1);
-#endif
 
     // test create detached
     function = test->create(C);
@@ -653,24 +539,6 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     type = test->types(types, C);
     ASSERT_EQ(size_t(15), types.size());
 
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_TRUE(type->isIntegerTy(64));
-    ASSERT_TRUE(types[0] == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 2)->getPointerTo());
-    ASSERT_TRUE(types[1] == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 2)->getPointerTo());
-    ASSERT_TRUE(types[2] == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2)->getPointerTo());
-    ASSERT_TRUE(types[3] == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3)->getPointerTo());
-    ASSERT_TRUE(types[4] == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 3)->getPointerTo());
-    ASSERT_TRUE(types[5] == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 3)->getPointerTo());
-    ASSERT_TRUE(types[6] == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 4)->getPointerTo());
-    ASSERT_TRUE(types[7] == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 4)->getPointerTo());
-    ASSERT_TRUE(types[8] == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 4)->getPointerTo());
-    ASSERT_TRUE(types[9] == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 9)->getPointerTo());
-    ASSERT_TRUE(types[10] == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 9)->getPointerTo());
-    ASSERT_TRUE(types[11] == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 9)->getPointerTo());
-    ASSERT_TRUE(types[12] == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 16)->getPointerTo());
-    ASSERT_TRUE(types[13] == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 16)->getPointerTo());
-    ASSERT_TRUE(types[14] == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 16)->getPointerTo());
-#else
     ASSERT_TRUE(types[0].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 2));
     ASSERT_TRUE(types[1].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 2));
     ASSERT_TRUE(types[2].GetUnderlyingType() == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2));
@@ -701,7 +569,6 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     ASSERT_TRUE(types[12].NumPtrs() == 1);
     ASSERT_TRUE(types[13].NumPtrs() == 1);
     ASSERT_TRUE(types[14].NumPtrs() == 1);
-#endif
 
     // test create detached
     function = test->create(C);
@@ -743,15 +610,9 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     // test print - note mat/i types are not ax types
     os.str("");
     test->print(C, os, "name", /*axtypes=*/true);
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_EQ(std::string("int64 name(vec2i; vec2f; vec2d; vec3i; vec3f; vec3d;"
-        " vec4i; vec4f; vec4d; [9 x i32]*; mat3f; mat3d; [16 x i32]*; mat4f; mat4d)"),
-        os.str());
-#else
     ASSERT_EQ(std::string("int64 name(vec2i; vec2f; vec2d; vec3i; vec3f; vec3d;"
         " vec4i; vec4f; vec4d; ptr; mat3f; mat3d; ptr; mat4f; mat4d)"),
         os.str());
-#endif
 
     //
     // Test void ptr arguments
@@ -773,15 +634,6 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     type = test->types(types, C);
     ASSERT_EQ(size_t(6), types.size());
 
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_TRUE(type->isVoidTy());
-    ASSERT_TRUE(types[0] == llvm::Type::getInt8Ty(C)->getPointerTo());
-    ASSERT_TRUE(types[1] == llvm::Type::getInt8Ty(C)->getPointerTo()->getPointerTo());
-    ASSERT_TRUE(types[2] == llvm::Type::getInt8Ty(C)->getPointerTo()->getPointerTo()->getPointerTo());
-    ASSERT_TRUE(types[3] == llvm::Type::getFloatTy(C)->getPointerTo());
-    ASSERT_TRUE(types[4] == llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo());
-    ASSERT_TRUE(types[5] == llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo()->getPointerTo());
-#else
     ASSERT_TRUE(type.IsVoid());
     ASSERT_TRUE(types[0].GetUnderlyingType() == llvm::Type::getInt8Ty(C));
     ASSERT_TRUE(types[1].GetUnderlyingType() == llvm::Type::getInt8Ty(C));
@@ -795,7 +647,6 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     ASSERT_TRUE(types[3].NumPtrs() == 1);
     ASSERT_TRUE(types[4].NumPtrs() == 2);
     ASSERT_TRUE(types[5].NumPtrs() == 3);
-#endif
 
     // test create detached
     function = test->create(C);
@@ -824,47 +675,6 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     ASSERT_TRUE(M.getFunction("ax.vptrs.test"));
     ASSERT_EQ(function, M.getFunction("ax.vptrs.test"));
     ASSERT_EQ(function, test->create(M));
-
-    //
-    // Test creation with builder methods
-    // @note  These methods may be moved to the constructor in the future
-
-    ASSERT_TRUE(test->dependencies().empty());
-    ASSERT_TRUE(!test->hasParamAttribute(0, llvm::Attribute::ReadOnly));
-    ASSERT_TRUE(!test->hasParamAttribute(-1, llvm::Attribute::ReadOnly));
-
-    test->setDependencies({"dep"});
-    ASSERT_EQ(size_t(1), test->dependencies().size());
-    ASSERT_EQ(std::string("dep"), std::string(test->dependencies().front()));
-
-    test->setDependencies({});
-    ASSERT_TRUE(test->dependencies().empty());
-
-    test->setFnAttributes({llvm::Attribute::ReadOnly});
-    test->setRetAttributes({llvm::Attribute::NoAlias});
-    test->setParamAttributes(1, {llvm::Attribute::WriteOnly});
-    test->setParamAttributes(-1, {llvm::Attribute::WriteOnly});
-
-    ASSERT_TRUE(!test->hasParamAttribute(0, llvm::Attribute::WriteOnly));
-    ASSERT_TRUE(!test->hasParamAttribute(2, llvm::Attribute::WriteOnly));
-    ASSERT_TRUE(test->hasParamAttribute(1, llvm::Attribute::WriteOnly));
-    ASSERT_TRUE(test->hasParamAttribute(-1, llvm::Attribute::WriteOnly));
-
-    function = test->create(C);
-    ASSERT_TRUE(function);
-    llvm::AttributeList list = function->getAttributes();
-    ASSERT_TRUE(!list.isEmpty());
-    ASSERT_TRUE(!list.hasParamAttrs(0));
-    ASSERT_TRUE(!list.hasParamAttrs(2));
-    ASSERT_TRUE(list.hasParamAttr(1, llvm::Attribute::WriteOnly));
-#if LLVM_VERSION_MAJOR <= 13
-    ASSERT_TRUE(list.hasFnAttribute(llvm::Attribute::ReadOnly));
-    ASSERT_TRUE(list.hasAttribute(llvm::AttributeList::ReturnIndex, llvm::Attribute::NoAlias));
-#else
-    ASSERT_TRUE(list.hasFnAttr(llvm::Attribute::ReadOnly));
-    ASSERT_TRUE(list.hasRetAttr(llvm::Attribute::NoAlias));
-#endif
-    delete function;
 }
 
 // Test Function::call
@@ -996,11 +806,7 @@ TEST_F(TestFunctionTypes, testFunctionCall)
 
         // test no casting needed for valid IR
 
-#if LLVM_VERSION_MAJOR <= 15
-        llvm::Value* llvmresult = test->call(llvmargs, B, /*cast*/false);
-#else
         llvm::Value* llvmresult = test->call(llvmargs, B);
-#endif
         ASSERT_TRUE(llvmresult);
         llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(llvmresult);
         ASSERT_TRUE(call);
@@ -1016,21 +822,6 @@ TEST_F(TestFunctionTypes, testFunctionCall)
 
         // test no casting needed for valid IR, even with cast=true
 
-#if LLVM_VERSION_MAJOR <= 15
-        llvmresult = test->call(llvmargs, B, /*cast*/true);
-        ASSERT_TRUE(llvmresult);
-        call = llvm::dyn_cast<llvm::CallInst>(llvmresult);
-        ASSERT_TRUE(call);
-        ASSERT_EQ(function, call->getCalledFunction());
-        ASSERT_EQ(6u, getNumArgFromCallInst(call));
-        ASSERT_EQ(llvmargs[0], call->getArgOperand(0));
-        ASSERT_EQ(llvmargs[1], call->getArgOperand(1));
-        ASSERT_EQ(llvmargs[2], call->getArgOperand(2));
-        ASSERT_EQ(llvmargs[3], call->getArgOperand(3));
-        ASSERT_EQ(llvmargs[4], call->getArgOperand(4));
-        ASSERT_EQ(llvmargs[5], call->getArgOperand(5));
-        VERIFY_MODULE_IR(&M);
-#endif
 
         // Test using Argument containers
 
@@ -1064,10 +855,6 @@ TEST_F(TestFunctionTypes, testFunctionCall)
         VERIFY_MODULE_IR(&M);
     }
 
-#if LLVM_VERSION_MAJOR <= 15
-    std::vector<llvm::Type*> expected;
-    test->types(expected, C);
-#endif
 
     ArgInfoVector arginfo;
     test->types(arginfo, C);
@@ -1092,35 +879,6 @@ TEST_F(TestFunctionTypes, testFunctionCall)
         const NativeArguments nativeargs({vec3f, vec2f, mat3f, i1c0, i1c0, i1c0});
         llvm::CallInst* call;
 
-#if LLVM_VERSION_MAJOR <= 15
-        const Arguments args(nativeargs);
-        const std::vector<llvm::Value*> llvmargs = args.AsLLVMValues();
-        llvm::Value* llvmresult = test->call(llvmargs, B, /*cast*/true);
-        ASSERT_TRUE(llvmresult);
-        call = llvm::dyn_cast<llvm::CallInst>(llvmresult);
-        ASSERT_TRUE(call);
-        ASSERT_EQ(function, call->getCalledFunction());
-        ASSERT_EQ(6u, getNumArgFromCallInst(call));
-        ASSERT_TRUE(llvmargs[0] != call->getArgOperand(0));
-        ASSERT_TRUE(llvmargs[1] != call->getArgOperand(1));
-        ASSERT_TRUE(llvmargs[2] != call->getArgOperand(2));
-        ASSERT_TRUE(llvmargs[3] != call->getArgOperand(3));
-        ASSERT_TRUE(llvmargs[4] != call->getArgOperand(4));
-        ASSERT_TRUE(llvmargs[5] != call->getArgOperand(5));
-        ASSERT_TRUE(expected[0] == call->getArgOperand(0)->getType());
-        ASSERT_TRUE(expected[1] == call->getArgOperand(1)->getType());
-        ASSERT_TRUE(expected[2] == call->getArgOperand(2)->getType());
-        ASSERT_TRUE(expected[3] == call->getArgOperand(3)->getType());
-        ASSERT_TRUE(expected[4] == call->getArgOperand(4)->getType());
-        ASSERT_TRUE(expected[5] == call->getArgOperand(5)->getType());
-        ASSERT_TRUE(arginfo[0].GetType() == call->getArgOperand(0)->getType());
-        ASSERT_TRUE(arginfo[1].GetType() == call->getArgOperand(1)->getType());
-        ASSERT_TRUE(arginfo[2].GetType() == call->getArgOperand(2)->getType());
-        ASSERT_TRUE(arginfo[3].GetType() == call->getArgOperand(3)->getType());
-        ASSERT_TRUE(arginfo[4].GetType() == call->getArgOperand(4)->getType());
-        ASSERT_TRUE(arginfo[5].GetType() == call->getArgOperand(5)->getType());
-        VERIFY_MODULE_IR(&M);
-#endif
 
         Value result = test->call(nativeargs, B);
         ASSERT_TRUE(result);
@@ -1156,31 +914,6 @@ TEST_F(TestFunctionTypes, testFunctionCall)
         });
         llvm::CallInst* call;
 
-#if LLVM_VERSION_MAJOR <= 15
-        const Arguments args(nativeargs);
-        const std::vector<llvm::Value*> llvmargs = args.AsLLVMValues();
-        llvm::Value* llvmresult = test->call(llvmargs, B, /*cast*/true);
-        ASSERT_TRUE(llvmresult);
-        call = llvm::dyn_cast<llvm::CallInst>(llvmresult);
-        ASSERT_TRUE(call);
-        ASSERT_EQ(function, call->getCalledFunction());
-        ASSERT_EQ(6u, getNumArgFromCallInst(call));
-        ASSERT_TRUE(llvmargs[0] != call->getArgOperand(0));
-        ASSERT_TRUE(llvmargs[1] != call->getArgOperand(1));
-        ASSERT_EQ(llvmargs[2], call->getArgOperand(2)); // no cast
-        ASSERT_TRUE(llvmargs[3] != call->getArgOperand(3));
-        ASSERT_TRUE(llvmargs[4] != call->getArgOperand(4));
-        ASSERT_EQ(llvmargs[5], call->getArgOperand(5)); // no cast
-        ASSERT_TRUE(expected[0] == call->getArgOperand(0)->getType());
-        ASSERT_TRUE(expected[1] == call->getArgOperand(1)->getType());
-        ASSERT_TRUE(expected[3] == call->getArgOperand(3)->getType());
-        ASSERT_TRUE(expected[4] == call->getArgOperand(4)->getType());
-        ASSERT_TRUE(arginfo[0].GetType() == call->getArgOperand(0)->getType());
-        ASSERT_TRUE(arginfo[1].GetType() == call->getArgOperand(1)->getType());
-        ASSERT_TRUE(arginfo[3].GetType() == call->getArgOperand(3)->getType());
-        ASSERT_TRUE(arginfo[4].GetType() == call->getArgOperand(4)->getType());
-        VERIFY_MODULE_IR(&M);
-#endif
 
         Value result = test->call(nativeargs, B);
         ASSERT_TRUE(result);
@@ -1212,25 +945,6 @@ TEST_F(TestFunctionTypes, testFunctionCall)
         });
         llvm::CallInst* call;
 
-#if LLVM_VERSION_MAJOR <= 15
-        const Arguments args(nativeargs);
-        const std::vector<llvm::Value*> llvmargs = args.AsLLVMValues();
-        llvm::Value* llvmresult = test->call(llvmargs, B, /*cast*/true);
-        ASSERT_TRUE(llvmresult);
-        call = llvm::dyn_cast<llvm::CallInst>(llvmresult);
-        ASSERT_TRUE(call);
-        ASSERT_EQ(function, call->getCalledFunction());
-        ASSERT_EQ(6u, getNumArgFromCallInst(call));
-        ASSERT_EQ(args[0], call->getArgOperand(0));
-        ASSERT_EQ(args[1], call->getArgOperand(1));
-        ASSERT_EQ(args[2], call->getArgOperand(2));
-        ASSERT_TRUE(args[3] != call->getArgOperand(3));
-        ASSERT_EQ(args[4], call->getArgOperand(4));
-        ASSERT_TRUE(args[5] != call->getArgOperand(5));
-        ASSERT_TRUE(expected[3] == call->getArgOperand(3)->getType());
-        ASSERT_TRUE(expected[5] == call->getArgOperand(5)->getType());
-        VERIFY_MODULE_IR(&M);
-#endif
 
         Value result = test->call(nativeargs, B);
         ASSERT_TRUE(result);
@@ -1261,11 +975,7 @@ TEST_F(TestFunctionTypes, testFunctionCall)
         Arguments args;
         args.AddArg(vec3f);
 
-#if LLVM_VERSION_MAJOR <= 15
-        llvm::Value* result = test->call(args.AsLLVMValues(), B, /*cast*/false);
-#else
         llvm::Value* result = test->call(args, B).GetValue();
-#endif
         ASSERT_TRUE(result);
         auto call = llvm::dyn_cast<llvm::CallInst>(result);
         ASSERT_TRUE(call);
@@ -1282,21 +992,12 @@ TEST_F(TestFunctionTypes, testFunctionCall)
         // Test called with castable arg with cast true. Test IR is invalid
         // due to signature size
 
-#if LLVM_VERSION_MAJOR <= 15
-        result = test->call(args.AsLLVMValues(), B, /*cast*/true);
-#else
         result = test->call(args, B).GetValue();
-#endif
         ASSERT_TRUE(result);
         call = llvm::dyn_cast<llvm::CallInst>(result);
         ASSERT_TRUE(call);
         ASSERT_EQ(function, call->getCalledFunction());
         ASSERT_EQ(1u, getNumArgFromCallInst(call));
-#if LLVM_VERSION_MAJOR <= 15
-        // shouldn't be the same as it should have been cast
-        ASSERT_TRUE(vec3f.GetValue() != call->getArgOperand(0));
-        ASSERT_TRUE(expected[0] == call->getArgOperand(0)->getType());
-#endif
         VERIFY_MODULE_IR_INVALID(&M);
 
         // Remove the bad instruction (and re-verify to double check)
@@ -1308,11 +1009,7 @@ TEST_F(TestFunctionTypes, testFunctionCall)
 
         const NativeArguments nativeargs({vec3i,vec2d,mat3d,i64c1,i64c1,i64c1});
         args = Arguments(nativeargs);
-#if LLVM_VERSION_MAJOR <= 15
-        result = test->call(args.AsLLVMValues(), B, /*cast*/false);
-#else
         result = test->call(args, B).GetValue();
-#endif
         ASSERT_TRUE(result);
         call = llvm::dyn_cast<llvm::CallInst>(result);
         ASSERT_TRUE(call);
@@ -1361,11 +1058,7 @@ TEST_F(TestFunctionTypes, testFunctionCall)
         finalizeFunction(B, function);
         VERIFY_FUNCTION_IR(function);
 
-#if LLVM_VERSION_MAJOR <= 15
-        llvm::Value* result = test->call(args.AsLLVMValues(), B, /*cast*/false);
-#else
         llvm::Value* result = test->call(args, B).GetValue();
-#endif
         ASSERT_TRUE(result);
         llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(result);
         ASSERT_TRUE(call);
@@ -1376,27 +1069,13 @@ TEST_F(TestFunctionTypes, testFunctionCall)
 
         //
 
-#if LLVM_VERSION_MAJOR <= 15
-        result = test->call(args.AsLLVMValues(), B, /*cast*/true);
-        ASSERT_TRUE(result);
-        call = llvm::dyn_cast<llvm::CallInst>(result);
-        ASSERT_TRUE(call);
-        ASSERT_EQ(function, call->getCalledFunction());
-        ASSERT_EQ(2u, getNumArgFromCallInst(call));
-        ASSERT_TRUE(args[0] == call->getArgOperand(0));
-        ASSERT_TRUE(args[1] == call->getArgOperand(1));
-#endif
 
         // Test openvdb::ax::codegen::String -> char*
         NativeArguments strargs;
         strargs.AddArg(Value(strptr, axstr));
         strargs.AddArg(Value(strptr, axstr));
 
-#if LLVM_VERSION_MAJOR <= 15
-        result = test->call(Arguments(strargs).AsLLVMValues(), B, /*cast*/true);
-#else
         result = test->call(strargs, B).GetValue();
-#endif
         ASSERT_TRUE(result);
         call = llvm::dyn_cast<llvm::CallInst>(result);
         ASSERT_TRUE(call);
@@ -1413,11 +1092,7 @@ TEST_F(TestFunctionTypes, testFunctionCall)
         charargs.AddArg(chararray, ArgInfo(chars, 1));
         charargs.AddArg(chararray, ArgInfo(chars, 1));
 
-#if LLVM_VERSION_MAJOR <= 15
-        result = test->call(charargs.AsLLVMValues(), B, /*cast*/true);
-#else
         result = test->call(charargs, B).GetValue();
-#endif
         call = llvm::dyn_cast<llvm::CallInst>(result);
         ASSERT_TRUE(call);
         ASSERT_EQ(function, call->getCalledFunction());
@@ -1426,9 +1101,6 @@ TEST_F(TestFunctionTypes, testFunctionCall)
         ASSERT_TRUE(charargs[0] == call->getArgOperand(0));
         ASSERT_TRUE(charargs[1] == call->getArgOperand(1));
         // The IR is actually valid from LLVM 16 as ptrs are opaque :|
-#if LLVM_VERSION_MAJOR <= 15
-        VERIFY_MODULE_IR_INVALID(&M);
-#endif
         // Remove the bad instruction (and re-verify to double check)
         call->eraseFromParent();
         VERIFY_MODULE_IR(&M);
@@ -1456,11 +1128,7 @@ TEST_F(TestFunctionTypes, testFunctionCall)
         args.AddArg(fptr, ArgInfo(llvm::Type::getFloatTy(C), 1));
         args.AddArg(dptr, ArgInfo(llvm::Type::getDoubleTy(C), 1));
 
-#if LLVM_VERSION_MAJOR <= 15
-        llvm::Value* result = test->call(Arguments(args).AsLLVMValues(), B, /*cast*/false);
-#else
         llvm::Value* result = test->call(args, B).GetValue();
-#endif
         ASSERT_TRUE(result);
         llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(result);
         ASSERT_TRUE(call);
@@ -1472,34 +1140,6 @@ TEST_F(TestFunctionTypes, testFunctionCall)
 
         //
 
-#if LLVM_VERSION_MAJOR <= 15 // non native ** args, no casting
-        result = test->call({fptr, dptr}, B, /*cast*/true);
-        ASSERT_TRUE(result);
-        call = llvm::dyn_cast<llvm::CallInst>(result);
-        ASSERT_TRUE(call);
-        ASSERT_EQ(function, call->getCalledFunction());
-        ASSERT_EQ(2u, getNumArgFromCallInst(call));
-        ASSERT_TRUE(fptr == call->getArgOperand(0));
-        ASSERT_TRUE(dptr == call->getArgOperand(1));
-        VERIFY_MODULE_IR(&M);
-#ifdef OPENVDB_AX_NO_LLVM_ASSERTS // only test in release otherwise LLVM asserts
-        // switch the points, check no valid casting
-        result = test->call({dptr, fptr}, B, /*cast*/true);
-        ASSERT_TRUE(result);
-        call = llvm::dyn_cast<llvm::CallInst>(result);
-        ASSERT_TRUE(call);
-        ASSERT_EQ(function, call->getCalledFunction());
-        ASSERT_EQ(2u, getNumArgFromCallInst(call));
-        // args unaltered as casting is invalid
-        ASSERT_TRUE(dptr == call->getArgOperand(0));
-        ASSERT_TRUE(fptr == call->getArgOperand(1));
-
-        VERIFY_MODULE_IR_INVALID(&M);
-        // Remove the bad instruction (and re-verify to double check)
-        call->eraseFromParent();
-        VERIFY_MODULE_IR(&M);
-#endif
-#endif
     }
 
     {
@@ -1521,11 +1161,7 @@ TEST_F(TestFunctionTypes, testFunctionCall)
         Arguments args;
         args.AddArg(vptr, ArgInfo(LLVMType<int8_t>::get(C), 1));
 
-#if LLVM_VERSION_MAJOR <= 15
-        llvm::Value* result = test->call(Arguments(args).AsLLVMValues(), B, /*cast*/false);
-#else
         llvm::Value* result = test->call(args, B).GetValue();
-#endif
         ASSERT_TRUE(result);
         llvm::CallInst* call = llvm::dyn_cast<llvm::CallInst>(result);
         ASSERT_TRUE(call);
@@ -1536,31 +1172,6 @@ TEST_F(TestFunctionTypes, testFunctionCall)
 
         //
 
-#if LLVM_VERSION_MAJOR <= 15 // non native ** args, no casting
-        result = test->call({vptr}, B, /*cast*/true);
-        ASSERT_TRUE(result);
-        call = llvm::dyn_cast<llvm::CallInst>(result);
-        ASSERT_TRUE(call);
-        ASSERT_EQ(function, call->getCalledFunction());
-        ASSERT_EQ(1u, getNumArgFromCallInst(call));
-        ASSERT_TRUE(vptr == call->getArgOperand(0));
-        VERIFY_MODULE_IR(&M);
-
-#ifdef OPENVDB_AX_NO_LLVM_ASSERTS // only test in release otherwise LLVM asserts
-        // verify no cast from other pointers to void*
-        result = test->call({fptr}, B, /*cast*/true);
-        ASSERT_TRUE(result);
-        call = llvm::dyn_cast<llvm::CallInst>(result);
-        ASSERT_TRUE(call);
-        ASSERT_EQ(function, call->getCalledFunction());
-        ASSERT_EQ(1u, getNumArgFromCallInst(call));
-        ASSERT_TRUE(fptr == call->getArgOperand(0));
-        VERIFY_MODULE_IR_INVALID(&M);
-        // Remove the bad instruction (and re-verify to double check)
-        call->eraseFromParent();
-        VERIFY_MODULE_IR(&M);
-#endif
-#endif
     }
 }
 
@@ -1621,10 +1232,6 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
 
     Function::Ptr test(new unittest_util::TestFunction({},
         ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
-#if LLVM_VERSION_MAJOR <= 15
-    match = test->match(std::vector<llvm::Type*>{}, C);
-    ASSERT_EQ(match, Function::Explicit);
-#endif
     match = test->match(ArgInfoVector{}, C);
     ASSERT_EQ(match, Function::Explicit);
 
@@ -1639,13 +1246,6 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
     for (auto& info : array16) types.emplace_back(info);
     types.emplace_back(ArgInfo(LLVMType<openvdb::ax::codegen::String>::get(C), 1));
 
-#if LLVM_VERSION_MAJOR <= 15
-    // check types are unique
-    {
-        auto llvmtypes = types.AsLLVMTypes();
-        ASSERT_EQ(std::set<llvm::Type*>(llvmtypes.begin(), llvmtypes.end()).size(), llvmtypes.size());
-    }
-#endif
 
     //
 
@@ -1684,12 +1284,6 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
     llvm::Type* i32t = llvm::Type::getInt32Ty(C);
     test.reset(new unittest_util::TestFunction({ArgInfo(i32t)},
         ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
-#if LLVM_VERSION_MAJOR <= 15
-    match = test->match({llvm::ArrayType::get(i32t, 1)->getPointerTo()}, C);
-    ASSERT_EQ(match, Function::Size);
-    match = test->match({i32t->getPointerTo()}, C);
-    ASSERT_EQ(match, Function::Size);
-#endif
 
     match = test->match({ArgInfo(llvm::ArrayType::get(i32t, 1))}, C);
     ASSERT_EQ(match, Function::Size);
@@ -1700,12 +1294,6 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
 
     // test no match
 
-#if LLVM_VERSION_MAJOR <= 15
-    match = test->match(std::vector<llvm::Type*>{}, C);
-    ASSERT_EQ(Function::None, match);
-    match = test->match({i32t, i32t}, C);
-    ASSERT_EQ(Function::None, match);
-#endif
     match = test->match(ArgInfoVector{}, C);
     ASSERT_EQ(Function::None, match);
     match = test->match(ArgInfoVector{ArgInfo(i32t), ArgInfo(i32t)}, C);
@@ -1752,32 +1340,6 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
         }
    }
 
-   //
-   // Test array matches with readonly marking
-
-   for (const ArgInfoVector& types : arrays) {
-        // test these array types
-        for (size_t i = 0; i < types.size(); ++i) {
-            test.reset(new unittest_util::TestFunction({types[i]}, ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
-            test->setParamAttributes(0, {llvm::Attribute::ReadOnly});
-            ArgInfoVector copy(types);
-            copy[i] = copy.back();
-            copy.pop_back();
-            ASSERT_EQ(size_t(2), copy.size());
-            ASSERT_EQ(Function::Explicit, test->match({types[i]}, C));
-            ASSERT_EQ(Function::Implicit, test->match({copy[0]}, C));
-            ASSERT_EQ(Function::Implicit, test->match({copy[1]}, C));
-
-            // test non matching size arrays
-            for (const ArgInfoVector& inputs : arrays) {
-                if (&types == &inputs) continue;
-                for (size_t i = 0; i < inputs.size(); ++i) {
-                    ASSERT_EQ(Function::Size, test->match({inputs[i]}, C));
-                }
-            }
-        }
-    }
-
     // test strings
     {
         test.reset(new unittest_util::TestFunction({ArgInfo(LLVMType<char>::get(C), 1)},
@@ -1785,15 +1347,6 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
         ASSERT_EQ(Function::Size,
             test->match({ArgInfo(LLVMType<openvdb::ax::codegen::String>::get(C), 1)}, C));
         ASSERT_EQ(Function::Explicit,
-            test->match({ArgInfo(LLVMType<char>::get(C), 1)}, C));
-
-        test->setParamAttributes(0, {llvm::Attribute::ReadOnly});
-        ASSERT_EQ(Function::Implicit,
-            test->match({ArgInfo(LLVMType<openvdb::ax::codegen::String>::get(C), 1)}, C));
-
-        test.reset(new unittest_util::TestFunction({ArgInfo(LLVMType<openvdb::ax::codegen::String>::get(C), 1)},
-            ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
-        ASSERT_EQ(Function::Size,
             test->match({ArgInfo(LLVMType<char>::get(C), 1)}, C));
     }
 
@@ -1810,13 +1363,6 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
             test->match({fss, dss}, C));
         ASSERT_EQ(Function::Size,
             test->match({fss, fss}, C));
-
-        // Even if pointers are marked as readonly, casting is not supported
-        test->setParamAttributes(0, {llvm::Attribute::ReadOnly});
-        test->setParamAttributes(1, {llvm::Attribute::ReadOnly});
-
-        ASSERT_EQ(Function::Size,
-            test->match({fss, fss}, C));
     }
 }
 
@@ -1829,11 +1375,7 @@ TEST_F(TestFunctionTypes, testCFunctions)
 
     unittest_util::LLVMState state;
     llvm::LLVMContext& C = state.context();
-#if LLVM_VERSION_MAJOR <= 15
-    std::vector<llvm::Type*> types;
-#else
     ArgInfoVector types;
-#endif
 
     // test basic creation
 
@@ -1903,15 +1445,6 @@ TEST_F(TestFunctionTypes, testCFunctions)
 
     auto returnType = scalars.types(types, C);
     ASSERT_EQ(size_t(6), types.size());
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_TRUE(returnType->isIntegerTy(16));
-    ASSERT_TRUE(types[0]->isIntegerTy(1));
-    ASSERT_TRUE(types[1]->isIntegerTy(16));
-    ASSERT_TRUE(types[2]->isIntegerTy(32));
-    ASSERT_TRUE(types[3]->isIntegerTy(64));
-    ASSERT_TRUE(types[4]->isFloatTy());
-    ASSERT_TRUE(types[5]->isDoubleTy());
-#else
     ASSERT_TRUE(returnType.GetType()->isIntegerTy(16));
     ASSERT_TRUE(types[0].GetType()->isIntegerTy(1));
     ASSERT_TRUE(types[1].GetType()->isIntegerTy(16));
@@ -1919,22 +1452,12 @@ TEST_F(TestFunctionTypes, testCFunctions)
     ASSERT_TRUE(types[3].GetType()->isIntegerTy(64));
     ASSERT_TRUE(types[4].GetType()->isFloatTy());
     ASSERT_TRUE(types[5].GetType()->isDoubleTy());
-#endif
     types.clear();
 
     // test scalar ptr arguments
 
     returnType = scalarptrs.types(types, C);
     ASSERT_EQ(size_t(6), types.size());
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_TRUE(returnType->isIntegerTy(32));
-    ASSERT_TRUE(types[0] == llvm::Type::getInt1Ty(C)->getPointerTo());
-    ASSERT_TRUE(types[1] == llvm::Type::getInt16Ty(C)->getPointerTo());
-    ASSERT_TRUE(types[2] == llvm::Type::getInt32Ty(C)->getPointerTo());
-    ASSERT_TRUE(types[3] == llvm::Type::getInt64Ty(C)->getPointerTo());
-    ASSERT_TRUE(types[4] == llvm::Type::getFloatTy(C)->getPointerTo());
-    ASSERT_TRUE(types[5] == llvm::Type::getDoubleTy(C)->getPointerTo());
-#else
     ASSERT_TRUE(returnType.GetType()->isIntegerTy(32));
     ASSERT_TRUE(types[0] == ArgInfo(llvm::Type::getInt1Ty(C), 1));
     ASSERT_TRUE(types[1] == ArgInfo(llvm::Type::getInt16Ty(C), 1));
@@ -1942,22 +1465,12 @@ TEST_F(TestFunctionTypes, testCFunctions)
     ASSERT_TRUE(types[3] == ArgInfo(llvm::Type::getInt64Ty(C), 1));
     ASSERT_TRUE(types[4] == ArgInfo(llvm::Type::getFloatTy(C), 1));
     ASSERT_TRUE(types[5] == ArgInfo(llvm::Type::getDoubleTy(C), 1));
-#endif
     types.clear();
 
     // test array ptr arguments
 
     returnType = arrayptrs.types(types, C);
     ASSERT_EQ(size_t(6), types.size());
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_TRUE(returnType->isIntegerTy(64));
-    ASSERT_TRUE(types[0] == llvm::ArrayType::get(llvm::Type::getInt1Ty(C), 1)->getPointerTo());
-    ASSERT_TRUE(types[1] == llvm::ArrayType::get(llvm::Type::getInt16Ty(C), 2)->getPointerTo());
-    ASSERT_TRUE(types[2] == llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3)->getPointerTo());
-    ASSERT_TRUE(types[3] == llvm::ArrayType::get(llvm::Type::getInt64Ty(C), 4)->getPointerTo());
-    ASSERT_TRUE(types[4] == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 5)->getPointerTo());
-    ASSERT_TRUE(types[5] == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 6)->getPointerTo());
-#else
     ASSERT_TRUE(returnType.GetType()->isIntegerTy(64));
     ASSERT_TRUE(types[0] == ArgInfo(llvm::ArrayType::get(llvm::Type::getInt1Ty(C), 1), 1));
     ASSERT_TRUE(types[1] == ArgInfo(llvm::ArrayType::get(llvm::Type::getInt16Ty(C), 2), 1));
@@ -1965,7 +1478,6 @@ TEST_F(TestFunctionTypes, testCFunctions)
     ASSERT_TRUE(types[3] == ArgInfo(llvm::ArrayType::get(llvm::Type::getInt64Ty(C), 4), 1));
     ASSERT_TRUE(types[4] == ArgInfo(llvm::ArrayType::get(llvm::Type::getFloatTy(C), 5), 1));
     ASSERT_TRUE(types[5] == ArgInfo(llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 6), 1));
-#endif
     types.clear();
 
     // test void ptr arguments
@@ -1973,15 +1485,6 @@ TEST_F(TestFunctionTypes, testCFunctions)
 
     returnType = mindirect.types(types, C);
     ASSERT_EQ(size_t(6), types.size());
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_TRUE(returnType->isVoidTy());
-    ASSERT_TRUE(types[0] == llvm::Type::getInt8PtrTy(C));
-    ASSERT_TRUE(types[1] == llvm::Type::getInt8PtrTy(C)->getPointerTo());
-    ASSERT_TRUE(types[2] == llvm::Type::getInt8PtrTy(C)->getPointerTo()->getPointerTo());
-    ASSERT_TRUE(types[3] == llvm::Type::getFloatTy(C)->getPointerTo());
-    ASSERT_TRUE(types[4] == llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo());
-    ASSERT_TRUE(types[5] == llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo()->getPointerTo());
-#else
     ASSERT_TRUE(returnType.IsVoid());
     ASSERT_TRUE(types[0] == ArgInfo(llvm::Type::getInt8Ty(C), 1));
     ASSERT_TRUE(types[1] == ArgInfo(llvm::Type::getInt8Ty(C), 2));
@@ -1989,7 +1492,6 @@ TEST_F(TestFunctionTypes, testCFunctions)
     ASSERT_TRUE(types[3] == ArgInfo(llvm::Type::getFloatTy(C), 1));
     ASSERT_TRUE(types[4] == ArgInfo(llvm::Type::getFloatTy(C), 2));
     ASSERT_TRUE(types[5] == ArgInfo(llvm::Type::getFloatTy(C), 3));
-#endif
 }
 
 // Test C constant folding
@@ -2057,19 +1559,11 @@ TEST_F(TestFunctionTypes, testCFunctionCF)
     // constant arg (verify it would 100% match)
     llvm::Value* nullfloat = llvm::ConstantPointerNull::get(LLVMType<float*>::get(C));
 
-#if LLVM_VERSION_MAJOR <= 15
-    std::vector<llvm::Type*> types;
-#else
     ArgInfoVector types;
-#endif
     test4.types(types, C);
 
     ASSERT_EQ(size_t(1), types.size());
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_TRUE(nullfloat->getType() == types.front());
-#else
     ASSERT_TRUE(nullfloat->getType() == types.front().GetType());
-#endif
     ASSERT_TRUE(test4.fold({nullfloat}, C) == nullptr);
 }
 
@@ -2476,11 +1970,7 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
     llvm::Module& M = state.module();
     llvm::IRBuilder<> B(state.scratchBlock());
 
-#if LLVM_VERSION_MAJOR <= 15
-    std::vector<llvm::Type*> types;
-#else
     ArgInfoVector types;
-#endif
     llvm::Value* result = nullptr;
     llvm::Function* function = nullptr;
     llvm::FunctionType* ftype = nullptr;
@@ -2501,15 +1991,9 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
 
     auto type = test->types(types, C);
     ASSERT_EQ(size_t(1), types.size());
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_TRUE(types[0] == vec3f->getPointerTo(0));
-    ASSERT_TRUE(type);
-    ASSERT_TRUE(type->isVoidTy());
-#else
     ASSERT_TRUE(types[0] == ArgInfo(vec3f, 1, true));
     ASSERT_TRUE(type.IsVoid());
     ASSERT_TRUE(type.IsReturn());
-#endif
     // test various getters
     ASSERT_EQ(std::string("ax.c.test"), std::string(test->symbol()));
     ASSERT_EQ(size_t(1), test->size());
@@ -2521,21 +2005,12 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
     ASSERT_EQ(std::string("vec3f name()"), os.str());
 
     // test match
-#if LLVM_VERSION_MAJOR <= 15
-    match = test->match({vec3f->getPointerTo()}, C);
-    ASSERT_EQ(match, Function::None);
-    match = test->match(std::vector<llvm::Type*>{}, C);
-    ASSERT_EQ(match, Function::Explicit);
-    match = test->Function::match({vec3f->getPointerTo()}, C);
-    ASSERT_EQ(match, Function::Explicit);
-#else
     match = test->match({ArgInfo(vec3f, 1)}, C);
     ASSERT_EQ(match, Function::None);
     match = test->match(ArgInfoVector{}, C);
     ASSERT_EQ(match, Function::Explicit);
     match = test->Function::match({ArgInfo(vec3f, 1, true)}, C);
     ASSERT_EQ(match, Function::Explicit);
-#endif
 
     // test create
     ASSERT_TRUE(!M.getFunction("ax.c.test"));
@@ -2574,18 +2049,11 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
     // test types
     type = test->types(types, C);
     ASSERT_EQ(size_t(2), types.size());
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_TRUE(types[0] == vec3f->getPointerTo(0));
-    ASSERT_TRUE(types[1] == vec3f->getPointerTo(0));
-    ASSERT_TRUE(type);
-    ASSERT_TRUE(type->isVoidTy());
-#else
     ASSERT_TRUE(types[0] == ArgInfo(vec3f, 1, true));
     ASSERT_TRUE(types[0].IsReturn());
     ASSERT_TRUE(types[1] == ArgInfo(vec3f, 1));
     ASSERT_TRUE(type.IsVoid());
     ASSERT_TRUE(type.IsReturn());
-#endif
     // test various getters
     ASSERT_EQ(std::string("ax.c2.test"), std::string(test->symbol()));
     ASSERT_EQ(size_t(2), test->size());
@@ -2598,16 +2066,6 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
     ASSERT_EQ(std::string("vec3f name(vec3f)"), os.str());
 
     // test match
-#if LLVM_VERSION_MAJOR <= 15
-    match = test->match({vec3f->getPointerTo(),vec3f->getPointerTo()}, C);
-    ASSERT_EQ(match, Function::None);
-    match = test->match({vec3f->getPointerTo()}, C);
-    ASSERT_EQ(match, Function::Explicit);
-    match = test->match(std::vector<llvm::Type*>{}, C);
-    ASSERT_EQ(match, Function::None);
-    match = test->Function::match({vec3f->getPointerTo(),vec3f->getPointerTo()}, C);
-    ASSERT_EQ(match, Function::Explicit);
-#else
     match = test->match({ArgInfo(vec3f, 1), ArgInfo(vec3f, 1)}, C);
     ASSERT_EQ(match, Function::None);
     match = test->match({ArgInfo(vec3f, 1)}, C);
@@ -2616,7 +2074,6 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
     ASSERT_EQ(match, Function::None);
     match = test->Function::match({ArgInfo(vec3f, 1, true), ArgInfo(vec3f, 1)}, C);
     ASSERT_EQ(match, Function::Explicit);
-#endif
 
     // test create
     ASSERT_TRUE(!M.getFunction("ax.c2.test"));
@@ -2690,9 +2147,7 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
 
         llvm::Type* arrayT = llvm::ArrayType::get(llvm::Type::getFloatTy(FunctionBB.getContext()), 3);
         EXPECT_TRUE(args[0] == llvm::cast<llvm::Value>(F->arg_begin()));
- #if LLVM_VERSION_MAJOR > 15
         EXPECT_TRUE(args.GetArgInfo(0) == ArgInfo(arrayT, 1, true));
- #endif
 
         llvm::Value* e0 = FunctionBB.CreateConstGEP2_64(arrayT, args[0], 0, 0);
         FunctionBB.CreateStore(LLVMType<float>::get(FunctionBB.getContext(), 1.0f), e0);
@@ -2704,16 +2159,9 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
 
     // test types
     type = test->types(types, C);
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_EQ(size_t(1), types.size());
-    ASSERT_TRUE(types[0] == vec3f->getPointerTo(0));
-    ASSERT_TRUE(type);
-    ASSERT_TRUE(type->isVoidTy());
-#else
     ASSERT_EQ(size_t(1), types.size());
     ASSERT_TRUE(types[0] == ArgInfo(vec3f, 1, true));
     ASSERT_TRUE(type.IsVoid());
-#endif
     // test various getters
     ASSERT_EQ(std::string("ax.ir.test"), std::string(test->symbol()));
     ASSERT_EQ(size_t(1), test->size());
@@ -2725,21 +2173,12 @@ TEST_F(TestFunctionTypes, testSRETFunctions)
     ASSERT_EQ(std::string("vec3f name()"), os.str());
 
     // test match
-#if LLVM_VERSION_MAJOR <= 15
-    match = test->match({vec3f->getPointerTo()}, C);
-    ASSERT_EQ(match, Function::None);
-    match = test->match(std::vector<llvm::Type*>{}, C);
-    ASSERT_EQ(match, Function::Explicit);
-    match = test->Function::match({vec3f->getPointerTo()}, C);
-    ASSERT_EQ(match, Function::Explicit);
-#else
     match = test->match({ArgInfo(vec3f, 1)}, C);
     ASSERT_EQ(match, Function::None);
     match = test->match(ArgInfoVector{}, C);
     ASSERT_EQ(match, Function::Explicit);
     match = test->Function::match({ArgInfo(vec3f, 1, true)}, C);
     ASSERT_EQ(match, Function::Explicit);
-#endif
 
     // test create
     ASSERT_TRUE(!M.getFunction("ax.ir.test"));

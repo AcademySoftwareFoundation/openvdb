@@ -12,7 +12,7 @@
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/GridHandle.h>
-#include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/cuda/Buffer.h>
 
 #include <nanovdb/tools/cuda/MeshToGrid.cuh>            // rasterize mesh -> ValueOnIndex + UDF
 #include <nanovdb/tools/cuda/PruneGrid.cuh>             // topological prune (barrier removal)
@@ -32,7 +32,8 @@
 namespace {
 
 using BuildT      = nanovdb::ValueOnIndex;
-using GridHandleT = nanovdb::GridHandle<nanovdb::cuda::DualDeviceBuffer>;
+using BufferT     = nanovdb::cuda::Buffer<std::byte>;
+using GridHandleT = nanovdb::GridHandle<BufferT>;
 using Traits      = nanovdb::util::cuda::DeviceGridTraits<BuildT>;
 
 // Per-leaf retain-mask functor: a voxel is kept iff its unsigned distance to the surface exceeds the
@@ -200,13 +201,12 @@ uint64_t connectedComponentsFromMesh(const std::vector<nanovdb::Vec3f>& points,
         const float    barrierSqWorld = 0.75f * voxelSize * voxelSize;  // (sqrt(3)/2 * voxelSize)^2
         const uint32_t srcLeafCount   = Traits::getTreeData(d_orig).mNodeCount[0];
 
-        auto  retainMask   = nanovdb::cuda::DualDeviceBuffer::create(
-            std::size_t(srcLeafCount) * sizeof(nanovdb::Mask<3>), nullptr, false);
-        auto* d_retainMask = static_cast<nanovdb::Mask<3>*>(retainMask.deviceData());
+        BufferT retainMask(stream, std::size_t(srcLeafCount) * sizeof(nanovdb::Mask<3>), nanovdb::cuda::noInit);
+        auto*   d_retainMask = reinterpret_cast<nanovdb::Mask<3>*>(retainMask.data());
 
         nanovdb::util::cuda::operatorKernel<UDFBarrierPruneMaskFunctor>
             <<<srcLeafCount, UDFBarrierPruneMaskFunctor::MaxThreadsPerBlock, 0, stream>>>(
-                d_orig, static_cast<const float*>(udfSidecar.deviceData()), barrierSqWorld, d_retainMask);
+                d_orig, reinterpret_cast<const float*>(udfSidecar.data()), barrierSqWorld, d_retainMask);
         cudaCheckError();
 
         nanovdb::tools::cuda::PruneGrid<BuildT> pruner(d_orig, d_retainMask, stream);

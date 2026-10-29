@@ -34,66 +34,11 @@ namespace openvdb {
 namespace OPENVDB_VERSION_NAME {
 namespace ax {
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
     using LeafIndexType = openvdb::Index64;
-#else
-    using LeafIndexType = openvdb::Index32;
-#endif
 
 class TestPointExecutable : public ::testing::Test
 {
 };
-
-TEST_F(TestPointExecutable, testConstructionDestruction)
-{
-#if LLVM_VERSION_MAJOR <= 15
-    // Test the building and teardown of executable objects. This is primarily to test
-    // the destruction of Context and ExecutionEngine LLVM objects. These must be destructed
-    // in the correct order (ExecutionEngine, then Context) otherwise LLVM will crash
-
-    // must be initialized, otherwise construction/destruction of llvm objects won't
-    // exhibit correct behaviour
-
-    ASSERT_TRUE(openvdb::ax::isInitialized());
-
-    std::shared_ptr<llvm::LLVMContext> C(new llvm::LLVMContext);
-    std::unique_ptr<llvm::Module> M(new llvm::Module("test_module", *C));
-    std::shared_ptr<const llvm::ExecutionEngine> E(llvm::EngineBuilder(std::move(M))
-            .setEngineKind(llvm::EngineKind::JIT)
-            .create());
-
-    ASSERT_TRUE(!M);
-    ASSERT_TRUE(E);
-
-    std::weak_ptr<llvm::LLVMContext> wC = C;
-    std::weak_ptr<const llvm::ExecutionEngine> wE = E;
-
-    // Basic construction
-
-    openvdb::ax::ast::Tree tree;
-    std::unordered_map<std::string, uint64_t> fnmap;
-    openvdb::ax::AttributeRegistry::ConstPtr emptyReg =
-        openvdb::ax::AttributeRegistry::create(tree);
-    openvdb::ax::PointExecutable::Ptr pointExecutable =
-        TestPointExecutableAcc::make(C, E, emptyReg, nullptr, fnmap, tree);
-
-    ASSERT_EQ(2, int(wE.use_count()));
-    ASSERT_EQ(2, int(wC.use_count()));
-
-    C.reset();
-    E.reset();
-
-    ASSERT_EQ(1, int(wE.use_count()));
-    ASSERT_EQ(1, int(wC.use_count()));
-
-    // test destruction
-
-    pointExecutable.reset();
-
-    ASSERT_EQ(0, int(wE.use_count()));
-    ASSERT_EQ(0, int(wC.use_count()));
-#endif
-}
 
 TEST_F(TestPointExecutable, testCreateMissingAttributes)
 {

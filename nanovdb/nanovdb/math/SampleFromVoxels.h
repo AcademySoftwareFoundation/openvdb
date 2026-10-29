@@ -169,6 +169,45 @@ __hostdev__ typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 0, false
 
 // ------------------------------> TrilinearSampler <--------------------------------------
 
+namespace detail {
+/// @brief Scalar component type of a scalar or vector value type, e.g. float for both float and Vec3<float>
+template<typename...>
+struct MakeVoid { using type = void; };// like std::void_t, which is unavailable under NVRTC
+template<typename T, typename = void>
+struct ScalarOf { using type = T; };
+template<typename T>
+struct ScalarOf<T, typename MakeVoid<typename T::ValueType>::type> { using type = typename T::ValueType; };
+
+/// @brief Explicitly convert an integral @a v to RealT, i.e. the implicit promotion in mixed
+///        integer/floating-point arithmetic. All other types are returned unchanged.
+/// @note  The samplers interpolate integral grids in integer arithmetic and truncate the result,
+///        e.g. the linear weights and tricubic stencil weights become zero, so their output
+///        is generally not meaningful.
+template<typename RealT, typename T>
+__hostdev__ inline constexpr auto toReal(const T& v)
+{
+    if constexpr(std::is_integral<T>::value) {
+        return RealT(v);
+    } else {
+        return v;
+    }
+}
+
+/// @brief Preserve NanoVDB vectors' component-precision scalar multiplication.
+///        For other types, multiply before converting the result back to T.
+template<typename T, typename S>
+__hostdev__ inline T scale(const T& v, S s)
+{
+    using ScalarT = typename ScalarOf<T>::type;
+    if constexpr(util::is_specialization<T, Vec3>::value ||
+                 util::is_specialization<T, Vec4>::value) {
+        return v * ScalarT(s);
+    } else {
+        return T(toReal<S>(v) * s);
+    }
+}
+}// namespace detail
+
 /// @brief Tri-linear sampler, i.e. first order, interpolator
 template<typename TreeOrAccT>
 class TrilinearSampler
@@ -234,7 +273,8 @@ __hostdev__ typename TreeOrAccT::ValueType TrilinearSampler<TreeOrAccT>::sample(
   auto lerp = [](ValueT a, ValueT b, ValueT w){ return fma(w, b-a, a); };// = w*(b-a) + a
   //auto lerp = [](ValueT a, ValueT b, ValueT w){ return fma(w, b, fma(-w, a, a));};// = (1-w)*a + w*b
 #else
-    auto lerp = [](ValueT a, ValueT b, RealT w) { return a + ValueT(w) * (b - a); };
+    using ScalarT = typename detail::ScalarOf<ValueT>::type;
+    auto lerp = [](ValueT a, ValueT b, RealT w) { return a + ValueT(ScalarT(w)) * (b - a); };
 #endif
     return lerp(lerp(lerp(v[0][0][0], v[0][0][1], uvw[2]), lerp(v[0][1][0], v[0][1][1], uvw[2]), uvw[1]),
                 lerp(lerp(v[1][0][0], v[1][0][1], uvw[2]), lerp(v[1][1][0], v[1][1][1], uvw[2]), uvw[1]),
@@ -424,7 +464,8 @@ template<typename TreeOrAccT>
 template<typename RealT, template<typename...> class Vec3T>
 __hostdev__ typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 1, false>::operator()(Vec3T<RealT> xyz) const
 {
-    auto lerp = [](ValueT a, ValueT b, RealT w) { return a + ValueT(w) * (b - a); };
+    using ScalarT = typename detail::ScalarOf<ValueT>::type;
+    auto lerp = [](ValueT a, ValueT b, RealT w) { return a + ValueT(ScalarT(w)) * (b - a); };
 
     CoordT coord = Floor<CoordT>(xyz);
 
@@ -533,8 +574,9 @@ template<typename RealT, template<typename...> class Vec3T>
 __hostdev__ typename TreeOrAccT::ValueType TriquadraticSampler<TreeOrAccT>::sample(const Vec3T<RealT> &uvw, const ValueT (&v)[3][3][3])
 {
     auto kernel = [](const ValueT* value, double weight)->ValueT {
-        return weight * (weight * (0.5f * (value[0] + value[2]) - value[1]) +
-                        0.5f * (value[2] - value[0])) + value[1];
+        using detail::toReal;
+        return ValueT(weight * (weight * (0.5f * toReal<float>(value[0] + value[2]) - toReal<float>(value[1])) +
+                               0.5f * toReal<float>(value[2] - value[0])) + value[1]);
     };
 
     ValueT vx[3];
@@ -727,7 +769,8 @@ __hostdev__ void TricubicSampler<TreeOrAccT>::stencil(const CoordT& ijk, ValueT 
             fetch(i, j,  2) = mAcc.getValue(ijk + CoordT(i, j,  2));
         }
     }
-    const ValueT half(0.5), quarter(0.25), eighth(0.125);
+    // NOTE: these weights truncate to zero for integral ValueT, see detail::toReal
+    const ValueT half = ValueT(0.5), quarter = ValueT(0.25), eighth = ValueT(0.125);
     const ValueT X[64] = {// values of f(x,y,z) at the 8 corners (each from 1 stencil value).
                           fetch(0, 0, 0),
                           fetch(1, 0, 0),
@@ -893,11 +936,13 @@ __hostdev__ typename TreeOrAccT::ValueType TricubicSampler<TreeOrAccT>::sample(c
 #if 0
             sum = fma( yPow, zPow * fma(xyz[0], fma(xyz[0], fma(xyz[0], C[n + 3], C[n + 2]), C[n + 1]), C[n]), sum);
 #else
-            sum += yPow * zPow * (C[n] + xyz[0] * (C[n + 1] + xyz[0] * (C[n + 2] + xyz[0] * C[n + 3])));
+            using detail::toReal;
+            sum = ValueT(toReal<RealT>(sum) + toReal<RealT>(yPow * zPow) * (toReal<RealT>(C[n]) + xyz[0] *
+                        (toReal<RealT>(C[n + 1]) + xyz[0] * (toReal<RealT>(C[n + 2]) + xyz[0] * toReal<RealT>(C[n + 3])))));
 #endif
-            yPow *= xyz[1];
+            yPow = detail::scale(yPow, xyz[1]);
         }
-        zPow *= xyz[2];
+        zPow = detail::scale(zPow, xyz[2]);
     }
     return sum;
 }
@@ -983,13 +1028,6 @@ __hostdev__ typename TreeOrAccT::ValueType SampleFromVoxels<TreeOrAccT, 3, false
 }
 
 }// namespace math
-
-template<int Order, typename TreeOrAccT, bool UseCache = true>
-[[deprecated("Use nanovdb::math::createSampler instead")]]
-__hostdev__ math::SampleFromVoxels<TreeOrAccT, Order, UseCache> createSampler(const TreeOrAccT& acc)
-{
-    return math::SampleFromVoxels<TreeOrAccT, Order, UseCache>(acc);
-}
 
 } // namespace nanovdb
 

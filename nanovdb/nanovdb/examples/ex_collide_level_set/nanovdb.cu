@@ -8,7 +8,7 @@
 #include <chrono>
 
 #include <nanovdb/io/IO.h>
-#include <nanovdb/cuda/DeviceBuffer.h>
+#include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/math/Ray.h>
 #include <nanovdb/math/HDDA.h>
 

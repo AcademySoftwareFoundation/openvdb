@@ -19,11 +19,12 @@
 
 #include <nanovdb/cuda/Buffer.h>// for the resource-aware scratch buffers below
 #include <nanovdb/cuda/HandleStorage.h> // cuda::copyTo and the storage helpers live there (host-includable)
-#include <nanovdb/cuda/DeviceBuffer.h>// required for instantiation of move c-tor of GridHandle
+#include <nanovdb/cuda/ManagedResource.h> // for the managed default handle instantiated below
 #include <nanovdb/tools/cuda/GridChecksum.cuh>// for cuda::updateChecksum
 #include <nanovdb/GridHandle.h>
 
 #include <algorithm>// for std::copy_n and std::min in rewriteGridCounts
+#include <cstddef> // for std::byte
 #include <limits>// for the grid-count bound in cuda::mergeGridHandles
 #include <stdexcept>// for std::runtime_error
 #include <string>// for the grid index in chain-validation error messages
@@ -255,97 +256,7 @@ inline void rewriteGridCounts(const std::vector<GridData*>& dst, uint32_t indexS
     cudaCheck(cudaStreamSynchronize(stream));
 }
 
-/// @brief Implementation behind the deprecated dual-space splitGridHandles,
-///        kept warning-free for in-tree callers until the dual buffers are
-///        removed.
-template<typename BufferT, template <class, class...> class VectorT = std::vector>
-inline VectorT<GridHandle<BufferT>>
-splitDualGridHandles(const GridHandle<BufferT> &handle, const BufferT* other, cudaStream_t stream)
-{
-    static_assert(BufferTraits<BufferT>::hasDeviceDual, "splitDualGridHandles requires a dual-space buffer");
-    const void *ptr = handle.deviceData();
-    if (ptr == nullptr) return VectorT<GridHandle<BufferT>>();
-    VectorT<GridHandle<BufferT>> handles(handle.gridCount());
-    Buffer<bool, DeviceResource> dirtyBuf(stream, 1, noInit);
-    bool *d_dirty = dirtyBuf.data();
-    int device = util::cuda::currentDevice();
-    for (uint32_t n=0; n<handle.gridCount(); ++n) {
-        bool dirty = false;// set when the checksum needs to be recomputed
-        auto buffer = BufferT::create(handle.gridSize(n), other, device, stream);
-        GridData *dst = reinterpret_cast<GridData*>(buffer.deviceData());
-        const GridData *src = reinterpret_cast<const GridData*>(ptr);
-        cudaCheck(cudaMemcpyAsync(dst, src, handle.gridSize(n), cudaMemcpyDeviceToDevice, stream));
-        detail::updateGridCount<<<1, 1, 0, stream>>>(dst, 0u, 1u, d_dirty);
-        cudaCheckError();
-        cudaCheck(cudaMemcpyAsync(&dirty, d_dirty, sizeof(bool), cudaMemcpyDeviceToHost, stream));
-        cudaCheck(cudaStreamSynchronize(stream));
-        if (dirty) tools::cuda::updateChecksum(dst, CheckMode::Partial, stream);
-        handles[n] = nanovdb::GridHandle<BufferT>(std::move(buffer));
-        ptr = util::PtrAdd(ptr, handle.gridSize(n));
-    }
-    return handles;
-}// cuda::detail::splitDualGridHandles
-
-/// @brief Implementation behind the deprecated dual-space mergeGridHandles,
-///        kept warning-free for in-tree callers until the dual buffers are
-///        removed.
-template<typename BufferT, template <class, class...> class VectorT>
-inline GridHandle<BufferT>
-mergeDualGridHandles(const VectorT<GridHandle<BufferT>> &handles, const BufferT* other, cudaStream_t stream)
-{
-    static_assert(BufferTraits<BufferT>::hasDeviceDual, "mergeDualGridHandles requires a dual-space buffer");
-    uint64_t size = 0u;
-    uint32_t counter = 0u, gridCount = 0u;
-    for (auto &h : handles) {
-        gridCount += h.gridCount();
-        for (uint32_t n=0; n<h.gridCount(); ++n) size += h.gridSize(n);
-    }
-    int device = util::cuda::currentDevice();
-    auto buffer = BufferT::create(size, other, device, stream);
-    void *dst = buffer.deviceData();
-    Buffer<bool, DeviceResource> dirtyBuf(stream, 1, noInit);
-    bool *d_dirty = dirtyBuf.data();
-    for (auto &h : handles) {
-        const void *src = h.deviceData();
-        for (uint32_t n=0; n<h.gridCount(); ++n) {
-            bool dirty = false;// set when the checksum needs to be recomputed
-            cudaCheck(cudaMemcpyAsync(dst, src, h.gridSize(n), cudaMemcpyDeviceToDevice, stream));
-            GridData *data = reinterpret_cast<GridData*>(dst);
-            detail::updateGridCount<<<1, 1, 0, stream>>>(data, counter++, gridCount, d_dirty);
-            cudaCheckError();
-            cudaCheck(cudaMemcpyAsync(&dirty, d_dirty, sizeof(bool), cudaMemcpyDeviceToHost, stream));
-            cudaCheck(cudaStreamSynchronize(stream));
-            if (dirty) tools::cuda::updateChecksum(data, CheckMode::Partial, stream);
-            dst = util::PtrAdd(dst, h.gridSize(n));
-            src = util::PtrAdd(src, h.gridSize(n));
-        }
-    }
-    return GridHandle<BufferT>(std::move(buffer));
-}// cuda::detail::mergeDualGridHandles
-
 }// namespace detail
-
-/// @deprecated The dual-space buffers are removed in a future release: hold
-///             grids in GridHandle<cuda::Buffer<std::byte>> and use the
-///             single-space overload splitGridHandles(handle, stream, proto).
-template<typename BufferT, template <class, class...> class VectorT = std::vector>
-[[deprecated("dual-space buffers are being removed: use GridHandle<cuda::Buffer<std::byte>> with splitGridHandles(handle, stream, proto)")]]
-inline typename util::enable_if<BufferTraits<BufferT>::hasDeviceDual, VectorT<GridHandle<BufferT>>>::type
-splitGridHandles(const GridHandle<BufferT> &handle, const BufferT* other = nullptr, cudaStream_t stream = 0)
-{
-    return detail::splitDualGridHandles<BufferT, VectorT>(handle, other, stream);
-}
-
-/// @deprecated The dual-space buffers are removed in a future release: hold
-///             grids in GridHandle<cuda::Buffer<std::byte>> and use the
-///             single-space overload mergeGridHandles(handles, stream, proto).
-template<typename BufferT, template <class, class...> class VectorT>
-[[deprecated("dual-space buffers are being removed: use GridHandle<cuda::Buffer<std::byte>> with mergeGridHandles(handles, stream, proto)")]]
-inline typename util::enable_if<BufferTraits<BufferT>::hasDeviceDual, GridHandle<BufferT>>::type
-mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, const BufferT* other = nullptr, cudaStream_t stream = 0)
-{
-    return detail::mergeDualGridHandles<BufferT, VectorT>(handles, other, stream);
-}
 
 /// @brief Splits a single-space device handle into one handle per grid.
 /// @param handle source handle containing one or more grids
@@ -376,14 +287,13 @@ splitGridHandles(const GridHandle<BufferT> &handle, cudaStream_t stream, const B
 
     detail::RetainedStreamOrdering<BufferT>(stream).after(handle.buffer());
 
-    const int device = util::cuda::currentDevice();
     std::vector<BufferT> buffers;
     std::vector<GridData*> dst;
     buffers.reserve(gridCount);
     dst.reserve(gridCount);
     const void *src = handle.deviceData();
     for (uint32_t n = 0; n < gridCount; ++n) {
-        buffers.push_back(detail::createDeviceStorage<BufferT>(meta[n].size, proto, device, stream));
+        buffers.push_back(detail::createDeviceStorage<BufferT>(meta[n].size, proto, stream));
         dst.push_back(reinterpret_cast<GridData*>(detail::deviceStorageData(buffers.back())));
         cudaCheck(cudaMemcpyAsync(dst.back(), util::PtrAdd(src, meta[n].offset), meta[n].size, cudaMemcpyDeviceToDevice, stream));
     }
@@ -439,7 +349,7 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, cudaStream_t strea
         }
     }
     if (size == 0u) {// nothing to merge: an empty handle, over the prototype's resource where given
-        if (proto) return GridHandle<BufferT>(detail::createDeviceStorage<BufferT>(0, proto, util::cuda::currentDevice(), stream));
+        if (proto) return GridHandle<BufferT>(detail::createDeviceStorage<BufferT>(0, proto, stream));
         if constexpr (std::is_default_constructible<BufferT>::value) {
             return GridHandle<BufferT>();
         } else {
@@ -456,7 +366,7 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, cudaStream_t strea
         for (auto &h : handles) ordering.after(h.buffer());
     }
     const uint32_t gridCount = static_cast<uint32_t>(meta.size());
-    BufferT buffer = detail::createDeviceStorage<BufferT>(size, proto, util::cuda::currentDevice(), stream);
+    BufferT buffer = detail::createDeviceStorage<BufferT>(size, proto, stream);
     std::vector<GridData*> dst;
     dst.reserve(gridCount);
     uint32_t counter = 0u;
@@ -473,46 +383,12 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, cudaStream_t strea
 
 }// namespace cuda
 
-template<typename BufferT, template <class, class...> class VectorT = std::vector>
-[[deprecated("dual-space buffers are being removed: use GridHandle<cuda::Buffer<std::byte>> with nanovdb::cuda::splitGridHandles(handle, stream, proto)")]]
-inline typename util::enable_if<BufferTraits<BufferT>::hasDeviceDual, VectorT<GridHandle<BufferT>>>::type
-splitDeviceGrids(const GridHandle<BufferT> &handle, const BufferT* other = nullptr, cudaStream_t stream = 0)
-{ return cuda::detail::splitDualGridHandles<BufferT, VectorT>(handle, other, stream); }
-
-template<typename BufferT, template <class, class...> class VectorT>
-[[deprecated("dual-space buffers are being removed: use GridHandle<cuda::Buffer<std::byte>> with nanovdb::cuda::mergeGridHandles(handles, stream, proto)")]]
-inline typename util::enable_if<BufferTraits<BufferT>::hasDeviceDual, GridHandle<BufferT>>::type
-mergeDeviceGrids(const VectorT<GridHandle<BufferT>> &handles, const BufferT* other = nullptr, cudaStream_t stream = 0)
-{ return cuda::detail::mergeDualGridHandles<BufferT, VectorT>(handles, other, stream); }
-
-template<typename BufferT>
-template<typename T, typename util::enable_if<BufferTraits<T>::hasDeviceDual, int>::type>
-GridHandle<BufferT>::GridHandle(T&& buffer)
-    : mBuffer(std::move(buffer))
-{
-    static_assert(util::is_same<T,BufferT>::value, "Expected U==BufferT");
-    if (auto *data = reinterpret_cast<const GridData*>(mBuffer.data())) {
-        detail::parseHostGridChain(data, mBuffer.size(), mMetaData);
-    } else {
-        if (auto *d_data = reinterpret_cast<const GridData*>(mBuffer.deviceData())) {
-            const uint32_t count = cuda::detail::validGridChainHead(d_data, mBuffer.size(), cudaStream_t(0));
-            // MallocResource: plain cudaMalloc, so this long-standing parse path
-            // keeps working on devices without memory-pool support.
-            cuda::Buffer<std::byte, cuda::MallocResource> scratch(cuda::detail::chainScratchSize(count), cuda::noInit);
-            cuda::detail::parseGridChain(d_data, mBuffer.size(), count, scratch, mMetaData, cudaStream_t(0));
-        }
-    }
-}// GridHandle(T&& buffer)
-
-// move constructor from a single-space device buffer: all device work runs on
+// metadata parse for a single-space device buffer: all device work runs on
 // the buffer's retained stream (or the default stream for a synchronous
 // resource), and the metadata scratch allocates through the buffer's resource.
 template<typename BufferT>
-template<typename T, typename util::enable_if<BufferHasDeviceSingle<T>::value, int>::type, typename>
-GridHandle<BufferT>::GridHandle(T&& buffer)
-    : mBuffer(std::move(buffer))
+void GridHandle<BufferT>::parseSingleBuffer()
 {
-    static_assert(util::is_same<T,BufferT>::value, "Expected U==BufferT");
     using ResourceT = typename BufferT::ResourceType;
     if (const GridData *d_data = reinterpret_cast<const GridData*>(mBuffer.data())) {
         const cudaStream_t stream = cuda::detail::retainedStreamOrDefault(mBuffer);
@@ -521,14 +397,15 @@ GridHandle<BufferT>::GridHandle(T&& buffer)
         ScratchT scratch = cuda::detail::makeMetaScratch<ScratchT>(mBuffer, cuda::detail::chainScratchSize(count), stream);
         cuda::detail::parseGridChain(d_data, mBuffer.size_bytes(), count, scratch, mMetaData, stream);
     }
-}// GridHandle(T&& buffer) for single-space device buffers
+}// GridHandle::parseSingleBuffer
 
-// Emit the dual-buffer move constructor from every CUDA translation unit, so
-// host-only translation units that construct GridHandle<cuda::DualDeviceBuffer>
-// (they see only the declaration) always find the symbol at link time. An
-// unused private function is not enough: the optimizer may drop the
-// complete-object constructor it instantiates.
-template GridHandle<cuda::DualDeviceBuffer>::GridHandle(cuda::DualDeviceBuffer&&);
+// Emit the device parse for the GPU tools' default handle types from every CUDA
+// translation unit, so host-only translation units that construct these handles
+// (they see only the declaration) always find the symbol at link time. The
+// definitions are emitted as weak symbols, so the copies in different
+// translation units fold at link time.
+template void GridHandle<cuda::Buffer<std::byte>>::parseSingleBuffer();
+template void GridHandle<cuda::Buffer<std::byte, cuda::ManagedResource>>::parseSingleBuffer();
 
 } // namespace nanovdb
 

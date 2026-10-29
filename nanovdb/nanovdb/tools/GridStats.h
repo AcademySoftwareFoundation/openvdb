@@ -732,8 +732,9 @@ inline void GridStats<GridT, StatsT>::
 {
     data->setMin(s.min());
     data->setMax(s.max());
-    data->setAvg(s.avg());
-    data->setDev(s.std());
+    using FloatT = typename RootT::FloatType;// statistics type shared by all nodes in the tree
+    data->setAvg(static_cast<FloatT>(s.avg()));
+    data->setDev(static_cast<FloatT>(s.std()));
 }
 
 //================================================================================================
@@ -929,16 +930,9 @@ void updateGridStats(NanoGrid<BuildT>* grid, StatsMode mode)
         GridStats<GridT, Stats<ValueT> > stats;
         stats.update(*grid);
     } else {
-        throw std::runtime_error("gridStats: Unsupported statistics mode.");
+        throw std::runtime_error("updateGridStats: Unsupported statistics mode.");
     }
 }// updateGridStats
-
-template<typename BuildT>
-[[deprecated("Use nanovdb::tools::updateGridStats(NanoGrid*, StatsMode) instead")]]
-void gridStats(NanoGrid<BuildT>& grid, StatsMode mode = StatsMode::Default)
-{
-    updateGridStats<BuildT>(&grid, mode);
-}
 
 //================================================================================================
 

@@ -767,9 +767,9 @@ initBox(double       width, // major radius of torus in world units
     grid->setTransform(voxelSize, origin);
 
     // Define size of box with narrow-band in voxel units
-    const Vec3T r(width  / (2 * ValueT(voxelSize)),
-                  height / (2 * ValueT(voxelSize)),
-                  depth  / (2 * ValueT(voxelSize)));
+    const Vec3T r(ValueT(width  / (2 * ValueT(voxelSize))),
+                  ValueT(height / (2 * ValueT(voxelSize))),
+                  ValueT(depth  / (2 * ValueT(voxelSize))));
 
     // Below the Nyquist frequency
     if (r.min() < ValueT(1.5)) return grid;
@@ -853,10 +853,10 @@ initBBox(double       width, // width of the bbox in world units
     grid->setTransform(voxelSize, origin);
 
     // Define size of bbox with narrow-band in voxel units
-    const Vec3T  r(width / (2 * ValueT(voxelSize)),
-                  height / (2 * ValueT(voxelSize)),
-                  depth  / (2 * ValueT(voxelSize)));
-    const ValueT e = thickness / ValueT(voxelSize);
+    const Vec3T  r(ValueT(width / (2 * ValueT(voxelSize))),
+                  ValueT(height / (2 * ValueT(voxelSize))),
+                  ValueT(depth  / (2 * ValueT(voxelSize))));
+    const ValueT e = ValueT(thickness / ValueT(voxelSize));
 
     // Below the Nyquist frequency
     if (r.min() < ValueT(1.5) || e < ValueT(1.5)) return grid;
@@ -941,7 +941,7 @@ initOctahedron(double       scale, // scale of the octahedron in world units
     grid->setTransform(voxelSize, origin);
 
     // Define size of octahedron with narrow-band in voxel units
-    const ValueT s = scale / (2 * ValueT(voxelSize));
+    const ValueT s = ValueT(scale / (2 * ValueT(voxelSize)));
 
     // Below the Nyquist frequency
     if ( s < ValueT(1.5) ) return grid;
@@ -1695,7 +1695,7 @@ createPointScatter(const NanoGrid<SrcBuildT>& srcGrid, // origin of grid in worl
     std::srand(1234);
     const ValueT s = 1 / (1 + ValueT(RAND_MAX)); // scale so s*rand() is in ] 0, 1 [
     // return a point with random local voxel coordinates (-0.5 to +0.5)
-    auto randomPoint = [&s](){return s * Vec3T(rand(), rand(), rand()) - Vec3T(0.5);};
+    auto randomPoint = [&s](){return s * Vec3T(ValueT(rand()), ValueT(rand()), ValueT(rand())) - Vec3T(0.5);};
     const auto& srcTree = srcGrid.tree();
     auto srcMgrHandle = createNodeManager(srcGrid);
     auto *srcMgr = srcMgrHandle.template mgr<SrcBuildT>();

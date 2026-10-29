@@ -13,7 +13,11 @@
 // Comment out to disable this explicit round-off check
 #define ENFORCE_FORWARD_STEPPING
 
-#include <nanovdb/NanoVDB.h> // only dependency
+#include <nanovdb/NanoVDB.h> // only nanovdb dependency
+
+#ifndef __CUDACC_RTC__
+#include <algorithm> // for std::min in the disabled host branch of HDDA::next
+#endif
 
 namespace nanovdb::math {
 
@@ -56,11 +60,11 @@ public:
                 mStep[axis] = 0;
             } else if (inv[axis] > 0) {
                 mStep[axis] = 1;
-                mNext[axis] = mT0 + (mVoxel[axis] + dim - pos[axis]) * inv[axis];
+                mNext[axis] = mT0 + (RealT(mVoxel[axis] + dim) - pos[axis]) * inv[axis];
                 mDelta[axis] = inv[axis];
             } else {
                 mStep[axis] = -1;
-                mNext[axis] = mT0 + (mVoxel[axis] - pos[axis]) * inv[axis];
+                mNext[axis] = mT0 + (RealT(mVoxel[axis]) - pos[axis]) * inv[axis];
                 mDelta[axis] = -inv[axis];
             }
         }
@@ -94,9 +98,9 @@ public:
         for (int axis = 0; axis < 3; ++axis) {
             if (mStep[axis] == 0)
                 continue;
-            mNext[axis] = mT0 + (mVoxel[axis] - pos[axis]) * inv[axis];
+            mNext[axis] = mT0 + (RealT(mVoxel[axis]) - pos[axis]) * inv[axis];
             if (mStep[axis] > 0)
-                mNext[axis] += dim * inv[axis];
+                mNext[axis] += RealT(dim) * inv[axis];
         }
 
         return true;
@@ -120,7 +124,7 @@ public:
         }
 #else
         mT0 = mNext[axis];
-        mNext[axis] += mDim * mDelta[axis];
+        mNext[axis] += RealT(mDim) * mDelta[axis];
         mVoxel[axis] += mDim * mStep[axis];
         return mT0 <= mT1;
 #endif
@@ -168,7 +172,7 @@ private:
         }
 #endif
         mT0 = mNext[axis];
-        mNext[ axis] += mDim * mDelta[axis];
+        mNext[ axis] += RealT(mDim) * mDelta[axis];
         mVoxel[axis] += mDim * mStep[ axis];
         return mT0 <= mT1;
     }
@@ -212,13 +216,6 @@ inline __hostdev__ bool zeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename 
     }
     return false;
 }// zeroCrossing
-
-template<typename RayT, typename AccT>
-[[deprecated("Use zeroCrossing(ray, acc, ijk, v, t)")]]
-inline __hostdev__ bool ZeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename AccT::ValueType& v, float& t)
-{
-    return zeroCrossing(ray, acc, ijk, v,t);
-}
 
 /////////////////////////////////////////// isoCrossing ////////////////////////////////////////////
 
@@ -287,11 +284,11 @@ public:
                 mStep[axis] = 0;
             } else if (inv[axis] > 0) {
                 mStep[axis] = Dim;
-                mNext[axis] = (mT0 + (mVoxel[axis] + Dim - pos[axis]) * inv[axis]);
+                mNext[axis] = (mT0 + (RealT(mVoxel[axis] + Dim) - pos[axis]) * inv[axis]);
                 mDelta[axis] = inv[axis];
             } else {
                 mStep[axis] = -Dim;
-                mNext[axis] = mT0 + (mVoxel[axis] - pos[axis]) * inv[axis];
+                mNext[axis] = mT0 + (RealT(mVoxel[axis]) - pos[axis]) * inv[axis];
                 mDelta[axis] = -inv[axis];
             }
         }
@@ -412,13 +409,6 @@ inline __hostdev__ bool zeroCrossingNode(RayT& ray, const NodeT& node, float v0,
     }
     return false;
 }// zeroCrossingNode
-
-template<typename RayT, typename NodeT>
-[[deprecated("Use zeroCrossingNode(ray, node, v0, ijk, v, t)")]]
-inline __hostdev__ bool ZeroCrossingNode(RayT& ray, const NodeT& node, float v0, nanovdb::math::Coord& ijk, float& v, float& t)
-{
-    return zeroCrossingNode(ray, node, v0, ijk, v, t);
-}
 
 /////////////////////////////////////////// TreeMarcher ////////////////////////////////////////////
 

@@ -349,9 +349,11 @@ TEST_F(TestPointCodec, testPointDataCodecIO)
 
         CodecRegistry::clear();
 
+        // Phase 1: write/read without codec. This falls back to raw Tree I/O,
+        // which is disabled for ABI >= 14, so this phase is skipped there.
+#if OPENVDB_ABI_VERSION_NUMBER < 14
         const std::string rawPath = "testPDG_B_raw.vdb";
 
-        // Phase 1: write/read without codec
         {
             io::File f(rawPath);
             f.write(GridPtrVec{srcGrid});
@@ -367,6 +369,7 @@ TEST_F(TestPointCodec, testPointDataCodecIO)
         ASSERT_TRUE(rawGrid);
 
         std::remove(rawPath.c_str());
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
         const std::string codecPath = "testPDG_B_codec.vdb";
 

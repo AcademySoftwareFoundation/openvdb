@@ -7,7 +7,6 @@
 - @ref buildCmakeStructure
   - @ref buildDependencies
   - @ref buildMixingDepInstalls
-  - @ref buildBloscSupport
   - @ref buildZLibSupport
   - @ref buildVCPKG
   - @ref buildSimd
@@ -52,7 +51,7 @@ CMake is expected to provide their own configuration files which dependent
 software will locate and use. Not all of OpenVDB's dependencies provide CMake
 support and therefore do not deploy with CMake configurations that OpenVDB can
 use. OpenVDB provides a set of `FindModules` in the `cmake` folder for finding
-these various dependencies e.g. `FindBlosc.cmake`. These are designed such
+these various dependencies. These are designed such
 that they can theoretically be used by any project that needs to locate the
 given library and are invoked by the `find_package()` call. For more
 information on FindModules and locating packages with CMake, see the following
@@ -75,7 +74,7 @@ Each CMake FindModule provides a description of the possible inputs which can
 be provided to help drive the search for OpenVDB dependencies (as well as the
 resulting outputs). They have been homogenized such that these variables
 follow a set convention, typically followed by most CMake projects. For a
-given FindModule e.g. `FindBlosc.cmake`:
+given FindModule:
 
   - FindXxx.cmake provides the module interface where Xxx becomes the library
   name
@@ -88,7 +87,7 @@ given FindModule e.g. `FindBlosc.cmake`:
    - @b Xxx_ROOT - Preferred installation prefix. The given dependency is
    expected to follow a folder structure `Xxx_ROOT/include` and `Xxx_ROOT/lib`
    exist. Note that unlike the above, this is the case matching name of the
-   find package .i.e. Blosc_ROOT, TBB_ROOT etc.
+   find package .i.e. TBB_ROOT etc.
    - @b XXX_INCLUDEDIR / @b XXX_LIBRARYDIR - Preferred include and library
    directories
    - @b SYSTEM_LIBRARY_PATHS - A list of paths appended to all include and lib
@@ -144,26 +143,21 @@ respectively.
 In summary try to stick to a single installation workflow and, if in doubt,
 provide direct include/lib paths to isolated software locations.
 
-@subsection buildBloscSupport Blosc Support
-
-Blosc is an optional dependency of all OpenVDB components. The documented
-build steps below treat blosc as a required dependency. There are two reasons
-for this:
-
- - Blosc produces significantly smaller `.vdb` files
- - If Blosc is disabled, you will not be able to read or use any `.vdb` files
-   that were created using blosc compression. This includes OpenVDB files from
-   Houdini.
-
-See the note in the [known issues list](@ref depKnownIssues) regarding supported
-versions of blosc.
-
 @subsection buildZLibSupport ZLIB Support
 
 ZLIB is an optional dependency of all OpenVDB components. The documented build
 steps below treat ZLib as a required dependency.
 
-You can disable ZLib using `-D USE_ZLIB=OFF` if Blosc is also disabled using `-D USE_BLOSC=OFF`.
+You can disable ZLib using `-D USE_ZLIB=OFF`.
+
+@subsection buildZstdSupport Zstd Support
+
+Zstd is an optional dependency of the OpenVDB core library. The documented
+build steps below treat Zstd as a required dependency.
+
+You can disable Zstd using `-D USE_ZSTD=OFF`. The zstd CMake config files are used
+if found, otherwise zstd is located manually. Use `-D Zstd_ROOT=<prefix>` to
+point at a specific installation.
 
 @subsection buildVCPKG Building Dependencies using VCPKG
 
@@ -268,8 +262,8 @@ Developers may wish to build a standalone version of OpenVDB to take advantage
 of newer dependencies and newer library features. See
 [here](@ref buildBuildStandalone) for more information.
 
-@b Note: Blosc and ZLib are treated as required dependencies in these install
-instructions. See the [blosc support](@ref buildBloscSupport) and
+@b Note: ZLib is treated as a required dependency in these install
+instructions. See the
 [zlib support](@ref buildZLibSupport) sections for more information.
 
 @subsection buildBuildHouMaya Building Against Houdini/Maya
@@ -302,14 +296,13 @@ C++17 Compiler | Matching Houdini compiler and version                          
 GoogleTest     | A unit testing framework module for C++                         | Unit Tests         |
 GLFW           | Simple API for OpenGL development                               | OpenVDB View       |
 Doxygen        | Documentation generation from C++                               | Documentation      |
-Log4cplus      | An optional dependency for improved OpenVDB Logging             | Optional (All)     |
 nanobind       | C++/python bindings                                             | Optional (Python)  |
 LLVM           | Target-independent code generation                              | OpenVDB AX         |
 
 At a minimum a matching C++17 compiler and CMake will be required. See
 the full [dependency list](@ref dependencies) for help with downloading and
-installing the above software. Note that as Blosc and ZLib are provided as part
-of the Houdini installation `USE_BLOSC` and `USE_ZLIB` should be left `ON`.
+installing the above software. Note that as ZLib is provided as part
+of the Houdini installation `USE_ZLIB` should be left `ON`.
 
 With the necessary dependencies installed, create and enter a directory for
 cmake to write to. It's generally useful to create this in the location you've
@@ -384,20 +377,16 @@ Package        | Description                                                    
 CMake          | Cross-platform family of tools designed to help build software    | All                              |
 C++17 Compiler | Matching Houdini compiler and version                             | All                              |
 ZLIB           | Compression library for disk serialization compression            | All                              |
-Blosc          | Recommended dependency for improved disk compression              | All*                             |
 GoogleTest     | A unit testing framework module for C++                           | Unit Tests                       |
 GLFW           | Simple API for OpenGL development                                 | OpenVDB View                     |
 Doxygen        | Documentation generation from C++                                 | Documentation                    |
 OpenEXR        | EXR serialization support                                         | OpenVDB Render                   |
 Imath          | Used half precision floating points and EXR serialization support | Optional (All)                   |
-Log4cplus      | An optional dependency for improved OpenVDB Logging               | Optional (All)                   |
 nanobind       | C++/python bindings                                               | Optional (Python)                |
 LLVM           | Target-independent code generation                                | OpenVDB AX                       |
 
 
-* See [blosc support](@ref buildBloscSupport)
-
-At a minimum, a matching C++17 compiler, ZLIB, blosc and CMake will be
+At a minimum, a matching C++17 compiler, ZLIB and CMake will be
 required. See the full [dependency list](@ref dependencies) for help with
 downloading and installing the above software.
 
@@ -535,9 +524,9 @@ these options directly, they both default to `ON`. This ensures that OpenVDB
 has installed the required CMake modules that your application will need to
 use.
 
-@b Note: Typically, projects provide a @b Config-file rather than a
-@b Find-module for downstream use. OpenVDB currently provides a @b Find-module.
-This may change in the future. Further information
+OpenVDB installs both a @b Config-file and a @b Find-module. The Config-file
+is preferred, as it provides the imported targets together with their include
+paths, definitions and dependencies. Further information
 [here](https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html#using-packages).
 
 You can add the below CMake snippet to your main `CMakeLists.txt` to bring in
@@ -545,15 +534,44 @@ OpenVDB as a dependency:
 
 @code{.cmake}
 cmake_minimum_required(VERSION 3.24)
-list(APPEND CMAKE_MODULE_PATH "/location/of/openvdb/install/lib/cmake/OpenVDB")
-find_package(OpenVDB REQUIRED)
+list(APPEND CMAKE_PREFIX_PATH "/location/of/openvdb/install")
+find_package(OpenVDB CONFIG REQUIRED)
 target_link_libraries(myapp OpenVDB::openvdb)
 @endcode
 
+`OpenVDB::openvdb` is the shared library if it was installed, otherwise the
+static library. `OpenVDB::openvdb_shared` and `OpenVDB::openvdb_static` select
+a library explicitly. When the static library is installed, the zlib and zstd
+libraries it was built with must also be available to your project.
+
+Without the `CONFIG` keyword, CMake uses the Find-module if the OpenVDB CMake
+module directory is in `CMAKE_MODULE_PATH`, and the Config-file otherwise:
+
+@code{.cmake}
+list(APPEND CMAKE_MODULE_PATH "/location/of/openvdb/install/lib/cmake/OpenVDB")
+find_package(OpenVDB REQUIRED)
+@endcode
+
+OpenVDB AX is available through the `openvdb_ax` component, which provides
+`OpenVDB::openvdb_ax` and needs LLVM to be available to your project:
+
+@code{.cmake}
+find_package(OpenVDB CONFIG REQUIRED COMPONENTS openvdb openvdb_ax)
+target_link_libraries(myapp OpenVDB::openvdb_ax)
+@endcode
+
+NanoVDB installs its own Config-file. Use it directly, or request the
+`nanovdb` component of OpenVDB, which provides `OpenVDB::nanovdb`:
+
+@code{.cmake}
+find_package(NanoVDB CONFIG REQUIRED)
+target_link_libraries(myapp NanoVDB::nanovdb)
+@endcode
+
 `myapp` in the above is a CMake target, usually created with `add_library()`
-or `add_executable()`. You can optionally provide `CMAKE_MODULE_PATH` as a
-`-D` argument to the cmake command line instead of specifying it in your
-`CMakeLists.txt`.
+or `add_executable()`. You can optionally provide `CMAKE_PREFIX_PATH` (or
+`CMAKE_MODULE_PATH` when using the Find-module) as a `-D` argument to the
+cmake command line instead of specifying it in your `CMakeLists.txt`.
 
 Note that the `FindOpenVDB.cmake` module relies on the other `FindModules`
 provided in the OpenVDB installation to find it's own dependencies. This may

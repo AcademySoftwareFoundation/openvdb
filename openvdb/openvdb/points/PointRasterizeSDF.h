@@ -338,11 +338,6 @@ struct EllipsoidSettings
     /// @details  This can be useful to override the position of a point in
     ///   index space. If it exists, it must be a Vec3d type.
     std::string pws = "";
-
-    /// Old style "xform" attribute which has since been renamed and ONLY
-    /// supported rotation. If set, will be prioritised and infered to only
-    /// hold a rotation. This will be removed and should not be used.
-    OPENVDB_DEPRECATED_MESSAGE("Use EllipsoidSettings::xform") std::string rotation = "";
 };
 
 OPENVDB_NO_DEPRECATION_WARNING_END

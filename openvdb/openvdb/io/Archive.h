@@ -12,6 +12,7 @@
 
 #include "Codec.h"
 #include "Compression.h" // for COMPRESS_ZIP, etc.
+#include "io.h" // for StreamMetadata
 
 #include <cstdint>
 #include <iosfwd>
@@ -71,6 +72,7 @@ public:
     void setInstancingEnabled(bool b) { mEnableInstancing = b; }
 
     /// Return @c true if the OpenVDB library includes support for the Blosc compressor.
+    /// @note Blosc is always built in, so this always returns @c true.
     static bool hasBloscCompression();
 
     /// Return @c true if the OpenVDB library includes support for the ZLib compressor.
