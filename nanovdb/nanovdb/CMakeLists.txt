@@ -41,6 +41,7 @@ option(NANOVDB_BUILD_PYTHON_MODULE "Build the nanovdb Python module" OFF)
 
 option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" OFF)
 option(NANOVDB_USE_CUDA "Build with CUDA support" OFF)
+option(NANOVDB_USE_NCCL "Build with NCCL support in cuda/DeviceMesh.h (requires CUDA)" OFF)
 option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
 option(NANOVDB_CUDA_WERROR "Treat all NVCC diagnostics as errors" ON)
 option(NANOVDB_FETCH_CCCL "Clone CCCL NANOVDB_CCCL_TAG instead of using the CUDA toolkit's CCCL" OFF)
@@ -68,6 +69,13 @@ if(NANOVDB_USE_OPENVDB)
     If you are linking NanoVDB against OpenVDB, then you
     need to use TBB, (i.e. -DNANOVDB_USE_TBB=ON).")
   endif()
+endif()
+
+if(NANOVDB_USE_NCCL AND NOT NANOVDB_USE_CUDA)
+  message(FATAL_ERROR "Invalid CMake build configuration:
+    NANOVDB_USE_NCCL : [ON]
+    NANOVDB_USE_CUDA : [OFF]
+  NCCL support requires CUDA, (i.e. -DNANOVDB_USE_CUDA=ON).")
 endif()
 
 
@@ -205,7 +213,9 @@ if(NANOVDB_USE_CUDA)
     )
   endif()
 
-  find_package(NCCL)
+  if(NANOVDB_USE_NCCL)
+    find_package(NCCL REQUIRED)
+  endif()
 endif()
 
 if(NANOVDB_USE_OPENVDB)
@@ -440,15 +450,11 @@ endif()
 
 if(NANOVDB_USE_CUDA)
   target_compile_definitions(nanovdb INTERFACE -DNANOVDB_USE_CUDA)
-  if(NOT CMAKE_CUDA_ARCHITECTURES)
-    target_compile_options(nanovdb INTERFACE
-      "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:-arch=sm_75>")
-  endif()
 
   # Add CUDA includes to any C++ units which use NanoVDB
   target_link_libraries(nanovdb INTERFACE CCCL::CCCL CUDA::cudart)
 
-  if(NCCL_FOUND)
+  if(NANOVDB_USE_NCCL)
     target_compile_definitions(nanovdb INTERFACE -DNANOVDB_USE_NCCL)
     target_link_libraries(nanovdb INTERFACE NCCL::NCCL)
   endif()
@@ -533,7 +539,7 @@ set(NANOVDB_CMAKE_FILES
 if(NANOVDB_USE_TBB)
   list(APPEND NANOVDB_CMAKE_FILES ${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindTBB.cmake)
 endif()
-if(NANOVDB_USE_CUDA AND NCCL_FOUND)
+if(NANOVDB_USE_NCCL)
   list(APPEND NANOVDB_CMAKE_FILES ${CMAKE_CURRENT_LIST_DIR}/../../cmake/FindNCCL.cmake)
 endif()
 

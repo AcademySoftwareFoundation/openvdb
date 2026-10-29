@@ -66,4 +66,4 @@ When NanoVDB is installed with OpenVDB, `find_package(OpenVDB CONFIG COMPONENTS 
 
 `find_package(NanoVDB 32 CONFIG)` only accepts an installation with the same major version, which tracks the NanoVDB ABI and file format. A NanoVDB installed with `NANOVDB_USE_CUDA=ON` requires CUDA 12.0 or newer and CCCL 2.8 or newer, which it looks for in the CUDA toolkit. `NanoVDB::nanovdb` sets the `NANOVDB_INCLUDE_DIR` target property to the directory holding the `nanovdb/` headers, for projects that bundle them.
 
-With `NANOVDB_USE_CUDA=ON`, a NanoVDB build uses a `CCCL::CCCL` target the parent project already defines, then the CUDA toolkit's CCCL. It clones the CCCL release named by `NANOVDB_CCCL_TAG` only when neither is found, or when `NANOVDB_FETCH_CCCL=ON`.
+With `NANOVDB_USE_CUDA=ON`, a NanoVDB build uses a `CCCL::CCCL` target the parent project already defines, then the CUDA toolkit's CCCL. It clones the CCCL release named by `NANOVDB_CCCL_TAG` only when neither is found, or when `NANOVDB_FETCH_CCCL=ON`. NCCL support in `nanovdb/cuda/DeviceMesh.h` is off unless `NANOVDB_USE_NCCL=ON`, and an installation built with it also requires NCCL.
