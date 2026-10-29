@@ -66,8 +66,8 @@ jobs:
           - { cxx: g++,       cudahostcxx: g++,     image: '2027',          build: 'Release' }
           # nvcc 13.1 does not support clang 22 as a host compiler (its front end
           # fails on clang's avx512 intrinsic headers), so use the clang 21 image.
-          - { cxx: clang++,   cudahostcxx: clang++, image: '2027-clang21.1', build: 'Release' }
-          - { cxx: clang++,   cudahostcxx: clang++, image: '2027-clang21.1', build: 'Debug' }
+          - { cxx: clang++,   cudahostcxx: clang++, image: '2027-clang21',  build: 'Release' }
+          - { cxx: clang++,   cudahostcxx: clang++, image: '2027-clang21',  build: 'Debug' }
           # clang 22 for the host code, g++ for the .cu code
           - { cxx: clang++,   cudahostcxx: g++,     image: '2027',          build: 'Release' }
       fail-fast: false
@@ -92,7 +92,6 @@ jobs:
           -DCMAKE_CUDA_ARCHITECTURES="80"
           -DNANOVDB_USE_OPENVDB=ON
           -DCMAKE_INSTALL_PREFIX=`pwd`
-          -DUSE_BLOSC=ON
           -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           \'
       - name: test
@@ -194,7 +193,7 @@ jobs:
           cd nanovdb/nanovdb
           mkdir .build
           cd .build
-          cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install ../
+          cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_CUDA=OFF -DNANOVDB_USE_BLOSC=OFF -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install ../
           make -j8
           make install
           ctest -V

@@ -81,6 +81,7 @@ else()
     TestAttributeGroup.cc
     TestAttributeSet.cc
     TestBBox.cc
+    TestBloscHeaders.cc
     TestClip.cc
     TestCodec.cc
     TestConjGradient.cc
@@ -202,31 +203,13 @@ endif()
 
 add_executable(vdb_test ${UNITTEST_SOURCE_FILES})
 
-# Blosc and ZLib are hidden dependencies for the core library
-# (not exposed in headers), so we need to manually link them in
-# here to provide header access for the relevant unit tests
+# Blosc is a vendored, hidden dependency for the core library (not exposed
+# in headers), so we need to manually add its include directory here to
+# provide header access for the relevant unit tests
 
-if(USE_BLOSC OR OpenVDB_USES_BLOSC)
-  find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
-  list(APPEND OPENVDB_TEST_DEPENDENT_LIBS Blosc::blosc)
-endif()
-
-if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
-  if(USE_STATIC_DEPENDENCIES)
-    set(_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-    if(MSVC)
-      set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
-    else()
-      set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
-    endif()
-  endif()
-  find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
-  if(USE_STATIC_DEPENDENCIES)
-    set(CMAKE_FIND_LIBRARY_SUFFIXES ${_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
-    unset(_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
-  endif()
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS ZLIB::ZLIB)
-endif()
+target_include_directories(vdb_test PRIVATE
+  ${CMAKE_SOURCE_DIR}/ext/blosc/openvdb/ext/blosc
+)
 
 target_link_libraries(vdb_test ${OPENVDB_TEST_DEPENDENT_LIBS})
 add_test(NAME vdb_unit_test COMMAND $<TARGET_FILE:vdb_test> -v)

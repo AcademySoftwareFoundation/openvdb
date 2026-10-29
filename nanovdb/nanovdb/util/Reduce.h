@@ -21,6 +21,7 @@
 #else
 #include <thread>
 #include <future>
+#include <utility> // for std::move
 #include <vector>
 #endif
 
@@ -99,34 +100,6 @@ inline T reduce(const ContainerT<ArgT...> &c, size_t grainSize, const T& identit
 }
 
 }// namespace util
-
-/// @brief Simple wrapper to the function defined above
-template <typename T, typename FuncT, typename JoinT>
-[[deprecated("Use nanovdb::util::reduce instead")]]
-inline T reduce(size_t begin, size_t end, size_t grainSize, const T& identity, const FuncT& func, const JoinT& join)
-{
-    util::Range1D range(begin, end, grainSize);
-    return util::reduce( range, identity, func, join );
-}
-
-/// @brief Simple wrapper that works with std::containers
-template <template<typename...> class ContainerT, typename... ArgT, typename T, typename FuncT, typename JoinT >
-[[deprecated("Use nanovdb::util::reduce instead")]]
-inline T reduce(const ContainerT<ArgT...> &c, const T& identity, const FuncT& func, const JoinT& join)
-{
-    util::Range1D range(0, c.size(), 1);
-    return util::reduce( range, identity, func, join );
-
-}
-
-/// @brief Simple wrapper that works with std::containers
-template <template<typename...> class ContainerT, typename... ArgT, typename T, typename FuncT, typename JoinT >
-[[deprecated("Use nanovdb::util::reduce instead")]]
-T reduce(const ContainerT<ArgT...> &c, size_t grainSize, const T& identity, const FuncT& func, const JoinT& join)
-{
-    util::Range1D range(0, c.size(), grainSize);
-    return util::reduce( range, identity, func, join );
-}
 
 }// namespace nanovdb
 

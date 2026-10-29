@@ -52,9 +52,9 @@ endif()
 
 ###### Version
 
-set(OpenVDB_MAJOR_VERSION 13)
-set(OpenVDB_MINOR_VERSION 1)
-set(OpenVDB_PATCH_VERSION 1)
+set(OpenVDB_MAJOR_VERSION 14)
+set(OpenVDB_MINOR_VERSION 0)
+set(OpenVDB_PATCH_VERSION 0)
 set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}")
 
 project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
@@ -105,7 +105,7 @@ option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)."
 cmake_dependent_option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON "NOT WIN32" OFF)
 option(USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
-When enabled, you do not need to provide dependency locations for TBB, Blosc, Imath and OpenEXR.
+When enabled, you do not need to provide dependency locations for TBB, Imath and OpenEXR.
 Imath/OpenEXR can optionally be provided.]=] OFF)
 option(USE_MAYA [=[
 Build the library against a Maya installation. Turns on automatically if OPENVDB_BUILD_MAYA_PLUGIN is enabled.
@@ -113,12 +113,18 @@ When enabled, you do not need to provide dependency locations for TBB. All other
 option(USE_TBB [=[
 Use TBB in building the NanoVDB library.]=] ON)
 option(USE_BLOSC [=[
-Use blosc while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
-openvdb build configuration to decide on blosc support. You may set this to on to force blosc to be used if you
-know it to be required.]=] ON)
+Deprecated, has no effect. OpenVDB no longer depends on Blosc.
+A subset of Blosc+LZ4 is now included in the OpenVDB core library.]=] OFF)
+if(USE_BLOSC)
+  message(DEPRECATION "The USE_BLOSC option has no effect. OpenVDB no longer depends on Blosc.
+  A subset of Blosc+LZ4 is now included in the OpenVDB core library.")
+endif()
 option(USE_ZLIB [=[
 Use zlib while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
-openvdb build configuration to decide on zlib support. ZLib can only be disabled if Blosc is also disabled. ]=] ON)
+openvdb build configuration to decide on zlib support.]=] ON)
+option(USE_ZSTD [=[
+Build the openvdb core library with Zstd support. This is a private dependency of shared builds.
+If OPENVDB_BUILD_CORE is OFF, the setting is read from the installed openvdb version.h instead.]=] ON)
 option(USE_LOG4CPLUS [=[
 Deprecated, has no effect. OpenVDB no longer depends on log4cplus. See openvdb::logging::Sink
 for the replacement API.]=] OFF)
@@ -198,10 +204,6 @@ if(NOT CONCURRENT_MALLOC)
 elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
   message(WARNING "Unrecognized value for CONCURRENT_MALLOC, using Auto instead.")
   set(CONCURRENT_MALLOC Auto CACHE STRING FORCE)
-endif()
-
-if(USE_BLOSC AND NOT USE_ZLIB)
-  message(WARNING "ZLib can only be disabled if Blosc is also disabled. Enabling ZLib.")
 endif()
 
 if(USE_NANOVDB)
@@ -310,6 +312,7 @@ if(SKBUILD)
   set(OPENVDB_INSTALL_BINDIR openvdb/${CMAKE_INSTALL_BINDIR})
   set(OPENVDB_INSTALL_LIBDIR openvdb/${CMAKE_INSTALL_LIBDIR})
   set(OPENVDB_INSTALL_INCLUDEDIR openvdb/${CMAKE_INSTALL_INCLUDEDIR})
+  set(OPENVDB_INSTALL_DOCDIR openvdb/${CMAKE_INSTALL_DOCDIR})
 
   if(OPENVDB_BUILD_NANOVDB)
     set(NANOVDB_INSTALL_BINDIR nanovdb/${CMAKE_INSTALL_BINDIR})
@@ -321,6 +324,7 @@ else()
   set(OPENVDB_INSTALL_BINDIR ${CMAKE_INSTALL_BINDIR})
   set(OPENVDB_INSTALL_LIBDIR ${CMAKE_INSTALL_LIBDIR})
   set(OPENVDB_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR})
+  set(OPENVDB_INSTALL_DOCDIR ${CMAKE_INSTALL_DOCDIR})
 
   if(OPENVDB_BUILD_NANOVDB)
     set(NANOVDB_INSTALL_BINDIR ${CMAKE_INSTALL_BINDIR})
@@ -332,11 +336,11 @@ endif()
 
 if(OPENVDB_INSTALL_CMAKE_MODULES)
   set(OPENVDB_CMAKE_MODULES
-    cmake/FindBlosc.cmake
     cmake/FindJemalloc.cmake
     cmake/FindOpenEXR.cmake
     cmake/FindOpenVDB.cmake
     cmake/FindTBB.cmake
+    cmake/FindZstd.cmake
     cmake/OpenVDBGLFW3Setup.cmake
     cmake/OpenVDBHoudiniSetup.cmake
     cmake/OpenVDBMayaSetup.cmake
@@ -444,9 +448,9 @@ endif()
 # Configure our cmake modules to only search for static libraries
 
 if(USE_STATIC_DEPENDENCIES)
-  set(BLOSC_USE_STATIC_LIBS ON)
   set(OPENEXR_USE_STATIC_LIBS ON)
   set(TBB_USE_STATIC_LIBS ON)
+  set(ZSTD_USE_STATIC_LIBS ON)
   set(JEMALLOC_USE_STATIC_LIBS ON)
   set(GTEST_USE_STATIC_LIBS ON)
   # @todo  glfw needs custom support.

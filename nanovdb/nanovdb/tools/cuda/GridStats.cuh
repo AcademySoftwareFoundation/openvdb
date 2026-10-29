@@ -362,13 +362,6 @@ void updateGridStats(NanoGrid<BuildT> *d_grid, StatsMode mode, cudaStream_t stre
 
 }// namespace tools::cuda
 
-template<typename BuildT>
-[[deprecated("Use nanovdb::cuda::updateGridStats instead")]]
-void cudaGridStats(NanoGrid<BuildT> *d_grid, tools::StatsMode mode = tools::StatsMode::Default, cudaStream_t stream = 0)
-{
-    tools::cuda::updateGridStats<BuildT>(d_grid, mode, stream);
-}
-
 } // namespace nanovdb
 
 #endif // NANOVDB_TOOLS_CUDA_GRIDSTATS_CUH_HAS_BEEN_INCLUDED

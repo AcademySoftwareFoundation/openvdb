@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 import argparse
 import os
+import re
 from pathlib import Path
 
 
@@ -66,7 +67,6 @@ def update_files(dir_path):
             "Vec3<",
             "Vec4<",
             "BBox<",
-            "ZeroCrossing",
             "TreeMarcher",
             "PointTreeMarcher",
             "BoxStencil<",
@@ -129,17 +129,42 @@ def update_files(dir_path):
         # list from func4 in updateFiles.sh
         "nanovdb::build::": "nanovdb::tools::build::",
         "nanovdb::BBoxR": "nanovdb::Vec3dBBox",
-        "nanovdb::BBox<nanovdb::Vec3d>": "nanovdb::Vec3dBbox",
+        "nanovdb::BBox<nanovdb::Vec3d>": "nanovdb::Vec3dBBox",
         # scope and rename, i.e. list from func2 in updateFiles.sh
         "nanovdb::cudaCreateNodeManager": "nanovdb::cuda::createNodeManager",
-        "nanovdb::cudaVoxelsToGrid": "nanovdb::cuda::voxelsToGrid",
-        "nanovdb::cudaPointsToGrid": "nanovdb::cuda::pointsToGrid",
         "nanovdb::DitherLUT": "nanovdb::math::DitherLUT",
         "nanovdb::PackedRGBA8": "nanovdb::math::Rgba8",
         "nanovdb::Rgba8": "nanovdb::math::Rgba8",
         "nanovdb::CpuTimer": "nanovdb::util::Timer",
         "nanovdb::GpuTimer": "nanovdb::util::cuda::Timer",
         "nanovdb::CountOn": "nanovdb::util::countOn",
+        "nanovdb::nanoToOpenVDB": "nanovdb::tools::nanoToOpenVDB",
+        "nanovdb::openToNanoVDB": "nanovdb::tools::openToNanoVDB",
+    }
+
+    regex_dic = {
+        # list from func5 in updateFiles.sh
+        # renamed functions, whether or not the old spelling is namespace-qualified
+        r"(nanovdb::)?(math::)?\bZeroCrossingNode\b": "nanovdb::math::zeroCrossingNode",
+        r"(nanovdb::)?(math::)?\bZeroCrossing\b": "nanovdb::math::zeroCrossing",
+        r"(nanovdb::)?\bFindLowestOn\b": "nanovdb::util::findLowestOn",
+        r"(nanovdb::)?\bFindHighestOn\b": "nanovdb::util::findHighestOn",
+        r"(nanovdb::)?\bmapToGridType\b": "nanovdb::toGridType",
+        r"(nanovdb::)?\bmapToGridClass\b": "nanovdb::toGridClass",
+        # pointsToGrid has no default voxel size, so a call that relied on it needs an explicit 1.0
+        r"(nanovdb::)?\bcudaPointsToGrid\b": "nanovdb::tools::cuda::pointsToGrid",
+        r"(nanovdb::)?\bcudaVoxelsToGrid\b": "nanovdb::tools::cuda::voxelsToGrid",
+        r"(nanovdb::)?\bcudaIndexToGrid\b": "nanovdb::tools::cuda::indexToGrid",
+        r"(nanovdb::)?\bcudaCreateNanoGrid\b": "nanovdb::tools::cuda::indexToGrid",
+        r"(nanovdb::)?\bcudaSignedFloodFill\b": "nanovdb::tools::cuda::signedFloodFill",
+        r"(nanovdb::)?\bcudaAddBlindData\b": "nanovdb::tools::cuda::addBlindData",
+        r"(nanovdb::)?\bcudaGridStats\b": "nanovdb::tools::cuda::updateGridStats",
+        r"(nanovdb::)?\bcudaIsValid\b": "nanovdb::tools::cuda::isValid",
+        r"\bcudaLambdaKernel\b": "nanovdb::util::cuda::lambdaKernel",
+        # these now take a grid pointer instead of a reference, so the argument may also need an &
+        r"\b(nanovdb::(tools::)?|tools::)gridStats\b": "nanovdb::tools::updateGridStats",
+        r"\b(nanovdb::(tools::)?|tools::)checksum\b": "nanovdb::tools::evalChecksum",
+        r"\bisPartial\(\)": "isHalf()",
     }
 
     movdir_dic = {
@@ -153,7 +178,7 @@ def update_files(dir_path):
         "util/HDDA.h": "math/HDDA.h",
         "util/Ray.h": "math/Ray.h",
         "util/SampleFromVoxels.h": "math/SampleFromVoxels.h",
-        "util/Stencils.h": "nanovdb/math/Stencils.h",
+        "util/Stencils.h": "math/Stencils.h",
         "util/CreateNanoGrid.h": "tools/CreateNanoGrid.h",
         "util/Primitives.h": "tools/CreatePrimitives.h",
         "util/GridChecksum.h": "tools/GridChecksum.h",
@@ -161,13 +186,18 @@ def update_files(dir_path):
         "util/GridChecksum.h": "tools/GridChecksum.h",
         "util/GridValidator.h": "tools/GridValidator.h",
         "util/NanoToOpenVDB.h": "tools/NanoToOpenVDB.h",
-        "util/cuda/CudaGridChecksum.cuh": "tools/cuda/CudaGridChecksum.cuh",
-        "util/cuda/CudaGridStats.cuh": "tools/cuda/CudaGridStats.cuh",
-        "util/cuda/CudaGridValidator.cuh": "tools/cuda/CudaGridValidator.cuh",
-        "util/cuda/CudaIndexToGrid.cuh": "tools/cuda/CudaIndexToGrid.cuh",
+        "util/OpenToNanoVDB.h": "tools/CreateNanoGrid.h",
+        "util/CpuTimer.h": "util/Timer.h",
+        "util/HostBuffer.h": "HostBuffer.h",
+        "util/NodeManager.h": "NodeManager.h",
+        "util/cuda/CudaGridChecksum.cuh": "tools/cuda/GridChecksum.cuh",
+        "util/cuda/CudaGridStats.cuh": "tools/cuda/GridStats.cuh",
+        "util/cuda/CudaGridValidator.cuh": "tools/cuda/GridValidator.cuh",
+        "util/cuda/CudaIndexToGrid.cuh": "tools/cuda/IndexToGrid.cuh",
         "util/cuda/CudaPointsToGrid.cuh": "tools/cuda/PointsToGrid.cuh",
-        "util/cuda/CudaSignedFloodFill.cuh": "tools/cuda/CudaSignedFloodFill.cuh",
-        "util/cuda/CudaDeviceBuffer.h": "cuda/DeviceBuffer.h",
+        "util/cuda/CudaSignedFloodFill.cuh": "tools/cuda/SignedFloodFill.cuh",
+        "util/cuda/CudaAddBlindData.cuh": "tools/cuda/AddBlindData.cuh",
+        "util/cuda/CudaNodeManager.cuh": "cuda/NodeManager.cuh",
         "util/cuda/CudaGridHandle.cuh": "cuda/GridHandle.cuh",
         "util/cuda/CudaUtils.h": "util/cuda/Util.h",
         "util/cuda/GpuTimer.h": "util/cuda/Timer.h",
@@ -192,6 +222,10 @@ def update_files(dir_path):
                 # Correspond to func4 and func2 in updateFiles.sh
                 for key, val in rename_dic.items():
                     content = content.replace(key, val)
+
+                # Correspond to func5 in updateFiles.sh
+                for key, val in regex_dic.items():
+                    content = re.sub(key, val, content)
 
                 # Correspond to func3 in updateFiles.sh
                 for key, val in movdir_dic.items():

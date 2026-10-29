@@ -675,42 +675,6 @@ TEST_F(TestFunctionTypes, testFunctionCreate)
     ASSERT_TRUE(M.getFunction("ax.vptrs.test"));
     ASSERT_EQ(function, M.getFunction("ax.vptrs.test"));
     ASSERT_EQ(function, test->create(M));
-
-    //
-    // Test creation with builder methods
-    // @note  These methods may be moved to the constructor in the future
-
-    ASSERT_TRUE(test->dependencies().empty());
-    ASSERT_TRUE(!test->hasParamAttribute(0, llvm::Attribute::ReadOnly));
-    ASSERT_TRUE(!test->hasParamAttribute(-1, llvm::Attribute::ReadOnly));
-
-    test->setDependencies({"dep"});
-    ASSERT_EQ(size_t(1), test->dependencies().size());
-    ASSERT_EQ(std::string("dep"), std::string(test->dependencies().front()));
-
-    test->setDependencies({});
-    ASSERT_TRUE(test->dependencies().empty());
-
-    test->setFnAttributes({llvm::Attribute::ReadOnly});
-    test->setRetAttributes({llvm::Attribute::NoAlias});
-    test->setParamAttributes(1, {llvm::Attribute::WriteOnly});
-    test->setParamAttributes(-1, {llvm::Attribute::WriteOnly});
-
-    ASSERT_TRUE(!test->hasParamAttribute(0, llvm::Attribute::WriteOnly));
-    ASSERT_TRUE(!test->hasParamAttribute(2, llvm::Attribute::WriteOnly));
-    ASSERT_TRUE(test->hasParamAttribute(1, llvm::Attribute::WriteOnly));
-    ASSERT_TRUE(test->hasParamAttribute(-1, llvm::Attribute::WriteOnly));
-
-    function = test->create(C);
-    ASSERT_TRUE(function);
-    llvm::AttributeList list = function->getAttributes();
-    ASSERT_TRUE(!list.isEmpty());
-    ASSERT_TRUE(!list.hasParamAttrs(0));
-    ASSERT_TRUE(!list.hasParamAttrs(2));
-    ASSERT_TRUE(list.hasParamAttr(1, llvm::Attribute::WriteOnly));
-    ASSERT_TRUE(list.hasFnAttr(llvm::Attribute::ReadOnly));
-    ASSERT_TRUE(list.hasRetAttr(llvm::Attribute::NoAlias));
-    delete function;
 }
 
 // Test Function::call
@@ -1376,32 +1340,6 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
         }
    }
 
-   //
-   // Test array matches with readonly marking
-
-   for (const ArgInfoVector& types : arrays) {
-        // test these array types
-        for (size_t i = 0; i < types.size(); ++i) {
-            test.reset(new unittest_util::TestFunction({types[i]}, ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
-            test->setParamAttributes(0, {llvm::Attribute::ReadOnly});
-            ArgInfoVector copy(types);
-            copy[i] = copy.back();
-            copy.pop_back();
-            ASSERT_EQ(size_t(2), copy.size());
-            ASSERT_EQ(Function::Explicit, test->match({types[i]}, C));
-            ASSERT_EQ(Function::Implicit, test->match({copy[0]}, C));
-            ASSERT_EQ(Function::Implicit, test->match({copy[1]}, C));
-
-            // test non matching size arrays
-            for (const ArgInfoVector& inputs : arrays) {
-                if (&types == &inputs) continue;
-                for (size_t i = 0; i < inputs.size(); ++i) {
-                    ASSERT_EQ(Function::Size, test->match({inputs[i]}, C));
-                }
-            }
-        }
-    }
-
     // test strings
     {
         test.reset(new unittest_util::TestFunction({ArgInfo(LLVMType<char>::get(C), 1)},
@@ -1409,15 +1347,6 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
         ASSERT_EQ(Function::Size,
             test->match({ArgInfo(LLVMType<openvdb::ax::codegen::String>::get(C), 1)}, C));
         ASSERT_EQ(Function::Explicit,
-            test->match({ArgInfo(LLVMType<char>::get(C), 1)}, C));
-
-        test->setParamAttributes(0, {llvm::Attribute::ReadOnly});
-        ASSERT_EQ(Function::Implicit,
-            test->match({ArgInfo(LLVMType<openvdb::ax::codegen::String>::get(C), 1)}, C));
-
-        test.reset(new unittest_util::TestFunction({ArgInfo(LLVMType<openvdb::ax::codegen::String>::get(C), 1)},
-            ArgInfo(llvm::Type::getVoidTy(C)), "ax.test"));
-        ASSERT_EQ(Function::Size,
             test->match({ArgInfo(LLVMType<char>::get(C), 1)}, C));
     }
 
@@ -1432,13 +1361,6 @@ TEST_F(TestFunctionTypes, testFunctionMatch)
 
         ASSERT_EQ(Function::Explicit,
             test->match({fss, dss}, C));
-        ASSERT_EQ(Function::Size,
-            test->match({fss, fss}, C));
-
-        // Even if pointers are marked as readonly, casting is not supported
-        test->setParamAttributes(0, {llvm::Attribute::ReadOnly});
-        test->setParamAttributes(1, {llvm::Attribute::ReadOnly});
-
         ASSERT_EQ(Function::Size,
             test->match({fss, fss}, C));
     }

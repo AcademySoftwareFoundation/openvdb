@@ -6,7 +6,7 @@
 /// @brief Unit tests for the typed, resource-aware CUDA containers
 ///        (cuda::Buffer, cuda::BufferView), the synchronous Resource trait
 ///        (cuda::is_resource), and that the GPU grid builders produce
-///        byte-identical grids into single-space and dual-space buffers.
+///        byte-identical grids into buffers over different resources.
 
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/cuda/Buffer.h>
@@ -16,10 +16,7 @@
 #include <nanovdb/tools/cuda/PointsToGrid.cuh> // voxelsToGrid / pointsToGrid, and inputs for the builder equivalence tests
 #include <nanovdb/cuda/GridHandle.cuh> // for cuda::mergeGridHandles / splitGridHandles
 #include <nanovdb/cuda/ManagedResource.h>
-#include <nanovdb/cuda/NodeManager.cuh> // for the dual-space node-manager transfers
-#include <nanovdb/cuda/UnifiedBuffer.h> // for the dual-space unified transfers
 #include <nanovdb/tools/cuda/VoxelBlockManager.cuh> // for the single-space entry-point test
-#include <nanovdb/cuda/DeviceBuffer.h> // the dual-space default of the prototype forms, compared against
 #include <nanovdb/tools/cuda/AddBlindData.cuh>
 #include <nanovdb/tools/cuda/CoarsenGrid.cuh>
 #include <nanovdb/tools/cuda/DilateGrid.cuh>
@@ -438,8 +435,8 @@ TEST(TestBuffer, ResourceRefSharesTheUnderlyingResource)
     EXPECT_EQ(res.deallocs, 1);
 }
 
-/// @brief A resource without operator==, which 13.2 deprecates and 14.0
-///        rejects. Constructed only under the deprecated-interface suppression below; trait probes elsewhere do not warn.
+/// @brief A resource without operator==, which Buffer and ResourceRef
+///        reject; used only in trait probes.
 struct NoEqualityResource : nanovdb::cuda::SyncFromAsync<NoEqualityResource>
 {
     static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
@@ -452,7 +449,7 @@ struct NoEqualityResource : nanovdb::cuda::SyncFromAsync<NoEqualityResource>
 };
 
 
-TEST(TestBuffer, DestroyIsTheSpellingClearDelegatesTo)
+TEST(TestBuffer, DestroyFreesOnceAndEmpties)
 {
     Counters c;
     nanovdb::cuda::Buffer<float, CountingResource> buf(0, CountingResource{&c}, 64, nanovdb::cuda::noInit);
@@ -610,6 +607,7 @@ static_assert(IsEqualityComparable<nanovdb::cuda::PinnedResource>::value, "Pinne
 static_assert(IsEqualityComparable<nanovdb::cuda::ManagedResource>::value, "ManagedResource needs ==");
 static_assert(IsEqualityComparable<nanovdb::cuda::AsyncFromSync<nanovdb::cuda::MallocResource>>::value, "AsyncFromSync needs ==");
 // The adapter is only as comparable as what it wraps.
+static_assert(!IsEqualityComparable<NoEqualityResource>::value, "a resource without == is not equality-comparable");
 static_assert(!IsEqualityComparable<nanovdb::cuda::AsyncFromSync<NoEqualityResource>>::value,
               "AsyncFromSync over a resource without == must not claim equality");
 
@@ -673,81 +671,12 @@ struct EqualityOnlyResource : nanovdb::cuda::SyncFromAsync<EqualityOnlyResource>
 };
 static_assert(IsEqualityComparable<EqualityOnlyResource>::value, "operator== alone suffices");
 
-//======================================================================
-// Deprecated interfaces, supported until 14.0 removes them
-//======================================================================
-
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-#if defined(_MSC_VER)
-#pragma warning(push)
-#pragma warning(disable : 4996)
-#endif
-#if defined(__CUDACC__)
-#pragma nv_diagnostic push
-#pragma nv_diag_suppress 1444
-#pragma nv_diag_suppress 20199
-#endif
-
-TEST(TestBuffer, ResizeDeprecatedArgumentOrderForwards)
-{
-    StreamLog log;
-    cudaStream_t c = nullptr;
-    ASSERT_EQ(cudaStreamCreate(&c), cudaSuccess);
-    {
-        nanovdb::cuda::Buffer<int, StreamRecordingResource> buf(0, StreamRecordingResource{&log}, 8, nanovdb::cuda::noInit);
-        buf.resize(size_t(16), c);
-        EXPECT_EQ(buf.size(), 16u);
-        EXPECT_EQ(buf.stream(), c);
-        EXPECT_EQ(log.allocStreams.back(), c);
-        buf.resize(0, 0); // two literal zeros: count 0 on the default stream in either order
-        EXPECT_TRUE(buf.empty());
-        EXPECT_EQ(buf.stream(), cudaStream_t(0));
-    }
-    ASSERT_EQ(cudaStreamSynchronize(c), cudaSuccess);
-    ASSERT_EQ(cudaStreamDestroy(c), cudaSuccess);
-}
-
-TEST(TestBuffer, ResizeRejectsNegativeCountInEitherOrder)
+TEST(TestBuffer, ResizeRejectsOverflowingCount)
 {
     nanovdb::cuda::Buffer<std::byte> buf(cudaStream_t(0), 8, nanovdb::cuda::noInit);
-    EXPECT_THROW(buf.resize(-1, cudaStream_t(0)), std::runtime_error);
     EXPECT_THROW(buf.resize(cudaStream_t(0), size_t(-1)), std::runtime_error);
     EXPECT_EQ(8u, buf.size()); // untouched
 }
-
-TEST(TestBuffer, ResizeDeprecatedOrderAcceptsBoolCount)
-{
-    nanovdb::cuda::Buffer<int> buf(cudaStream_t(0), 8, nanovdb::cuda::noInit);
-    buf.resize(true, cudaStream_t(0)); // converted to size_t, as the old signature did
-    EXPECT_EQ(1u, buf.size());
-    buf.resize({4}, cudaStream_t(0));   // a braced count, as the old size_t parameter accepted
-    EXPECT_EQ(4u, buf.size());
-    buf.resize(2.0, cudaStream_t(0));
-    EXPECT_EQ(2u, buf.size());
-    EXPECT_THROW(buf.resize(-1.5, cudaStream_t(0)), std::runtime_error);
-    EXPECT_EQ(2u, buf.size());
-}
-
-TEST(TestBuffer, ResourceRefWithoutResourceEqualityFallsBackToIdentity)
-{
-    NoEqualityResource a, b;
-    nanovdb::cuda::ResourceRef<NoEqualityResource> ra(a), raAgain(a), rb(b);
-    EXPECT_TRUE(ra == raAgain); // same underlying resource
-    EXPECT_TRUE(ra != rb);      // different underlying resources
-}
-
-#if defined(__CUDACC__)
-#pragma nv_diagnostic pop
-#endif
-#if defined(_MSC_VER)
-#pragma warning(pop)
-#endif
-#if defined(__GNUC__) || defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
 
 //======================================================================
 // Move semantics (Buffer is move-only) and explicit deep copy
@@ -1479,7 +1408,7 @@ TEST(TestBuffer, SingleSpaceNodeManager)
 TEST(TestBuffer, SingleSpaceToolEntryPoints)
 {
     // The builders allocate their result handle through createDeviceStorage,
-    // so a single-space buffer type works wherever a dual-space one does.
+    // so any single-space buffer type works.
     // voxelsToGrid stands in for the whole PointsToGrid family; the pool
     // buffer supplies the resource for the handle storage.
     nanovdb::Coord coords[2] = {nanovdb::Coord(1,2,3), nanovdb::Coord(10,20,8)}, *d_coords = nullptr;
@@ -1807,24 +1736,18 @@ TEST(TestBuffer, SingleSpaceVoxelBlockManager)
 }
 
 //======================================================================
-// The GPU builders write into a single-space buffer exactly what they write
-// into the dual-space buffer that the rest of the suite tests against
+// The GPU builders write the same grid into a device buffer and into a
+// managed buffer, i.e. whatever resource the output allocates through
 //======================================================================
 
-using SingleBufT = nanovdb::cuda::Buffer<std::byte>;
-using DualBufT   = nanovdb::cuda::DualDeviceBuffer;
+using SingleBufT  = nanovdb::cuda::Buffer<std::byte>;
+using ManagedBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>;
 
-/// @brief Host copy of a handle of either buffer family, for byte comparison.
+/// @brief Host copy of a device handle, for byte comparison.
 template<typename BufT>
 nanovdb::GridHandle<nanovdb::HostBuffer> hostImage(nanovdb::GridHandle<BufT>& handle)
 {
-    if constexpr (nanovdb::BufferTraits<BufT>::hasDeviceDual) {
-        auto host = nanovdb::HostBuffer::create(handle.bufferSize());
-        cudaCheck(cudaMemcpy(host.data(), handle.deviceData(), handle.bufferSize(), cudaMemcpyDeviceToHost));
-        return nanovdb::GridHandle<nanovdb::HostBuffer>(std::move(host));
-    } else {
-        return nanovdb::cuda::copyTo<nanovdb::HostBuffer>(handle, cudaStream_t(0));
-    }
+    return nanovdb::cuda::copyTo<nanovdb::HostBuffer>(handle, cudaStream_t(0));
 }
 
 /// @brief Requires two host images to hold the same, non-empty grids, byte for byte.
@@ -1838,17 +1761,17 @@ void expectSameBytes(const nanovdb::GridHandle<nanovdb::HostBuffer>& a, const na
     if (a.gridCount() > 0) EXPECT_GT(a.gridMetaData()->activeVoxelCount(), 0u); // not trivially equal
 }
 
-/// @brief Runs @a build once with a dual-space and once with a single-space
+/// @brief Runs @a build once with a device and once with a managed
 ///        prototype buffer, requires byte-identical, non-empty grids, and
 ///        returns the host image for further checks.
 template<typename BuildFn>
-nanovdb::GridHandle<nanovdb::HostBuffer> expectSameGridInBothFamilies(BuildFn build)
+nanovdb::GridHandle<nanovdb::HostBuffer> expectSameGridInBothResources(BuildFn build)
 {
-    auto dual   = build(DualBufT());
-    auto single = build(SingleBufT());
+    auto managed = build(ManagedBufT());
+    auto single  = build(SingleBufT());
     static_assert(std::is_same<decltype(single), nanovdb::GridHandle<SingleBufT>>::value,
                   "the builder must return a handle over the prototype's buffer type");
-    auto a = hostImage(dual);
+    auto a = hostImage(managed);
     expectSameBytes(a, hostImage(single));
     return a;
 }
@@ -1888,12 +1811,12 @@ IndexInput makeIndexInput()
     return {std::move(coords), std::move(d_coords), std::move(handle)};
 }
 
-TEST(TestBuffer, SingleSpaceDilateMatchesDual)
+TEST(TestBuffer, DilateMatchesAcrossResources)
 {
     using BuildT = nanovdb::ValueOnIndex;
     auto in = makeIndexInput<BuildT>();
     auto& input = in.handle;
-    expectSameGridInBothFamilies([&](const auto& proto) {
+    expectSameGridInBothResources([&](const auto& proto) {
         nanovdb::tools::cuda::DilateGrid<BuildT> op(input.deviceGrid<BuildT>());
         op.setOperation(nanovdb::tools::morphology::NN_FACE_EDGE_VERTEX);
         op.setChecksum(nanovdb::CheckMode::Full);
@@ -1901,7 +1824,7 @@ TEST(TestBuffer, SingleSpaceDilateMatchesDual)
     });
 }
 
-TEST(TestBuffer, SingleSpaceMergeMatchesDual)
+TEST(TestBuffer, MergeMatchesAcrossResources)
 {
     using BuildT = nanovdb::ValueOnIndex;
     auto inA = makeIndexInput<BuildT>();
@@ -1909,14 +1832,14 @@ TEST(TestBuffer, SingleSpaceMergeMatchesDual)
     const std::vector<nanovdb::Coord> coordsB = {nanovdb::Coord(-8,3,5), nanovdb::Coord(1,0,0), nanovdb::Coord(300,-40,9)};
     auto d_coordsB = toDevice(coordsB);
     auto b = nanovdb::tools::cuda::voxelsToGrid<BuildT, nanovdb::Coord*, SingleBufT>(d_coordsB.data(), coordsB.size(), 1.0, SingleBufT());
-    expectSameGridInBothFamilies([&](const auto& proto) {
+    expectSameGridInBothResources([&](const auto& proto) {
         nanovdb::tools::cuda::MergeGrids<BuildT> op(a.deviceGrid<BuildT>(), b.deviceGrid<BuildT>());
         op.setChecksum(nanovdb::CheckMode::Full);
         return op.getHandle(proto);
     });
 }
 
-TEST(TestBuffer, SingleSpacePruneMatchesDual)
+TEST(TestBuffer, PruneMatchesAcrossResources)
 {
     using BuildT = nanovdb::ValueOnIndex;
     auto in = makeIndexInput<BuildT>();
@@ -1928,7 +1851,7 @@ TEST(TestBuffer, SingleSpacePruneMatchesDual)
     std::vector<nanovdb::Mask<3>> masks(leafCount);
     for (auto& m : masks) m.setOn(0);
     auto d_masks = toDevice(masks);
-    auto pruned = expectSameGridInBothFamilies([&](const auto& proto) {
+    auto pruned = expectSameGridInBothResources([&](const auto& proto) {
         nanovdb::tools::cuda::PruneGrid<BuildT> op(input.deviceGrid<BuildT>(), d_masks.data());
         op.setChecksum(nanovdb::CheckMode::Full);
         return op.getHandle(proto);
@@ -1938,24 +1861,24 @@ TEST(TestBuffer, SingleSpacePruneMatchesDual)
     EXPECT_EQ(2u, pruned.gridMetaData()->nodeCount(0));
 }
 
-TEST(TestBuffer, SingleSpaceRefineAndCoarsenMatchDual)
+TEST(TestBuffer, RefineAndCoarsenMatchAcrossResources)
 {
     using BuildT = nanovdb::ValueOnIndex;
     auto in = makeIndexInput<BuildT>();
     auto& input = in.handle;
-    expectSameGridInBothFamilies([&](const auto& proto) {
+    expectSameGridInBothResources([&](const auto& proto) {
         nanovdb::tools::cuda::RefineGrid<BuildT> op(input.deviceGrid<BuildT>());
         op.setChecksum(nanovdb::CheckMode::Full);
         return op.getHandle(proto);
     });
-    expectSameGridInBothFamilies([&](const auto& proto) {
+    expectSameGridInBothResources([&](const auto& proto) {
         nanovdb::tools::cuda::CoarsenGrid<BuildT> op(input.deviceGrid<BuildT>());
         op.setChecksum(nanovdb::CheckMode::Full);
         return op.getHandle(proto);
     });
 }
 
-TEST(TestBuffer, SingleSpaceMeshToGridMatchesDual)
+TEST(TestBuffer, MeshToGridMatchesAcrossResources)
 {
     using BuildT = nanovdb::ValueOnIndex;
     const std::vector<nanovdb::Vec3f> points = {{0.f,0.f,0.f}, {1.f,0.f,0.f}, {0.f,1.f,0.f}, {0.f,0.f,1.f}};
@@ -1968,20 +1891,20 @@ TEST(TestBuffer, SingleSpaceMeshToGridMatchesDual)
         return nanovdb::tools::cuda::MeshToGrid<BuildT>(d_points.data(), uint32_t(points.size()),
                                                         d_triangles.data(), uint32_t(triangles.size()), map);
     };
-    expectSameGridInBothFamilies([&](const auto& proto) { auto op = makeOp(); return op.getHandle(proto); });
+    expectSameGridInBothResources([&](const auto& proto) { auto op = makeOp(); return op.getHandle(proto); });
 
-    // getHandleAndUDF: the grid and its distance sidecar, in both families
-    auto dual   = makeOp().getHandleAndUDF<DualBufT, DualBufT>();
-    auto single = makeOp().getHandleAndUDF<SingleBufT, SingleBufT>(SingleBufT(), SingleBufT());
-    expectSameBytes(hostImage(dual.first), hostImage(single.first));
-    ASSERT_EQ(dual.second.size(), single.second.size_bytes());
-    std::vector<std::byte> udfA(dual.second.size()), udfB(single.second.size_bytes());
-    ASSERT_EQ(cudaSuccess, cudaMemcpy(udfA.data(), dual.second.deviceData(), udfA.size(), cudaMemcpyDeviceToHost));
+    // getHandleAndUDF: the grid and its distance sidecar, with both resources
+    auto managed = makeOp().getHandleAndUDF<ManagedBufT, ManagedBufT>(ManagedBufT(), ManagedBufT());
+    auto single  = makeOp().getHandleAndUDF<SingleBufT, SingleBufT>(SingleBufT(), SingleBufT());
+    expectSameBytes(hostImage(managed.first), hostImage(single.first));
+    ASSERT_EQ(managed.second.size_bytes(), single.second.size_bytes());
+    std::vector<std::byte> udfA(managed.second.size_bytes()), udfB(single.second.size_bytes());
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(udfA.data(), managed.second.data(), udfA.size(), cudaMemcpyDefault));
     ASSERT_EQ(cudaSuccess, cudaMemcpy(udfB.data(), single.second.data(), udfB.size(), cudaMemcpyDeviceToHost));
     EXPECT_EQ(0, std::memcmp(udfA.data(), udfB.data(), udfA.size()));
 }
 
-TEST(TestBuffer, SingleSpaceIndexToGridMatchesDual)
+TEST(TestBuffer, IndexToGridMatchesAcrossResources)
 {
     using BuildT = nanovdb::ValueOnIndex;
     auto in = makeIndexInput<BuildT>();
@@ -1990,17 +1913,17 @@ TEST(TestBuffer, SingleSpaceIndexToGridMatchesDual)
     std::vector<float> values(valueCount);
     for (uint64_t i = 0; i < valueCount; ++i) values[i] = 0.5f * float(i);
     auto d_values = toDevice(values);
-    auto viaIndexToGrid = expectSameGridInBothFamilies([&](const auto& proto) {
+    auto viaIndexToGrid = expectSameGridInBothResources([&](const auto& proto) {
         return nanovdb::tools::cuda::indexToGrid<float, BuildT>(input.deviceGrid<BuildT>(), d_values.data(), proto);
     });
     // tools::cuda::createNanoGrid is a forwarder to indexToGrid: same grid
-    auto viaCreateNanoGrid = expectSameGridInBothFamilies([&](const auto& proto) {
+    auto viaCreateNanoGrid = expectSameGridInBothResources([&](const auto& proto) {
         return nanovdb::tools::cuda::createNanoGrid<float, BuildT>(input.deviceGrid<BuildT>(), d_values.data(), proto);
     });
     expectSameBytes(viaIndexToGrid, viaCreateNanoGrid);
 }
 
-TEST(TestBuffer, SingleSpaceAddBlindDataMatchesDual)
+TEST(TestBuffer, AddBlindDataMatchesAcrossResources)
 {
     auto in = makeIndexInput<float>();
     auto& input = in.handle;
@@ -2008,7 +1931,7 @@ TEST(TestBuffer, SingleSpaceAddBlindDataMatchesDual)
     for (size_t i = 0; i < blind.size(); ++i) blind[i] = 1.25f * float(i);
     auto d_blind = toDevice(blind);
     // Two additions: the second shifts the first's metadata offsets.
-    auto twice = expectSameGridInBothFamilies([&](const auto& proto) {
+    auto twice = expectSameGridInBothResources([&](const auto& proto) {
         auto once = nanovdb::tools::cuda::addBlindData(input.deviceGrid<float>(), d_blind.data(), blind.size(),
                                                        nanovdb::GridBlindDataClass::AttributeArray,
                                                        nanovdb::GridBlindDataSemantic::Unknown, "weights", proto);
@@ -2020,7 +1943,7 @@ TEST(TestBuffer, SingleSpaceAddBlindDataMatchesDual)
     EXPECT_EQ(2u, twice.gridData()->mBlindMetadataCount);
 }
 
-TEST(TestBuffer, MaxPointsPerVoxelPointsToGridInBothFamilies)
+TEST(TestBuffer, MaxPointsPerVoxelPointsToGridAcrossResources)
 {
     // The density-targeting overload, which nothing else instantiates.
     // Scattered points near the origin and their mirror at negative
@@ -2038,7 +1961,7 @@ TEST(TestBuffer, MaxPointsPerVoxelPointsToGridInBothFamilies)
     }
     auto d_points = toDevice(points);
     constexpr int maxPointsPerVoxel = 4, tolerance = 1;
-    auto host = expectSameGridInBothFamilies([&](const auto& proto) {
+    auto host = expectSameGridInBothResources([&](const auto& proto) {
         using BufT = std::decay_t<decltype(proto)>;
         return nanovdb::tools::cuda::pointsToGrid<nanovdb::Vec3f*, BufT>(d_points.data(), int(points.size()),
                                                                          maxPointsPerVoxel, tolerance, /*maxIterations=*/10,
@@ -2119,7 +2042,7 @@ TEST(TestBuffer, ResourceFormsOfTheGpuTools)
         // voxelsToGrid: the resource form matches the prototype form, and every
         // allocation (scratch and output) goes through the caller's resource.
         auto proto = nanovdb::tools::cuda::voxelsToGrid<float>(d_coords.data(), coords.size(), 1.0);
-        static_assert(std::is_same<decltype(proto), nanovdb::GridHandle<nanovdb::cuda::DualDeviceBuffer>>::value,
+        static_assert(std::is_same<decltype(proto), nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>>>::value,
                       "a call without a stream keeps selecting the prototype form");
         auto viaRes = nanovdb::tools::cuda::voxelsToGrid<float>(d_coords.data(), coords.size(), 1.0, stream, RefT(res));
         static_assert(std::is_same<decltype(viaRes), nanovdb::GridHandle<OutT>>::value, "the resource form returns a buffer over that resource");
@@ -2361,7 +2284,7 @@ TEST(TestBuffer, StreamWrapperSelectsTheResourceForm)
     using nanovdb::cuda::detail::IsStreamArgument;
     static_assert(IsStreamArgument<cudaStream_t>::value && IsStreamArgument<StreamWrapper>::value, "streams select the resource form");
     static_assert(!IsStreamArgument<std::nullptr_t>::value && !IsStreamArgument<int>::value, "0 and nullptr reach the prototype form's static_assert");
-    static_assert(!IsStreamArgument<SingleBufT>::value && !IsStreamArgument<nanovdb::cuda::DualDeviceBuffer>::value, "buffers stay prototypes");
+    static_assert(!IsStreamArgument<SingleBufT>::value && !IsStreamArgument<ManagedBufT>::value, "buffers stay prototypes");
     const std::vector<nanovdb::Coord> coords = {nanovdb::Coord(1,2,3), nanovdb::Coord(-5,0,7)};
     auto d_coords = toDevice(coords);
     const StreamWrapper wrapped{cudaStream_t(0)};
@@ -2469,10 +2392,10 @@ TEST(TestBuffer, BuilderBuildAllocatesThroughTheBuilderResource)
             auto withUdf = op2.buildWithUDF();
             auto refUdf = nanovdb::tools::cuda::MeshToGrid<BuildT>(d_points.data(), 4u, d_tris.data(), 4u, map).getHandleAndUDF();
             expectSameBytes(deviceToHost(withUdf.first), hostImage(refUdf.first));
-            ASSERT_EQ(refUdf.second.size(), withUdf.second.size_bytes());
-            std::vector<std::byte> a(withUdf.second.size_bytes()), b(refUdf.second.size());
+            ASSERT_EQ(refUdf.second.size_bytes(), withUdf.second.size_bytes());
+            std::vector<std::byte> a(withUdf.second.size_bytes()), b(refUdf.second.size_bytes());
             ASSERT_EQ(cudaSuccess, cudaMemcpy(a.data(), withUdf.second.data(), a.size(), cudaMemcpyDeviceToHost));
-            ASSERT_EQ(cudaSuccess, cudaMemcpy(b.data(), refUdf.second.deviceData(), b.size(), cudaMemcpyDeviceToHost));
+            ASSERT_EQ(cudaSuccess, cudaMemcpy(b.data(), refUdf.second.data(), b.size(), cudaMemcpyDeviceToHost));
             EXPECT_EQ(0, std::memcmp(a.data(), b.data(), a.size()));
         }
     }
@@ -2569,33 +2492,6 @@ TEST(TestBuffer, CopyToKeepsUnalignedGrids)
     std::vector<nanovdb::GridHandle<DevBufT>> devs;
     devs.push_back(std::move(dev));
     EXPECT_THROW((nanovdb::cuda::mergeGridHandles<DevBufT, std::vector>(devs, cudaStream_t(0))), std::runtime_error);
-}
-
-TEST(TestBuffer, DeprecatedDualTransfersWarnOnlyAtTheCall)
-{
-    // This file builds with warnings as errors and no file-wide suppression:
-    // the deprecated dual-space transfers, called inside the suppression
-    // macros, must not warn from within the NanoVDB headers that forward them.
-    auto host = nanovdb::tools::createLevelSetSphere<float>(20);
-    NANOVDB_SUPPRESS_DEPRECATION_BEGIN
-    auto dual = host.copy<nanovdb::cuda::DualDeviceBuffer>();
-    dual.deviceUpload();
-    EXPECT_TRUE(dual.deviceGrid<float>());
-    dual.deviceDownload();
-    dual.buffer().deviceUpload(0, cudaStream_t(0), true);
-    auto mgr = nanovdb::createNodeManager<float, nanovdb::cuda::DualDeviceBuffer>(*dual.grid<float>());
-    mgr.deviceUpload(dual.deviceGrid<float>());
-    EXPECT_TRUE(mgr.deviceMgr<float>());
-    mgr.deviceDownload();
-    EXPECT_TRUE(mgr.mgr<float>());
-
-    auto unified = host.copy<nanovdb::cuda::DualUnifiedBuffer>();
-    unified.deviceUpload();
-    unified.deviceDownload();
-    NANOVDB_SUPPRESS_DEPRECATION_END
-    unified.buffer().prefetch(0, 0, 0);// the public prefetch keeps its call shapes
-    ASSERT_EQ(cudaSuccess, cudaDeviceSynchronize());
-    EXPECT_EQ(host.gridData()->mChecksum.full(), unified.gridData()->mChecksum.full());
 }
 
 } // namespace nanovdb_test

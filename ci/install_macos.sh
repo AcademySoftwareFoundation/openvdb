@@ -13,7 +13,6 @@ rm /usr/local/bin/python3* || :
 
 brew update
 brew install bash gnu-getopt # for CI scripts
-brew install c-blosc
 brew install cmake
 brew install glfw
 brew install googletest
@@ -22,6 +21,7 @@ brew install openexr
 brew install nanobind # also installs the dependent python version
 brew install robin-map # required for nanobind
 brew install zlib
+brew install zstd
 brew install jemalloc
 
 # Use the python version that nanobind depends on

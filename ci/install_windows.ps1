@@ -5,12 +5,12 @@ $VerbosePreference = "Continue"
 # Required dependencies
 $vcpkgPackages = @(
     "zlib",
+    "zstd",
     "libpng",
     "openexr",
     "tbb",
     "gtest",
     "cppunit",
-    "blosc",
     "glfw3",
     "glew",
     "python3",

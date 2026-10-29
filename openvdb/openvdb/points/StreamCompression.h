@@ -36,11 +36,11 @@ namespace compression {
 
 // This is the minimum number of bytes below which Blosc compression is not used to
 // avoid unecessary computation, as Blosc offers minimal compression until this limit
-static const int BLOSC_MINIMUM_BYTES = 48;
+static const int OPENVDB_BLOSC_MINIMUM_BYTES = 48;
 
 // This is the minimum number of bytes below which the array is padded with zeros up
 // to this number of bytes to allow Blosc to perform compression with small arrays
-static const int BLOSC_PAD_BYTES = 128;
+static const int OPENVDB_BLOSC_PAD_BYTES = 128;
 
 
 /// @brief Returns true if compression is available
@@ -124,9 +124,6 @@ public:
 
     Page() = default;
 
-    OPENVDB_DEPRECATED_MESSAGE("Always returns false. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    void load() const { }
-
     /// @brief Uncompressed bytes of the Paged data, available
     /// when the header has been read.
     long uncompressedBytes() const;
@@ -145,9 +142,6 @@ public:
     /// @brief Skip the Page buffers by seeking past the compressed data
     /// without reading or decompressing it.
     void skipBuffers(std::istream&);
-
-    OPENVDB_DEPRECATED_MESSAGE("Always returns false. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    bool isOutOfCore() const { return false; }
 
 private:
     /// @brief Convenience method to store a copy of the supplied buffer

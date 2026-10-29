@@ -899,10 +899,6 @@ __hostdev__ inline GridType toGridType()
     return GridType::Unknown;
 }// toGridType
 
-template<typename BuildT>
-[[deprecated("Use toGridType<T>() instead.")]]
-__hostdev__ inline GridType mapToGridType(){return toGridType<BuildT>();}
-
 // ----------------------------> mapping BuildType -> GridClass <--------------------------------------
 
 /// @brief Maps from a templated build type to a GridClass enum
@@ -919,13 +915,6 @@ __hostdev__ inline GridClass toGridClass(GridClass defaultClass = GridClass::Unk
         return GridClass::PointIndex;
     }
     return defaultClass;
-}
-
-template<typename BuildT>
-[[deprecated("Use toGridClass<T>() instead.")]]
-__hostdev__ inline GridClass mapToGridClass(GridClass defaultClass = GridClass::Unknown)
-{
-    return toGridClass<BuildT>();
 }
 
 //  ----------------------------> BitFlags <--------------------------------------
@@ -1895,14 +1884,6 @@ public:
         if (mode == CheckMode::Partial) mCRC32[1] = EMPTY32;
     }
 
-    /// @brief return the 64 bit checksum of this instance
-    [[deprecated("Use Checksum::data instead.")]]
-    __hostdev__ uint64_t checksum() const { return mCRC64; }
-    [[deprecated("Use Checksum::head and Ckecksum::tail instead.")]]
-    __hostdev__ uint32_t& checksum(int i) {NANOVDB_ASSERT(i==0 || i==1); return mCRC32[i]; }
-    [[deprecated("Use Checksum::head and Ckecksum::tail instead.")]]
-    __hostdev__ uint32_t checksum(int i) const {NANOVDB_ASSERT(i==0 || i==1); return mCRC32[i]; }
-
     __hostdev__ uint64_t  full() const { return mCRC64; }
     __hostdev__ uint64_t& full()       { return mCRC64; }
     __hostdev__ uint32_t  head() const { return mCRC32[0]; }
@@ -1910,9 +1891,7 @@ public:
     __hostdev__ uint32_t  tail() const { return mCRC32[1]; }
     __hostdev__ uint32_t& tail()       { return mCRC32[1]; }
 
-    /// @brief return true if the 64 bit checksum is partial, i.e. of head only
-    [[deprecated("Use Checksum::isHalf instead.")]]
-    __hostdev__ bool isPartial() const { return mCRC32[0] != EMPTY32 && mCRC32[1] == EMPTY32; }
+    /// @brief return true if the 64 bit checksum is half, i.e. of head only
     __hostdev__ bool isHalf() const { return mCRC32[0] != EMPTY32 && mCRC32[1] == EMPTY32; }
 
     /// @brief return true if the 64 bit checksum is fill, i.e. of both had and nodes
@@ -2355,18 +2334,6 @@ public:
 
     /// @brief Return the index of the first blind data with specified semantic if found, otherwise -1.
     __hostdev__ int findBlindDataForSemantic(GridBlindDataSemantic semantic) const;
-
-    /// @brief Returns a const pointer to the blindData at the specified linear offset.
-    ///
-    /// @warning Pointer might be NULL and the linear offset is assumed to be in the valid range
-    // this method is deprecated !!!!
-    [[deprecated("Use Grid::getBlindData<T>() instead.")]]
-    __hostdev__ const void* blindData(uint32_t n) const
-    {
-        printf("\nnanovdb::Grid::blindData is unsafe and hence deprecated! Please use nanovdb::Grid::getBlindData instead.\n\n");
-        NANOVDB_ASSERT(n < DataType::mBlindMetadataCount);
-        return this->blindMetaData(n).blindData();
-    }
 
     template <typename BlindDataT>
      __hostdev__ const BlindDataT* getBlindData(uint32_t n) const
@@ -6015,7 +5982,7 @@ namespace io {
 ///
 /// @note NONE is the default, ZIP is slow but compact and BLOSC offers a great balance.
 ///
-/// @throw NanoVDB optionally supports ZIP and BLOSC compression and will throw an exception
+/// @throw NanoVDB optionally supports ZIP and will throw an exception
 ///        if its support is required but missing.
 enum class Codec : uint16_t { NONE = 0,
                               ZIP = 1,
@@ -6096,12 +6063,12 @@ struct FileMetaData
 // is used for tools like nanovdb_print.
 
 ///
-/// @brief This is a standalone alternative to io::writeGrid(...,Codec::NONE) defined in util/IO.h
+/// @brief This is a standalone alternative to io::writeGrid(...,Codec::NONE) defined in io/IO.h
 ///        Unlike the latter this function has no dependencies at all, not even NanoVDB.h, so it also
 ///        works if client code only includes PNanoVDB.h!
 ///
 /// @details Writes a raw NanoVDB buffer, possibly with multiple grids, to a stream WITHOUT compression.
-///          It follows all the conventions in util/IO.h so the stream can be read by all existing client
+///          It follows all the conventions in io/IO.h so the stream can be read by all existing client
 ///          code of NanoVDB.
 ///
 /// @note This method will always write uncompressed grids to the stream, i.e. Blosc or ZIP compression

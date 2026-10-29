@@ -15,7 +15,7 @@
 #include <openvdb/util/Name.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/util/Assert.h>
-#include <openvdb/io/io.h> // MappedFile
+#include <openvdb/io/io.h>
 #include <openvdb/io/Compression.h> // COMPRESS_BLOSC
 
 #include "IndexIterator.h"
@@ -189,8 +189,10 @@ public:
     /// Return the number of bytes of memory used by this attribute.
     virtual size_t memUsage() const = 0;
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
     virtual size_t memUsageIfLoaded() const = 0;
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     /// Create a new attribute array of the given (registered) type, length and stride.
     /// @details If @a lock is non-null, the AttributeArray registry mutex
@@ -315,11 +317,13 @@ public:
     /// @param outputTransient if true, write out transient attributes
     virtual void writePagedBuffers(compression::PagedOutputStream&, bool outputTransient) const = 0;
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     virtual void loadData() const = 0;
 
     OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     virtual bool isDataLoaded() const = 0;
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     /// Check the compressed bytes and flags. If they are equal, perform a deeper
     /// comparison check necessary on the inherited types (TypedAttributeArray)
@@ -613,8 +617,10 @@ public:
     /// Return the number of bytes of memory used by this attribute.
     size_t memUsage() const override;
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
     size_t memUsageIfLoaded() const override { return memUsage(); }
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     /// Return the value at index @a n (assumes in-core)
     ValueType getUnsafe(Index n) const;
@@ -695,14 +701,13 @@ public:
     /// @param outputTransient if true, write out transient attributes
     void writePagedBuffers(compression::PagedOutputStream& os, bool outputTransient) const override;
 
-    OPENVDB_DEPRECATED_MESSAGE("Always returns false. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    bool isOutOfCore() const { return false; }
-
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     void loadData() const override { }
 
     OPENVDB_DEPRECATED_MESSAGE("Always returns true. This method is deprecated and will be removed. Delayed loading is no longer supported.")
     bool isDataLoaded() const override { return true; }
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     /// Return the raw data buffer
     inline const StorageType* constData() const { return this->data(); }
@@ -1764,7 +1769,7 @@ TypedAttributeArray<ValueType_, Codec_>::writePagedBuffers(compression::PagedOut
 {
     if (!outputTransient && this->isTransient())    return;
 
-    // paged compression only available when Blosc is enabled
+    // paged compression only applies when Blosc compression is requested
     bool bloscCompression = io::getDataCompression(os.getOutputStream()) & io::COMPRESS_BLOSC;
     if (!bloscCompression) {
         if (!os.sizeOnly())   this->writeBuffers(os.getOutputStream(), outputTransient);

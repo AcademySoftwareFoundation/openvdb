@@ -10,25 +10,23 @@
 #include <atomic>
 #include <mutex>
 
-#ifdef OPENVDB_USE_BLOSC
-#include <blosc.h>
-#endif
+#include <openvdb_blosc.h>
 
-#if OPENVDB_ABI_VERSION_NUMBER <= 10
-    #error ABI <= 10 is no longer supported
+#if OPENVDB_ABI_VERSION_NUMBER <= 11
+    #error ABI <= 11 is no longer supported
 #endif
 
 // If using an OPENVDB_ABI_VERSION_NUMBER that has been deprecated, issue an
 // error directive. This can be optionally suppressed by defining:
 //   OPENVDB_USE_DEPRECATED_ABI_<VERSION>=ON.
-#ifndef OPENVDB_USE_DEPRECATED_ABI_11
-    #if OPENVDB_ABI_VERSION_NUMBER == 11
-        #error ABI = 11 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_11 suppresses this error
-    #endif
-#endif
 #ifndef OPENVDB_USE_DEPRECATED_ABI_12
     #if OPENVDB_ABI_VERSION_NUMBER == 12
-        PRAGMA(message("NOTE: ABI = 12 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_12 "
+        #error ABI = 12 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_12 suppresses this error
+    #endif
+#endif
+#ifndef OPENVDB_USE_DEPRECATED_ABI_13
+    #if OPENVDB_ABI_VERSION_NUMBER == 13
+        PRAGMA(message("NOTE: ABI = 13 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_13 "
             "to suppress this message"))
     #endif
 #endif
@@ -36,10 +34,10 @@
 // If using a future OPENVDB_ABI_VERSION_NUMBER, issue an error directive.
 // This can be optionally suppressed by defining:
 //   OPENVDB_USE_FUTURE_ABI_<VERSION>=ON.
-#ifndef OPENVDB_USE_FUTURE_ABI_14
-    #if OPENVDB_ABI_VERSION_NUMBER == 14
-        #error ABI = 14 is still in active development and has not been finalized, \
-CMake option OPENVDB_USE_FUTURE_ABI_14 suppresses this error
+#ifndef OPENVDB_USE_FUTURE_ABI_15
+    #if OPENVDB_ABI_VERSION_NUMBER == 15
+        #error ABI = 15 is still in active development and has not been finalized, \
+CMake option OPENVDB_USE_FUTURE_ABI_15 suppresses this error
     #endif
 #endif
 
@@ -92,14 +90,6 @@ initialize()
     // Register types associated with point data grids.
     points::internal::initialize();
 
-#ifdef OPENVDB_USE_BLOSC
-    blosc_init();
-    if (blosc_set_compressor("lz4") < 0) {
-        OPENVDB_LOG_WARN("Blosc LZ4 compressor is unavailable");
-    }
-    /// @todo blosc_set_nthreads(int nthreads);
-#endif
-
 #ifdef __ICC
 // Disable ICC "assignment to statically allocated variable" warning.
 // This assignment is mutex-protected and therefore thread-safe.
@@ -135,12 +125,6 @@ __pragma(warning(default:1711))
     math::MapRegistry::clear();
     io::internal::uninitialize();
     points::internal::uninitialize();
-
-#ifdef OPENVDB_USE_BLOSC
-    // We don't want to destroy Blosc, because it might have been
-    // initialized by some other library.
-    //blosc_destroy();
-#endif
 }
 
 } // namespace OPENVDB_VERSION_NAME
