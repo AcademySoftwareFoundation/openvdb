@@ -228,9 +228,13 @@ TEST_F(TestOpenVDB, getExtrema)
 
 TEST_F(TestOpenVDB, Basic)
 {
-    { // openvdb::math::cwiseLessThan
+    { // openvdb::Vec3::operator<
         const openvdb::Vec3f a(1.0f, 10.0f, 200.0f), b(2.0f, 0.0f, 0.0f);
-        EXPECT_TRUE(openvdb::math::cwiseLessThan(a, b));
+#ifdef OPENVDB_ENABLE_VEC_RELATIONAL_OPERATIONS
+        OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+        EXPECT_TRUE(a < b);// default behavior inherited from openvdb::math::Tuple
+        OPENVDB_NO_DEPRECATION_WARNING_END
+#endif
         EXPECT_TRUE(a.lengthSqr() > b.lengthSqr());// behavior used in nanovdb::GridStats
     }
 }
