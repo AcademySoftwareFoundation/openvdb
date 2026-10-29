@@ -4506,6 +4506,7 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
             cudaCheck(cudaStreamSynchronize(stream));// the point buffer is released at the end of this iteration
         }
     }
+    cudaCheck(cudaStreamSynchronize(stream));// the empty members' copies are not waited for above; every input is ready from here on
     std::vector<const GridT*> srcGrids(gridCount);
     std::vector<nanovdb::TreeData> srcTrees(gridCount);
     std::vector<uint32_t> leafStart(gridCount + 1, 0);
@@ -4551,7 +4552,7 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
     EXPECT_GT(tileCounts[3], 1u);
     EXPECT_EQ(tileCounts[4], 0u);
 
-    auto upload = [&](const auto &host) {// std::vector<T> -> device cuda::Buffer<T>; pageable source, so the copy completes before returning
+    auto upload = [&](const auto &host) {// std::vector<T> -> device cuda::Buffer<T>; the source can be released on return; the copy is ordered on stream
         using T = typename std::decay_t<decltype(host)>::value_type;
         nanovdb::cuda::Buffer<T> buf(stream, host.size(), nanovdb::cuda::noInit);
         cudaCheck(cudaMemcpyAsync(buf.data(), host.data(), buf.size_bytes(), cudaMemcpyHostToDevice, stream));

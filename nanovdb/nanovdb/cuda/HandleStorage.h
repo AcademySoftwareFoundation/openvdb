@@ -198,8 +198,9 @@ struct [[deprecated("use GridHandle::adopt(buffer, meta) and GridHandle::metaDat
 ///          alive under either overload: its destruction frees host memory
 ///          immediately, unordered against the still-asynchronous copy, so
 ///          synchronize @a stream before destroying such a source. (A
-///          pageable HostBuffer source is exempt: its copy degrades to
-///          synchronous behavior.)
+///          pageable HostBuffer source is exempt: CUDA has staged its bytes
+///          by the time this function returns, so it can be destroyed then,
+///          although the copy may not have reached the device yet.)
 /// @param proto optional buffer whose resource (or pool, for buffers
 ///        providing create()) allocates the destination storage; without it
 ///        the destination resource is default-constructed
@@ -211,14 +212,14 @@ struct [[deprecated("use GridHandle::adopt(buffer, meta) and GridHandle::metaDat
 /// @details A host-readable destination -- HostBuffer, pinned, or a
 ///          both-space managed buffer -- synchronizes @c stream before
 ///          returning, so its host accessors are immediately valid; a
-///          device-only destination is stream-ordered, so use its
-///          contents on @c stream or synchronize first. The destination
-///          reuses the source handle's metadata, which was checked when the
-///          source was made, so no kernel runs and this function is
-///          callable from host-only translation units. A
-///          pageable host source or destination (HostBuffer) degrades the
-///          copy to synchronous behavior; pinned single-space handles keep
-///          it asynchronous.
+///          device-only destination is stream-ordered whatever the source,
+///          so use its contents on @c stream or synchronize first. The
+///          destination reuses the source handle's metadata, which was
+///          checked when the source was made, so no kernel runs and this
+///          function is callable from host-only translation units. A
+///          pageable HostBuffer source can be destroyed as soon as this
+///          function returns, because CUDA has staged its bytes by then, but
+///          its copy to the device may still be in flight.
 template<typename DstBufferT, typename SrcBufferT>
 inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, cudaStream_t stream, const DstBufferT* proto = nullptr)
 {
