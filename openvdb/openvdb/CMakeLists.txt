@@ -15,7 +15,7 @@ project(OpenVDBCore LANGUAGES CXX)
 enable_language(C)
 
 include(GNUInstallDirs)
-include(${CMAKE_SOURCE_DIR}/cmake/OpenVDBUtils.cmake)
+include(${OpenVDB_SOURCE_DIR}/cmake/OpenVDBUtils.cmake)
 
 ###### OpenVDB Core Options
 
@@ -537,12 +537,12 @@ set(OPENVDB_LIBRARY_SIMD_INCLUDE_FILES
 )
 
 list(APPEND OPENVDB_LIBRARY_MATH_INCLUDE_FILES
-  ${CMAKE_SOURCE_DIR}/ext/imath/openvdb/math/Half.h)
+  ${OpenVDB_SOURCE_DIR}/ext/imath/openvdb/math/Half.h)
 list(APPEND OPENVDB_LIBRARY_SOURCE_FILES
-  ${CMAKE_SOURCE_DIR}/ext/imath/openvdb/math/Half.cc)
+  ${OpenVDB_SOURCE_DIR}/ext/imath/openvdb/math/Half.cc)
 
 list(APPEND OPENVDB_LIBRARY_SOURCE_FILES
-  ${CMAKE_SOURCE_DIR}/ext/blosc/openvdb/ext/blosc/openvdb_blosc.c)
+  ${OpenVDB_SOURCE_DIR}/ext/blosc/openvdb/ext/blosc/openvdb_blosc.c)
 
 ##########################################################################
 
@@ -643,16 +643,16 @@ if(OPENVDB_CORE_STATIC)
 
   if(NOT USE_IMATH_HALF)
     target_include_directories(openvdb_static SYSTEM PUBLIC
-      $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/ext/imath>)
+      $<BUILD_INTERFACE:${OpenVDB_SOURCE_DIR}/ext/imath>)
   endif()
 
   if(USE_VCL)
     target_include_directories(openvdb_static SYSTEM PUBLIC
-      $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/ext/vcl>)
+      $<BUILD_INTERFACE:${OpenVDB_SOURCE_DIR}/ext/vcl>)
   endif()
 
   target_include_directories(openvdb_static PRIVATE
-    ${CMAKE_SOURCE_DIR}/ext/blosc/openvdb/ext/blosc
+    ${OpenVDB_SOURCE_DIR}/ext/blosc/openvdb/ext/blosc
   )
 
   target_compile_definitions(openvdb_static
@@ -697,16 +697,16 @@ if(OPENVDB_CORE_SHARED)
 
   if(NOT USE_IMATH_HALF)
     target_include_directories(openvdb_shared SYSTEM PUBLIC
-      $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/ext/imath>)
+      $<BUILD_INTERFACE:${OpenVDB_SOURCE_DIR}/ext/imath>)
   endif()
 
   if(USE_VCL)
     target_include_directories(openvdb_shared SYSTEM PUBLIC
-      $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/ext/vcl>)
+      $<BUILD_INTERFACE:${OpenVDB_SOURCE_DIR}/ext/vcl>)
   endif()
 
   target_include_directories(openvdb_shared PRIVATE
-    ${CMAKE_SOURCE_DIR}/ext/blosc/openvdb/ext/blosc
+    ${OpenVDB_SOURCE_DIR}/ext/blosc/openvdb/ext/blosc
   )
 
   target_compile_definitions(openvdb_shared
@@ -787,7 +787,7 @@ install(FILES ${OPENVDB_LIBRARY_THREAD_INCLUDE_FILES} DESTINATION ${OPENVDB_INST
 install(FILES ${OPENVDB_LIBRARY_SIMD_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/openvdb/simd)
 
 if(USE_VCL)
-  install(DIRECTORY ${CMAKE_SOURCE_DIR}/ext/vcl/openvdb DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR})
+  install(DIRECTORY ${OpenVDB_SOURCE_DIR}/ext/vcl/openvdb DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR})
 endif()
 
 ##########################################################################
@@ -813,7 +813,7 @@ install(EXPORT OpenVDBTargets
 )
 
 configure_package_config_file(
-  ${CMAKE_SOURCE_DIR}/cmake/config/OpenVDBConfig.cmake.in
+  ${OpenVDB_SOURCE_DIR}/cmake/config/OpenVDBConfig.cmake.in
   ${CMAKE_CURRENT_BINARY_DIR}/OpenVDBConfig.cmake
   INSTALL_DESTINATION ${OPENVDB_CMAKE_INSTALL_DIR}
 )
