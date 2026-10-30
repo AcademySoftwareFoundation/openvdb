@@ -868,6 +868,14 @@ round added (the plain scheme's "flags are consumed, new tiles enter with all fa
 - **`pendingchanges/propagatesign.txt`** still describes the sign-array interface.
 - **Root guard in release:** throw (or stop) when a neighbor leaves the hull; the flag is already read
   back every round.
+- **No valid input yet makes stage 4 expand.** In the scratch regression harness, the synthetic cases
+  with one sign everywhere ("enclosed absent root cell, all inside", "distant clusters, all inside" and
+  "half-space") break precondition 3: their inside reaches past the active bounding box. The dense root
+  array clipped them at the box; the sparse root drops the neighbors outside the hull, which gives the
+  same release result, and trips the hull assert in debug builds, as designed. These cases belong with
+  the robustness inputs, and would throw once the release guard does. A valid case needs a closed band
+  around at least one absent root tile, i.e. at least about 6 x 512^2 = 1.5M leaves for a two-layer
+  band: affordable on the GPU, but a test of its own.
 - **Optional: check `seedAcrossFace` with a host simulator on synthetic trees.** Build trees on the host
   whose nodes sit at every kind of boundary: within one lower node, across lower, upper and root-tile
   boundaries, at negative coordinates, and next to absent root tiles. For every (node, face), compute
