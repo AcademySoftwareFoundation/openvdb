@@ -23,6 +23,7 @@
 #include <nanovdb/tools/cuda/DilateGrid.cuh>
 #include <nanovdb/tools/cuda/MergeGrids.cuh>
 #include <nanovdb/tools/cuda/PruneGrid.cuh>
+#include <nanovdb/tools/cuda/PartitionGrid.cuh>
 #include <nanovdb/tools/cuda/CoarsenGrid.cuh>
 #include <nanovdb/tools/cuda/RefineGrid.cuh>
 #include <nanovdb/util/cuda/Injection.cuh>
@@ -3933,6 +3934,142 @@ TEST(TestNanoVDBCUDA, DilateInjectPrune_ValueOnIndex)
     EXPECT_TRUE(hostPruned.grid<BuildT>());
     EXPECT_EQ(hostInput.grid<BuildT>()->mChecksum.full(), hostPruned.grid<BuildT>()->mChecksum.full());
 }// DilateInjectPrune_ValueOnIndex
+
+// PartitionGridBinary against PruneGrid: output 0 must be byte-identical to PruneGrid with the same retain mask, and
+// output 1 to PruneGrid with the complemented mask, including masks that leave one output empty.
+TEST(TestNanoVDBCUDA, PartitionGridBinary_ValueOnIndex)
+{
+    using BuildT  = nanovdb::ValueOnIndex;
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
+    using MaskT   = nanovdb::Mask<3>;
+
+    // Voxels spread over many leaves and three root tiles (a root tile spans 4096 voxels per axis)
+    std::vector<nanovdb::Coord> inputPoints;
+    for (int i = 0; i < 40; ++i)
+        for (int j = 0; j < 40; ++j) inputPoints.emplace_back(3*i, 5*j, (7*i + 11*j) % 90);
+    inputPoints.emplace_back(4100, 1, 2);
+    inputPoints.emplace_back(-5, 4100, 9);
+    nanovdb::cuda::Buffer<nanovdb::Coord> pointBuffer(cudaStream_t(0), inputPoints.size(), nanovdb::cuda::noInit);
+    cudaCheck(cudaMemcpy(pointBuffer.data(), inputPoints.data(), inputPoints.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    nanovdb::tools::cuda::PointsToGrid<BuildT> converter;
+    auto inputHandle = converter.getHandle(pointBuffer.data(), inputPoints.size());
+    auto inputGrid = inputHandle.deviceGrid<BuildT>();
+    EXPECT_TRUE(inputGrid);
+    const auto inputTreeData = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(inputGrid);
+    const uint32_t leafCount = inputTreeData.mNodeCount[0];
+    EXPECT_EQ(inputTreeData.mNodeCount[2], 3);
+
+    auto download = [](const auto& handle) {
+        std::vector<std::byte> bytes(handle.bufferSize());
+        cudaCheck(cudaMemcpy(bytes.data(), handle.deviceData(), bytes.size(), cudaMemcpyDeviceToHost));
+        return bytes;
+    };
+
+    auto testMask = [&](const char* name, const std::vector<MaskT>& hostMask) {
+        SCOPED_TRACE(name);
+        std::vector<MaskT> hostComplement(hostMask);
+        for (auto& mask : hostComplement) mask.toggle();
+        nanovdb::cuda::Buffer<MaskT> mask(cudaStream_t(0), leafCount, nanovdb::cuda::noInit);
+        nanovdb::cuda::Buffer<MaskT> complement(cudaStream_t(0), leafCount, nanovdb::cuda::noInit);
+        cudaCheck(cudaMemcpy(mask.data(), hostMask.data(), mask.size_bytes(), cudaMemcpyHostToDevice));
+        cudaCheck(cudaMemcpy(complement.data(), hostComplement.data(), complement.size_bytes(), cudaMemcpyHostToDevice));
+
+        nanovdb::tools::cuda::PartitionGridBinary<BuildT> partitioner(inputGrid, mask.data());
+        auto outputs = partitioner.getHandles<BufferT>();
+        nanovdb::tools::cuda::PruneGrid<BuildT> pruner0(inputGrid, mask.data());
+        auto pruned0 = pruner0.getHandle<BufferT>();
+        nanovdb::tools::cuda::PruneGrid<BuildT> pruner1(inputGrid, complement.data());
+        auto pruned1 = pruner1.getHandle<BufferT>();
+
+        EXPECT_EQ(download(outputs[0]), download(pruned0));
+        EXPECT_EQ(download(outputs[1]), download(pruned1));
+        const auto treeData0 = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(outputs[0].deviceGrid<BuildT>());
+        const auto treeData1 = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(outputs[1].deviceGrid<BuildT>());
+        EXPECT_EQ(treeData0.mVoxelCount + treeData1.mVoxelCount, inputTreeData.mVoxelCount);
+    };
+
+    // A retain pattern that splits most leaves, and keeps all or none of some
+    std::vector<MaskT> hostMask(leafCount);
+    for (uint32_t n = 0; n < leafCount; ++n) {
+        if (n % 5 == 3) hostMask[n].setOn();
+        else if (n % 5 != 4) for (uint32_t i = 0; i < MaskT::SIZE; ++i) hostMask[n].set(i, (i * 37 + n * 11) % 3 == 0);
+    }
+    testMask("pattern", hostMask);
+    testMask("all on", std::vector<MaskT>(leafCount, MaskT(true)));
+    testMask("all off", std::vector<MaskT>(leafCount, MaskT(false)));
+}// PartitionGridBinary_ValueOnIndex
+
+// PartitionGrid against PruneGrid: output l must be byte-identical to PruneGrid with a retain mask of the voxels
+// labelled l, for labels of uneven sizes including one without voxels, for many labels, and for a single label.
+TEST(TestNanoVDBCUDA, PartitionGrid_ValueOnIndex)
+{
+    using BuildT  = nanovdb::ValueOnIndex;
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
+    using MaskT   = nanovdb::Mask<3>;
+
+    // Voxels spread over many leaves and three root tiles, as in PartitionGridBinary_ValueOnIndex
+    std::vector<nanovdb::Coord> inputPoints;
+    for (int i = 0; i < 40; ++i)
+        for (int j = 0; j < 40; ++j) inputPoints.emplace_back(3*i, 5*j, (7*i + 11*j) % 90);
+    inputPoints.emplace_back(4100, 1, 2);
+    inputPoints.emplace_back(-5, 4100, 9);
+    nanovdb::cuda::Buffer<nanovdb::Coord> pointBuffer(cudaStream_t(0), inputPoints.size(), nanovdb::cuda::noInit);
+    cudaCheck(cudaMemcpy(pointBuffer.data(), inputPoints.data(), inputPoints.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    nanovdb::tools::cuda::PointsToGrid<BuildT> converter;
+    auto inputHandle = converter.getHandle<nanovdb::Coord*, BufferT>(pointBuffer.data(), inputPoints.size());
+    auto inputGrid = inputHandle.deviceGrid<BuildT>();
+    EXPECT_TRUE(inputGrid);
+    const auto inputTreeData = nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(inputGrid);
+    const uint32_t leafCount = inputTreeData.mNodeCount[0];
+    auto hostHandle = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(inputHandle, cudaStream_t(0));
+    const auto* hostGrid = hostHandle.grid<BuildT>();
+    EXPECT_TRUE(hostGrid);
+
+    auto download = [](const auto& handle) {
+        std::vector<std::byte> bytes(handle.bufferSize());
+        cudaCheck(cudaMemcpy(bytes.data(), handle.deviceData(), bytes.size(), cudaMemcpyDeviceToHost));
+        return bytes;
+    };
+
+    // labelOf(leafID, n) is the label of voxel n of a leaf, in [0, labelCount)
+    auto testLabels = [&](const char* name, uint32_t labelCount, auto labelOf) {
+        SCOPED_TRACE(name);
+        // The background slot keeps the all-ones value ConnectedComponents writes to every entry that is not a voxel
+        std::vector<uint32_t> hostLabels(hostGrid->valueCount(), ~0u);
+        std::vector<std::vector<MaskT>> hostMasks(labelCount, std::vector<MaskT>(leafCount));
+        const auto* leaves = hostGrid->tree().getFirstLeaf();
+        for (uint32_t i = 0; i < leafCount; ++i)
+            for (auto it = leaves[i].beginValueOn(); it; ++it) {
+                const uint32_t label = labelOf(i, it.pos());
+                hostLabels[*it] = label;
+                hostMasks[label][i].setOn(it.pos());
+            }
+        nanovdb::cuda::Buffer<uint32_t> labels(cudaStream_t(0), hostLabels.size(), nanovdb::cuda::noInit);
+        cudaCheck(cudaMemcpy(labels.data(), hostLabels.data(), labels.size_bytes(), cudaMemcpyHostToDevice));
+
+        nanovdb::tools::cuda::PartitionGrid<BuildT> partitioner(inputGrid, labels.data(), labelCount);
+        auto outputs = partitioner.getHandles<BufferT>();
+        ASSERT_EQ(outputs.size(), labelCount);
+        uint64_t voxelCount = 0;
+        for (uint32_t l = 0; l < labelCount; ++l) {
+            SCOPED_TRACE(l);
+            nanovdb::cuda::Buffer<MaskT> mask(cudaStream_t(0), leafCount, nanovdb::cuda::noInit);
+            cudaCheck(cudaMemcpy(mask.data(), hostMasks[l].data(), mask.size_bytes(), cudaMemcpyHostToDevice));
+            nanovdb::tools::cuda::PruneGrid<BuildT> pruner(inputGrid, mask.data());
+            EXPECT_EQ(download(outputs[l]), download(pruner.getHandle<BufferT>()));
+            voxelCount += nanovdb::util::cuda::DeviceGridTraits<BuildT>::getTreeData(outputs[l].deviceGrid<BuildT>()).mVoxelCount;
+        }
+        EXPECT_EQ(voxelCount, inputTreeData.mVoxelCount);
+    };
+
+    // Most voxels in label 0, a few in labels 1, 2, 4 and 5, none in label 3
+    testLabels("uneven", 6, [](uint32_t leafID, uint32_t n) -> uint32_t {
+        if (leafID % 7 == 0) return 1 + n % 2;
+        if (leafID % 11 == 0) return n % 3 == 0 ? 5 : 4;
+        return 0; });
+    testLabels("many", 13, [](uint32_t leafID, uint32_t) -> uint32_t { return leafID % 13; });
+    testLabels("single", 1, [](uint32_t, uint32_t) -> uint32_t { return 0; });
+}// PartitionGrid_ValueOnIndex
 
 // Busy-wait on whatever stream it is launched on; used to occupy the default
 // stream so that a kernel mistakenly launched there (instead of the caller's
