@@ -403,7 +403,7 @@ struct PruneInternalNodesFunctor
     }
 };
 
-/// @brief The two-output counterpart of PruneInternalNodesFunctor, for PartitionGrid: marks the upper and lower
+/// @brief The two-output counterpart of PruneInternalNodesFunctor, for PartitionGridBinary: marks the upper and lower
 ///        node masks that each source leaf needs in output 0 (its active voxels with the retain bit on) and in
 ///        output 1 (the rest). Both outputs share the processed root, so a leaf has the same tile in each.
 template <typename BuildT>
@@ -895,7 +895,7 @@ struct PruneLeafMasksFunctor
     }
 };
 
-/// @brief The two-output counterpart of PruneLeafMasksFunctor, for PartitionGrid: sets the value mask of the
+/// @brief The two-output counterpart of PruneLeafMasksFunctor, for PartitionGridBinary: sets the value mask of the
 ///        source leaf's copy in output 0 to its active voxels with the retain bit on, and in output 1 to the rest.
 ///        A copy is missing from an output that keeps none of the leaf's voxels.
 template <typename BuildT>
