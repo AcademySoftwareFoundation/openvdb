@@ -89,7 +89,7 @@ namespace tools::cuda {
 template <typename BuildT, typename ValueT = float, typename ResourceT = nanovdb::cuda::DeviceResource>
 class PropagateSign
 {
-    static_assert(util::is_same<BuildT, ValueOnIndex>::value,
+    static_assert(nanovdb::BuildTraits<BuildT>::is_onindex,
                   "PropagateSign requires a ValueOnIndex grid: inactive voxels share the background index 0");
     static_assert(util::is_floating_point<ValueT>::value,
                   "PropagateSign reads SDF values: ValueT must be a floating-point type");
@@ -281,17 +281,20 @@ namespace floodfill::detail {
 // MaskShift of util/cuda/MorphologyHelpers.cuh, stores its inactive part as the node's invert mask, and then
 // seeds coarser levels across the node's faces (seedAcrossFace).
 
-/// @brief The calling lane's x-slice of the seeds of @a leaf, i.e. the interior at sweep 0 of its fill: its
-///        active voxels with a negative SDF value. Lane x gets x-slice x, and lanes x >= 8 get empty slices.
-///        All 32 lanes of the warp call it together.
+/// @brief The seeds of @a leaf's flood fill: its *active* voxels with a negative SDF value.
+/// @details Warp-collective: one warp per leaf, and all 32 lanes call it together and share the work over the
+///          leaf's 512 voxels. The seeds are conceptually a Mask<3>, but are returned as one Mask2D<3> x-slice per
+///          lane: lane x < 8 gets x-slice x (word x of the Mask<3>: voxels 64 x to 64 x + 63), and lanes x >= 8
+///          get empty slices.
 /// @param sdf SDF sidecar of the grid, indexed by value index; read only at the leaf's active voxels.
 template <typename BuildT, typename ValueT>
 __device__ util::morphology::Mask2D<3> leafSeedSlice(const NanoLeaf<BuildT>& leaf, const ValueT* sdf)
 {
-    // Each ballot tests 32 consecutive voxels, half of the one-word slice n / 64, and the lane holding that
-    // slice keeps the answers. So all 32 lanes test voxels, 16 each, not only the 8 lanes holding slices.
+    // Each iteration tests 32 consecutive voxels, one per lane, and the ballot gathers the answers into one
+    // word (bit l: voxel first + l). That word is half of x-slice first / 64, and the lane holding that slice
+    // ORs it in. So all 32 lanes test voxels, 16 each, though only lanes 0-7 keep results.
     // In a ValueOnIndex leaf an inactive voxel has value index 0, the background: it is never a seed, and
-    // its index is not read.
+    // its SDF value is not read.
     const int lane = threadIdx.x & 31;
     util::morphology::Mask2D<3> s{};
     for (uint32_t first = 0; first < NanoLeaf<BuildT>::SIZE; first += 32) {
