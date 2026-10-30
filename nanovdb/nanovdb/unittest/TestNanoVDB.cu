@@ -3875,8 +3875,21 @@ TEST(TestNanoVDBCUDA, VoxelBlockManager_ValueOnIndex_UnifiedBuffer)
     testVoxelBlockManager<nanovdb::ValueOnIndex,nanovdb::cuda::UnifiedBuffer>();
 }// VoxelBlockManager_ValueOnIndex_UnifiedBuffer
 
+// Entry source that derives each entry in the build kernel, the way a caller with device-side
+// per-grid data would, instead of reading a materialized entry array.
+struct VoxelBlockManagerBatchTestSource
+{
+    const nanovdb::tools::cuda::VoxelBlockManagerBatchEntry *entries;
+
+    __device__ nanovdb::tools::cuda::VoxelBlockManagerBatchEntry operator()(uint32_t g) const
+    {
+        return {entries[g].grid, entries[g].voxelCount, entries[g].blockBase, entries[g].leafBase};
+    }
+};
+
+// gapped: leave one unused block after every grid, and build through an entry source.
 template<int Log2BlockWidth>
-void testVoxelBlockManagerBatch()
+void testVoxelBlockManagerBatch(bool gapped)
 {
     using BuildT = nanovdb::ValueOnIndex;
     using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
@@ -3909,6 +3922,7 @@ void testVoxelBlockManagerBatch()
     for (uint32_t g = 0; g < gridCount; ++g) {
         const auto &voxels = voxelSets[g];
         entries[g] = {nullptr, voxels.size(), blockCount, leafCount};
+        if (gapped) ++blockCount;
         if (voxels.empty()) continue;
         nanovdb::Coord *deviceVoxels;
         cudaCheck(cudaMalloc(&deviceVoxels, voxels.size() * sizeof(nanovdb::Coord)));
@@ -3938,8 +3952,13 @@ void testVoxelBlockManagerBatch()
 
     cudaStream_t stream;
     cudaCheck(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
-    nanovdb::tools::cuda::buildVoxelBlockManagerBatch<Log2BlockWidth>(
-        d_entries, gridCount, leafCount, blockCount, d_firstLeafID, d_jumpMap, stream);
+    if (gapped) {
+        nanovdb::tools::cuda::buildVoxelBlockManagerBatch<Log2BlockWidth>(
+            VoxelBlockManagerBatchTestSource{d_entries}, gridCount, leafCount, blockCount, d_firstLeafID, d_jumpMap, stream);
+    } else {
+        nanovdb::tools::cuda::buildVoxelBlockManagerBatch<Log2BlockWidth>(
+            d_entries, gridCount, leafCount, blockCount, d_firstLeafID, d_jumpMap, stream);
+    }
     cudaCheck(cudaGetLastError());
     cudaCheck(cudaStreamSynchronize(stream));
     cudaCheck(cudaStreamDestroy(stream));
@@ -3967,6 +3986,16 @@ void testVoxelBlockManagerBatch()
         }
     }
 
+    // Gap blocks (one after every grid, empty grids included) must have a zeroed jumpMap.
+    if (gapped) {
+        for (uint32_t g = 0; g < gridCount; ++g) {
+            const uint64_t gap = entries[g].blockBase + (entries[g].voxelCount + BlockWidth - 1) / BlockWidth;
+            for (uint64_t w = 0; w < JumpMapLength; ++w) {
+                EXPECT_EQ(0u, jumpMap[gap * JumpMapLength + w]) << "gap after grid " << g << " word " << w;
+            }
+        }
+    }
+
     cudaCheck(cudaFree(d_entries));
     cudaCheck(cudaFree(d_firstLeafID));
     cudaCheck(cudaFree(d_jumpMap));
@@ -3974,8 +4003,10 @@ void testVoxelBlockManagerBatch()
 
 TEST(TestNanoVDBCUDA, VoxelBlockManagerBatch_ValueOnIndex)
 {
-    testVoxelBlockManagerBatch<7>();
-    testVoxelBlockManagerBatch<9>();
+    testVoxelBlockManagerBatch<7>(/*gapped=*/false);
+    testVoxelBlockManagerBatch<9>(/*gapped=*/false);
+    testVoxelBlockManagerBatch<7>(/*gapped=*/true);
+    testVoxelBlockManagerBatch<9>(/*gapped=*/true);
 }// VoxelBlockManagerBatch_ValueOnIndex
 
 TEST(TestNanoVDBCUDA, DilateInjectPrune_ValueOnIndex)

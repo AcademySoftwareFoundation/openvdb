@@ -11,7 +11,9 @@ NanoVDB:
   - Added tools::cuda::buildVoxelBlockManagerBatch, which builds the VoxelBlockManagers
     of a batch of grids into shared arrays with one memset and one kernel launch and
     no host synchronization. Each grid's slice is byte-identical to its single-grid
-    build; grids are described by VoxelBlockManagerBatchEntry records.
+    build. Grids are described by VoxelBlockManagerBatchEntry records, read from a
+    device array or produced by any device-callable entry source, so callers can derive
+    them in the build kernel. Grids' block ranges may leave gaps between them.
   API Changes:
   - VoxelBlockManagerHandle gained an optional trailing leafCount constructor
     parameter and leafCount()/setLeafCount() accessors (defaulted; existing callers
