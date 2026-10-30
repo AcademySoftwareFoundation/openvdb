@@ -19,6 +19,7 @@
 
 #include <nanovdb/cuda/Buffer.h>// for the resource-aware scratch buffers below
 #include <nanovdb/cuda/HandleStorage.h> // cuda::copyTo and the storage helpers live there (host-includable)
+#include <nanovdb/cuda/Memcpy.h> // for cuda::memcpyAsync between memory on any devices
 #include <nanovdb/cuda/ManagedResource.h> // for the managed default handle instantiated below
 #include <nanovdb/tools/cuda/GridChecksum.cuh>// for cuda::updateChecksum
 #include <nanovdb/GridHandle.h>
@@ -295,7 +296,7 @@ splitGridHandles(const GridHandle<BufferT> &handle, cudaStream_t stream, const B
     for (uint32_t n = 0; n < gridCount; ++n) {
         buffers.push_back(detail::createDeviceStorage<BufferT>(meta[n].size, proto, stream));
         dst.push_back(reinterpret_cast<GridData*>(detail::deviceStorageData(buffers.back())));
-        cudaCheck(cudaMemcpyAsync(dst.back(), util::PtrAdd(src, meta[n].offset), meta[n].size, cudaMemcpyDeviceToDevice, stream));
+        cuda::memcpyAsync(dst.back(), util::PtrAdd(src, meta[n].offset), meta[n].size, stream);
     }
     detail::rewriteGridCounts(dst, 0u, 1u, stream);
 
@@ -374,7 +375,7 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, cudaStream_t strea
         const void *src = h.deviceData();
         for (auto &m : h.metaData()) {
             dst.push_back(util::PtrAdd<GridData>(detail::deviceStorageData(buffer), meta[counter++].offset));
-            cudaCheck(cudaMemcpyAsync(dst.back(), util::PtrAdd(src, m.offset), m.size, cudaMemcpyDeviceToDevice, stream));
+            cuda::memcpyAsync(dst.back(), util::PtrAdd(src, m.offset), m.size, stream);
         }
     }
     detail::rewriteGridCounts(dst, 1u, gridCount, stream);

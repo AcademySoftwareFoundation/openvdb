@@ -11,6 +11,7 @@
 
 #include <cuda_runtime_api.h>
 #include <nanovdb/cuda/DeviceResource.h>
+#include <nanovdb/cuda/Memcpy.h> // for copies from memory on any device
 #include <nanovdb/util/cuda/Util.h>
 
 #include <cstddef>
@@ -180,7 +181,7 @@ public:
     Buffer copy(cudaStream_t stream) const
     {
         Buffer out(stream, mResource, mSize, noInit);
-        if (mData) cudaCheck(cudaMemcpyAsync(out.mData, mData, this->size_bytes(), cudaMemcpyDefault, stream));
+        if (mData) cuda::memcpyAsync(out.mData, mData, this->size_bytes(), stream);
         return out;
     }
 
@@ -195,7 +196,7 @@ public:
     Buffer copy() const
     {
         Buffer out(mResource, mSize, noInit);
-        if (mData) cudaCheck(cudaMemcpy(out.mData, mData, this->size_bytes(), cudaMemcpyDefault));
+        if (mData) cuda::memcpySync(out.mData, mData, this->size_bytes());
         return out;
     }
 
@@ -241,7 +242,7 @@ public:
             if (newData && mData) {
                 const size_t prefix = count < mSize ? count : mSize;
                 try {
-                    cudaCheck(cudaMemcpyAsync(newData, mData, prefix * sizeof(T), cudaMemcpyDefault, stream));
+                    cuda::memcpyAsync(newData, mData, prefix * sizeof(T), stream);
                 }
                 catch (...) {
                     mResource.deallocate_async(newData, checkedBytes(count), R::DEFAULT_ALIGNMENT, stream);
@@ -272,7 +273,7 @@ public:
         if (newData && mData) {
             const size_t prefix = count < mSize ? count : mSize;
             try {
-                cudaCheck(cudaMemcpy(newData, mData, prefix * sizeof(T), cudaMemcpyDefault));
+                cuda::memcpySync(newData, mData, prefix * sizeof(T));
             }
             catch (...) {
                 mResource.deallocate(newData, checkedBytes(count), R::DEFAULT_ALIGNMENT);

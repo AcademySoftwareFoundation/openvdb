@@ -1,0 +1,6 @@
+NanoVDB:
+  Fixes:
+  - Fixed cuda::mergeGridHandles, cuda::splitGridHandles, cuda::copyTo, cuda::Buffer::copy and cuda::Buffer::resize failing with "invalid argument" when the source or destination lives on a device other than the current one. Device buffers are allocated from per-device stream-ordered memory pools, which by default are accessible only from their owning device (cudaDeviceEnablePeerAccess does not change that; only cudaMemPoolSetAccess does).
+
+  New features:
+  - Added nanovdb/cuda/Memcpy.h with cuda::memcpyAsync and cuda::memcpySync, which copy between device memory on any device, managed memory, and pinned or pageable host memory, independent of the current device.
