@@ -381,3 +381,79 @@ class documents it.
 - The n-ary entry point (§7), including the predicate-templated binary core (§7f): deferred until the
   open items of §8.2 to §8.4 are settled.
 - The example in this directory.
+
+## Update 2026-10-28: n-ary implemented
+
+### N-ary `partitionGrid` (§7)
+
+- `tools/cuda/PartitionGrid.cuh`: free function `partitionGrid<BuildT, BufferT, ResourceT>(d_srcGrid,
+  d_srcLabels, labelCount, stream, resource)` returning `std::vector<GridHandle<BufferT>>`. Output l holds the
+  voxels labelled l, and is a valid empty grid if there are none. Labels are indexed by the source's value
+  index, the format `ConnectedComponents` writes.
+- Pivot (§7b): one `cub::DeviceHistogram::HistogramEven` of the labels and a prefix sum on the host, computed
+  once. Each split takes the label that halves the voxel count of its range, keeping one label per side.
+- Each split builds a `Mask<3>` per leaf of the grid being split and runs the binary `PartitionGrid` unchanged.
+  A grid split off from the source has its own value indices, so the mask kernel reads each voxel's label
+  through the source leaf at the same origin (`probeLeaf`); no per-grid label array is built.
+- Depth-first; a grid is released once it is split, so only the grids on the current path and their siblings
+  are alive. A single label covering the whole source returns a copy, since the source is the caller's.
+- Validation, stronger than §7g: `TestNanoVDBCUDA.PartitionGridNary_ValueOnIndex` checks that every output is
+  byte-identical to `PruneGrid` with the mask of its label, and that the active counts add up to the source's,
+  for uneven labels including one with no voxels, for 13 labels and for a single label.
+
+### Not done yet
+
+- §7f predicate templating: each split still pays the mask kernel and a `leafCount × 64 B` buffer.
+- §7e cutoff and §8.2 sidecar carrying: open.
+- The example in this directory.
+
+## Update 2026-10-29: names, and performance
+
+### Names
+
+The n-ary operator is now the class `PartitionGrid`, and the binary one is renamed `PartitionGridBinary`. The n-ary
+one takes the general name because it is the general case (a binary partition is the case of labels 0 and 1), and
+it takes the labels `ConnectedComponents` writes. Both are classes used like `PruneGrid`: a constructor taking the
+source grid, its sidecar, the stream and the resource, then `setVerbose`, `setChecksum`, and `getHandles(pool)`,
+which returns `std::array<GridHandle<BufferT>, 2>` and `std::vector<GridHandle<BufferT>>` respectively (§2b). As a
+free function, the n-ary one took no output pool and had no checksum or timing option. The n-ary `setChecksum`
+applies to the outputs only, not to the grids split on the way. The updates of 2026-10-19 and 2026-10-28 above use
+the old names: `PartitionGrid` for the binary class and `partitionGrid` for the n-ary free function.
+
+### Setup
+
+The sphere shells of "Measured payoff" above (R = 64 to 1024, 0.3M to 79M voxels), at a 60 W power limit; median
+of 31 runs, the two sides of each comparison timed alternately. Every output is byte-identical to its `PruneGrid`
+counterpart.
+
+### Binary: the gain is mostly gone
+
+`PartitionGridBinary` now takes 0.90 to 0.99 of the time of `PruneGrid(m)` plus `PruneGrid(~m)`, against 0.68 to
+0.90 on 2026-10-19. The change is upstream: bisected to #2336, after which one `PruneGrid` is about 0.6 ms cheaper
+at R = 128, about what `PartitionGridBinary` used to save. Part of it is located: before #2336 the builder freed its
+pinned host root table (`cudaFreeHost`) in the middle of the build, and `cudaFreeHost` waits for the GPU work
+already queued, so two `PruneGrid` calls paid that wait twice and `PartitionGridBinary` once. #2336 keeps the
+pinned block until the builder is destroyed. The rest is not itemized.
+
+### N-ary
+
+The baseline is, per label, a kernel that builds the label's mask and a `PruneGrid` with it. Labels are N equal
+azimuth sectors around z (N = 2, 8, 32, 128), or a skewed set of 22 (x < 0 about 50%, a 2% cap at +x cut into 20
+sectors, the rest about 48%).
+
+| voxels         | `PartitionGrid` / baseline                 |
+|----------------|--------------------------------------------|
+| 0.3M to 4.9M   | 0.70 to 0.92                               |
+| 20M            | 0.65 to 0.85                               |
+| 79M            | 0.38 to 0.88 (N = 128: 502 ms to 193 ms)   |
+
+- Large grids: the baseline reads every label once per label, N passes over the source, while a split reads only
+  the labels of the grid it splits, so each voxel's label is read about log2 N times. With N = 128 at 79M voxels the
+  baseline's mask kernels take 305 ms of its 502 ms.
+- Up to 4.9M voxels: the baseline's mask kernels are at most about 3% of its time; both sides are dominated by the
+  builder's fixed costs.
+- The mask kernel of a split (`LabelBelowPivotFunctor`) runs one warp per leaf: lane i tests voxels i, i + 32, ...,
+  so a warp reads the labels of 32 consecutive voxels at once, and `__ballot_sync` assembles each mask word. One
+  pass over 79M voxels takes about 2 ms, against about 7 ms with one thread per leaf; `PartitionGrid` at 79M voxels
+  takes 0.63 (N = 2) to 0.84 (N = 128) of its time with one thread per leaf. The baseline's mask kernel uses the
+  same scheme.
