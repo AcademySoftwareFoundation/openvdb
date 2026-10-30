@@ -25,7 +25,8 @@ planned example while the PR is in draft. To be removed before the PR leaves dra
 
 ## Preconditions (contract with the caller)
 
-None is checked by the operator; all must be guaranteed by how the input is built.
+Preconditions 1-3 are not checked by the operator; they must be guaranteed by how the input is built.
+Precondition 4 is checked on the host since 2026-10-30 (see the update at the end of these notes).
 
 1. **No empty nodes.** Every leaf contains at least one active voxel, every lower node has at least one
    leaf child, and every upper node has at least one lower child. (With no active tiles, this is the same
@@ -99,6 +100,9 @@ None is checked by the operator; all must be guaranteed by how the input is buil
 
    Both hold for any `TopologyBuilder`-based output (including `PruneGrid` and `MeshToGrid`), whose root
    has only child tiles and whose active values are leaf voxels.
+
+   *Checked* (since 2026-10-30): `initializeMasks()` throws if any `mTileCount` is nonzero (a) or if the
+   root table has more entries than there are upper nodes (b).
 
 ## Results
 
@@ -797,3 +801,83 @@ and asserts.
 - The "Formal races" item under "Still open" is closed by the atomic flag store.
 - Root value tiles (precondition 4(b)) are unchanged: such a tile is an original entry, so it is never
   added (and `probeTerminalSlot` still asserts on it).
+
+## Update 2026-10-30: SDF input, invert masks, sparse root implemented, precondition 4 checked
+
+This supersedes the earlier sections where they disagree: `deviceSigns` and its -1/+1 tags, "interior"
+masks, `mRootMask` and the dense root flood, `TerminalSlot`/`probeTerminalSlot`, and `signing::detail`.
+
+### Interface (`fab481195`, `7822d9523`)
+
+- **Input** is the SDF sidecar itself, `const ValueT* deviceSdf` with `ValueT` floating point (float or
+  double, `static_assert`), not an int8 sign or tag array. Inside means a negative value; zero is outside.
+- **`BuildT` must be `ValueOnIndex`** (`static_assert` on `BuildTraits<BuildT>::is_onindex`). An inactive
+  voxel has value index 0, so `leafSeedSlice` reads one `getValue(n)` per voxel and tests `index != 0`
+  before reading `sdf[index]`.
+- **Outputs are invert masks:** a bit is on for an inactive element (voxel, childless slot, absent root
+  tile) whose value is `-sdf[0]`. Leaf masks hold only inactive voxels (`interior & open`), while face
+  seeding still uses the whole interior. Complementing a level set means negating the sidecar, slot 0
+  included, and leaves the masks unchanged. Invert is not the same as bounded: in a hollow ball the
+  cavity is bounded but has the background's sign, so its bits are off.
+- **`propagate(leafMasks, lowerMasks, upperMasks)`** fills caller-allocated masks, which need not be
+  initialized, and returns `{root-tile origins, hasInvertRootTiles}`, the origins sorted by (x, y, z).
+- The detail namespace is `floodfill::detail`.
+
+### Sparse root propagation as implemented (`7822d9523`)
+
+It follows the 2026-10-29 proposal in the form of the refinement: round 1 emits only the flagged
+neighbors of the table entries, and each later round emits all six neighbors of the tiles the previous
+round added (the plain scheme's "flags are consumed, new tiles enter with all faces set"). Deviations:
+
+- **No `set_difference`:** each sorted, unique candidate is binary-searched in the sorted known tiles,
+  and `cub::DeviceSelect::Flagged` keeps the new ones; merges use `cub::DeviceMerge::MergeKeys`
+  (thrust's scratch would bypass `ResourceT`). Round 1 filters against the known tiles too, which F1
+  makes unnecessary, so that every round runs the same loop body.
+- **Two sorted lists,** `known` and `added`, each merged every round; the output is `added`.
+- **The hull** is computed on the host from a copy of the entries' keys (one more sync, on the expansion
+  path only).
+- **The guard is weaker than proposed:** a neighbor outside the hull is dropped and sets a flag that only
+  a `NANOVDB_ASSERT` checks after the loop, so a release build returns a wrong (though bounded) result
+  without notice. See Still open.
+- **`seedAcrossFace` walks root -> upper -> lower itself** and seeds where the walk ends; `TerminalSlot`
+  and `probeTerminalSlot` are gone. A root seed sets bit `face` of the seeding node's own root-table
+  entry, found with a second `probeTile` (on the node's own origin, so it always succeeds; asserted).
+
+### Review pass 2026-10-30
+
+- **Precondition 4 is checked on the host,** in `initializeMasks()`: it throws if any `mTileCount` is
+  nonzero (active tiles) or if the root table has more entries than there are upper nodes (root value
+  tiles, active or not; `mTileCount` misses the inactive ones). `seedAcrossFace` then only asserts
+  `tile->isChild()`. Without the host check, release builds would be unsafe there: `getChild` on a
+  value tile returns the root itself, and the walk would write outside `upperMasks`.
+- **`FaceSet` dropped:** a set of faces is a plain `uint32_t` (bit f for face f). `atomicOr` and the
+  warp shuffles fix the width at 32 bits anyway.
+- **Comments:** `leafSeedSlice` and `BitFloodFunctor` are documented as warp-collective, `hasSlice`
+  says which lanes hold slices (8, 16, 32), the flood update cites precondition 2, the sweep bound is
+  stated as the node's Manhattan diameter, and the same-level returns in `seedAcrossFace` say why
+  nothing is seeded (a node of our own level fills itself).
+
+### Still open
+
+- **Packaging:** no target includes the header, so CI never compiles it; it is not in
+  `NANOVDB_INCLUDE_TOOLS_CUDA_FILES`; there is no test or example. Planned test: a gtest in
+  `nanovdb_test_openvdb` with OpenVDB level sets (sphere, torus, CSG hollow shell, two distant spheres,
+  and a band enclosing a cavity several root tiles wide so that stage 4 expands), stripped to the
+  narrow band and compared with OpenVDB's inactive signs; plus a run on a non-blocking stream, outputs
+  that outlive the operator, and an injected resource that sees every allocation.
+- **`pendingchanges/propagatesign.txt`** still describes the sign-array interface.
+- **Root guard in release:** throw (or stop) when a neighbor leaves the hull; the flag is already read
+  back every round.
+- **Optional: check `seedAcrossFace` with a host simulator on synthetic trees.** Build trees on the host
+  whose nodes sit at every kind of boundary: within one lower node, across lower, upper and root-tile
+  boundaries, at negative coordinates, and next to absent root tiles. For every (node, face), compute
+  the expected destination by brute force from the node sets: a root face bit of the node's entry if no
+  upper node contains the block across, else an upper slot if that upper node has no lower child there,
+  else a lower slot if that lower node has no leaf there, else nothing (a node of the same level). Run a
+  kernel that calls `seedAcrossFace` for every (node, face) and compare masks and face bits exactly.
+  This tests the walk and its indexing (`getFirstNode` offsets, `CoordToOffset`, the entry index)
+  independently of the fills.
+- Preconditions 1-3 remain unchecked. Root value tiles from OpenVDB level sets are now rejected, not
+  handled. Background-relative seeding (precondition 3 requires `sdf[0] > 0`) is deferred.
+- **Closed from the earlier "Still open" lists:** formal races (root seeds are `atomicOr`), the
+  `signs` -> `signSidecar` todo (the input is the SDF sidecar), and the mask naming (invert masks).

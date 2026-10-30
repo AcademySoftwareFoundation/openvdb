@@ -31,6 +31,7 @@
 #include <algorithm> // std::none_of
 #include <cstddef>   // std::size_t
 #include <cstdint>   // uint8_t, uint32_t, uint64_t
+#include <stdexcept> // std::runtime_error
 #include <utility>   // std::move, std::pair
 #include <vector>    // std::vector
 
@@ -76,7 +77,8 @@ namespace tools::cuda {
 ///          - lower and upper: one Mask per node; bit n is on if slot n has no child and is inside.
 ///          - root: the origins of the absent root tiles that are inside, in increasing (x, y, z) order.
 ///
-///          Preconditions, not checked (PruneGrid and MeshToGrid output satisfies 1 and 4):
+///          Preconditions (PruneGrid and MeshToGrid output satisfies 1 and 4). Only 4 is checked, by propagate(),
+///          which throws if it fails; the others are the caller's to ensure:
 ///          1. No empty nodes: every leaf has an active voxel, and every lower and upper node has a child.
 ///          2. The active voxels shield both sides: no voxel with a negative SDF value is face-adjacent to an
 ///             inactive outside voxel, and no other active voxel to an inactive inside one.
@@ -113,7 +115,7 @@ public:
     ///       another stream, make @a stream wait for it, e.g. with cudaStreamWaitEvent), and must remain
     ///       valid until propagate() returns.
     /// todo: Handle inputs that break the preconditions, e.g. root value tiles, which an OpenVDB level set converted
-    ///       to NanoVDB can have.
+    ///       to NanoVDB can have (propagate() now rejects them).
     PropagateSign(const GridT* deviceGrid, const ValueT* deviceSdf,
                   cudaStream_t stream = 0,
                   ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
@@ -140,6 +142,7 @@ public:
     ///        be initialized.
     /// @return { origins, hasInvertRootTiles }: a device buffer with the origins of the inside absent root tiles,
     ///         which the root does not store, and whether there is any.
+    /// @throw std::runtime_error if the grid breaks precondition 4: an active tile, or a root value tile.
     /// @note The masks must be ready to be written in @a stream order. The stream is synchronized before this
     ///       method returns.
     std::pair<BufferT<nanovdb::Coord>, bool> propagate(nanovdb::Mask<3>* leafMasks, nanovdb::Mask<4>* lowerMasks,
@@ -218,9 +221,8 @@ private:
 
     // Root-level scratch. A root-tile position is the place of one root tile, NanoUpper<BuildT>::DIM voxels
     // per axis; it is absent if the root has no tile there, and then the grid does not store it. So the seeds
-    // at the root are kept per root-table entry instead: word e is a floodfill::detail::FaceSet (declared below,
-    // so spelled uint32_t here), whose bit f is set if the absent root-tile position across face f of entry e is
-    // interior.
+    // at the root are kept per root-table entry instead: word e is a set of faces (see floodfill::detail::Face),
+    // whose bit f is set if the absent root-tile position across face f of entry e is interior.
     BufferT<uint32_t>         mRootFaceSeeds;
 }; // tools::cuda::PropagateSign<BuildT, ValueT, ResourceT>
 
@@ -233,16 +235,23 @@ void PropagateSign<BuildT, ValueT, ResourceT>::initializeMasks()
     // Inputs are ready in mStream order, so read the grid's tree header on mStream (the read blocks).
     mTreeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceGrid, mStream);
 
+    // Precondition 4, checked here once so that the kernels can assume it: no active tiles at any level, and a
+    // root that holds only child tiles. Every upper node is the child of one root-table entry, so the root holds
+    // no value tile, active or not, if and only if its table has as many entries as there are upper nodes.
+    const uint32_t entryCount = util::cuda::DeviceGridTraits<BuildT>::getRootTableSize(mDeviceGrid, mTreeData, mStream);
+    if (mTreeData.mTileCount[0] || mTreeData.mTileCount[1] || mTreeData.mTileCount[2])
+        throw std::runtime_error("PropagateSign: the grid has active tiles (precondition 4)");
+    if (entryCount != mTreeData.mNodeCount[2])
+        throw std::runtime_error("PropagateSign: the root holds value tiles (precondition 4)");
+
     // Stage 1 writes every leaf mask whole. Lower and upper masks receive seeds (atomic ORs) before their own
     // fill, so they start at zero.
     cudaCheck(cudaMemsetAsync(mLowerInvertMasks, 0, mTreeData.mNodeCount[1] * sizeof(nanovdb::Mask<4>), mStream));
     cudaCheck(cudaMemsetAsync(mUpperInvertMasks, 0, mTreeData.mNodeCount[2] * sizeof(nanovdb::Mask<5>), mStream));
 
     // One word per root-table entry (see mRootFaceSeeds), sized by the table rather than by the extent of the
-    // active voxels. The table size, not the upper-node count: the two are equal under precondition 4, but a root
-    // that also holds value tiles has more entries than upper nodes, and a seed's entry index must stay in range.
-    // All zero: no absent root-tile position is interior until a face of a leaf, lower or upper node seeds it.
-    const uint32_t entryCount = util::cuda::DeviceGridTraits<BuildT>::getRootTableSize(mDeviceGrid, mTreeData, mStream);
+    // active voxels. All zero: no absent root-tile position is interior until a face of a leaf, lower or upper
+    // node seeds it.
     mRootFaceSeeds = BufferT<uint32_t>(mStream, this->ref(), entryCount, nanovdb::cuda::noInit);
     cudaCheck(cudaMemsetAsync(mRootFaceSeeds.data(), 0, mRootFaceSeeds.size_bytes(), mStream));
 }// PropagateSign<BuildT, ValueT, ResourceT>::initializeMasks
@@ -306,16 +315,15 @@ __device__ util::morphology::Mask2D<3> leafSeedSlice(const NanoLeaf<BuildT>& lea
     return s;
 }
 
-/// @brief A face of a node. In a set of faces, a FaceSet, bit f stands for face f.
+/// @brief A face of a node. A set of faces is a uint32_t, in which bit f stands for face f.
 enum Face : int { minusX, plusX, minusY, plusY, minusZ, plusZ, faceCount };
-using FaceSet = uint32_t;
 
 /// @brief The set of the node's faces on which x-slice @a x, held as @a s, has an on slot: minusX and plusX if
 ///        it is the first or last slice and not empty, and minusY, plusY, minusZ and plusZ if it has an on slot
 ///        with y = 0, y = Dim - 1, z = 0 or z = Dim - 1. The z edges are the slots a unit z shift zero-fills:
 ///        z = 0 has no source under dk = -1, and z = Dim - 1 none under dk = +1.
 template <int LOG2DIM>
-__hostdev__ FaceSet facesWithOnSlots(const util::morphology::Mask2D<LOG2DIM>& s, int x)
+__hostdev__ uint32_t facesWithOnSlots(const util::morphology::Mask2D<LOG2DIM>& s, int x)
 {
     constexpr int      Dim       = util::morphology::Mask2D<LOG2DIM>::DIM;
     constexpr int      WordCount = util::morphology::Mask2D<LOG2DIM>::WORD_COUNT;
@@ -326,12 +334,12 @@ __hostdev__ FaceSet facesWithOnSlots(const util::morphology::Mask2D<LOG2DIM>& s,
     uint64_t firstZ = 0, lastZ = 0;
     for (int j = 0; j < WordCount; ++j) { firstZ |= s.mWords[j] & FirstZ; lastZ |= s.mWords[j] & LastZ; }
     const bool nonEmpty = !s.isOff();
-    return uint32_t(x == 0 && nonEmpty)                      << minusX |
-           uint32_t(x == Dim - 1 && nonEmpty)                << plusX  |
-           uint32_t((s.mWords[0] & FirstY) != 0)             << minusY |
+    return uint32_t(x == 0 && nonEmpty)                     << minusX |
+           uint32_t(x == Dim - 1 && nonEmpty)               << plusX  |
+           uint32_t((s.mWords[0] & FirstY) != 0)            << minusY |
            uint32_t((s.mWords[WordCount - 1] & LastY) != 0) << plusY  |
-           uint32_t(firstZ != 0)                             << minusZ |
-           uint32_t(lastZ != 0)                              << plusZ;
+           uint32_t(firstZ != 0)                            << minusZ |
+           uint32_t(lastZ != 0)                             << plusZ;
 }
 
 // Seeding coarser levels across node faces.
@@ -369,7 +377,7 @@ __device__ inline nanovdb::Coord faceNeighbor(nanovdb::Coord origin, Face face, 
 template <typename BuildT, int Level>
 __device__ inline void seedAcrossFace(const NanoGrid<BuildT>& grid, const nanovdb::Coord& origin, Face face,
                                       nanovdb::Mask<4>* lowerMasks, nanovdb::Mask<5>* upperMasks,
-                                      FaceSet* rootFaceSeeds)
+                                      uint32_t* rootFaceSeeds)
 {
     const auto& tree = grid.tree();
     const auto& root = tree.root();
@@ -377,14 +385,13 @@ __device__ inline void seedAcrossFace(const NanoGrid<BuildT>& grid, const nanovd
 
     const auto* tile = root.probeTile(ijk);
     if (!tile) { // ends at the root: an absent root-tile position
-        atomicOr(&rootFaceSeeds[root.probeTile(origin) - root.tile(0)], 1u << face);
+        const auto* ownTile = root.probeTile(origin); // the seeding node's own entry, which always exists
+        NANOVDB_ASSERT(ownTile);
+        atomicOr(&rootFaceSeeds[ownTile - root.tile(0)], 1u << face);
         return;
     }
-    if (!tile->isChild()) { // a root value tile, which precondition 4 excludes: nothing to seed
-        NANOVDB_ASSERT(false);
-        return;
-    }
-    if (uint32_t(Level) == NanoUpper<BuildT>::LEVEL) return; // the block across is an upper node
+    NANOVDB_ASSERT(tile->isChild()); // precondition 4, checked by initializeMasks(): no root value tiles
+    if (uint32_t(Level) == NanoUpper<BuildT>::LEVEL) return; // an upper node across: our own level, which fills itself
 
     const auto* upper = root.getChild(tile);
     const auto* lower = upper->probeChild(ijk);
@@ -392,7 +399,7 @@ __device__ inline void seedAcrossFace(const NanoGrid<BuildT>& grid, const nanovd
         upperMasks[upper - tree.template getFirstNode<2>()].setOnAtomic(NanoUpper<BuildT>::CoordToOffset(ijk));
         return;
     }
-    if (uint32_t(Level) == NanoLower<BuildT>::LEVEL) return; // the block across is a lower node
+    if (uint32_t(Level) == NanoLower<BuildT>::LEVEL) return; // a lower node across: our own level, which fills itself
 
     const uint32_t slot = NanoLower<BuildT>::CoordToOffset(ijk);
     if (!lower->childMask().isOn(slot)) // ends at a lower node: a childless lower slot
@@ -401,6 +408,7 @@ __device__ inline void seedAcrossFace(const NanoGrid<BuildT>& grid, const nanovd
 
 /// @brief Fills one leaf (Level 0), lower (1) or upper (2) node, one warp per node, stores its invert mask in
 ///        @a masks, then seeds the childless slots of coarser levels across the node's inside faces.
+///        Warp-collective: all 32 lanes of a warp call it together, and lane x holds x-slice x of the node.
 template <typename BuildT, typename ValueT, int Level>
 struct BitFloodFunctor
 {
@@ -416,7 +424,7 @@ struct BitFloodFunctor
     static constexpr int      MinBlocksPerMultiprocessor = 1;
 
     __device__ void operator()(const NanoGrid<BuildT>* grid, const ValueT* sdf, MaskT* masks, uint32_t nodeCount,
-                               nanovdb::Mask<4>* lowerMasks, nanovdb::Mask<5>* upperMasks, FaceSet* rootFaceSeeds)
+                               nanovdb::Mask<4>* lowerMasks, nanovdb::Mask<5>* upperMasks, uint32_t* rootFaceSeeds)
     {
         // One warp per node; the block's last warps may have no node, and leave together.
         const int      x      = threadIdx.x & 31; // the lane, which holds x-slice x
@@ -424,6 +432,8 @@ struct BitFloodFunctor
         const uint32_t nodeID = blockIdx.x * NodesPerBlock + warpID;
         if (nodeID >= nodeCount) return;
         const auto& node     = grid->tree().template getFirstNode<Level>()[nodeID];
+        // Lane x holds x-slice x if x < Dim: lanes [0, 8) in a leaf, [0, 16) in a lower node, and all 32 in an
+        // upper node. The other lanes hold empty slices, and take part only in the warp's collective operations.
         const bool  hasSlice = x < Dim;
 
         // Interior starts as the seeds; open slots are those the interior may spread into.
@@ -444,12 +454,13 @@ struct BitFloodFunctor
 
         // Each sweep adds the open face neighbors of the previous interior. A sweep that changes nothing ends
         // the fill; any other sweep adds at least one slot, so SlotCount + 1 sweeps suffice for any input.
-        // Under preconditions 1 and 2 (see PropagateSign), a straight walk from an inside open slot toward the
-        // nearest wall crosses only inside open slots and ends on a seed: the wall itself in a leaf (a voxel
-        // with a negative SDF value), the slot just before it in a lower or upper node (seeded across the
-        // child's face, see the stage comment above).
-        // So at most 3 * (Dim - 1) sweeps turn slots on in a leaf, one fewer in a lower or upper node, and
-        // one more sweep changes nothing: MaxSweeps, i.e. 22, 45 and 93.
+        // Under preconditions 1 and 2 (see PropagateSign), a Manhattan-shortest walk from an inside open slot to
+        // the nearest wall (in the Manhattan metric) crosses only inside open slots, since any wall on it would be
+        // nearer, and ends on a seed: the wall itself in a leaf (a voxel with a negative SDF value), the slot just
+        // before it in a lower or upper node (seeded across the child's face, see the stage comment above).
+        // So no slot is farther from a seed than the node's Manhattan diameter, 3 * (Dim - 1): at most that
+        // many sweeps turn slots on in a leaf, one fewer in a lower or upper node, and one more sweep changes
+        // nothing: MaxSweeps, i.e. 22, 45 and 93.
         int sweep = 0;
         for (; sweep <= SlotCount; ++sweep) {
             SliceT neighbors{};
@@ -459,6 +470,9 @@ struct BitFloodFunctor
             util::morphology::cuda::MaskShift< 0,  1,  0>(interior, neighbors);
             util::morphology::cuda::MaskShift< 0,  0, -1>(interior, neighbors);
             util::morphology::cuda::MaskShift< 0,  0,  1>(interior, neighbors);
+            // Only open slots are entered, so active voxels keep their start: seeds, or walls if nonnegative. A
+            // leaf's seeds may spread into any open neighbor by precondition 2: no voxel with a negative SDF value
+            // is face-adjacent to an inactive outside voxel. Beyond that, face-adjacent open slots share a label.
             const SliceT next = interior | (open & neighbors);
             if (!__any_sync(0xFFFFFFFFu, next != interior)) break;
             interior = next;
@@ -473,7 +487,7 @@ struct BitFloodFunctor
         // Bit f is set if face f holds an inside slot. Each lane first finds the faces on which its own slice
         // has an inside slot; the xor-shuffle butterfly then ORs these sets over all 32 lanes, so every lane
         // ends up with the set for the whole node.
-        FaceSet faceHasInside = facesWithOnSlots(interior, x);
+        uint32_t faceHasInside = facesWithOnSlots(interior, x);
         for (int offset = 16; offset > 0; offset >>= 1) faceHasInside |= __shfl_xor_sync(0xFFFFFFFFu, faceHasInside, offset);
 
         // Lane f seeds across face f if that face has an inside slot.
@@ -572,11 +586,11 @@ struct RootEntryKeyFunctor
 template <typename BuildT>
 struct RootNeighborFunctor
 {
-    __device__ void operator()(size_t i, const uint64_t* positions, const FaceSet* faces, nanovdb::CoordBBox hull,
+    __device__ void operator()(size_t i, const uint64_t* positions, const uint32_t* faces, nanovdb::CoordBBox hull,
                                uint64_t* candidates, int* escaped) const
     {
         const nanovdb::Coord p = rootTileOf(positions[i]);
-        const FaceSet emitted = faces ? faces[i] : (1u << faceCount) - 1;
+        const uint32_t emitted = faces ? faces[i] : (1u << faceCount) - 1;
         for (int f = 0; f < faceCount; ++f) {
             uint64_t key = NoRootTile;
             if ((emitted >> f) & 1u) {
@@ -619,11 +633,11 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
     // Decide: read the face seeds back; if none is set, no absent root-tile position is interior.
     const uint32_t entryCount = uint32_t(mRootFaceSeeds.size());
     if (entryCount == 0) return;
-    std::vector<floodfill::detail::FaceSet> faceSeeds(entryCount);
+    std::vector<uint32_t> faceSeeds(entryCount);
     cudaCheck(cudaMemcpyAsync(faceSeeds.data(), mRootFaceSeeds.data(), mRootFaceSeeds.size_bytes(),
                               cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaStreamSynchronize(mStream));
-    if (std::none_of(faceSeeds.begin(), faceSeeds.end(), [](floodfill::detail::FaceSet seeds) { return seeds != 0; }))
+    if (std::none_of(faceSeeds.begin(), faceSeeds.end(), [](uint32_t seeds) { return seeds != 0; }))
         return;
 
     // Expand. The entries' keys, in table order so that round 1 pairs them with their face seeds, and their hull.
@@ -648,7 +662,7 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
     uint32_t          addedCount = 0;
     BufferT<uint64_t> frontier = std::move(entryKeys);
     uint32_t          frontierCount = entryCount;
-    const floodfill::detail::FaceSet* frontierFaces = mRootFaceSeeds.data();
+    const uint32_t* frontierFaces = mRootFaceSeeds.data();
 
     // counts[0]: the number of keys a cub selection kept; counts[1]: set if a neighbor fell outside the hull
     BufferT<int> counts(mStream, this->ref(), 2, nanovdb::cuda::noInit);
