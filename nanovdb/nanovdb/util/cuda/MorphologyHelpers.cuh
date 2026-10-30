@@ -15,6 +15,7 @@
 #define NANOVDB_UTIL_MORPHOLOGY_CUDA_MORPHOLOGYHELPERS_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h> // for Mask
+#include <nanovdb/util/MorphologyHelpers.h> // for Mask2D
 
 #include <stdint.h> // for uint64_t
 
@@ -121,6 +122,35 @@ void MaskShift( const nanovdb::Mask<4>& inMaskQ, nanovdb::Mask<4>& outMaskQ )
     else {
         outMask[0][ii][jj] = loWord;
         outMask[1][ii][jj] = hiWord; }
+}
+
+/// @brief out(x, y, z) |= in(x + di, y + dj, z + dk), or = if !combine, with zeros from outside the mask:
+///        the 3D MaskShift on a Mask<LOG2DIM> held by a warp as Mask2D slices.
+/// @note  Warp-cooperative: lane x holds x-slice x of the 3D Mask<LOG2DIM> (lanes x >= DIM hold empty slices),
+///        and all 32 lanes must call this together, each passing its own slice. @a in and @a out may be the
+///        same slice.
+template<int di, int dj, int dk, bool combine = true, int LOG2DIM>
+__device__ void MaskShift(const Mask2D<LOG2DIM>& in, Mask2D<LOG2DIM>& out)
+{
+    constexpr int DIM = Mask2D<LOG2DIM>::DIM, WORD_COUNT = Mask2D<LOG2DIM>::WORD_COUNT;
+    static_assert(di > -DIM && di < DIM, "the shift must stay within the mask");
+
+    // x: slice x + di, held by lane x + di. Lanes whose source is outside the mask take zeros, and so do
+    // lanes x >= DIM, whose slices stay empty.
+    Mask2D<LOG2DIM> t = in;
+    if constexpr (di != 0) {
+        const int  x         = threadIdx.x & 31;
+        const bool hasSource = x < DIM && unsigned(x + di) < unsigned(DIM);
+        for (int j = 0; j < WORD_COUNT; ++j) {
+            uint64_t w;
+            if constexpr (di > 0) w = __shfl_down_sync(0xffffffff, in.mWords[j],  di);
+            else                  w = __shfl_up_sync  (0xffffffff, in.mWords[j], -di);
+            t.mWords[j] = hasSource ? w : 0;
+        }
+    }
+
+    // y and z: within the slice.
+    morphology::MaskShift<dj, dk, combine>(t, out);
 }
 
 } // namespace cuda

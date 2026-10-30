@@ -1,0 +1,5 @@
+NanoVDB:
+  New Features:
+  - Added tools::cuda::PropagateSign, the index-grid counterpart of tools::cuda::signedFloodFill: given the
+    signs of the active voxels of an index grid, it returns per-level masks (leaf, lower, upper) and the
+    root-tile origins of the inactive regions that are inside, without modifying the grid.
