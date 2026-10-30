@@ -283,6 +283,7 @@ set(NANOVDB_INCLUDE_CUDA_FILES
   cuda/GridHandle.cuh
   cuda/HandleStorage.h
   cuda/ManagedResource.h
+  cuda/Memcpy.h
   cuda/NodeManager.cuh
   cuda/PinnedResource.h
   cuda/TempPool.h

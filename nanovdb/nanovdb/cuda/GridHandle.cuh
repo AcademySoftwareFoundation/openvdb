@@ -19,6 +19,7 @@
 
 #include <nanovdb/cuda/Buffer.h>// for the resource-aware scratch buffers below
 #include <nanovdb/cuda/HandleStorage.h> // cuda::copyTo and the storage helpers live there (host-includable)
+#include <nanovdb/cuda/Memcpy.h> // for cuda::memcpyAsync between memory on any devices
 #include <nanovdb/cuda/ManagedResource.h> // for the managed default handle instantiated below
 #include <nanovdb/tools/cuda/GridChecksum.cuh>// for cuda::updateChecksum
 #include <nanovdb/GridHandle.h>
@@ -295,7 +296,7 @@ splitGridHandles(const GridHandle<BufferT> &handle, cudaStream_t stream, const B
     for (uint32_t n = 0; n < gridCount; ++n) {
         buffers.push_back(detail::createDeviceStorage<BufferT>(meta[n].size, proto, stream));
         dst.push_back(reinterpret_cast<GridData*>(detail::deviceStorageData(buffers.back())));
-        cudaCheck(cudaMemcpyAsync(dst.back(), util::PtrAdd(src, meta[n].offset), meta[n].size, cudaMemcpyDeviceToDevice, stream));
+        cuda::memcpyAsync(dst.back(), util::PtrAdd(src, meta[n].offset), meta[n].size, stream);
     }
     detail::rewriteGridCounts(dst, 0u, 1u, stream);
 
@@ -370,27 +371,11 @@ mergeGridHandles(const VectorT<GridHandle<BufferT>> &handles, cudaStream_t strea
     std::vector<GridData*> dst;
     dst.reserve(gridCount);
     uint32_t counter = 0u;
-    const int current = util::cuda::currentDevice();
     for (auto &h : handles) {
         const void *src = h.deviceData();
-        // By default, stream-ordered (pool) allocations are accessible only from
-        // their owning device: cudaDeviceEnablePeerAccess does not change that,
-        // only cudaMemPoolSetAccess does. Copies from another device's memory are
-        // therefore peer copies rather than plain device-to-device copies.
-        int srcDevice = current;
-        cudaPointerAttributes attr;
-        if (cudaPointerGetAttributes(&attr, src) != cudaSuccess) {
-            (void)cudaGetLastError();
-        } else if (attr.type == cudaMemoryTypeDevice && attr.device >= 0) {
-            srcDevice = attr.device;
-        }
         for (auto &m : h.metaData()) {
             dst.push_back(util::PtrAdd<GridData>(detail::deviceStorageData(buffer), meta[counter++].offset));
-            if (srcDevice != current) {
-                cudaCheck(cudaMemcpyPeerAsync(dst.back(), current, util::PtrAdd(src, m.offset), srcDevice, m.size, stream));
-            } else {
-                cudaCheck(cudaMemcpyAsync(dst.back(), util::PtrAdd(src, m.offset), m.size, cudaMemcpyDeviceToDevice, stream));
-            }
+            cuda::memcpyAsync(dst.back(), util::PtrAdd(src, m.offset), m.size, stream);
         }
     }
     detail::rewriteGridCounts(dst, 1u, gridCount, stream);

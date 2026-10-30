@@ -69,6 +69,203 @@ TEST(TestNanoVDBMultiGPU, MergeGridHandlesFromAnotherDevice)
     ASSERT_EQ(cudaSuccess, cudaStreamDestroy(remote));
 }
 
+/// @brief Two devices for the cross-device copy tests below: a stream on the
+///        current device and one on the other device, which owns the pool
+///        memory but is not current while the copies run. As in the merge test
+///        above, every stream and buffer is synchronized and freed while its
+///        own device is current.
+struct TwoDevices
+{
+    int current = 0, other = 0;
+    cudaStream_t local = nullptr, remote = nullptr;
+    bool init()
+    {
+        int deviceCount = 0;
+        if (cudaGetDeviceCount(&deviceCount) != cudaSuccess || deviceCount < 2) return false;
+        cudaGetDevice(&current);
+        other = (current + 1) % deviceCount;
+        cudaSetDevice(other);
+        cudaStreamCreateWithFlags(&remote, cudaStreamNonBlocking);
+        cudaSetDevice(current);
+        cudaStreamCreateWithFlags(&local, cudaStreamNonBlocking);
+        return true;
+    }
+    ~TwoDevices()
+    {
+        if (local) { cudaSetDevice(current); cudaStreamSynchronize(local); cudaStreamDestroy(local); }
+        if (remote) { cudaSetDevice(other); cudaStreamSynchronize(remote); cudaStreamDestroy(remote); }
+        cudaSetDevice(current);
+    }
+    /// @brief Completes the work issued on the remote stream, e.g. before its
+    ///        results are read on the local stream; leaves the current device as is.
+    void syncRemote() const
+    {
+        nanovdb::cuda::detail::DeviceGuard guard;
+        cudaSetDevice(other);
+        cudaStreamSynchronize(remote);
+    }
+};
+
+/// @brief Checks that @c handle holds @c gridCount copies of @c ref, each with
+///        a consistent grid index and count and a valid checksum.
+template<typename BufferT>
+void expectGridCopies(const nanovdb::GridHandle<BufferT>& handle, const nanovdb::GridHandle<nanovdb::HostBuffer>& ref, uint32_t gridCount)
+{
+    ASSERT_EQ(gridCount, handle.gridCount());
+    for (uint32_t i = 0; i < gridCount; ++i) {
+        const nanovdb::GridData* data = handle.gridData(i);
+        ASSERT_NE(nullptr, data);
+        EXPECT_EQ(i, data->mGridIndex);
+        EXPECT_EQ(gridCount, data->mGridCount);
+        EXPECT_EQ(ref.gridSize(), handle.gridSize(i));
+        EXPECT_TRUE(nanovdb::tools::validateChecksum(data, nanovdb::CheckMode::Full));
+    }
+}
+
+/// @brief Splits a handle that lives on another device.
+TEST(TestNanoVDBMultiGPU, SplitGridHandlesFromAnotherDevice)
+{
+    nanovdb::cuda::detail::DeviceGuard guard;
+    TwoDevices dev;
+    if (!dev.init()) GTEST_SKIP() << "needs two devices";
+
+    using BufT = nanovdb::cuda::Buffer<std::byte>;
+    auto host = nanovdb::tools::createLevelSetSphere<float>(10.0);
+    ASSERT_EQ(cudaSuccess, cudaSetDevice(dev.other));
+    {
+        std::vector<nanovdb::GridHandle<BufT>> sources;
+        sources.push_back(nanovdb::cuda::copyTo<BufT>(host, dev.remote));
+        sources.push_back(nanovdb::cuda::copyTo<BufT>(host, dev.remote));
+        auto merged = nanovdb::cuda::mergeGridHandles<BufT, std::vector>(sources, dev.remote);
+        ASSERT_EQ(dev.other, nanovdb::cuda::detail::owningDevice(merged.deviceData()));
+
+        ASSERT_EQ(cudaSuccess, cudaSetDevice(dev.current));
+        {
+            auto split = nanovdb::cuda::splitGridHandles<BufT>(merged, dev.local);
+            ASSERT_EQ(2u, split.size());
+            for (auto& h : split) {
+                EXPECT_EQ(dev.current, nanovdb::cuda::detail::owningDevice(h.deviceData()));
+                expectGridCopies(nanovdb::cuda::copyTo<nanovdb::HostBuffer>(h, dev.local), host, 1u);
+            }
+            EXPECT_EQ(dev.current, nanovdb::util::cuda::currentDevice());
+        }
+        ASSERT_EQ(cudaSuccess, cudaSetDevice(dev.other));// the sources are freed on their own device
+    }
+}
+
+/// @brief Downloads a handle that lives on another device, on a stream of the
+///        current device and on the handle's own retained stream.
+TEST(TestNanoVDBMultiGPU, CopyToHostFromAnotherDevice)
+{
+    nanovdb::cuda::detail::DeviceGuard guard;
+    TwoDevices dev;
+    if (!dev.init()) GTEST_SKIP() << "needs two devices";
+
+    using BufT = nanovdb::cuda::Buffer<std::byte>;
+    auto host = nanovdb::tools::createLevelSetSphere<float>(10.0);
+    ASSERT_EQ(cudaSuccess, cudaSetDevice(dev.other));
+    {
+        auto remoteHandle = nanovdb::cuda::copyTo<BufT>(host, dev.remote);
+        dev.syncRemote();// copyTo leaves ordering the upload before other streams to the caller
+        ASSERT_EQ(cudaSuccess, cudaSetDevice(dev.current));
+        expectGridCopies(nanovdb::cuda::copyTo<nanovdb::HostBuffer>(remoteHandle, dev.local), host, 1u);
+        expectGridCopies(nanovdb::cuda::copyTo<nanovdb::HostBuffer>(remoteHandle), host, 1u);
+        EXPECT_EQ(dev.current, nanovdb::util::cuda::currentDevice());
+        ASSERT_EQ(cudaSuccess, cudaSetDevice(dev.other));// freed on its own device
+    }
+}
+
+/// @brief Uploads into another device: a stream-ordered allocation lands on its
+///        stream's device, here the other device, while the current device is
+///        unchanged.
+TEST(TestNanoVDBMultiGPU, CopyToDeviceOnAnotherDevice)
+{
+    nanovdb::cuda::detail::DeviceGuard guard;
+    TwoDevices dev;
+    if (!dev.init()) GTEST_SKIP() << "needs two devices";
+
+    using BufT = nanovdb::cuda::Buffer<std::byte>;
+    auto host = nanovdb::tools::createLevelSetSphere<float>(10.0);
+    {
+        auto remoteHandle = nanovdb::cuda::copyTo<BufT>(host, dev.remote);
+        EXPECT_EQ(dev.current, nanovdb::util::cuda::currentDevice());
+        ASSERT_EQ(dev.other, nanovdb::cuda::detail::owningDevice(remoteHandle.deviceData()));
+        dev.syncRemote();// copyTo leaves ordering the upload before other streams to the caller
+        expectGridCopies(nanovdb::cuda::copyTo<nanovdb::HostBuffer>(remoteHandle, dev.local), host, 1u);
+        ASSERT_EQ(cudaSuccess, cudaSetDevice(dev.other));// freed on its own device
+    }
+}
+
+/// @brief Fills a buffer on @c device with 0, 1, ..., ordered on @c stream.
+template<typename BufferT>
+void fillIota(BufferT& buffer, cudaStream_t stream, int device)
+{
+    nanovdb::cuda::detail::DeviceGuard guard;
+    std::vector<int> values(buffer.size());
+    for (size_t i = 0; i < values.size(); ++i) values[i] = static_cast<int>(i);
+    nanovdb::cuda::memcpyAsync(buffer.data(), values.data(), buffer.size_bytes(), stream);
+    ASSERT_EQ(cudaSuccess, cudaSetDevice(device));
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(stream));
+}
+
+/// @brief Checks that the first @c count elements of a buffer on @c device are
+///        0, 1, ..., reading them back on @c stream.
+template<typename BufferT>
+void expectIota(const BufferT& buffer, size_t count, cudaStream_t stream, int device)
+{
+    nanovdb::cuda::detail::DeviceGuard guard;
+    ASSERT_GE(buffer.size(), count);
+    std::vector<int> values(count);
+    nanovdb::cuda::memcpyAsync(values.data(), buffer.data(), count * sizeof(int), stream);
+    ASSERT_EQ(cudaSuccess, cudaSetDevice(device));
+    ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(stream));
+    for (size_t i = 0; i < count; ++i) EXPECT_EQ(static_cast<int>(i), values[i]);
+}
+
+/// @brief Copies and resizes buffers that live on another device, through a
+///        stream-ordered and a synchronous resource.
+TEST(TestNanoVDBMultiGPU, BufferCopyFromAnotherDevice)
+{
+    nanovdb::cuda::detail::DeviceGuard guard;
+    TwoDevices dev;
+    if (!dev.init()) GTEST_SKIP() << "needs two devices";
+
+    const size_t count = 1000;
+    {// stream-ordered resource: pool memory on the other device
+        using BufT = nanovdb::cuda::Buffer<int>;
+        ASSERT_EQ(cudaSuccess, cudaSetDevice(dev.other));
+        BufT remoteBuffer(dev.remote, count, nanovdb::cuda::noInit);
+        fillIota(remoteBuffer, dev.remote, dev.other);
+        ASSERT_EQ(cudaSuccess, cudaSetDevice(dev.current));
+
+        BufT localCopy = remoteBuffer.copy(dev.local);
+        EXPECT_EQ(dev.current, nanovdb::cuda::detail::owningDevice(localCopy.data()));
+        expectIota(localCopy, count, dev.local, dev.current);
+
+        // The copy above read the source on dev.local, so freeing it there is ordered.
+        remoteBuffer.resize(dev.local, 2 * count);// reallocates on the current device
+        EXPECT_EQ(dev.current, nanovdb::cuda::detail::owningDevice(remoteBuffer.data()));
+        expectIota(remoteBuffer, count, dev.local, dev.current);
+        EXPECT_EQ(dev.current, nanovdb::util::cuda::currentDevice());
+    }
+    {// synchronous resource: cudaMalloc memory on the other device
+        using BufT = nanovdb::cuda::Buffer<int, nanovdb::cuda::MallocResource>;
+        ASSERT_EQ(cudaSuccess, cudaSetDevice(dev.other));
+        BufT remoteBuffer(count, nanovdb::cuda::noInit);
+        fillIota(remoteBuffer, dev.remote, dev.other);
+        ASSERT_EQ(cudaSuccess, cudaSetDevice(dev.current));
+
+        BufT localCopy = remoteBuffer.copy();
+        EXPECT_EQ(dev.current, nanovdb::cuda::detail::owningDevice(localCopy.data()));
+        expectIota(localCopy, count, dev.local, dev.current);
+
+        remoteBuffer.resize(2 * count);
+        EXPECT_EQ(dev.current, nanovdb::cuda::detail::owningDevice(remoteBuffer.data()));
+        expectIota(remoteBuffer, count, dev.local, dev.current);
+        EXPECT_EQ(dev.current, nanovdb::util::cuda::currentDevice());
+    }
+}
+
 /// @brief No points build a valid empty grid, as in PointsToGrid.
 TEST(TestNanoVDBMultiGPU, ZeroPoints_DistributedCudaPointsToGrid)
 {
