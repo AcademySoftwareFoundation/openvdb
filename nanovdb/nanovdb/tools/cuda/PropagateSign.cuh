@@ -23,10 +23,9 @@
 #include <nanovdb/util/cuda/Util.h>
 
 #include <cstddef>   // std::size_t
-#include <cstdint>   // int8_t, uint8_t, uint32_t, uint64_t
+#include <cstdint>   // uint8_t, uint32_t, uint64_t
 #include <limits>    // std::numeric_limits
 #include <stdexcept> // std::runtime_error
-#include <tuple>     // std::tuple
 #include <utility>   // std::move
 #include <vector>    // std::vector
 
@@ -34,32 +33,45 @@ namespace nanovdb {
 
 namespace tools::cuda {
 
-/// @brief Propagate the signs of active voxels through every inactive level of an index grid.
-/// todo: Choose the name of the output masks: "interior masks" or "invert masks".
+/// @brief Propagate the signs of the active voxels of a ValueOnIndex level set through every inactive level.
 /// @details This is the index-grid counterpart of tools::cuda::signedFloodFill (SignedFloodFill.cuh), which
 ///          only works on float grids: it writes +/-background in place into the inactive values themselves.
-///          An index grid (e.g. ValueOnIndex) has no inactive values to write to; its values live in
-///          separate arrays indexed by the active voxels, and every inactive voxel shares the background
-///          index. So instead of modifying the grid, PropagateSign takes the signs of the active voxels from
-///          @a deviceSigns and returns, for every tree level, a mask of the inactive regions that are inside.
+///          A ValueOnIndex grid has no inactive values to write to: its SDF values live in a separate sidecar
+///          indexed by the active voxels, and every inactive voxel shares the background, slot 0. So instead
+///          of modifying the grid, PropagateSign reads the SDF sidecar @a deviceSdf and returns invert masks:
+///          a bit is on for an inactive element (voxel, childless slot, or absent root tile) whose value is
+///          the background with its sign inverted. The value of the level set at an inactive element is thus
+///          -sdf[0] if its bit is on and sdf[0] otherwise; active voxels take their own values, and their bits
+///          are off. The masks are topology: negating every value of the sidecar, slot 0 included, gives the
+///          complement of the level set without touching them.
+///
+///          Inside means a negative SDF value (for an inactive element, that of the region it lies in). The
+///          masks mark the inactive inside regions, i.e. those whose sign differs from the background's
+///          (precondition 3). These are not the bounded regions in general: in a hollow ball the cavity is
+///          bounded but has the background's sign, so its bits are off.
 ///
 ///          The result has one entry per tree level, each covering what that level owns:
-///          - leaf masks: one Mask<3> per leaf; bit n is on if voxel n is inside (an active voxel with
-///            sign -1, or an inactive voxel reached from one).
-///          - lower and upper masks: one Mask per node; bit n is on if slot n has no child and is inside.
-///          - root-tile origins: the inside root-tile positions that have no upper child.
+///          - leaf: one Mask<3> per leaf; bit n is on if voxel n is inactive and inside.
+///          - lower and upper: one Mask per node; bit n is on if slot n has no child and is inside.
+///          - root: the origins of the absent root tiles that are inside.
 ///
 ///          Preconditions, not checked (PruneGrid and MeshToGrid output satisfies 1 and 4):
 ///          1. No empty nodes: every leaf has an active voxel, and every lower and upper node has a child.
-///          2. The active voxels shield both sides: no voxel with sign -1 is face-adjacent to an inactive
-///             outside voxel, and no other active voxel to an inactive inside one.
-///          3. The inside is bounded: it lies within the bounding box of the active voxels.
+///          2. The active voxels shield both sides: no voxel with a negative SDF value is face-adjacent to an
+///             inactive outside voxel, and no other active voxel to an inactive inside one.
+///          3. Only the background's sign reaches infinity: the background sdf[0] is positive, and the inside
+///             lies within the bounding box of the active voxels.
 ///          4. Active values are leaf voxels only (no active tiles), and the root holds only child tiles.
-/// @tparam BuildT NanoVDB index-grid build type.
+/// @tparam BuildT The grid's build type, which must be ValueOnIndex.
+/// @tparam ValueT Floating-point type of the SDF values.
 /// @tparam ResourceT Stream-ordered resource used for all output and scratch allocations.
-template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
+template <typename BuildT, typename ValueT = float, typename ResourceT = nanovdb::cuda::DeviceResource>
 class PropagateSign
 {
+    static_assert(util::is_same<BuildT, ValueOnIndex>::value,
+                  "PropagateSign requires a ValueOnIndex grid: inactive voxels share the background index 0");
+    static_assert(util::is_floating_point<ValueT>::value,
+                  "PropagateSign reads SDF values: ValueT must be a floating-point type");
     static_assert(nanovdb::cuda::is_async_resource<ResourceT>::value,
                   "PropagateSign allocates stream-ordered storage and requires an AsyncResource");
     static_assert(ResourceT::DEFAULT_ALIGNMENT >= alignof(uint64_t),
@@ -71,60 +83,68 @@ class PropagateSign
     using BufferT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ResourceRef<ResourceT>>;
 
 public:
-    /// @param deviceGrid Device index grid whose active values index @a deviceSigns.
-    /// @param deviceSigns Per-active-value signs: -1 inside, any other value (including 0) outside.
+    /// @brief The result of propagate(): the invert masks of every tree level (see the class description).
+    struct InvertMasks
+    {
+        BufferT<nanovdb::Mask<3>> leaf;            // one per leaf
+        BufferT<nanovdb::Mask<4>> lower;           // one per lower node
+        BufferT<nanovdb::Mask<5>> upper;           // one per upper node
+        BufferT<nanovdb::Coord>   rootTileOrigins; // the absent root tiles that are inside
+    };
+
+    /// @param deviceGrid Device ValueOnIndex grid whose active voxels index @a deviceSdf.
+    /// @param deviceSdf SDF sidecar: the SDF value of each active voxel at its value index (leaf.getValue(n));
+    ///        slot 0 is the background. A voxel is inside if its value is negative; zero counts as outside.
+    ///        Only the values of active voxels are read.
     /// @param resource Allocation resource; must outlive the returned buffers.
-    /// @note @a deviceGrid and @a deviceSigns must be ready in @a stream order (if they were written on
+    /// @note @a deviceGrid and @a deviceSdf must be ready in @a stream order (if they were written on
     ///       another stream, make @a stream wait for it, e.g. with cudaStreamWaitEvent), and must remain
     ///       valid until propagate() returns.
     /// todo: Handle inputs that break the preconditions, e.g. root value tiles, which an OpenVDB level set converted
     ///       to NanoVDB can have.
-    PropagateSign(const GridT* deviceGrid, const int8_t* deviceSigns,
+    PropagateSign(const GridT* deviceGrid, const ValueT* deviceSdf,
                   cudaStream_t stream = 0,
                   ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
         : mStream(stream)
         , mTimer(stream)
         , mDeviceGrid(deviceGrid)
-        , mDeviceSigns(deviceSigns)
+        , mDeviceSdf(deviceSdf)
         , mResource(&resource)
-        , mLeafInteriorMasks(stream, resource, 0, nanovdb::cuda::noInit)
-        , mLowerInteriorMasks(stream, resource, 0, nanovdb::cuda::noInit)
-        , mUpperInteriorMasks(stream, resource, 0, nanovdb::cuda::noInit)
-        , mRootInteriorTileOrigins(stream, resource, 0, nanovdb::cuda::noInit)
+        , mLeafInvertMasks(stream, resource, 0, nanovdb::cuda::noInit)
+        , mLowerInvertMasks(stream, resource, 0, nanovdb::cuda::noInit)
+        , mUpperInvertMasks(stream, resource, 0, nanovdb::cuda::noInit)
+        , mRootInvertTileOrigins(stream, resource, 0, nanovdb::cuda::noInit)
         , mRootMask(stream, resource, 0, nanovdb::cuda::noInit)
     {}
 
     /// @brief Toggle timing output.
     void setVerbose(int level = 1) { mVerbose = level; }
 
-    /// @brief Propagate interior (-1) sign and return the leaf, lower, upper, and root-tile outputs.
+    /// @brief Compute the invert masks of every tree level.
     /// @note The stream is synchronized before this method returns.
-    std::tuple<BufferT<nanovdb::Mask<3>>,
-               BufferT<nanovdb::Mask<4>>,
-               BufferT<nanovdb::Mask<5>>,
-               BufferT<nanovdb::Coord>> propagate()
+    InvertMasks propagate()
     {
-        if (mVerbose==1) mTimer.start("Allocating interior masks");
+        if (mVerbose==1) mTimer.start("Allocating invert masks");
         initializeMasks();
         if (mVerbose==1) mTimer.stop();
         // Root propagation is needed when the active bounds contain root-tile positions without an upper child.
-        const bool needsRootPropagation = mRootMask.size() > mUpperInteriorMasks.size();
+        const bool needsRootPropagation = mRootMask.size() > mUpperInvertMasks.size();
 
-        if (mVerbose==1) mTimer.start("Leaf interior fill and seeding coarser levels");
+        if (mVerbose==1) mTimer.start("Leaf fill and seeding coarser levels");
         fillLeafAndSeedCoarserLevels();
         if (mVerbose==1) mTimer.stop();
 
-        if (mVerbose==1) mTimer.start("Lower interior fill and seeding coarser levels");
+        if (mVerbose==1) mTimer.start("Lower fill and seeding coarser levels");
         fillLowerAndSeedCoarserLevels();
         if (mVerbose==1) mTimer.stop();
 
-        if (mVerbose==1) mTimer.start("Upper interior fill and seeding root tiles");
+        if (mVerbose==1) mTimer.start("Upper fill and seeding root tiles");
         fillUpperAndSeedCoarserLevels();
         if (mVerbose==1) mTimer.stop();
 
         if (needsRootPropagation) {
-            if (mVerbose==1) mTimer.start("Root interior fill");
-            fillRootInteriorMasks();
+            if (mVerbose==1) mTimer.start("Root fill");
+            fillRootInvertTiles();
             if (mVerbose==1) mTimer.stop();
         }
 
@@ -132,8 +152,8 @@ public:
         mRootMask.destroy();
 
         cudaCheck(cudaStreamSynchronize(mStream));
-        return {std::move(mLeafInteriorMasks), std::move(mLowerInteriorMasks),
-                std::move(mUpperInteriorMasks), std::move(mRootInteriorTileOrigins)};
+        return {std::move(mLeafInvertMasks), std::move(mLowerInvertMasks),
+                std::move(mUpperInvertMasks), std::move(mRootInvertTileOrigins)};
     }
 
 private:
@@ -155,7 +175,7 @@ private:
 
     // Stage 4: fill the root-tile positions, with those that have upper children as walls, then collect the
     // origins of the interior ones.
-    void fillRootInteriorMasks();
+    void fillRootInvertTiles();
 
     /// @brief Borrowed handle to the injected resource, for the scratch allocated after construction.
     nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource); }
@@ -164,14 +184,14 @@ private:
     util::cuda::Timer  mTimer;
     int                mVerbose{0};
     const GridT*       mDeviceGrid{nullptr};
-    const int8_t*      mDeviceSigns{nullptr};
+    const ValueT*      mDeviceSdf{nullptr};
     ResourceT*         mResource{nullptr};
 
-    // Outputs: one mask per node of each level, and the origins of the interior root-tile positions.
-    BufferT<nanovdb::Mask<3>> mLeafInteriorMasks;
-    BufferT<nanovdb::Mask<4>> mLowerInteriorMasks;
-    BufferT<nanovdb::Mask<5>> mUpperInteriorMasks;
-    BufferT<nanovdb::Coord>   mRootInteriorTileOrigins;
+    // Outputs: one invert mask per node of each level, and the origins of the inside absent root tiles.
+    BufferT<nanovdb::Mask<3>> mLeafInvertMasks;
+    BufferT<nanovdb::Mask<4>> mLowerInvertMasks;
+    BufferT<nanovdb::Mask<5>> mUpperInvertMasks;
+    BufferT<nanovdb::Coord>   mRootInvertTileOrigins;
 
     // Root-level scratch. A root-tile position is the place of one root tile, NanoUpper<BuildT>::DIM voxels
     // per axis; it is absent if the root has no tile there, and then the grid does not store it. So the root
@@ -181,24 +201,24 @@ private:
     BufferT<uint8_t>           mRootMask;       // One byte per root-tile position: 1 if interior, else 0.
     nanovdb::Coord             mRootTileMin{0};  // Root-tile coordinate (voxel coordinate >> TOTAL) of entry 0.
     nanovdb::Coord             mRootTileDims{0}; // Number of root-tile positions along x, y and z.
-}; // tools::cuda::PropagateSign<BuildT, ResourceT>
+}; // tools::cuda::PropagateSign<BuildT, ValueT, ResourceT>
 
 //----------------------------------------------------------------------------------------------------------------------
 // Setup: allocate the per-level masks.
 
-template <typename BuildT, typename ResourceT>
-void PropagateSign<BuildT, ResourceT>::initializeMasks()
+template <typename BuildT, typename ValueT, typename ResourceT>
+void PropagateSign<BuildT, ValueT, ResourceT>::initializeMasks()
 {
     // Inputs are ready in mStream order, so read the grid's tree header on mStream (the read blocks).
     const auto treeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceGrid, mStream);
     const auto& [leafCount, lowerCount, upperCount] = treeData.mNodeCount;
 
     //Initialize Leaf and internal node masks
-    mLeafInteriorMasks = BufferT<nanovdb::Mask<3>>(mStream, this->ref(), leafCount, nanovdb::cuda::noInit);
-    mLowerInteriorMasks = BufferT<nanovdb::Mask<4>>(mStream, this->ref(), lowerCount, nanovdb::cuda::noInit);
-    mUpperInteriorMasks = BufferT<nanovdb::Mask<5>>(mStream, this->ref(), upperCount, nanovdb::cuda::noInit);
-    cudaCheck(cudaMemsetAsync(mLowerInteriorMasks.data(), 0, mLowerInteriorMasks.size_bytes(), mStream));
-    cudaCheck(cudaMemsetAsync(mUpperInteriorMasks.data(), 0, mUpperInteriorMasks.size_bytes(), mStream));
+    mLeafInvertMasks = BufferT<nanovdb::Mask<3>>(mStream, this->ref(), leafCount, nanovdb::cuda::noInit);
+    mLowerInvertMasks = BufferT<nanovdb::Mask<4>>(mStream, this->ref(), lowerCount, nanovdb::cuda::noInit);
+    mUpperInvertMasks = BufferT<nanovdb::Mask<5>>(mStream, this->ref(), upperCount, nanovdb::cuda::noInit);
+    cudaCheck(cudaMemsetAsync(mLowerInvertMasks.data(), 0, mLowerInvertMasks.size_bytes(), mStream));
+    cudaCheck(cudaMemsetAsync(mUpperInvertMasks.data(), 0, mUpperInvertMasks.size_bytes(), mStream));
 
     // Unlike node masks, root propagation must also cover absent root-tile positions, which the grid does not
     // store. An absent position can only be interior if active voxels enclose it, so it lies inside the bbox
@@ -221,38 +241,59 @@ void PropagateSign<BuildT, ResourceT>::initializeMasks()
     // All zero: no root-tile position is interior until a face of a leaf, lower or upper node seeds it.
     mRootMask = BufferT<uint8_t>(mStream, this->ref(), rootPositionCount, nanovdb::cuda::noInit);
     cudaCheck(cudaMemsetAsync(mRootMask.data(), 0, mRootMask.size_bytes(), mStream));
-}// PropagateSign<BuildT, ResourceT>::initializeMasks
+}// PropagateSign<BuildT, ValueT, ResourceT>::initializeMasks
 
 //----------------------------------------------------------------------------------------------------------------------
 
-namespace signing::detail {
+namespace floodfill::detail {
 
 // Stages 1, 2 and 3: fill each leaf, lower or upper node, then seed coarser levels across its faces.
 //
-// In a leaf, active voxels keep their own sign and act as walls; the inside ones seed a flood through the
-// leaf's inactive voxels. In a lower or upper node, slots with a child are walls, and the seeds are the
+// The labels are those of a flood fill over all of space at voxel resolution: it starts from the active
+// voxels with a negative SDF value, spreads across faces through inactive voxels, and stops at the other
+// active voxels. So face-adjacent inactive voxels always share a label. Under preconditions 1-4 (see
+// PropagateSign) this fill can be done node by node, finest level first, because of two facts:
+// - A leaf's fill is exact on its own. A region of inside inactive voxels in a leaf borders, within the
+//   leaf, only voxels with a negative SDF value (precondition 2). If it bordered none, it would be the whole
+//   leaf, which has an active voxel (1). So it touches a voxel with a negative SDF value in its own leaf,
+//   and the leaf's fill reaches it.
+// - A node face-adjacent to an inside childless slot has that whole face inside: its inactive voxels share
+//   the slot's label, and its active ones have a negative SDF value (2). The finest nodes holding the face
+//   mark it, and seed the slot across it (seedAcrossFace); this is why every level seeds every coarser
+//   level directly. A region of inside childless slots always borders a child (1), or at the root an upper
+//   node (3), so it is seeded, and the coarser level's fill spreads over it.
+// Seeds only go to strictly coarser levels, so each level is final before a coarser fill reads it.
+//
+// In a leaf, active voxels keep their own sign and act as walls; the inside ones seed a flood fill through
+// the leaf's inactive voxels. In a lower or upper node, slots with a child are walls, and the seeds are the
 // slots that the faces of finer nodes set in the previous stages. The flood is Jacobi style: in each sweep
 // every unreached open slot turns on if a face neighbor is already on, so a sweep is one parallel step with
-// no ordering between threads. Under the preconditions no wall makes the flood detour inside a node, so the
-// number of sweeps is bounded by the node's size (see BitFloodFunctor).
+// no ordering between threads. Under preconditions 1 and 2, every wall facing an inside region is a seed or
+// has a seed next to it, so the flood never has to go around a wall, and the number of sweeps is bounded by
+// the node's size (see BitFloodFunctor).
 //
 // One kernel per level, one warp per node: lane x holds x-slice x of the node's mask in registers as a
 // util::morphology::Mask2D, and lanes x >= Dim hold empty slices. The warp fills the mask with the warp
-// MaskShift of util/cuda/MorphologyHelpers.cuh, stores it, and then seeds coarser levels across the node's
-// faces (seedAcrossFace).
+// MaskShift of util/cuda/MorphologyHelpers.cuh, stores its inactive part as the node's invert mask, and then
+// seeds coarser levels across the node's faces (seedAcrossFace).
 
-/// @brief The calling lane's slice of the seeds of @a leaf, its active voxels whose sign is -1: lane x gets
-///        x-slice x, and lanes x >= 8 get empty slices. All 32 lanes of the warp call it together.
-template <typename BuildT>
-__device__ util::morphology::Mask2D<3> leafSeedSlice(const NanoLeaf<BuildT>& leaf, const int8_t* signs)
+/// @brief The calling lane's x-slice of the seeds of @a leaf, i.e. the interior at sweep 0 of its fill: its
+///        active voxels with a negative SDF value. Lane x gets x-slice x, and lanes x >= 8 get empty slices.
+///        All 32 lanes of the warp call it together.
+/// @param sdf SDF sidecar of the grid, indexed by value index; read only at the leaf's active voxels.
+template <typename BuildT, typename ValueT>
+__device__ util::morphology::Mask2D<3> leafSeedSlice(const NanoLeaf<BuildT>& leaf, const ValueT* sdf)
 {
     // Each ballot tests 32 consecutive voxels, half of the one-word slice n / 64, and the lane holding that
     // slice keeps the answers. So all 32 lanes test voxels, 16 each, not only the 8 lanes holding slices.
+    // In a ValueOnIndex leaf an inactive voxel has value index 0, the background: it is never a seed, and
+    // its index is not read.
     const int lane = threadIdx.x & 31;
     util::morphology::Mask2D<3> s{};
     for (uint32_t first = 0; first < NanoLeaf<BuildT>::SIZE; first += 32) {
-        const uint32_t n      = first + uint32_t(lane);
-        const uint32_t ballot = __ballot_sync(0xFFFFFFFFu, leaf.isActive(n) && signs[leaf.getValue(n)] == int8_t(-1));
+        const uint64_t index  = leaf.getValue(first + uint32_t(lane));
+        const bool     seed   = index != 0 && sdf[index] < ValueT(0); // zero is outside
+        const uint32_t ballot = __ballot_sync(0xFFFFFFFFu, seed);
         if (lane == int(first / 64)) s.mWords[0] |= uint64_t(ballot) << (first % 64);
     }
     return s;
@@ -385,9 +426,9 @@ __device__ inline void seedAcrossFace(const NanoGrid<BuildT>& grid, const nanovd
     }
 }
 
-/// @brief Fills one leaf (Level 0), lower (1) or upper (2) node's interior mask in @a masks, one warp per
-///        node, then seeds the childless slots of coarser levels across the node's inside faces.
-template <typename BuildT, int Level>
+/// @brief Fills one leaf (Level 0), lower (1) or upper (2) node, one warp per node, stores its invert mask in
+///        @a masks, then seeds the childless slots of coarser levels across the node's inside faces.
+template <typename BuildT, typename ValueT, int Level>
 struct BitFloodFunctor
 {
     using NodeT  = typename NanoNode<BuildT, Level>::type;
@@ -401,7 +442,7 @@ struct BitFloodFunctor
     static constexpr int      MaxThreadsPerBlock         = 32 * NodesPerBlock;
     static constexpr int      MinBlocksPerMultiprocessor = 1;
 
-    __device__ void operator()(const NanoGrid<BuildT>* grid, const int8_t* signs, MaskT* masks, uint32_t nodeCount,
+    __device__ void operator()(const NanoGrid<BuildT>* grid, const ValueT* sdf, MaskT* masks, uint32_t nodeCount,
                                nanovdb::Mask<4>* lowerMasks, nanovdb::Mask<5>* upperMasks, uint8_t* rootMask,
                                nanovdb::Coord tileMin, nanovdb::Coord tileDims)
     {
@@ -416,8 +457,8 @@ struct BitFloodFunctor
         // Interior starts as the seeds; open slots are those the interior may spread into.
         SliceT interior{}, open{};
         if constexpr (Level == 0) {
-            // Leaf: seeds are active voxels whose sign is -1; inactive voxels are open.
-            interior = leafSeedSlice(node, signs);
+            // Leaf: seeds are active voxels with a negative SDF value; inactive voxels are open.
+            interior = leafSeedSlice(node, sdf);
             if (hasSlice) {
                 open = SliceT::load(node.valueMask(), x);
                 open.toggle();
@@ -433,7 +474,8 @@ struct BitFloodFunctor
         // the fill; any other sweep adds at least one slot, so SlotCount + 1 sweeps suffice for any input.
         // Under preconditions 1 and 2 (see PropagateSign), a straight walk from an inside open slot toward the
         // nearest wall crosses only inside open slots and ends on a seed: the wall itself in a leaf (a voxel
-        // with sign -1), the slot just before it in a lower or upper node (seeded across the child's face).
+        // with a negative SDF value), the slot just before it in a lower or upper node (seeded across the
+        // child's face, see the stage comment above).
         // So at most 3 * (Dim - 1) sweeps turn slots on in a leaf, one fewer in a lower or upper node, and
         // one more sweep changes nothing: MaxSweeps, i.e. 22, 45 and 93.
         int sweep = 0;
@@ -450,7 +492,11 @@ struct BitFloodFunctor
             interior = next;
         }
         NANOVDB_ASSERT(sweep < MaxSweeps); // the input breaks preconditions 1 or 2
-        if (hasSlice) interior.store(masks[nodeID], x);
+
+        // The invert mask holds only the open inside slots: a leaf's inside active voxels take their own
+        // values, so their bits are off (in lower and upper nodes the interior is already within open). The
+        // face seeding below still uses the whole interior, since a face of inside active voxels seeds too.
+        if (hasSlice) (interior & open).store(masks[nodeID], x);
 
         // Bit f is set if face f holds an inside slot. Each lane first finds the faces on which its own slice
         // has an inside slot; the xor-shuffle butterfly then ORs these sets over all 32 lanes, so every lane
@@ -465,52 +511,52 @@ struct BitFloodFunctor
     }
 }; // BitFloodFunctor
 
-} // namespace signing::detail
+} // namespace floodfill::detail
 
-template <typename BuildT, typename ResourceT>
-void PropagateSign<BuildT, ResourceT>::fillLeafAndSeedCoarserLevels()
+template <typename BuildT, typename ValueT, typename ResourceT>
+void PropagateSign<BuildT, ValueT, ResourceT>::fillLeafAndSeedCoarserLevels()
 {
-    if (mLeafInteriorMasks.size() == 0) return; // a kernel launch with zero blocks is an error
-    using Op = signing::detail::BitFloodFunctor<BuildT, 0>;
-    const uint32_t count = uint32_t(mLeafInteriorMasks.size());
+    if (mLeafInvertMasks.size() == 0) return; // a kernel launch with zero blocks is an error
+    using Op = floodfill::detail::BitFloodFunctor<BuildT, ValueT, 0>;
+    const uint32_t count = uint32_t(mLeafInvertMasks.size());
     util::cuda::operatorKernel<Op>
         <<<util::cuda::blocksPerGrid(size_t(count) * 32, Op::MaxThreadsPerBlock), Op::MaxThreadsPerBlock, 0, mStream>>>(
-        mDeviceGrid, mDeviceSigns, mLeafInteriorMasks.data(), count,
-        mLowerInteriorMasks.data(), mUpperInteriorMasks.data(), mRootMask.data(), mRootTileMin, mRootTileDims);
+        mDeviceGrid, mDeviceSdf, mLeafInvertMasks.data(), count,
+        mLowerInvertMasks.data(), mUpperInvertMasks.data(), mRootMask.data(), mRootTileMin, mRootTileDims);
     cudaCheckError();
-}// PropagateSign<BuildT, ResourceT>::fillLeafAndSeedCoarserLevels
+}// PropagateSign<BuildT, ValueT, ResourceT>::fillLeafAndSeedCoarserLevels
 
-template <typename BuildT, typename ResourceT>
-void PropagateSign<BuildT, ResourceT>::fillLowerAndSeedCoarserLevels()
+template <typename BuildT, typename ValueT, typename ResourceT>
+void PropagateSign<BuildT, ValueT, ResourceT>::fillLowerAndSeedCoarserLevels()
 {
-    if (mLowerInteriorMasks.size() == 0) return; // a kernel launch with zero blocks is an error
-    using Op = signing::detail::BitFloodFunctor<BuildT, 1>;
-    const uint32_t count = uint32_t(mLowerInteriorMasks.size());
-    const int8_t*  noSigns = nullptr;
+    if (mLowerInvertMasks.size() == 0) return; // a kernel launch with zero blocks is an error
+    using Op = floodfill::detail::BitFloodFunctor<BuildT, ValueT, 1>;
+    const uint32_t count = uint32_t(mLowerInvertMasks.size());
+    const ValueT*  noSdf = nullptr;
     util::cuda::operatorKernel<Op>
         <<<util::cuda::blocksPerGrid(size_t(count) * 32, Op::MaxThreadsPerBlock), Op::MaxThreadsPerBlock, 0, mStream>>>(
-        mDeviceGrid, noSigns, mLowerInteriorMasks.data(), count,
-        mLowerInteriorMasks.data(), mUpperInteriorMasks.data(), mRootMask.data(), mRootTileMin, mRootTileDims);
+        mDeviceGrid, noSdf, mLowerInvertMasks.data(), count,
+        mLowerInvertMasks.data(), mUpperInvertMasks.data(), mRootMask.data(), mRootTileMin, mRootTileDims);
     cudaCheckError();
-}// PropagateSign<BuildT, ResourceT>::fillLowerAndSeedCoarserLevels
+}// PropagateSign<BuildT, ValueT, ResourceT>::fillLowerAndSeedCoarserLevels
 
-template <typename BuildT, typename ResourceT>
-void PropagateSign<BuildT, ResourceT>::fillUpperAndSeedCoarserLevels()
+template <typename BuildT, typename ValueT, typename ResourceT>
+void PropagateSign<BuildT, ValueT, ResourceT>::fillUpperAndSeedCoarserLevels()
 {
-    if (mUpperInteriorMasks.size() == 0) return; // a kernel launch with zero blocks is an error
-    using Op = signing::detail::BitFloodFunctor<BuildT, 2>;
-    const uint32_t count = uint32_t(mUpperInteriorMasks.size());
-    const int8_t*  noSigns = nullptr;
+    if (mUpperInvertMasks.size() == 0) return; // a kernel launch with zero blocks is an error
+    using Op = floodfill::detail::BitFloodFunctor<BuildT, ValueT, 2>;
+    const uint32_t count = uint32_t(mUpperInvertMasks.size());
+    const ValueT*  noSdf = nullptr;
     util::cuda::operatorKernel<Op>
         <<<util::cuda::blocksPerGrid(size_t(count) * 32, Op::MaxThreadsPerBlock), Op::MaxThreadsPerBlock, 0, mStream>>>(
-        mDeviceGrid, noSigns, mUpperInteriorMasks.data(), count,
-        mLowerInteriorMasks.data(), mUpperInteriorMasks.data(), mRootMask.data(), mRootTileMin, mRootTileDims);
+        mDeviceGrid, noSdf, mUpperInvertMasks.data(), count,
+        mLowerInvertMasks.data(), mUpperInvertMasks.data(), mRootMask.data(), mRootTileMin, mRootTileDims);
     cudaCheckError();
-}// PropagateSign<BuildT, ResourceT>::fillUpperAndSeedCoarserLevels
+}// PropagateSign<BuildT, ValueT, ResourceT>::fillUpperAndSeedCoarserLevels
 
 //----------------------------------------------------------------------------------------------------------------------
 
-namespace signing::detail {
+namespace floodfill::detail {
 
 // Stage 4: fill the root-tile positions.
 //
@@ -584,10 +630,10 @@ struct RootPropagationFunctor
     }
 }; // RootPropagationFunctor
 
-} // namespace signing::detail
+} // namespace floodfill::detail
 
-template <typename BuildT, typename ResourceT>
-void PropagateSign<BuildT, ResourceT>::fillRootInteriorMasks()
+template <typename BuildT, typename ValueT, typename ResourceT>
+void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
 {
     const std::size_t rootPositionCount = mRootMask.size();
     BufferT<uint8_t> walls(mStream, this->ref(), rootPositionCount, nanovdb::cuda::noInit);
@@ -597,11 +643,11 @@ void PropagateSign<BuildT, ResourceT>::fillRootInteriorMasks()
     static constexpr unsigned int threadsPerBlock = 128;
     util::cuda::lambdaKernel
         <<<util::cuda::blocksPerGrid(rootPositionCount, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
-        rootPositionCount, signing::detail::RootWallFunctor<BuildT>{},
+        rootPositionCount, floodfill::detail::RootWallFunctor<BuildT>{},
         mDeviceGrid, walls.data(), mRootTileMin, mRootTileDims);
     cudaCheckError();
 
-    using RootPropagationOp = signing::detail::RootPropagationFunctor;
+    using RootPropagationOp = floodfill::detail::RootPropagationFunctor;
     util::cuda::operatorKernel<RootPropagationOp>
         <<<1, RootPropagationOp::MaxThreadsPerBlock, 0, mStream>>>(
         walls.data(), mRootMask.data(), next.data(), mRootTileDims);
@@ -615,13 +661,13 @@ void PropagateSign<BuildT, ResourceT>::fillRootInteriorMasks()
     std::vector<nanovdb::Coord> origins;
     for (std::size_t n = 0; n < rootPositionCount; ++n) {
         if (!interior[n]) continue;
-        origins.push_back((mRootTileMin + signing::detail::rootTilePosition(n, mRootTileDims))
+        origins.push_back((mRootTileMin + floodfill::detail::rootTilePosition(n, mRootTileDims))
                           << NanoUpper<BuildT>::TOTAL);
     }
-    mRootInteriorTileOrigins = BufferT<nanovdb::Coord>(mStream, this->ref(), origins.size(), nanovdb::cuda::noInit);
-    cudaCheck(cudaMemcpyAsync(mRootInteriorTileOrigins.data(), origins.data(), mRootInteriorTileOrigins.size_bytes(),
+    mRootInvertTileOrigins = BufferT<nanovdb::Coord>(mStream, this->ref(), origins.size(), nanovdb::cuda::noInit);
+    cudaCheck(cudaMemcpyAsync(mRootInvertTileOrigins.data(), origins.data(), mRootInvertTileOrigins.size_bytes(),
                               cudaMemcpyHostToDevice, mStream));
-}// PropagateSign<BuildT, ResourceT>::fillRootInteriorMasks
+}// PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles
 
 //----------------------------------------------------------------------------------------------------------------------
 
