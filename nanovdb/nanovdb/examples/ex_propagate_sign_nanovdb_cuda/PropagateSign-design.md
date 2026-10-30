@@ -864,7 +864,9 @@ round added (the plain scheme's "flags are consumed, new tiles enter with all fa
   `nanovdb_test_openvdb` with OpenVDB level sets (sphere, torus, CSG hollow shell, two distant spheres,
   and a band enclosing a cavity several root tiles wide so that stage 4 expands), stripped to the
   narrow band and compared with OpenVDB's inactive signs; plus a run on a non-blocking stream, outputs
-  that outlive the operator, and an injected resource that sees every allocation.
+  that outlive the operator, and an injected resource that sees every allocation. The example follows
+  the plan in "Example: validation against an OpenVDB level set" below; the gtest can share its
+  stripping and checking code.
 - **`pendingchanges/propagatesign.txt`** still describes the sign-array interface.
 - **Root guard in release:** throw (or stop) when a neighbor leaves the hull; the flag is already read
   back every round.
@@ -889,3 +891,74 @@ round added (the plain scheme's "flags are consumed, new tiles enter with all fa
   handled. Background-relative seeding (precondition 3 requires `sdf[0] > 0`) is deferred.
 - **Closed from the earlier "Still open" lists:** formal races (root seeds are `atomicOr`), the
   `signs` -> `signSidecar` todo (the input is the SDF sidecar), and the mask naming (invert masks).
+
+## Example: validation against an OpenVDB level set (plan, 2026-10-30)
+
+Agreed in review, for implementation in `ex_propagate_sign_nanovdb_cuda`. The example reads a
+conventional OpenVDB level set (a `FloatGrid` from a `.vdb` file), converts it to a narrow-band-only
+`ValueOnIndex` grid plus SDF sidecar, runs `PropagateSign`, and checks the invert masks against the
+OpenVDB grid, which serves as an independent reference.
+
+### Why OpenVDB is a reference
+
+An OpenVDB level set stores the sign of every inactive element explicitly:
+
+- **Tiles:** inactive value tiles at the lower, upper and root levels hold +background outside and
+  -background inside.
+- **Leaf voxels:** OpenVDB leaves are dense; all 512 slots of the `LeafBuffer` hold a value, active or
+  not. Level sets use this to store +background in the inactive voxels outside the narrow band and
+  -background in those inside (as set by `signedFloodFill`).
+
+The narrow-band-only `ValueOnIndex` grid keeps none of this, and the invert masks are what replaces it.
+So the masks can be checked element by element against the values the stripping discards.
+
+### Stripping to the narrow band
+
+- **Every value tile is dropped,** at the lower, upper and root levels. In the NanoVDB grid a tile slot of
+  a lower or upper node becomes a childless slot, and a root tile becomes an absent root-tile position.
+- **Every inactive voxel value is dropped:** in the `ValueOnIndex` grid all inactive voxels share value
+  index 0, the background.
+- **The topology is rebuilt from the active voxels only,** so that preconditions 1 and 4 hold by
+  construction: no leaf without an active voxel, no lower or upper node without a child, no active
+  tiles, and a root that holds only child tiles. (Converting the OpenVDB tree as is would keep its
+  inactive root tiles, which `propagate()` now rejects, and any leaf without active voxels.)
+- **The sidecar** holds the active voxels' values at their value indices; slot 0 is the background
+  (positive, precondition 3).
+- The discarded values remain in the OpenVDB grid, which is the reference.
+
+### The check
+
+The value at an inactive element is `-sdf[0]` if its invert bit is on (for an absent root tile: if its
+origin is in the returned list) and `sdf[0]` otherwise. The check compares signs only, inside meaning
+negative, so an inactive value that some operation left unsaturated still counts by its sign.
+
+1. **Every inactive voxel.** Iterate over the off values of the OpenVDB tree at the voxel level
+   (`ValueOffIter`, leaf voxels) and check that each one's sign matches the invert state of the NanoVDB
+   element containing it.
+2. **Every coarser tile.** Do the same for the OpenVDB tiles at the lower and upper levels (the same
+   iteration, at tile level).
+3. **The root,** in both directions:
+   - forward: every OpenVDB root tile, as in step 2;
+   - reverse: every root-tile origin that `propagate()` returns must be negative in OpenVDB. The forward
+     iteration only visits what OpenVDB stores, never the space outside its root table, where OpenVDB
+     returns the (positive) background; a NanoVDB root tile can fall there. Leaf, lower and upper bits
+     need no reverse check: they lie in NanoVDB nodes, which are also OpenVDB nodes, so the forward
+     iteration visits every one of them.
+
+**The NanoVDB element containing an OpenVDB element is not necessarily of the same kind.** The stripped
+topology is a subset of OpenVDB's: an inactive OpenVDB voxel can fall in a NanoVDB leaf voxel (its leaf
+kept an active voxel), a childless lower or upper slot (its leaf or lower node was dropped), or an absent
+root tile (its whole upper node was dropped); likewise for OpenVDB tiles. So each check is one lookup on
+the NanoVDB side: descend from the root toward the coordinate, to where the descent ends, and read that
+element's invert state. A single lookup at a tile's origin covers the whole tile: since NanoVDB keeps a
+subset of OpenVDB's nodes, every OpenVDB tile lies inside one NanoVDB element (a slot at the same level,
+or a coarser one).
+
+### Inputs
+
+Well-formed symmetric level sets satisfy precondition 2. Files from elsewhere may not. Suggested, not
+yet settled: the example reports mismatches next to the precondition 2 violations it finds (an active voxel face-adjacent
+to an inactive voxel of the other sign, read off the OpenVDB grid) rather than count every mismatch as
+a failure of the operator. Good inputs: OpenVDB's own level-set generators and CSG (sphere, torus, a
+hollow shell from a difference of spheres, two distant spheres), and a band enclosing at least one
+absent root tile, so that stage 4 expands (see Still open).
