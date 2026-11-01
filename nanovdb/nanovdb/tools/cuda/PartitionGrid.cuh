@@ -43,9 +43,8 @@ namespace nanovdb {
 namespace tools::cuda {
 
 /// @brief Splits the active voxels of an index grid in two, by a retain mask with one Mask<3> per source leaf.
-/// @details Output 0 holds the active voxels whose retain bit is on, and is identical to what PruneGrid returns
-///          for the same mask; output 1 holds the other active voxels, i.e. PruneGrid with the complemented
-///          mask. Together they hold every active voxel exactly once. Retain bits of inactive voxels are ignored
+/// @details Output 0 holds the active voxels whose retain bit is on, and output 1 the other active voxels.
+///          Together they hold every active voxel exactly once. Retain bits of inactive voxels are ignored
 ///          on both sides. An output that keeps no voxel is a valid empty grid.
 ///
 ///          Both outputs are built in one pass: the root table is computed once, and each kernel that reads the
