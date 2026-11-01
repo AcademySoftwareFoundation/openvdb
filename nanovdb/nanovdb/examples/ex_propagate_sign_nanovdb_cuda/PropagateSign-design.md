@@ -836,9 +836,9 @@ round added (the plain scheme's "flags are consumed, new tiles enter with all fa
 - **Two sorted lists,** `known` and `added`, each merged every round; the output is `added`.
 - **The hull** is computed on the host from a copy of the entries' keys (one more sync, on the expansion
   path only).
-- **The guard is weaker than proposed:** a neighbor outside the hull is dropped and sets a flag that only
-  a `NANOVDB_ASSERT` checks after the loop, so a release build returns a wrong (though bounded) result
-  without notice. See Still open.
+- **The guard was weaker than proposed** (fixed in `4f67a5a9c`, see Review pass 2026-10-31): a neighbor
+  outside the hull was dropped and set a flag that only a `NANOVDB_ASSERT` checked after the loop, so a
+  release build returned a wrong (though bounded) result without notice.
 - **`seedAcrossFace` walks root -> upper -> lower itself** and seeds where the walk ends; `TerminalSlot`
   and `probeTerminalSlot` are gone. A root seed sets bit `face` of the seeding node's own root-table
   entry, found with a second `probeTile` (on the node's own origin, so it always succeeds; asserted).
@@ -857,27 +857,72 @@ round added (the plain scheme's "flags are consumed, new tiles enter with all fa
   stated as the node's Manhattan diameter, and the same-level returns in `seedAcrossFace` say why
   nothing is seeded (a node of our own level fills itself).
 
+### Review pass 2026-10-31 (`4f67a5a9c`)
+
+- **Root guard:** `fillRootInvertTiles()` reads the hull flag back with each round's count and throws
+  `std::runtime_error` once it is set, in every build. The one-sign synthetic cases of the scratch
+  regression harness, which break precondition 3 (see Still open), now throw instead of returning a
+  result clipped at the hull.
+- **Stage 4 scratch:** the search state (`frontier`, `known`, `added`) and each round's scratch are
+  declared together, and the two-int counts buffer, whose first slot held two different counts, is split
+  into `uniqueCount`, `newCount` and `escaped`.
+- **Packaging:** the header is in `NANOVDB_INCLUDE_TOOLS_CUDA_FILES`, so it is installed, and
+  `nanovdb_cuda_header_check` compiles it on its own under nvcc.
+- **`pendingchanges/propagatesign.txt`** describes the SDF input and the caller-allocated masks.
+
+### Stage 4 on valid inputs (2026-10-31)
+
+A scratch test (not in the repository) builds inputs that make stage 4 expand and meet every
+precondition. The inside region I is a union of boxes, wrapped in a two-layer band of active voxels: SDF
+-0.5 at Chebyshev distance 1 from I, +0.5 at distance 2. Face neighbors differ by at most 1 in distance,
+so no negative voxel touches the outside and no positive one touches I (precondition 2); the grid holds
+only these voxels (1 and 4), and the background is positive (3). Every mask bit of every level and the
+root output are compared with the answer computed from I, and with `fab481195`, whose dense root flood
+is an independent implementation of the root stage.
+
+| I | leaves | entries | active voxels | root output |
+| :-- | --: | --: | --: | --: |
+| one root tile, band right outside it | 1.58M | 26 | 2.0 x 10^8 | 1 tile |
+| two root tiles, extended by 300 voxels on every side | 3.27M | 34 | 4.2 x 10^8 | 2 tiles |
+| a plus of 7 root tiles | 7.9M | 74 | 1.0 x 10^9 | 7 tiles |
+
+All three match both references in release and debug builds. They exercise what no earlier input did:
+deduplication in round 1 (an arm tile of the plus is seeded by five entries), a tile found only in
+round 2 (the center of the plus: its six neighbors are all absent, so no entry seeds it), inside bits
+at every level at once (in the second case the inside reaches into the neighboring upper nodes), and
+negative coordinates. Stage 4 took 0.2-0.5 ms on an RTX PRO 3000 (Blackwell), in line with Cost.
+
+Not covered: an absent exterior tile enclosed by the inside (a hollow shell at root-tile scale). OpenVDB
+level sets, one of which makes stage 4 expand, are covered by the example (see its Results).
+
+### Unit tests (2026-11-01)
+
+The unit tests run on index grids built without OpenVDB, and only on a sphere; comparing with OpenVDB is
+the example's job. This replaces the OpenVDB-based gtest planned earlier (sphere, torus, CSG hollow
+shell, two distant spheres, and a band around a cavity several root tiles wide): a unit test only has to
+fail when the operator is wrong, and the target planned for it, `nanovdb_test_openvdb`, is built from
+`TestOpenVDB.cc`, a C++ file, which cannot include the header.
+
+- **`TestNanoVDB.cu`, `PropagateSign_Sphere`:** the level set of `createLevelSetSphere` (radius 120,
+  center off the lattice, straddling the origin so that the root has eight entries, half-width 3),
+  converted to a ValueOnIndex grid whose blind data channel is the SDF sidecar. Every leaf, lower and
+  upper mask bit is compared with the analytic answer, each level has bits on (the center sits in a
+  128^3 block that lies inside clear of the band), and no root tile is returned.
+- **`TestMemoryResource.cu`, `PropagateSign_InjectedResourceSeam` and `PropagateSign_NonBlockingStream`**,
+  as for ConnectedComponents, on a sphere of radius 6: every allocation goes through the injected
+  resource and is released, and on a `cudaStreamNonBlocking` stream the leaf bits on equal the inactive
+  voxels inside the sphere.
+
 ### Still open
 
-- **Packaging:** no target includes the header, so CI never compiles it; it is not in
-  `NANOVDB_INCLUDE_TOOLS_CUDA_FILES`; there is no test or example. Planned test: a gtest in
-  `nanovdb_test_openvdb` with OpenVDB level sets (sphere, torus, CSG hollow shell, two distant spheres,
-  and a band enclosing a cavity several root tiles wide so that stage 4 expands), stripped to the
-  narrow band and compared with OpenVDB's inactive signs; plus a run on a non-blocking stream, outputs
-  that outlive the operator, and an injected resource that sees every allocation. The example follows
-  the plan in "Example: validation against an OpenVDB level set" below; the gtest can share its
-  stripping and checking code.
-- **`pendingchanges/propagatesign.txt`** still describes the sign-array interface.
-- **Root guard in release:** throw (or stop) when a neighbor leaves the hull; the flag is already read
-  back every round.
-- **No valid input yet makes stage 4 expand.** In the scratch regression harness, the synthetic cases
-  with one sign everywhere ("enclosed absent root cell, all inside", "distant clusters, all inside" and
-  "half-space") break precondition 3: their inside reaches past the active bounding box. The dense root
-  array clipped them at the box; the sparse root drops the neighbors outside the hull, which gives the
-  same release result, and trips the hull assert in debug builds, as designed. These cases belong with
-  the robustness inputs, and would throw once the release guard does. A valid case needs a closed band
-  around at least one absent root tile, i.e. at least about 6 x 512^2 = 1.5M leaves for a two-layer
-  band: affordable on the GPU, but a test of its own.
+- **Untested:** outputs that outlive the operator. The only output the operator allocates is the list of
+  root-tile origins, which is empty, and not allocated, unless stage 4 expands; and the smallest input
+  that expands it, a band around one absent root tile, is about 1.5M leaves and 2 x 10^8 active voxels
+  (6 x 512^2 leaves for a two-layer band; see the table above), too heavy for a unit test.
+- **Robustness inputs.** In the scratch regression harness, the synthetic cases with one sign
+  everywhere ("enclosed absent root cell, all inside", "distant clusters, all inside" and "half-space")
+  break precondition 3: their inside reaches past the active bounding box. The dense root array clipped
+  them at the box; the sparse root throws on them (`4f67a5a9c`). They belong with the robustness inputs.
 - **Optional: check `seedAcrossFace` with a host simulator on synthetic trees.** Build trees on the host
   whose nodes sit at every kind of boundary: within one lower node, across lower, upper and root-tile
   boundaries, at negative coordinates, and next to absent root tiles. For every (node, face), compute
@@ -890,7 +935,10 @@ round added (the plain scheme's "flags are consumed, new tiles enter with all fa
 - Preconditions 1-3 remain unchecked. Root value tiles from OpenVDB level sets are now rejected, not
   handled. Background-relative seeding (precondition 3 requires `sdf[0] > 0`) is deferred.
 - **Closed from the earlier "Still open" lists:** formal races (root seeds are `atomicOr`), the
-  `signs` -> `signSidecar` todo (the input is the SDF sidecar), and the mask naming (invert masks).
+  `signs` -> `signSidecar` todo (the input is the SDF sidecar), the mask naming (invert masks), the root
+  guard in release and the stale `pendingchanges` entry (`4f67a5a9c`), the lack of a valid input
+  that makes stage 4 expand (see "Stage 4 on valid inputs"), and the missing example and unit tests
+  (see "Unit tests" and the example's Results).
 
 ## Example: validation against an OpenVDB level set (plan, 2026-10-30)
 
@@ -962,3 +1010,21 @@ to an inactive voxel of the other sign, read off the OpenVDB grid) rather than c
 a failure of the operator. Good inputs: OpenVDB's own level-set generators and CSG (sphere, torus, a
 hollow shell from a difference of spheres, two distant spheres), and a band enclosing at least one
 absent root tile, so that stage 4 expands (see Still open).
+
+### Results (2026-11-01)
+
+`ex_propagate_sign_nanovdb_cuda` follows this plan: one iteration over the OpenVDB off values at every
+level, with one lookup each, then the returned root tiles in reverse. Every input below gives no
+mismatch:
+
+- OpenVDB level-set generators and CSG, half-width 3: a sphere, a hollow shell (difference of spheres of
+  radius 300 and 200), two spheres in different root tiles, one at negative coordinates, a dodecahedron,
+  a sphere of radius 1000 centered on a root-tile corner, and a sphere with active tiles added at the
+  lower, upper and root levels, which the stripping drops.
+- A sphere of radius 3600, half-width 2 (6.5 x 10^8 active voxels): it encloses the root tile
+  [0, 4096)^3, which OpenVDB stores as an inside root tile and the stripping drops; stage 4 returns it.
+- Closed meshes converted with `meshToLevelSet` at 1024 voxels across, half-width 3: armadillo, torus,
+  wingnut, skull, a tree with thin branches, and a house.
+
+With the leaf and lower masks cleared after `propagate()`, the check reports millions of mismatches on
+the same inputs, so it does see the masks.

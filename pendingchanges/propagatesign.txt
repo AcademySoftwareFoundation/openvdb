@@ -3,4 +3,5 @@ NanoVDB:
   - Added tools::cuda::PropagateSign, the index-grid counterpart of tools::cuda::signedFloodFill: given the
     SDF values of the active voxels of a ValueOnIndex grid, it fills caller-allocated masks per level (leaf,
     lower, upper) and returns the root-tile origins of the inactive regions that are inside, without modifying
-    the grid.
+    the grid. Added a companion ex_propagate_sign_nanovdb_cuda example, which checks the masks against an
+    OpenVDB level set, and unit tests.

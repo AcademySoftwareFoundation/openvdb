@@ -16,6 +16,7 @@
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 #include <nanovdb/tools/cuda/IndexToGrid.cuh>
 #include <nanovdb/tools/cuda/ConnectedComponents.cuh>
+#include <nanovdb/tools/cuda/PropagateSign.cuh>
 #include <nanovdb/tools/cuda/AddBlindData.cuh>
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
 #include <nanovdb/tools/cuda/GridValidator.cuh>
@@ -5261,3 +5262,72 @@ TEST(TestNanoVDBCUDA, ConnectedComponents_InFlightGrid)
     cudaCheck(cudaFree(d_bytes));
     cudaCheck(cudaFreeHost(pinned));
 }// ConnectedComponents_InFlightGrid
+
+// PropagateSign on the narrow band of a sphere: the level set from createLevelSetSphere, active where the signed
+// distance d satisfies |d| < 3, converted to a ValueOnIndex grid whose blind data channel 0, the SDF sidecar, holds
+// d at the active voxels' value indices and the background 3 at index 0; the level set's inactive values are
+// dropped. The sphere straddles the origin, so the root has eight entries and coordinates are negative too. Every
+// invert mask bit is checked against the analytic answer: on for an inactive voxel, or a childless lower or upper
+// slot, inside the sphere. A childless slot holds no active voxel, so its voxels all have the sign of its origin.
+// The center lies in the middle of the 128^3 block [0,128)^3, which is inside the sphere clear of the band, so
+// upper bits are on as well; no absent root tile is inside. createLevelSetSphere fills an inside gap between root
+// entries with a root value tile, which PropagateSign rejects (precondition 4), but only once a whole 4096^3 root
+// tile lies inside the sphere, i.e. above a radius of about 3547; so this radius is safe, and inside absent root
+// tiles (stage 4) are left to a test of their own.
+TEST(TestNanoVDBCUDA, PropagateSign_Sphere)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    const nanovdb::Vec3d center(64.3, 63.7, 64.2);
+    const double radius = 120.0, halfWidth = 3.0;
+    auto sphereSdf = [&](const nanovdb::Coord& ijk) {// signed distance from the center of voxel ijk
+        return (nanovdb::Vec3d(ijk[0], ijk[1], ijk[2]) - center).length() - radius;
+    };
+
+    auto sphere = nanovdb::tools::createLevelSetSphere<float>(radius, center, 1.0, halfWidth);
+    auto handle = nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, BuildT>(*sphere.grid<float>(), 1u, false, false);// one channel, no stats or tiles
+    const auto* grid = handle.grid<BuildT>();
+    ASSERT_TRUE(grid);
+    const auto& tree = grid->tree();
+    EXPECT_EQ(8u, tree.nodeCount(2));
+    const float* sdf = grid->getBlindData<float>(0);
+    ASSERT_TRUE(sdf);
+
+    // The sidecar is blind data, so it lies at the same offset from the grid on the device as on the host
+    auto deviceHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle);
+    const auto* deviceGrid = deviceHandle.deviceGrid<BuildT>();
+    ASSERT_TRUE(deviceGrid);
+    const float* deviceSdf = nanovdb::util::PtrAdd<float>(deviceGrid, nanovdb::util::PtrDiff(sdf, grid));
+
+    nanovdb::cuda::Buffer<nanovdb::Mask<3>> deviceLeafMasks(cudaStream_t(0), tree.nodeCount(0), nanovdb::cuda::noInit);
+    nanovdb::cuda::Buffer<nanovdb::Mask<4>> deviceLowerMasks(cudaStream_t(0), tree.nodeCount(1), nanovdb::cuda::noInit);
+    nanovdb::cuda::Buffer<nanovdb::Mask<5>> deviceUpperMasks(cudaStream_t(0), tree.nodeCount(2), nanovdb::cuda::noInit);
+    nanovdb::tools::cuda::PropagateSign<BuildT> op(deviceGrid, deviceSdf);
+    auto [rootOrigins, hasInvertRootTiles] =
+        op.propagate(deviceLeafMasks.data(), deviceLowerMasks.data(), deviceUpperMasks.data());
+    EXPECT_FALSE(hasInvertRootTiles);
+    EXPECT_EQ(0u, rootOrigins.size());
+
+    std::vector<nanovdb::Mask<3>> leafMasks(tree.nodeCount(0));
+    std::vector<nanovdb::Mask<4>> lowerMasks(tree.nodeCount(1));
+    std::vector<nanovdb::Mask<5>> upperMasks(tree.nodeCount(2));
+    cudaCheck(cudaMemcpy(leafMasks.data(), deviceLeafMasks.data(), deviceLeafMasks.size_bytes(), cudaMemcpyDeviceToHost));
+    cudaCheck(cudaMemcpy(lowerMasks.data(), deviceLowerMasks.data(), deviceLowerMasks.size_bytes(), cudaMemcpyDeviceToHost));
+    cudaCheck(cudaMemcpy(upperMasks.data(), deviceUpperMasks.data(), deviceUpperMasks.size_bytes(), cudaMemcpyDeviceToHost));
+
+    // Compares the masks of one level with the analytic answer; the bits on are counted so that every level is
+    // seen to be exercised
+    auto check = [&](const auto* nodes, const auto& masks, auto isOccupied) {
+        uint64_t errors = 0, on = 0;
+        for (size_t i = 0; i < masks.size(); ++i)
+            for (uint32_t n = 0; n < nodes[i].SIZE; ++n) {
+                const bool inside = !isOccupied(nodes[i], n) && sphereSdf(nodes[i].offsetToGlobalCoord(n)) < 0;
+                errors += masks[i].isOn(n) != inside;
+                on += masks[i].isOn(n);
+            }
+        EXPECT_EQ(0u, errors);
+        EXPECT_GT(on, 0u);
+    };
+    check(tree.getFirstLeaf(), leafMasks, [](const auto& leaf, uint32_t n) { return leaf.isActive(n); });
+    check(tree.getFirstLower(), lowerMasks, [](const auto& node, uint32_t n) { return node.isChild(n); });
+    check(tree.getFirstUpper(), upperMasks, [](const auto& node, uint32_t n) { return node.isChild(n); });
+}// PropagateSign_Sphere
