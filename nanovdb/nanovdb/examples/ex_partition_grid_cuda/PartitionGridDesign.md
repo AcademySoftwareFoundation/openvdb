@@ -457,3 +457,47 @@ sectors, the rest about 48%).
   pass over 79M voxels takes about 2 ms, against about 7 ms with one thread per leaf; `PartitionGrid` at 79M voxels
   takes 0.63 (N = 2) to 0.84 (N = 128) of its time with one thread per leaf. The baseline's mask kernel uses the
   same scheme.
+
+## Update 2026-11-01: review, tests and the example
+
+### Review (2026-10-30)
+
+- **`build()`** on both classes, as in `PruneGrid`: `getHandles` with a pool over the injected resource, so that the
+  outputs allocate through it as well.
+- **The n-ary `getHandles` splits the source itself**, so that `split()` only receives grids it owns and releases;
+  the outputs are appended in label order. This also lets the n-ary class return buffers that are not default
+  constructible, such as those of `build()`.
+- **A single label** skips the label count and takes one split that keeps every voxel, since the source itself is
+  not returned.
+- **`pivotLabel`** cuts a range without voxels at its middle label, so that a run of empty labels is halved rather
+  than peeled one label per split, which made the recursion as deep as the run.
+- **The mask kernel of a split** builds the mask by 32-bit words, one `__ballot_sync` per word, as
+  `ConnectedComponents` does.
+- **Aligned with `ConnectedComponents` and `PruneGrid`:** a `static_assert` that `BuildT` is `ValueOnIndex`, the
+  shared message for grids with value tiles, and the constructor, `setVerbose` and `setChecksum` documentation. The
+  label count is checked against `MaxLabelCount` (the label histogram takes `labelCount + 1` levels as an `int`),
+  and the number of label entries is taken as the active voxel count plus one, as in `MeshToGrid`.
+
+### Tests
+
+The tests are now unit tests on five voxels, two in one leaf and the others in other leaves and root tiles:
+`PartitionGridBinary_ValueOnIndex` checks that output 0 holds exactly the voxels whose retain bit is on and output 1
+the others, and `PartitionGrid_ValueOnIndex` that there is one output per label, holding exactly the voxels with
+that label. They replace the byte comparisons with `PruneGrid` of 2026-10-19 and 2026-10-28, and the class
+documentation no longer promises outputs identical to `PruneGrid`'s; the example still compares them.
+
+### Example
+
+`ex_partition_grid_cuda` reads several `.vdb` files and places their active voxels side by side along x, with one
+empty voxel in between so that inputs never touch. It labels the connected components with `ConnectedComponents` and
+splits them with `PartitionGrid`. Each output is compared byte for byte with `PruneGrid` given the mask of its
+component, and with the OpenVDB `segmentActiveVoxels` segment, converted with `openToIndexVDB`, that holds one of
+its voxels. Both agree on the level sets of a sphere, a hollow shell, two spheres, an armadillo and a torus read
+together (7 components), and on the same sphere read twice (2 components of equal size).
+
+### Not done yet (replaces the lists above)
+
+- §7f predicate templating, §7e cutoff and §8.2 sidecar carrying: open.
+- Tests of the injected resource (`TestMemoryResource`) and of `build()` (`TestBuffer`), which other topology
+  operators have: deferred.
+- These notes are to be removed before the PR leaves draft.
