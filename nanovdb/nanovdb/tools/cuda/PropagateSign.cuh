@@ -76,6 +76,7 @@ namespace tools::cuda {
 ///          - leaf: one Mask<3> per leaf; bit n is on if voxel n is inactive and inside.
 ///          - lower and upper: one Mask per node; bit n is on if slot n has no child and is inside.
 ///          - root: the origins of the absent root tiles that are inside, in increasing (x, y, z) order.
+///          The free function isInvert() reads the result back: the invert bit of any index coordinate.
 ///
 ///          Preconditions (PruneGrid and MeshToGrid output satisfies 1 and 4). Only 4 is checked, by propagate(),
 ///          which throws if it fails; the others are the caller's to ensure:
@@ -733,6 +734,48 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
         addedCount, floodfill::detail::RootTileOriginFunctor<BuildT>{}, added.data(), mRootInvertTileOrigins.data());
     cudaCheckError();
 }// PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles
+
+//======================================================================================================================
+// Free functions
+//======================================================================================================================
+
+/// @brief Whether the invert bit of the element that holds index coordinate @a ijk is on, i.e. whether the value of
+///        the level set there is the background with its sign inverted.
+/// @details The element is the first one without a child on the way down from the root: an absent root tile, a
+///          childless upper or lower slot, or a leaf voxel. An active voxel's bit is off, so for an active voxel this
+///          returns false: its sign is that of its own SDF value. Host and device callable; all pointers must be
+///          readable where it is called.
+/// @param grid The grid PropagateSign ran on.
+/// @param ijk Index coordinate.
+/// @param leafMasks, lowerMasks, upperMasks The invert masks propagate() filled.
+/// @param rootOrigins, rootOriginCount The root-tile origins propagate() returned, in their order (increasing
+///        (x, y, z)), which this function searches by bisection.
+template <typename BuildT>
+__hostdev__ inline bool isInvert(const NanoGrid<BuildT>& grid, const nanovdb::Coord& ijk,
+                                 const nanovdb::Mask<3>* leafMasks, const nanovdb::Mask<4>* lowerMasks,
+                                 const nanovdb::Mask<5>* upperMasks, const nanovdb::Coord* rootOrigins,
+                                 uint64_t rootOriginCount)
+{
+    using UpperT = NanoUpper<BuildT>;
+    using LowerT = NanoLower<BuildT>;
+    using LeafT  = NanoLeaf<BuildT>;
+    const auto& tree = grid.tree();
+
+    const auto* tile = tree.root().probeTile(ijk);
+    if (!tile) return thrust::binary_search(thrust::seq, rootOrigins, rootOrigins + rootOriginCount,
+                                            ijk & ~int(UpperT::DIM - 1));
+    NANOVDB_ASSERT(tile->isChild()); // precondition 4: the root holds only child tiles
+
+    const auto*    upper = tree.root().getChild(tile);
+    const uint32_t u     = UpperT::CoordToOffset(ijk);
+    if (!upper->isChild(u)) return upperMasks[upper - tree.getFirstUpper()].isOn(u);
+
+    const auto*    lower = upper->getChild(u);
+    const uint32_t l     = LowerT::CoordToOffset(ijk);
+    if (!lower->isChild(l)) return lowerMasks[lower - tree.getFirstLower()].isOn(l);
+
+    return leafMasks[lower->getChild(l) - tree.getFirstLeaf()].isOn(LeafT::CoordToOffset(ijk));
+}// isInvert
 
 //----------------------------------------------------------------------------------------------------------------------
 
