@@ -3,7 +3,9 @@ NanoVDB:
   - With NANOVDB_USE_CUDA=ON, NanoVDB uses the CUDA toolkit's CCCL and clones
     CCCL only when the toolkit has none or NANOVDB_FETCH_CCCL=ON. NanoVDB
     requires CUDA 12.0 and CCCL 2.8 or newer, and the CMake Config-file
-    accepts any CCCL that meets that minimum.
+    accepts any CCCL that meets that minimum. The minimum also applies to a
+    CCCL::CCCL target the parent project creates, and NANOVDB_FETCH_CCCL=ON
+    clones even with CPM_USE_LOCAL_PACKAGES=ON.
   - NanoVDB::nanovdb sets the NANOVDB_INCLUDE_DIR target property to the
     directory holding the nanovdb/ headers.
   - NCCL support in cuda/DeviceMesh.h is now opt-in through the new

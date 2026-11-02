@@ -24,6 +24,10 @@
 
 @PACKAGE_INIT@
 
+# Dependency package configs can overwrite PACKAGE_PREFIX_DIR, so resolve
+# install paths before looking for them
+set_and_check(NanoVDB_INCLUDE_DIR "@PACKAGE_NANOVDB_INSTALL_INCLUDEDIR@")
+
 # The installed Find modules (such as FindTBB) live next to this file
 set(_nanovdb_original_module_path ${CMAKE_MODULE_PATH})
 list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
@@ -62,19 +66,31 @@ endif()
 
 if(@NANOVDB_USE_CUDA@)
   _nanovdb_find_dependency(CUDAToolkit @MINIMUM_CUDA_VERSION@)
-  # The CUDA toolkit ships CCCL outside the default search path. CCCL's version
-  # file only accepts its own major version, so the minimum is checked here.
+  # The CUDA toolkit ships CCCL outside the default search path
   if(NOT TARGET CCCL::CCCL)
     _nanovdb_find_dependency(CCCL CONFIG
       HINTS "${CUDAToolkit_TARGET_DIR}/lib/cmake" "${CUDAToolkit_LIBRARY_DIR}/cmake")
-    if("@MINIMUM_CCCL_VERSION@" AND CCCL_VERSION VERSION_LESS "@MINIMUM_CCCL_VERSION@")
-      set(CMAKE_MODULE_PATH ${_nanovdb_original_module_path})
-      set(NanoVDB_NOT_FOUND_MESSAGE
-        "NanoVDB requires CCCL @MINIMUM_CCCL_VERSION@ or newer, but found ${CCCL_VERSION} at ${CCCL_DIR}.")
-      set(NanoVDB_FOUND FALSE)
-      return()
-    endif()
   endif()
+
+  # CCCL's version file only accepts its own major version, so the minimum is
+  # checked here, including for a CCCL::CCCL the consumer created first
+  if(CCCL_VERSION)
+    set(_nanovdb_cccl_version ${CCCL_VERSION})
+  else()
+    set(_nanovdb_cccl_version ${CPM_PACKAGE_CCCL_VERSION})
+  endif()
+  if(NOT _nanovdb_cccl_version)
+    message(WARNING "Could not determine the version of CCCL::CCCL, so NanoVDB "
+      "cannot check that it is at least @MINIMUM_CCCL_VERSION@.")
+  elseif(_nanovdb_cccl_version VERSION_LESS "@MINIMUM_CCCL_VERSION@")
+    set(CMAKE_MODULE_PATH ${_nanovdb_original_module_path})
+    set(NanoVDB_NOT_FOUND_MESSAGE
+      "NanoVDB requires CCCL @MINIMUM_CCCL_VERSION@ or newer, but found ${_nanovdb_cccl_version}.")
+    set(NanoVDB_FOUND FALSE)
+    unset(_nanovdb_cccl_version)
+    return()
+  endif()
+  unset(_nanovdb_cccl_version)
   if(@NANOVDB_USE_NCCL@)
     _nanovdb_find_dependency(NCCL)
   endif()
@@ -92,7 +108,6 @@ unset(_nanovdb_find_arguments)
 
 include("${CMAKE_CURRENT_LIST_DIR}/NanoVDBTargets.cmake")
 
-set_and_check(NanoVDB_INCLUDE_DIR "@PACKAGE_NANOVDB_INSTALL_INCLUDEDIR@")
 set_target_properties(NanoVDB::nanovdb PROPERTIES NANOVDB_INCLUDE_DIR "${NanoVDB_INCLUDE_DIR}")
 
 check_required_components(NanoVDB)

@@ -194,24 +194,37 @@ if(NANOVDB_USE_CUDA)
   # exists or NANOVDB_FETCH_CCCL is set.
   set(NANOVDB_CCCL_TAG "v3.4.2" CACHE STRING "Git tag of the CCCL release to fetch")
   if(NOT TARGET CCCL::CCCL AND NOT NANOVDB_FETCH_CCCL)
-    # CCCL's version file only accepts its own major version, so the minimum
-    # is checked here
     find_package(CCCL CONFIG QUIET
       HINTS "${CUDAToolkit_TARGET_DIR}/lib/cmake" "${CUDAToolkit_LIBRARY_DIR}/cmake")
-    if(CCCL_FOUND AND MINIMUM_CCCL_VERSION AND CCCL_VERSION VERSION_LESS MINIMUM_CCCL_VERSION)
-      message(FATAL_ERROR "NanoVDB requires CCCL ${MINIMUM_CCCL_VERSION} or newer, but found "
-        "${CCCL_VERSION} at ${CCCL_DIR}. Set CCCL_DIR to a newer CCCL, or set "
-        "NANOVDB_FETCH_CCCL=ON to clone CCCL ${NANOVDB_CCCL_TAG}.")
-    endif()
   endif()
   if(NOT TARGET CCCL::CCCL)
     include(../../cmake/CPM.cmake)
+    # FORCE stops CPM_USE_LOCAL_PACKAGES from swapping in an installed CCCL
     CPMAddPackage(
         NAME CCCL
         GITHUB_REPOSITORY nvidia/cccl
         GIT_TAG ${NANOVDB_CCCL_TAG}
+        FORCE ${NANOVDB_FETCH_CCCL}
     )
   endif()
+
+  # CCCL's version file only accepts its own major version, so NanoVDB checks
+  # the minimum itself, whichever source provided CCCL::CCCL. CPM records the
+  # version of a CCCL it added in CPM_PACKAGE_CCCL_VERSION.
+  if(CCCL_VERSION)
+    set(_nanovdb_cccl_version ${CCCL_VERSION})
+  else()
+    set(_nanovdb_cccl_version ${CPM_PACKAGE_CCCL_VERSION})
+  endif()
+  if(NOT _nanovdb_cccl_version)
+    message(WARNING "Could not determine the version of CCCL::CCCL, so NanoVDB "
+      "cannot check that it is at least ${MINIMUM_CCCL_VERSION}.")
+  elseif(_nanovdb_cccl_version VERSION_LESS MINIMUM_CCCL_VERSION)
+    message(FATAL_ERROR "NanoVDB requires CCCL ${MINIMUM_CCCL_VERSION} or newer, but found "
+      "${_nanovdb_cccl_version}. Set CCCL_DIR to a newer CCCL, or set "
+      "NANOVDB_FETCH_CCCL=ON to clone CCCL ${NANOVDB_CCCL_TAG}.")
+  endif()
+  unset(_nanovdb_cccl_version)
 
   if(NANOVDB_USE_NCCL)
     find_package(NCCL REQUIRED)

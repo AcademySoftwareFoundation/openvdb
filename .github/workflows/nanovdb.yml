@@ -96,6 +96,8 @@ jobs:
           \'
       - name: test
         run: cd build && ctest -V -E ".*cuda.*|.*mgpu.*"
+      - name: test_config
+        run: ./ci/test_nanovdb_config.sh `pwd`
 
   windows-nanovdb:
     if: |
