@@ -99,6 +99,19 @@ void cudaStr()
     EXPECT_EQ(std::strcmp(str, "this is a test #2"), n);
     EXPECT_EQ(0, n);
 
+    // Formatting integers into a local buffer used to crash cicc in nvcc 13.4 for sm_100 and sm_120
+    const int num = -2147483647 - 1;
+    nanovdb::util::cuda::lambdaKernel<<<1, 1>>>(1, [=] __device__ (size_t) {
+        char buf[32];
+        nanovdb::util::strcpy(buf, "n=");
+        nanovdb::util::strcat(buf, num);
+        nanovdb::util::strcat(buf, " hex=");
+        nanovdb::util::strcat(buf, 255, 16);
+        nanovdb::util::strcpy(d_str, buf);
+    });
+    cudaCheck(cudaMemcpy(str, d_str, size, cudaMemcpyDeviceToHost));
+    EXPECT_STREQ(str, "n=-2147483648 hex=ff");
+
     cudaCheck(cudaFreeHost(str));
     cudaCheck(cudaFree(d_n));
     cudaCheck(cudaFree(d_str));
