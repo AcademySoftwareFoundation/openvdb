@@ -32,6 +32,8 @@
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>                    // operatorKernel, cudaCheck
 
+#include <cuda/std/algorithm> // cuda::std::binary_search
+
 #include <cstddef>
 #include <tuple>
 #include <utility>
@@ -563,6 +565,39 @@ void MeshToSDF<BuildT, ResourceT>::signBarrier(const GridT* dGrid, float* dSDF, 
 
 namespace sdf::detail {
 
+/// @brief Whether the invert bit that PropagateSign computed for index coordinate @a ijk of @a grid is on, i.e.
+///        whether the level set takes the background value with its sign inverted there.
+/// @details Descends from the root to the first element without a child that holds @a ijk: a region without a
+///          root-table entry (its bit is on if its origin is among @a rootOrigins), a childless upper or lower slot,
+///          or a leaf voxel. The bit of an active voxel is off.
+/// @param leafMasks, lowerMasks, upperMasks The invert masks PropagateSign::propagate() filled.
+/// @param rootOrigins, rootOriginCount The root origins propagate() returned, in increasing (x, y, z) order.
+template <typename BuildT>
+__hostdev__ inline bool isInverted(const NanoGrid<BuildT>& grid, const Coord& ijk, const Mask<3>* leafMasks,
+                                   const Mask<4>* lowerMasks, const Mask<5>* upperMasks, const Coord* rootOrigins,
+                                   uint64_t rootOriginCount)
+{
+    using UpperT = NanoUpper<BuildT>;
+    using LowerT = NanoLower<BuildT>;
+    using LeafT  = NanoLeaf<BuildT>;
+    const auto& tree = grid.tree();
+
+    const auto* tile = tree.root().probeTile(ijk);
+    if (!tile) return ::cuda::std::binary_search(rootOrigins, rootOrigins + rootOriginCount,
+                                                 ijk & ~int(UpperT::DIM - 1));
+    NANOVDB_ASSERT(tile->isChild()); // PropagateSign rejects root value tiles
+
+    const auto*    upper = tree.root().getChild(tile);
+    const uint32_t u     = UpperT::CoordToOffset(ijk);
+    if (!upper->isChild(u)) return upperMasks[upper - tree.getFirstUpper()].isOn(u);
+
+    const auto*    lower = upper->getChild(u);
+    const uint32_t l     = LowerT::CoordToOffset(ijk);
+    if (!lower->isChild(l)) return lowerMasks[lower - tree.getFirstLower()].isOn(l);
+
+    return leafMasks[lower->getChild(l) - tree.getFirstLeaf()].isOn(LeafT::CoordToOffset(ijk));
+} // isInverted
+
 /// @brief Count surface j as enclosed by the surface of @a dGrid if a voxel of surface j is inside it.
 /// @details Any voxel of surface j gives the same answer: its voxels are connected and none is active in @a dGrid,
 ///          so they all lie in one region of the inactive space of @a dGrid. The first active voxel of the first leaf
@@ -581,7 +616,7 @@ struct AccumulateNestingFunctor
         if (j == surfaceID) return;
         const auto* leaf = dSurfaceGrids[j]->tree().getFirstLeaf();
         const Coord ijk  = leaf->offsetToGlobalCoord(leaf->valueMask().template findFirst<true>());
-        if (isInvert(*dGrid, ijk, dLeaf, dLower, dUpper, dRootTiles, rootTileCount))
+        if (isInverted(*dGrid, ijk, dLeaf, dLower, dUpper, dRootTiles, rootTileCount))
             ++dDepth[j];
     }
 };
