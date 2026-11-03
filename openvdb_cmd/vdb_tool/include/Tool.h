@@ -4272,7 +4272,7 @@ inline void saveJPG(const std::string& fname, const tools::Film& film)
   auto buf = film.convertToBitBuffer<uint8_t>(/*alpha=*/false);
   uint8_t *row = buf.get();
   const uint32_t stride = static_cast<uint32_t>(film.width() * 3);
-  for (int y = 0; y < film.height(); ++y) {
+  for (size_t y = 0; y < film.height(); ++y) {
       jpeg_write_scanlines(&cinfo, &row, 1);
       row += stride;
   }

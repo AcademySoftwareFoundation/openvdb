@@ -269,18 +269,12 @@ TEST_F(TestStringIR, testStringImpl)
 TEST_F(TestStringIR, testStringStringIR)
 {
     static auto setInvalidString = [](String& S) {
-#if defined(__GNUC__) && !defined(__clang__)
-        _Pragma("GCC diagnostic push")
-        _Pragma("GCC diagnostic ignored \"-Wclass-memaccess\"")
-#endif
         // zero out the data held by a String object (expected to not hold heap memory).
         // This is used to test the IR methods work as expected with the allocated, but
         // uninitialized stack mem from the compute generator
         OPENVDB_ASSERT(S.isLocal());
-        std::memset(&S, 0, sizeof(String)); // uninit string, invalid class memory
-#if defined(__GNUC__) && !defined(__clang__)
-        _Pragma("GCC diagnostic pop")
-#endif
+        // The void* cast silences the non-trivial type warnings from both GCC and clang
+        std::memset(static_cast<void*>(&S), 0, sizeof(String)); // uninit string, invalid class memory
     };
 
     // Test the String IR in StringFunctions.cc

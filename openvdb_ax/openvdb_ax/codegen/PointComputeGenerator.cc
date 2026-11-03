@@ -167,8 +167,6 @@ inline void PointComputeGenerator::computePKBR(const AttributeRegistry&)
         OPENVDB_ASSERT(abuff);
         OPENVDB_ASSERT(mode);
 
-        OPENVDB_ASSERT(AssertOpaquePtrs(vbuff, vbuffT));
-        OPENVDB_ASSERT(AssertOpaquePtrs(abuff, abuffT));
 
         llvm::Function* base = B.GetInsertBlock()->getParent();
 
@@ -481,14 +479,11 @@ inline void PointComputeGenerator::computePKB(const AttributeRegistry& registry)
         llvm::Type* voidstar = LLVMType<void*>::get(C);
         llvm::Type* buffT = voidstar;
         llvm::Type* flagT = LLVMType<uint64_t>::get(C);
-        OPENVDB_ASSERT(AssertOpaquePtrs(buffers, buffT));
-        OPENVDB_ASSERT(AssertOpaquePtrs(flags, flagT));
 
         // create array of void*. each pointer will encode an address to a stored typed value
         llvm::Type* locType = llvm::ArrayType::get(voidstar, registry.data().size()); // [SIZE x i8*]
         llvm::Value* loc = insertStaticAlloca(B, locType);
 
-        OPENVDB_ASSERT(AssertOpaquePtrs(loc, locType));
 
         size_t i = 0;
         for (const AttributeRegistry::AccessData& data : registry.data())
@@ -565,7 +560,6 @@ inline void PointComputeGenerator::computePKB(const AttributeRegistry& registry)
             llvm::Type* type = llvmTypeFromToken(data.type(), C);
 
             llvm::Value* store = B.CreateConstInBoundsGEP2_64(locType, loc, 0, i++); // void**, location to hold the typed ptr
-            OPENVDB_ASSERT(AssertOpaquePtrs(store, voidstar));
             store = B.CreateLoad(voidstar, store); // void*
             store = B.CreatePointerCast(store, llvm::PointerType::get(type, 0)); // ValueType*
 
@@ -627,7 +621,6 @@ inline void PointComputeGenerator::computePKAA(const AttributeRegistry& registry
 
         llvm::Value* arrays = extractArgument(self, "attribute_arrays");
         OPENVDB_ASSERT(arrays);
-        OPENVDB_ASSERT(AssertOpaquePtrs(arrays, voidstar));
 
         llvm::Value* array = B.CreateGEP(voidstar, arrays, index);
         array = B.CreateLoad(voidstar, array); // void** = void*
@@ -665,7 +658,6 @@ inline void PointComputeGenerator::computePKAA(const AttributeRegistry& registry
 
         llvm::Value* arrays = extractArgument(self, "attribute_arrays");
         OPENVDB_ASSERT(arrays);
-        OPENVDB_ASSERT(AssertOpaquePtrs(arrays, voidstar));
 
         llvm::Value* array = B.CreateGEP(voidstar, arrays, index);
         array = B.CreateLoad(voidstar, array); // void** = void*
@@ -853,7 +845,6 @@ bool PointComputeGenerator::visit(const ast::Attribute* node)
     // index into the void* array of handles and load the value.
     index = mBuilder.CreateLoad(mBuilder.getInt64Ty(), index);
     llvm::Value* value = extractArgument(mFunction, "values"); // void**
-    OPENVDB_ASSERT(AssertOpaquePtrs(value, voidstar));
 
     value = mBuilder.CreateGEP(voidstar, value, index); // void**
     value = mBuilder.CreateLoad(voidstar, value); // void*

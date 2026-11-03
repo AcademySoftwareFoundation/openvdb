@@ -79,11 +79,7 @@ public:
     void prune(const ValueType& = 0) {}
     void clip(const openvdb::CoordBBox&) {}
     void clipUnallocatedNodes() override {}
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
     openvdb::Index64 unallocatedLeafCount() const override { return 0; }
-#else
-    openvdb::Index32 unallocatedLeafCount() const override { return 0; }
-#endif
 
     void getIndexRange(openvdb::CoordBBox&) const override {}
     bool evalLeafBoundingBox(openvdb::CoordBBox& bbox) const override
@@ -96,17 +92,10 @@ public:
         { dim = openvdb::Coord(0, 0, 0); return false; }
 
     openvdb::Index treeDepth() const override { return 0; }
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
     openvdb::Index64 leafCount() const override { return 0; }
     std::vector<openvdb::Index64> nodeCount() const override
         { return std::vector<openvdb::Index64>(DEPTH, 0); }
     openvdb::Index64 nonLeafCount() const override { return 0; }
-#else
-    openvdb::Index32 leafCount() const override { return 0; }
-    std::vector<openvdb::Index32> nodeCount() const override
-        { return std::vector<openvdb::Index32>(DEPTH, 0); }
-    openvdb::Index32 nonLeafCount() const override { return 0; }
-#endif
     openvdb::Index64 activeVoxelCount() const override { return 0UL; }
     openvdb::Index64 inactiveVoxelCount() const override { return 0UL; }
     openvdb::Index64 activeLeafVoxelCount() const override { return 0UL; }

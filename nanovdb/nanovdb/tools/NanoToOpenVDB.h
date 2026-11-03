@@ -351,7 +351,7 @@ NanoToOpenVDB::process(trait::OpenNodeT<NanoBuildT, LEVEL> *dstNode,
     };
 
 #if 0
-    kernel(Range1D(0, childCount));
+    kernel(util::Range1D(0, childCount));
 #else
     util::forEach(0, childCount, 1, kernel);
 #endif
@@ -394,7 +394,7 @@ NanoToOpenVDB::process(trait::OpenNodeT<NanoValueT, LEVEL> *dstNode,
     };
 
 #if 0
-    kernel(Range1D(0, childCount));
+    kernel(util::Range1D(0, childCount));
 #else
     util::forEach(0, childCount, 1, kernel);
 #endif
@@ -536,22 +536,6 @@ nanoToOpenVDB(const GridHandle<BufferT>& handle, uint32_t n)
 }// tools::nanoToOpenVDB
 
 }// namespace tools
-
-/// @brief Forward declaration of free-standing function that de-serializes a typed NanoVDB grid into an OpenVDB Grid
-template<typename NanoBuildT>
-[[deprecated("Use nanovdb::tools::nanoToOpenVDB instead.")]]
-tools::trait::OpenGridPtr<NanoBuildT> nanoToOpenVDB(const NanoGrid<NanoBuildT>& grid)
-{
-    return tools::nanoToOpenVDB(grid);
-}
-
-/// @brief Forward declaration of free-standing function that de-serializes a NanoVDB GridHandle into an OpenVDB GridBase
-template<typename BufferT>
-[[deprecated("Use nanovdb::tools::nanoToOpenVDB instead.")]]
-openvdb::GridBase::Ptr nanoToOpenVDB(const GridHandle<BufferT>& handle, uint32_t n = 0)
-{
-    return tools::nanoToOpenVDB(handle, n);
-}
 
 } // namespace nanovdb
 

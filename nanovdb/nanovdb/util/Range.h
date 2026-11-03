@@ -86,7 +86,7 @@ public:
     }
     Range(Range &r, Split) : Range(r.mRange[0], r.mRange[1]) {
         assert( r.is_divisible() );// at least one of the two dimensions must be divisible!
-        if( mRange[0].size()*double(mRange[1].grainsize()) < mRange[1].size()*double(mRange[0].grainsize()) ) {
+        if( double(mRange[0].size())*double(mRange[1].grainsize()) < double(mRange[1].size())*double(mRange[0].grainsize()) ) {
             r.mRange[1].mEnd = mRange[1].mBegin = mRange[1].middle();
         } else {
             r.mRange[0].mEnd = mRange[0].mBegin = mRange[0].middle();
@@ -124,14 +124,14 @@ public:
     Range(Range &r, Split) : Range(r.mRange[0], r.mRange[1], r.mRange[2])
     {
         assert( r.is_divisible() );// at least one of the three dimensions must be divisible!
-        if ( mRange[2].size()*double(mRange[0].grainsize()) < mRange[0].size()*double(mRange[2].grainsize()) ) {
-            if ( mRange[0].size()*double(mRange[1].grainsize()) < mRange[1].size()*double(mRange[0].grainsize()) ) {
+        if ( double(mRange[2].size())*double(mRange[0].grainsize()) < double(mRange[0].size())*double(mRange[2].grainsize()) ) {
+            if ( double(mRange[0].size())*double(mRange[1].grainsize()) < double(mRange[1].size())*double(mRange[0].grainsize()) ) {
                 r.mRange[1].mEnd = mRange[1].mBegin = mRange[1].middle();
             } else {
                 r.mRange[0].mEnd = mRange[0].mBegin = mRange[0].middle();
             }
         } else {
-            if ( mRange[2].size()*double(mRange[1].grainsize()) < mRange[1].size()*double(mRange[2].grainsize()) ) {
+            if ( double(mRange[2].size())*double(mRange[1].grainsize()) < double(mRange[1].size())*double(mRange[2].grainsize()) ) {
                 r.mRange[1].mEnd = mRange[1].mBegin = mRange[1].middle();
             } else {
                 r.mRange[2].mEnd = mRange[2].mBegin = mRange[2].middle();
@@ -148,10 +148,6 @@ public:
 };// Range<3, T>
 
 }// namespace util
-
-using Range1D [[deprecated("Use nanovdb::util::Range1D instead")]] = util::Range<1, size_t>;
-using Range2D [[deprecated("Use nanovdb::util::Range2D instead")]] = util::Range<2, size_t>;
-using Range3D [[deprecated("Use nanovdb::util::Range3D instead")]] = util::Range<3, size_t>;
 
 }// namespace nanovdb
 

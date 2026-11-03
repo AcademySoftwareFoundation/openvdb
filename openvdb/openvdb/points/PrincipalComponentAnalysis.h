@@ -213,13 +213,6 @@ struct PcaAttributes
     ///   flag, will still contribute to their neighbours and may have their
     ///   world space position deformed in relation to their neighboring points.
     std::string ellipses = "ellipsoids";
-
-    /// Old style "xform" attribute which has since been renamed and ONLY
-    /// supported rotation. If set, both the above "xform" and this attribute
-    /// will be created. This attribute only ever holds rotation, regardless
-    /// of the xformOutput specified. This will be removed and should not be
-    /// used.
-    OPENVDB_DEPRECATED_MESSAGE("Use PcaAttributes::xform") std::string rotation = "";
 };
 
 OPENVDB_NO_DEPRECATION_WARNING_END

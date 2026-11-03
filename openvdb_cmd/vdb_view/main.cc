@@ -25,6 +25,8 @@ usage [[noreturn]] (const char* progName, int status)
 "    -i                 print grid information\n" <<
 "    -h, -help          print this usage message and exit\n" <<
 "    -version           print version information\n" <<
+"    -debug|-info|-warn|-error|-fatal\n" <<
+"                       set the diagnostic message threshold (default: warn)\n" <<
 "\n" <<
 "Controls:\n" <<
 "    Esc                exit\n" <<

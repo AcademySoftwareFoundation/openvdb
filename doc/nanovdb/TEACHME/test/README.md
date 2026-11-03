@@ -77,7 +77,7 @@ compile-gated is visible (and ideally climbing).
 
 Includes that are intentionally not real are skipped by the validator:
 - ellipsis placeholders such as `#include <openvdb/...>`
-- any include inside a `skip-refs` block (e.g. the deprecated
+- any include inside a `skip-refs` block (e.g. the removed
   `nanovdb/util/cuda/CudaDeviceBuffer.h` shown as a "this path is stale"
   counter-example)
 

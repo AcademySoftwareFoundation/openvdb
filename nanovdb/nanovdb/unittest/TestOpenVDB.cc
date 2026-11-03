@@ -230,7 +230,11 @@ TEST_F(TestOpenVDB, Basic)
 {
     { // openvdb::Vec3::operator<
         const openvdb::Vec3f a(1.0f, 10.0f, 200.0f), b(2.0f, 0.0f, 0.0f);
+#ifdef OPENVDB_ENABLE_VEC_RELATIONAL_OPERATIONS
+        OPENVDB_NO_DEPRECATION_WARNING_BEGIN
         EXPECT_TRUE(a < b);// default behavior inherited from openvdb::math::Tuple
+        OPENVDB_NO_DEPRECATION_WARNING_END
+#endif
         EXPECT_TRUE(a.lengthSqr() > b.lengthSqr());// behavior used in nanovdb::GridStats
     }
 }
@@ -754,7 +758,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp4)
     }
     {// Model
         auto openGrid = this->getSrcGrid(false);
-        const float tolerance = 0.5f*openGrid->voxelSize()[0];
+        const float tolerance = static_cast<float>(0.5f*openGrid->voxelSize()[0]);
         nanovdb::tools::CreateNanoGrid<openvdb::FloatGrid> converter(*openGrid);
         converter.enableDithering();
         //converter.setVerbose(2);
@@ -837,7 +841,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp8)
     }
     {// Model
         auto openGrid = this->getSrcGrid(false);
-        const float tolerance = 0.05f*openGrid->voxelSize()[0];
+        const float tolerance = static_cast<float>(0.05f*openGrid->voxelSize()[0]);
         nanovdb::tools::CreateNanoGrid<openvdb::FloatGrid> converter(*openGrid);
         auto handle = converter.getHandle<nanovdb::Fp8>();
         converter.enableDithering();
@@ -923,7 +927,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp16)
     }
     {// Model
         auto openGrid = this->getSrcGrid(false);
-        const float tolerance = 0.005f*openGrid->voxelSize()[0];
+        const float tolerance = static_cast<float>(0.005f*openGrid->voxelSize()[0]);
         nanovdb::tools::CreateNanoGrid<openvdb::FloatGrid> converter(*openGrid);
         converter.enableDithering();
         auto handle = converter.getHandle<nanovdb::Fp16>();
@@ -1501,9 +1505,9 @@ TEST_F(TestOpenVDB, CNanoVDBTrilinear)
         for (auto it = bbox.begin(); it; ++it) {
             auto           ijk = *it;
             cnanovdb_Vec3F cn_xyz;
-            cn_xyz.mVec[0] = ijk[0] + 0.3;
-            cn_xyz.mVec[1] = ijk[1] + 0.7;
-            cn_xyz.mVec[2] = ijk[2] + 0.9;
+            cn_xyz.mVec[0] = static_cast<float>(ijk[0] + 0.3);
+            cn_xyz.mVec[1] = static_cast<float>(ijk[1] + 0.7);
+            cn_xyz.mVec[2] = static_cast<float>(ijk[2] + 0.9);
             const auto v = cnanovdb_sampleF_trilinear(&dstAcc, &cn_xyz);
 
             openvdb::math::Vec3d xyz(ijk[0] + 0.3,
@@ -1542,9 +1546,9 @@ TEST_F(TestOpenVDB, CNanoVDBTrilinearStencil)
         for (auto it = bbox.begin(); it; ++it) {
             auto           ijk = *it;
             cnanovdb_Vec3F cn_xyz;
-            cn_xyz.mVec[0] = ijk[0] + 0.3;
-            cn_xyz.mVec[1] = ijk[1] + 0.7;
-            cn_xyz.mVec[2] = ijk[2] + 0.9;
+            cn_xyz.mVec[0] = static_cast<float>(ijk[0] + 0.3);
+            cn_xyz.mVec[1] = static_cast<float>(ijk[1] + 0.7);
+            cn_xyz.mVec[2] = static_cast<float>(ijk[2] + 0.9);
             const auto v = cnanovdb_sampleF_trilinear_stencil(&stencil, &dstAcc, &cn_xyz);
 
             openvdb::math::Vec3d xyz(ijk[0] + 0.3,
@@ -2515,7 +2519,7 @@ TEST_F(TestOpenVDB, MultiFile)
     for (int i = 0; i < 10; ++i) {// 8 -> 17
         const float          radius = 100.0f;
         const float          voxelSize = 1.0f, width = 3.0f;
-        const openvdb::Vec3f center(i * 10.0f, 0.0f, 0.0f);
+        const openvdb::Vec3f center(static_cast<float>(i) * 10.0f, 0.0f, 0.0f);
         auto                 srcGrid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(radius, center, voxelSize, width);
         srcGrid->setName("Level set sphere at (" + std::to_string(i * 10) + ",0,0)");
         handles.push_back(nanovdb::tools::createNanoGrid(*srcGrid));
@@ -2811,7 +2815,7 @@ TEST_F(TestOpenVDB, LongGridName)
         openvdb::FloatGrid srcGrid(0.0f);
         const int limit = nanovdb::GridData::MaxNameSize - 1, length = limit + n;
         char buffer[limit + 10 + 1] = {'\0'};
-        srand (time(NULL));
+        srand (static_cast<unsigned int>(time(NULL)));
         for (int i = 0; i < length; ++i) {
             buffer[i] = 'a' + (rand() % 26);// a-z
         }
@@ -3087,7 +3091,7 @@ TEST_F(TestOpenVDB, Trilinear)
 {
     // create a grid so sample from
     auto trilinear = [](const openvdb::Vec3d& xyz) -> float {
-        return 0.34 + 1.6 * xyz[0] + 6.7 * xyz[1] - 3.5 * xyz[2]; // world coordinates
+        return static_cast<float>(0.34 + 1.6 * xyz[0] + 6.7 * xyz[1] - 3.5 * xyz[2]); // world coordinates
     };
 
     //mTimer.start("Generating a dense tri-linear openvdb grid");
@@ -3184,8 +3188,8 @@ TEST_F(TestOpenVDB, Triquadratic)
     EXPECT_TRUE(dstGrid);
 
     const openvdb::Vec3d ijk(3.4, 4.67, 5.23); // in index space
-    const float          exact = triquadratic(srcGrid->indexToWorld(ijk));
-    const float          approx = triquadratic(srcGrid->indexToWorld(openvdb::Coord(3, 5, 5)));
+    const float          exact = static_cast<float>(triquadratic(srcGrid->indexToWorld(ijk)));
+    const float          approx = static_cast<float>(triquadratic(srcGrid->indexToWorld(openvdb::Coord(3, 5, 5))));
     //std::cerr << "Trilinear: exact = " << exact << ", approx = " << approx << std::endl;
     auto dstAcc = dstGrid->getAccessor();
 
@@ -3243,8 +3247,8 @@ TEST_F(TestOpenVDB, Tricubic)
     EXPECT_TRUE(dstGrid);
 
     const openvdb::Vec3d ijk(3.4, 4.67, 5.23); // in index space
-    const float          exact = tricubic(srcGrid->indexToWorld(ijk));
-    const float          approx = tricubic(srcGrid->indexToWorld(openvdb::Coord(3, 5, 5)));
+    const float          exact = static_cast<float>(tricubic(srcGrid->indexToWorld(ijk)));
+    const float          approx = static_cast<float>(tricubic(srcGrid->indexToWorld(openvdb::Coord(3, 5, 5))));
     //std::cerr << "Trilinear: exact = " << exact << ", approx = " << approx << std::endl;
     auto dstAcc = dstGrid->getAccessor();
 
@@ -3266,6 +3270,45 @@ TEST_F(TestOpenVDB, Tricubic)
     //std::cerr << "3'rd order: v = " << sampler3(ijk) << std::endl;
     EXPECT_NEAR(exact, sampler3(ijk), 1e-4); // it's a 3nd order polynomial
 } // Tricubic
+
+TEST_F(TestOpenVDB, TricubicMixedPrecision)
+{
+    struct OpenVDBVec3fAccessor {
+        using ValueType = openvdb::Vec3f;
+        using CoordType = openvdb::Coord;
+    };
+    using ScalarSampler = nanovdb::math::TricubicSampler<nanovdb::NanoTree<float>>;
+    using OpenSampler = nanovdb::math::TricubicSampler<OpenVDBVec3fAccessor>;
+    using NanoSampler = nanovdb::math::TricubicSampler<nanovdb::NanoTree<nanovdb::Vec3f>>;
+
+    // The three components are y^3, z^3 and y^3*z^3. These expose rounding
+    // changes when double coordinates are converted to float before multiplication.
+    float coefficients[3][64] = {};
+    coefficients[0][12] = coefficients[1][48] = coefficients[2][60] = 1.0f;
+    openvdb::Vec3f openCoefficients[64];
+    nanovdb::Vec3f nanoCoefficients[64];
+    for (int i = 0; i < 64; ++i) {
+        for (int c = 0; c < 3; ++c) {
+            openCoefficients[i][c] = nanoCoefficients[i][c] = coefficients[c][i];
+        }
+    }
+
+    const nanovdb::Vec3d positions[] = {
+        {0.0, 0.234567891, 0.345678912},
+        {0.0, 0.654321987, 0.543219876}
+    };
+    for (const auto& xyz : positions) {
+        const auto openResult = OpenSampler::sample(xyz, openCoefficients);
+        const auto nanoResult = NanoSampler::sample(xyz, nanoCoefficients);
+        const nanovdb::Vec3f floatXYZ(xyz);
+        for (int c = 0; c < 3; ++c) {
+            // Exact equality catches even a one-ULP change. OpenVDB vectors
+            // promote the multiplication; NanoVDB vectors narrow the weight first.
+            EXPECT_EQ(ScalarSampler::sample(xyz, coefficients[c]), openResult[c]);
+            EXPECT_EQ(ScalarSampler::sample(floatXYZ, coefficients[c]), nanoResult[c]);
+        }
+    }
+}
 
 TEST_F(TestOpenVDB, GridValidator)
 {

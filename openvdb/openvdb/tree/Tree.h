@@ -96,11 +96,7 @@ public:
     virtual void getIndexRange(CoordBBox& bbox) const = 0;
 
     virtual void clipUnallocatedNodes() = 0;
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
     virtual Index64 unallocatedLeafCount() const = 0;
-#else
-    virtual Index32 unallocatedLeafCount() const = 0;
-#endif
 
 
     //
@@ -111,25 +107,13 @@ public:
     /// A tree with only a root node and leaf nodes has depth 2, for example.
     virtual Index treeDepth() const = 0;
     /// Return the number of leaf nodes.
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
     virtual Index64 leafCount() const = 0;
-#else
-    virtual Index32 leafCount() const = 0;
-#endif
     /// Return a vector with node counts. The number of nodes of type NodeType
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
     virtual std::vector<Index64> nodeCount() const = 0;
-#else
-    virtual std::vector<Index32> nodeCount() const = 0;
-#endif
     /// Return the number of non-leaf nodes.
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
     virtual Index64 nonLeafCount() const = 0;
-#else
-    virtual Index32 nonLeafCount() const = 0;
-#endif
     /// Return the number of active voxels stored in leaf nodes.
     virtual Index64 activeLeafVoxelCount() const = 0;
     /// Return the number of inactive voxels stored in leaf nodes.
@@ -351,37 +335,18 @@ public:
     /// A tree with only a root node and leaf nodes has depth 2, for example.
     Index treeDepth() const override { return DEPTH; }
     /// Return the number of leaf nodes.
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
     Index64 leafCount() const override { return mRoot.leafCount(); }
-#else
-    Index32 leafCount() const override { return static_cast<Index32>(mRoot.leafCount()); }
-#endif
     /// Return a vector with node counts. The number of nodes of type NodeType
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
     std::vector<Index64> nodeCount() const override
     {
         std::vector<Index64> vec(DEPTH, 0);
         mRoot.nodeCount( vec );
         return vec;// Named Return Value Optimization
     }
-#else
-    std::vector<Index32> nodeCount() const override
-    {
-        std::vector<Index32> vec(DEPTH, 0);
-        OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-        mRoot.nodeCount( vec );
-        OPENVDB_NO_DEPRECATION_WARNING_END
-        return vec;// Named Return Value Optimization
-    }
-#endif
     /// Return the number of non-leaf nodes.
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
     Index64 nonLeafCount() const override { return mRoot.nonLeafCount(); }
-#else
-    Index32 nonLeafCount() const override { return static_cast<Index32>(mRoot.nonLeafCount()); }
-#endif
     /// Return the number of active voxels stored in leaf nodes.
     Index64 activeLeafVoxelCount() const override { return tools::countActiveLeafVoxels(*this); }
     /// Return the number of inactive voxels stored in leaf nodes.
@@ -489,11 +454,7 @@ public:
     void clipUnallocatedNodes() override;
 
     /// Return the total number of unallocated leaf nodes residing in this tree.
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
     Index64 unallocatedLeafCount() const override;
-#else
-    Index32 unallocatedLeafCount() const override;
-#endif
 
     //@{
     /// @brief Set all voxels within a given axis-aligned box to a constant value.
@@ -1676,7 +1637,6 @@ Tree<RootNodeType>::clipUnallocatedNodes()
     }
 }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 12
 template<typename RootNodeType>
 inline Index64
 Tree<RootNodeType>::unallocatedLeafCount() const
@@ -1685,16 +1645,6 @@ Tree<RootNodeType>::unallocatedLeafCount() const
     for (auto it = this->cbeginLeaf(); it; ++it) if (!it->isAllocated()) ++sum;
     return sum;
 }
-#else
-template<typename RootNodeType>
-inline Index32
-Tree<RootNodeType>::unallocatedLeafCount() const
-{
-    Index32 sum = 0;
-    for (auto it = this->cbeginLeaf(); it; ++it) if (!it->isAllocated()) ++sum;
-    return sum;
-}
-#endif
 
 
 template<typename RootNodeType>

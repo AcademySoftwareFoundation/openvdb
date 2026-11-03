@@ -13,7 +13,6 @@ rm /usr/local/bin/python3* || :
 
 brew update
 brew install bash gnu-getopt # for CI scripts
-brew install c-blosc
 brew install cmake
 brew install glfw
 brew install googletest
@@ -21,17 +20,25 @@ brew install jq # for trivial parsing of brew json
 brew install openexr
 brew install nanobind # also installs the dependent python version
 brew install robin-map # required for nanobind
-brew install numpy # only for python tests
 brew install zlib
+brew install zstd
 brew install jemalloc
 
-# Alias python version installed by nanobind to path
+# Use the python version that nanobind depends on
 py_version=$(brew info nanobind --json | \
     jq -cr '.[].dependencies[] | select(. | startswith("python"))')
 echo "Using python $py_version"
+py_prefix=$(brew --prefix "$py_version") || exit 1
+
+# numpy from brew pulls in a second python that fails to link, so install it
+# in a venv based on the nanobind python instead
+"$py_prefix/bin/python3" -m venv "$HOME/openvdb-venv" || exit 1
+"$HOME/openvdb-venv/bin/pip" install numpy || exit 1
+
+# Point CMake's FindPython at the venv so the python tests see numpy.
 # export for subsequent action steps (note, not exported for this env)
-echo "Python_ROOT_DIR=/usr/local/opt/$py_version" >> $GITHUB_ENV
-echo "/usr/local/opt/$py_version/bin" >> $GITHUB_PATH
+echo "VIRTUAL_ENV=$HOME/openvdb-venv" >> $GITHUB_ENV
+echo "$HOME/openvdb-venv/bin" >> $GITHUB_PATH
 
 # use bash
 echo "/usr/local/opt/bash/bin" >> $GITHUB_PATH

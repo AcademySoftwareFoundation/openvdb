@@ -50,10 +50,8 @@ TEST_F(TestTypes, testTypes)
 
     // array types
 
-#if LLVM_VERSION_MAJOR > 6
     ASSERT_EQ(llvm::cast<llvm::Type>(llvm::ArrayType::get(llvm::Type::getInt1Ty(C), 1)),
         LLVMType<bool[1]>::get(C));
-#endif
 
     ASSERT_EQ(llvm::cast<llvm::Type>(llvm::ArrayType::get(llvm::Type::getInt8Ty(C), 2)),
         LLVMType<int8_t[2]>::get(C));
@@ -70,10 +68,8 @@ TEST_F(TestTypes, testTypes)
 
     // array values
 
-#if LLVM_VERSION_MAJOR > 6
     ASSERT_EQ(llvm::cast<llvm::Constant>(llvm::ConstantDataArray::get<bool>(C, {true})),
         LLVMType<bool[1]>::get(C, {true}));
-#endif
 
     const std::vector<uint8_t> veci8{1,2};
     ASSERT_EQ(llvm::cast<llvm::Constant>(llvm::ConstantDataArray::get(C, veci8)),
@@ -101,10 +97,6 @@ TEST_F(TestTypes, testTypes)
 
     // void
     ASSERT_EQ(llvm::cast<llvm::Type>(llvm::Type::getVoidTy(C)), LLVMType<void>::get(C));
-    // some special cases we alias
-#if LLVM_VERSION_MAJOR <= 15
-    ASSERT_EQ(llvm::Type::getInt8PtrTy(C), LLVMType<void*>::get(C));
-#endif
     ASSERT_EQ(llvm::cast<llvm::Type>(llvm::Type::getInt8Ty(C)), LLVMType<char>::get(C));
 }
 

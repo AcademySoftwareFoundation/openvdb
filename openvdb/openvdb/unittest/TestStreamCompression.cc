@@ -9,12 +9,11 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <cstring> // for std::memcmp()
 #include <fstream>
 #include <numeric> // for std::iota()
 
-#ifdef OPENVDB_USE_BLOSC
-#include <blosc.h>
-#endif
+#include <openvdb_blosc.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -35,12 +34,7 @@ public:
 
 TEST_F(TestStreamCompression, testBlosc)
 {
-    // ensure that the library and unit tests are both built with or without Blosc enabled
-#ifdef OPENVDB_USE_BLOSC
     EXPECT_TRUE(bloscCanCompress());
-#else
-    EXPECT_TRUE(!bloscCanCompress());
-#endif
 
     const int count = 256;
 
@@ -61,7 +55,6 @@ TEST_F(TestStreamCompression, testBlosc)
         std::unique_ptr<char[]> compressedBuffer = bloscCompress(
             reinterpret_cast<char*>(uncompressedBuffer.get()), uncompressedBytes, compressedBytes);
 
-#ifdef OPENVDB_USE_BLOSC
         EXPECT_TRUE(compressedBytes < uncompressedBytes);
         EXPECT_TRUE(compressedBuffer);
         EXPECT_EQ(testCompressedBytes, compressedBytes);
@@ -80,23 +73,12 @@ TEST_F(TestStreamCompression, testBlosc)
             bloscDecompress(compressedBuffer.get(), 1), openvdb::RuntimeError);
 
         EXPECT_TRUE(newUncompressedBuffer);
-#else
-        EXPECT_TRUE(!compressedBuffer);
-        EXPECT_EQ(testCompressedBytes, size_t(0));
 
-        // uncompressedSize
-
-        EXPECT_THROW(bloscUncompressedSize(compressedBuffer.get()), openvdb::RuntimeError);
-
-        // decompress
-
-        std::unique_ptr<char[]> newUncompressedBuffer;
-        EXPECT_THROW(
-            newUncompressedBuffer = bloscDecompress(compressedBuffer.get(), uncompressedBytes),
+        // bitshuffle is not supported, so a header with the bitshuffle flag
+        // (0x04 in the flags byte) must be rejected
+        compressedBuffer.get()[2] |= 0x04;
+        EXPECT_THROW(bloscDecompress(compressedBuffer.get(), uncompressedBytes),
             openvdb::RuntimeError);
-
-        EXPECT_TRUE(!newUncompressedBuffer);
-#endif
     }
 
     { // one value (below minimum bytes)
@@ -120,7 +102,6 @@ TEST_F(TestStreamCompression, testBlosc)
             std::unique_ptr<char[]> newTest(new char[paddedCount]);
             for (int i = 0; i < paddedCount; i++)  newTest.get()[i] = char(0);
 
-#ifdef OPENVDB_USE_BLOSC
             size_t compressedBytes;
             std::unique_ptr<char[]> compressedBuffer = bloscCompress(
                 newTest.get(), paddedCount, compressedBytes);
@@ -134,7 +115,7 @@ TEST_F(TestStreamCompression, testBlosc)
             EXPECT_EQ(compressedSizeBytes, compressedBytes);
 
             // no compression performed due to buffer being too small
-            if (paddedCount <= BLOSC_MINIMUM_BYTES) {
+            if (paddedCount <= OPENVDB_BLOSC_MINIMUM_BYTES) {
                 EXPECT_TRUE(!compressedBuffer);
             }
             else {
@@ -151,7 +132,6 @@ TEST_F(TestStreamCompression, testBlosc)
                     EXPECT_EQ((uncompressedBuffer.get())[i], newTest[i]);
                 }
             }
-#endif
         }
     }
 
@@ -179,7 +159,6 @@ TEST_F(TestStreamCompression, testBlosc)
 
         // decompress
 
-#ifdef OPENVDB_USE_BLOSC
         std::unique_ptr<char[]> compressedBuffer = bloscCompress(
             reinterpret_cast<char*>(&smallBuffer[0]), count * sizeof(int), testCompressedBytes);
 
@@ -192,7 +171,6 @@ TEST_F(TestStreamCompression, testBlosc)
         EXPECT_THROW(bloscDecompress(
             reinterpret_cast<char*>(compressedBuffer.get()), count * sizeof(int) + 1),
             openvdb::RuntimeError);
-#endif
     }
 
     { // uncompressible buffer
@@ -290,10 +268,6 @@ TestStreamCompression::testPagedStreams()
         size_t compressedSize = compression::bloscCompressedSize(
             reinterpret_cast<const char*>(&values[0]), values.size());
 
-#ifndef OPENVDB_USE_BLOSC
-        compressedSize = values.size();
-#endif
-
         EXPECT_EQ(ostr.tellp(), std::streampos(compressedSize));
 
         ostream.write(reinterpret_cast<const char*>(&values[0]), values.size());
@@ -324,21 +298,12 @@ TestStreamCompression::testPagedStreams()
         ostreamSizeOnly.write(reinterpret_cast<const char*>(&values[0]), values.size());
         ostreamSizeOnly.flush();
 
-#ifdef OPENVDB_USE_BLOSC
         // two integers - compressed size and uncompressed size
         EXPECT_EQ(ss.tellp(), std::streampos(sizeof(int)*2));
-#else
-        // one integer - uncompressed size
-        EXPECT_EQ(ss.tellp(), std::streampos(sizeof(int)));
-#endif
 
         PagedOutputStream ostream(ss);
         ostream.write(reinterpret_cast<const char*>(&values[0]), values.size());
         ostream.flush();
-
-#ifndef OPENVDB_USE_BLOSC
-        EXPECT_EQ(ss.tellp(), std::streampos(PageSize+sizeof(int)));
-#endif
 
         // read
 
@@ -349,19 +314,10 @@ TestStreamCompression::testPagedStreams()
 
         PageHandle::Ptr handle = istream.createHandle(values.size());
 
-#ifdef OPENVDB_USE_BLOSC
         // two integers - compressed size and uncompressed size
         EXPECT_EQ(ss.tellg(), std::streampos(sizeof(int)*2));
-#else
-        // one integer - uncompressed size
-        EXPECT_EQ(ss.tellg(), std::streampos(sizeof(int)));
-#endif
 
         istream.read(handle, values.size(), false);
-
-#ifndef OPENVDB_USE_BLOSC
-        EXPECT_EQ(ss.tellg(), std::streampos(PageSize+sizeof(int)));
-#endif
 
         std::unique_ptr<uint8_t[]> newValues(reinterpret_cast<uint8_t*>(handle->read().release()));
 
@@ -419,11 +375,7 @@ TestStreamCompression::testPagedStreams()
             }
             ostreamSizeOnly.flush();
 
-#ifdef OPENVDB_USE_BLOSC
             int pages = static_cast<int>(fileout.tellp() / (sizeof(int)*2));
-#else
-            int pages = static_cast<int>(fileout.tellp() / (sizeof(int)));
-#endif
 
             EXPECT_EQ(pages, 10);
 
@@ -441,14 +393,82 @@ TestStreamCompression::testPagedStreams()
             }
 
             ostream.flush();
-
-#ifndef OPENVDB_USE_BLOSC
-            EXPECT_EQ(fileout.tellp(), std::streampos(values.size()+sizeof(int)*pages));
-#endif
-
         }
         std::remove(filename.c_str());
     }
 }
 
 TEST_F(TestStreamCompression, testPagedStreams) { testPagedStreams(); }
+
+
+TEST_F(TestStreamCompression, testPagedStreamsInvalid)
+{
+    // a 1024-byte compressible payload
+    std::vector<uint8_t> values(1024);
+    for (size_t i = 0; i < values.size(); ++i)  values[i] = uint8_t(i % 16);
+
+    size_t compressedBytes = 0;
+    std::unique_ptr<char[]> compressedBuffer = bloscCompress(
+        reinterpret_cast<const char*>(values.data()), values.size(), compressedBytes);
+    ASSERT_TRUE(compressedBuffer);
+    ASSERT_TRUE(compressedBytes > 0);
+
+    // write a page header followed by the compressed payload
+    auto writePage = [&](int headerCompressedBytes, int headerUncompressedBytes) {
+        std::ostringstream ostr(std::ios_base::binary);
+        ostr.write(reinterpret_cast<const char*>(&headerCompressedBytes), sizeof(int));
+        ostr.write(reinterpret_cast<const char*>(&headerUncompressedBytes), sizeof(int));
+        ostr.write(compressedBuffer.get(), compressedBytes);
+        return ostr.str();
+    };
+
+    // read a single handle of handleBytes from the page
+    auto readPage = [&](const std::string& data, std::streamsize handleBytes) {
+        std::istringstream istr(data, std::ios_base::binary);
+        PagedInputStream sizeStream(istr);
+        sizeStream.setSizeOnly(true);
+        PageHandle::Ptr handle = sizeStream.createHandle(handleBytes);
+        PagedInputStream dataStream(istr);
+        dataStream.read(handle, handleBytes, false);
+        return handle->read();
+    };
+
+    const int valueBytes = int(values.size());
+
+    { // valid page
+        const std::string data = writePage(int(compressedBytes), valueBytes);
+        std::unique_ptr<char[]> buffer;
+        EXPECT_NO_THROW(buffer = readPage(data, valueBytes));
+        ASSERT_TRUE(buffer);
+        EXPECT_EQ(0, std::memcmp(buffer.get(), values.data(), values.size()));
+    }
+
+    { // handle larger than the page
+        const std::string data = writePage(int(compressedBytes), valueBytes);
+        EXPECT_THROW(readPage(data, 16384), IoError);
+    }
+
+    { // page header advertises more uncompressed bytes than the payload decodes to
+        const std::string data = writePage(int(compressedBytes), 1 << 20);
+        EXPECT_THROW(readPage(data, 16384), RuntimeError);
+    }
+
+    { // zero or negative sizes in the page header
+        std::string data = writePage(0, valueBytes);
+        EXPECT_THROW(readPage(data, valueBytes), IoError);
+        data = writePage(int(compressedBytes), 0);
+        EXPECT_THROW(readPage(data, valueBytes), IoError);
+        data = writePage(int(compressedBytes), -1);
+        EXPECT_THROW(readPage(data, valueBytes), IoError);
+    }
+
+    { // page header advertises fewer compressed bytes than the blosc header reports
+        const std::string data = writePage(OPENVDB_BLOSC_MIN_HEADER_LENGTH, valueBytes);
+        EXPECT_THROW(readPage(data, valueBytes), IoError);
+    }
+
+    { // compressed page smaller than a blosc header
+        const std::string data = writePage(4, valueBytes);
+        EXPECT_THROW(readPage(data, valueBytes), IoError);
+    }
+}

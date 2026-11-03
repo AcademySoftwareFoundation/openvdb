@@ -79,13 +79,6 @@ T prefixSum(std::vector<T> &vec, bool threaded, OpT op)
 
 }// namespace util
 
-template<typename T, typename OpT = std::plus<T>>
-[[deprecated("Use nanovdb::util::prefixSum instead")]]
-T prefixSum(std::vector<T> &vec, bool threaded = true, OpT op = OpT())
-{
-    return util::prefixSum<T, OpT>(vec, threaded, op);
-}// prefixSum
-
 }// namespace nanovdb
 
 #endif // NANOVDB_UTIL_PREFIX_SUM_H_HAS_BEEN_INCLUDED

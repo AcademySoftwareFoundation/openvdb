@@ -90,9 +90,9 @@ public:
     __hostdev__ Ray& setDir(const Vec3Type& dir)
     {
         mDir = dir;
-        mInvDir[0] = 1.0 / mDir[0];
-        mInvDir[1] = 1.0 / mDir[1];
-        mInvDir[2] = 1.0 / mDir[2];
+        mInvDir[0] = RealT(1) / mDir[0];
+        mInvDir[1] = RealT(1) / mDir[1];
+        mInvDir[2] = RealT(1) / mDir[2];
         mSign[0] = mInvDir[0] < 0;
         mSign[1] = mInvDir[1] < 0;
         mSign[2] = mInvDir[2] < 0;
@@ -548,9 +548,6 @@ private:
 }; // end of Ray class
 
 } // namespace math =========================================================
-
-template<typename RealT>
-using Ray [[deprecated("Use nanovdb::math::Ray instead")]] = math::Ray<RealT>;
 
 } // namespace nanovdb =======================================================
 

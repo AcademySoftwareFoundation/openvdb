@@ -50,8 +50,7 @@ Stream::Stream(std::istream& is, const io::ReadOptions& readOptions)
 
     // Tag the input stream with the library and file format version numbers
     // and the compression options specified in the header.
-    StreamMetadata::Ptr streamMetadata(new StreamMetadata);
-    io::setStreamMetadataPtr(is, streamMetadata, /*transfer=*/false);
+    io::StreamMetadataScope streamMetadataScope(is, StreamMetadata::Ptr(new StreamMetadata));
     io::setVersion(is, libraryVersion(), fileVersion());
     io::setDataCompression(is, compression());
 

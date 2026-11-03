@@ -4640,10 +4640,12 @@ CliResult runCli(const std::vector<std::string>& args, const std::string& input 
         stream.write(input.data(), static_cast<std::streamsize>(input.size()));
         stream.close();
     }
-    using File = std::unique_ptr<FILE, decltype(&std::fclose)>;
-    File in(std::fopen(inPath.string().c_str(), "rb"), &std::fclose);
-    File out(std::fopen(outPath.string().c_str(), "wb"), &std::fclose);
-    File err(std::fopen(errPath.string().c_str(), "wb"), &std::fclose);
+    // A deleter struct avoids decltype(&std::fclose), which drops glibc's nonnull attribute (-Wignored-attributes)
+    struct FileCloser { void operator()(FILE *f) const { std::fclose(f); } };
+    using File = std::unique_ptr<FILE, FileCloser>;
+    File in(std::fopen(inPath.string().c_str(), "rb"));
+    File out(std::fopen(outPath.string().c_str(), "wb"));
+    File err(std::fopen(errPath.string().c_str(), "wb"));
     if (!in || !out || !err) throw std::runtime_error("Cannot open CLI test streams");
     CliResult result;
 

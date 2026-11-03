@@ -374,6 +374,14 @@ struct OPENVDB_API CodecData
 ///    If a requested option (e.g. spatial clipping) cannot be honoured natively,
 ///    record a warning via @c diagnostics.addWarning() rather than silently ignoring it.
 ///
+///    A grid is read in four phases:
+///    @c beginRead() => @c readTopology() => @c readBuffers() => @c finishRead().
+///
+///    For non-instance grid reading, only @c beginRead and @c finishRead are guaranteed to run.
+///    A topology-only read will skip the @c readBuffers() phase for example. Compute tasks may
+///    continue asynchronously across phases, the codec owns that work and is responsible for
+///    starting and ending it.
+///
 /// 5. **Register the codec** once at start-up, typically from the library's
 ///    @c initialize() function, using @c CodecRegistry::registerCodec<MyCodec>():
 ///    @code
@@ -400,6 +408,19 @@ struct OPENVDB_API Codec
     /// @return A fully initialized @c CodecData whose @c grid field is non-null.
     virtual CodecData::Ptr createData() = 0;
 
+    /// @brief Begin a read. Called by the I/O layer once before the first phase of every read
+    ///   of a grid, for every read mode, after the metadata and the transform are read.
+    ///   It is not called for instances, which have no phases.
+    ///
+    /// @details This is the place to start work that later phases use, for example a thread
+    /// pool, or to choose a strategy from the read options, the metadata and the transform.
+    /// Until @c finishRead() returns the caller does not touch the tree of the grid.
+    /// If this throws, no other phase is called, including @c finishRead(), so the
+    /// destructor of the @c CodecData must release anything started here. The default
+    /// implementation does nothing.
+    virtual void beginRead(CodecData& /*data*/, const ReadOptions& /*options*/,
+        ReadDiagnostics& /*diagnostics*/) const { }
+
     /// @brief Deserialize the grid topology (tree structure and active-voxel
     ///   mask) from @a is into the grid held by @a data.
     virtual void readTopology(std::istream& /*is*/, CodecData& /*data*/,
@@ -421,6 +442,18 @@ struct OPENVDB_API Codec
     /// (a non-seekable stream, or a stream without grid offsets).
     virtual void readBuffers(std::istream& /*is*/, int64_t /*size*/, CodecData& /*data*/,
         const ReadOptions& /*options*/, ReadDiagnostics& /*diagnostics*/) const { }
+
+    /// @brief Finish a read. Called by the I/O layer after the last phase of every read of a
+    ///   grid, for every read mode and whether or not @c readTopology() and @c readBuffers()
+    ///   were called, so work that a codec started in an earlier phase has one place to be
+    ///   joined. It is not called for instances, which have no phases.
+    ///
+    /// @details Until this returns the caller does not touch the tree of the grid. It may read
+    /// and change the metadata and the transform. An error from work started in an earlier
+    /// phase is thrown from here, on the calling thread. The default implementation does
+    /// nothing.
+    virtual void finishRead(CodecData& /*data*/, const ReadOptions& /*options*/,
+        ReadDiagnostics& /*diagnostics*/) const { }
 
     /// @brief Serialize the grid topology (tree structure and active-voxel
     ///   mask) from @a grid to @a os.

@@ -32,15 +32,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace io {
 
-#ifdef OPENVDB_USE_BLOSC
 const uint32_t Archive::DEFAULT_COMPRESSION_FLAGS = (COMPRESS_BLOSC | COMPRESS_ACTIVE_MASK);
-#else
-#ifdef OPENVDB_USE_ZLIB
-const uint32_t Archive::DEFAULT_COMPRESSION_FLAGS = (COMPRESS_ZIP | COMPRESS_ACTIVE_MASK);
-#else
-const uint32_t Archive::DEFAULT_COMPRESSION_FLAGS = (COMPRESS_ACTIVE_MASK);
-#endif
-#endif
 
 
 namespace {
@@ -573,11 +565,7 @@ Archive::setDataCompression(std::istream& is)
 bool
 Archive::hasBloscCompression()
 {
-#ifdef OPENVDB_USE_BLOSC
     return true;
-#else
-    return false;
-#endif
 }
 
 
@@ -736,6 +724,21 @@ clearStreamMetadataPtr(std::ios_base& strm)
 }
 
 
+StreamMetadataScope::StreamMetadataScope(std::ios_base& strm, StreamMetadata::Ptr meta)
+    : mStream(strm)
+    , mMetadata(std::move(meta))
+    , mPrevious(strm.pword(GetSteamState().metadata))
+{
+    strm.pword(GetSteamState().metadata) = &mMetadata;
+}
+
+
+StreamMetadataScope::~StreamMetadataScope()
+{
+    mStream.pword(GetSteamState().metadata) = mPrevious;
+}
+
+
 ////////////////////////////////////////
 
 
@@ -752,7 +755,11 @@ Archive::readHeader(std::istream& is)
 
     // 2) Read the file format version number.
     is.read(reinterpret_cast<char*>(&mFileVersion), sizeof(uint32_t));
-    if (mFileVersion > OPENVDB_FILE_VERSION) {
+    if (mFileVersion >= OPENVDB_UNSUPPORTED_FILE_VERSION) {
+        OPENVDB_THROW(IoError, "unsupported VDB file format (expected version "
+            << OPENVDB_FILE_VERSION << " or earlier, got version " << mFileVersion
+            << "), the file was written by a newer version of OpenVDB");
+    } else if (mFileVersion > OPENVDB_FILE_VERSION) {
         OPENVDB_LOG_WARN("unsupported VDB file format (expected version "
             << OPENVDB_FILE_VERSION << " or earlier, got version " << mFileVersion << ")");
     } else if (mFileVersion < OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX) {
@@ -957,17 +964,18 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
     // so that downstream functions can reference them.
     readGridCompression(is);
 
-    // Restore the file-level stream metadata on exit.
-    struct OnExit {
-        OnExit(std::ios_base& strm_): strm(&strm_), ptr(strm_.pword(GetSteamState().metadata)) {}
-        ~OnExit() { strm->pword(GetSteamState().metadata) = ptr; }
-        std::ios_base* strm;
-        void* ptr;
-    };
-    OnExit restore(is);
-
     // Find the codec for the grid type and options.
     io::Codec* codec = findCodec(gd.gridType(), readOptions);
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 14
+    if (!codec) {
+        OPENVDB_THROW(IoError,
+            "No I/O codec found for " << gd.gridType() << ", "
+            "register the codec for this grid type "
+            "(either explicitly or via openvdb::initialize()). "
+            "Note: Tree I/O is disabled for ABI=14.");
+    }
+#endif
 
     GridBase::Ptr grid;
     io::CodecData::Ptr codecData;
@@ -987,19 +995,24 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
     }
     grid->setSaveFloatAsHalf(gd.saveFloatAsHalf());
 
-    // Stream metadata varies per grid, and it needs to persist
-    // in case delayed load is in effect.
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+    // Codecs take per-grid values from the grid and CodecData, so they use the
+    // file-level stream metadata as it is. Legacy tree I/O stores per-pass state on
+    // the stream metadata, so grids without a codec get their own copy. It stays
+    // installed until this function returns.
     io::StreamMetadata::Ptr streamMetadata;
-    if (io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is)) {
-        // Make a grid-level copy of the file-level stream metadata.
-        streamMetadata.reset(new StreamMetadata(*meta));
-    } else {
-        streamMetadata.reset(new StreamMetadata);
+    std::unique_ptr<io::StreamMetadataScope> streamMetadataScope;
+    if (!codec) {
+        if (io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(is)) {
+            streamMetadata.reset(new StreamMetadata(*meta));
+        } else {
+            streamMetadata.reset(new StreamMetadata);
+        }
+        streamMetadata->setHalfFloat(grid->saveFloatAsHalf());
+        streamMetadataScope.reset(new io::StreamMetadataScope(is, streamMetadata));
+        io::setGridClass(is, GRID_UNKNOWN);
     }
-    streamMetadata->setHalfFloat(grid->saveFloatAsHalf());
-    io::setStreamMetadataPtr(is, streamMetadata, /*transfer=*/false);
-
-    io::setGridClass(is, GRID_UNKNOWN);
+#endif
     io::setGridBackgroundValuePtr(is, nullptr);
 
     grid->readMeta(is);
@@ -1009,11 +1022,17 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
         grid->removeMeta(GridBase::META_FILE_DELAYED_LOAD);
     }
 
-    streamMetadata->gridMetadata() = static_cast<MetaMap&>(*grid);
-    const GridClass gridClass = grid->getGridClass();
-    io::setGridClass(is, gridClass);
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+    if (streamMetadata) {
+        streamMetadata->gridMetadata() = static_cast<MetaMap&>(*grid);
+        io::setGridClass(is, grid->getGridClass());
+    }
+#endif
 
     grid->readTransform(is);
+    if (codec && !gd.isInstance()) {
+        codec->beginRead(*codecData, readOptions, diagnostics);
+    }
     const bool readTopology = readOptions.readMode != io::ReadMode::MetadataOnly && !gd.isInstance();
     const bool readBuffers  = readTopology && readOptions.readMode != io::ReadMode::TopologyOnly;
     if (readTopology) {
@@ -1047,8 +1066,9 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
     if (readBuffers) {
         // read buffers
         if (codec) {
-            OPENVDB_ASSERT(gd.getEndPos() >= gd.getGridPos());
-            const Index64 size = static_cast<Index64>(gd.getEndPos() - gd.getGridPos());
+            // Size is of the buffer region only. Streams that cannot seek use -1 for size.
+            const bool sizeKnown = gd.getBlockPos() > 0 && gd.getEndPos() >= gd.getBlockPos();
+            const int64_t size = sizeKnown ? gd.getEndPos() - gd.getBlockPos() : -1;
             codec->readBuffers(is, size, *codecData, readOptions, diagnostics);
         } else {
 #if OPENVDB_ABI_VERSION_NUMBER < 14
@@ -1062,6 +1082,10 @@ Archive::readGrid(const GridDescriptor& gd, std::istream& is, const io::ReadOpti
             }
 #endif // OPENVDB_ABI_VERSION_NUMBER < 14
         }
+    }
+
+    if (codec && !gd.isInstance()) {
+        codec->finishRead(*codecData, readOptions, diagnostics);
     }
 
     return grid;
@@ -1091,11 +1115,26 @@ void
 Archive::write(std::ostream& os, const GridCPtrVec& grids, bool seekable,
     const MetaMap& metadata, const io::WriteOptions& writeOptions) const
 {
+#if OPENVDB_ABI_VERSION_NUMBER >= 14
+    // Fail before anything is written, so a missing codec cannot leave a grid
+    // without topology and buffers.
+    for (const GridBase::ConstPtr& grid : grids) {
+        if (grid && !findCodec(grid->type(), io::ReadOptions{})) {
+            OPENVDB_THROW(IoError,
+                "No I/O codec found for " << grid->type() << ", "
+                "register the codec for this grid type "
+                "(either explicitly or via openvdb::initialize()). "
+                "Note: Tree I/O is disabled for ABI=14.");
+        }
+    }
+#endif
+
     // Set stream flags so that downstream functions can reference them.
-    io::StreamMetadata::Ptr streamMetadata = io::getStreamMetadataPtr(os);
-    if (!streamMetadata) {
-        streamMetadata.reset(new StreamMetadata);
-        io::setStreamMetadataPtr(os, streamMetadata, /*transfer=*/false);
+    // If there is no stream metadata attached to this stream, then create
+    // one only for the duration of this function.
+    std::unique_ptr<io::StreamMetadataScope> fileMetadataScope;
+    if (!io::getStreamMetadataPtr(os)) {
+        fileMetadataScope.reset(new io::StreamMetadataScope(os, io::StreamMetadata::Ptr(new StreamMetadata)));
     }
     io::setDataCompression(os, compression());
     io::setWriteGridStatsMetadata(os, isGridStatsMetadataEnabled());
@@ -1188,28 +1227,26 @@ void
 Archive::writeGrid(GridDescriptor& gd, GridBase::ConstPtr grid,
     std::ostream& os, bool seekable, const io::WriteOptions& writeOptions) const
 {
-    // Restore file-level stream metadata on exit.
-    struct OnExit {
-        OnExit(std::ios_base& strm_): strm(&strm_), ptr(strm_.pword(GetSteamState().metadata)) {}
-        ~OnExit() { strm->pword(GetSteamState().metadata) = ptr; }
-        std::ios_base* strm;
-        void* ptr;
-    };
-    OnExit restore(os);
-
     // Find the codec for the grid type and options.
     io::Codec* codec = findCodec(gd.gridType());
 
-    // Stream metadata varies per grid, so make a copy of the file-level stream metadata.
-    io::StreamMetadata::Ptr streamMetadata;
-    if (io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(os)) {
-        streamMetadata.reset(new StreamMetadata(*meta));
-    } else {
-        streamMetadata.reset(new StreamMetadata);
+#if OPENVDB_ABI_VERSION_NUMBER < 14
+    // Codecs use the file-level stream metadata as it is. Legacy tree I/O stores
+    // per-pass state on the stream metadata, so a grid with no codec gets its own
+    // copy, installed until the grid is fully written.
+    std::unique_ptr<io::StreamMetadataScope> gridMetadataScope;
+    if (!codec) {
+        io::StreamMetadata::Ptr gridMetadata;
+        if (io::StreamMetadata::Ptr meta = io::getStreamMetadataPtr(os)) {
+            gridMetadata.reset(new StreamMetadata(*meta));
+        } else {
+            gridMetadata.reset(new StreamMetadata);
+        }
+        gridMetadata->setHalfFloat(grid->saveFloatAsHalf());
+        gridMetadata->gridMetadata() = static_cast<const MetaMap&>(*grid);
+        gridMetadataScope.reset(new io::StreamMetadataScope(os, gridMetadata));
     }
-    streamMetadata->setHalfFloat(grid->saveFloatAsHalf());
-    streamMetadata->gridMetadata() = static_cast<const MetaMap&>(*grid);
-    io::setStreamMetadataPtr(os, streamMetadata, /*transfer=*/false);
+#endif
 
     // Write out the Descriptor's header information (grid name and type)
     gd.writeHeader(os);

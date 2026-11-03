@@ -14,8 +14,6 @@
 #include <memory>
 #include <string>
 
-class TestMappedFile;
-
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -132,36 +130,6 @@ struct PointDataGridMultiPass {};
 class File;
 
 
-// This class is deprecated and will be removed. Delayed loading is no longer supported.
-// It is retained for API backwards compatibility only, but all methods are no-ops.
-class OPENVDB_API MappedFile
-{
-public:
-    using Ptr = SharedPtr<MappedFile>;
-    using Notifier = std::function<void(std::string /*filename*/)>;
-
-    OPENVDB_DEPRECATED_MESSAGE("This class is deprecated and will be removed. Delayed loading is no longer supported.")
-    explicit MappedFile(const std::string& /*filename*/, bool /*autoDelete*/ = false) {}
-
-    /// @brief Destructor
-    ~MappedFile() = default;
-
-    MappedFile(const MappedFile&) = delete;
-    MappedFile& operator=(const MappedFile&) = delete;
-
-    OPENVDB_DEPRECATED_MESSAGE("Always returns an empty string. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    std::string filename() const { return std::string(); }
-
-    OPENVDB_DEPRECATED_MESSAGE("Always returns a null stream buffer pointer. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    SharedPtr<std::streambuf> createBuffer() const { return SharedPtr<std::streambuf>(); }
-
-    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    void setNotifier(const Notifier&) {}
-
-    OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    void clearNotifier() {}
-}; // class MappedFile
-
 
 ////////////////////////////////////////
 
@@ -238,11 +206,6 @@ OPENVDB_API bool getWriteGridStatsMetadata(std::ios_base&);
 /// and store them as grid metadata when writing to the given stream.
 OPENVDB_API void setWriteGridStatsMetadata(std::ios_base&, bool writeGridStats);
 
-OPENVDB_DEPRECATED_MESSAGE("Always returns a null pointer. This function is deprecated and will be removed. Delayed loading is no longer supported.")
-inline SharedPtr<MappedFile> getMappedFilePtr(std::ios_base&) { return SharedPtr<MappedFile>(); }
-OPENVDB_DEPRECATED_MESSAGE("This function is deprecated and will be removed. Delayed loading is no longer supported.")
-inline void setMappedFilePtr(std::ios_base&, SharedPtr<MappedFile>&) { }
-
 /// @brief Return a shared pointer to an object that stores metadata (file format,
 /// compression scheme, etc.) for use when reading from or writing to the given stream.
 OPENVDB_API SharedPtr<StreamMetadata> getStreamMetadataPtr(std::ios_base&);
@@ -258,6 +221,27 @@ OPENVDB_API void setStreamMetadataPtr(std::ios_base&,
 /// @brief Dissociate the given stream from its metadata object (if it has one)
 /// and return a shared pointer to the object.
 OPENVDB_API SharedPtr<StreamMetadata> clearStreamMetadataPtr(std::ios_base&);
+
+/// @brief Replaces any StreamMetadata shared pointer associated with the stream
+/// with the given one for the lifetime of this object. When the destructor of this
+/// object is called, the StreamMetadata shared pointer is replaced with the prior one
+/// again.
+/// @details The stream only stores the address of the shared pointer, so this object
+/// owns it and cannot be copied or moved. The stream must outlive this object.
+class OPENVDB_API StreamMetadataScope
+{
+public:
+    StreamMetadataScope(std::ios_base&, SharedPtr<StreamMetadata>);
+    ~StreamMetadataScope();
+
+    StreamMetadataScope(const StreamMetadataScope&) = delete;
+    StreamMetadataScope& operator=(const StreamMetadataScope&) = delete;
+
+private:
+    std::ios_base& mStream;
+    SharedPtr<StreamMetadata> mMetadata;
+    void* mPrevious;
+}; // class StreamMetadataScope
 
 } // namespace io
 } // namespace OPENVDB_VERSION_NAME

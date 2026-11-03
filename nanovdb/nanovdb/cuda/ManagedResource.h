@@ -16,13 +16,13 @@ namespace cuda {
 /// @brief Managed (unified) memory resource. Allocations
 ///        (cudaMallocManaged) are accessible from both the host and the
 ///        device, with the driver migrating pages on demand, so a container
-///        over this resource serves grids that are read on both sides --
-///        the replacement for the legacy UnifiedBuffer. A GridHandle over
+///        over this resource serves grids that are read on both sides. A
+///        GridHandle over
 ///        this resource parses (and validates) its metadata through the
 ///        device like any device buffer -- a host-side parse could race
 ///        still-running producer kernels -- while the host accessors remain
 ///        available afterwards; ordering host reads after device writes is
-///        the caller's responsibility, exactly as with UnifiedBuffer.
+///        the caller's responsibility.
 /// @note This resource is *synchronous*: cudaMallocManaged / cudaFree have
 ///       no stream-ordered form, so it models the synchronous Resource
 ///       concept (allocate / deallocate, no stream). The usual contract

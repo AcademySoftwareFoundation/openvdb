@@ -227,7 +227,6 @@ set(DOXYGEN_PREDEFINED
   # even if it was not properly tagged
   [["OPENVDB_DEPRECATED=/** \deprecated */"]]
   [["OPENVDB_DEPRECATED_MESSAGE(x)=/** \deprecated x */"]]
-  "OPENVDB_USE_LOG4CPLUS="
   "OPENVDB_UBSAN_SUPPRESS=")
 
 set(DOXYGEN_ENABLED_SECTIONS "")

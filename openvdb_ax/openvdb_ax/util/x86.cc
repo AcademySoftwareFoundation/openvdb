@@ -6,11 +6,7 @@
 #include "x86.h"
 
 #include <llvm/Config/llvm-config.h>
-#if LLVM_VERSION_MAJOR < 18
-#include <llvm/Support/Host.h>
-#else
 #include <llvm/TargetParser/Host.h>
-#endif
 #include <llvm/ADT/StringMap.h>
 
 namespace openvdb {

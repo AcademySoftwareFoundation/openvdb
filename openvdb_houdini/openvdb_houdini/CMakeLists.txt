@@ -53,6 +53,9 @@ houdini_get_default_install_dir():
 If OFF, CMAKE_INSTALL_PREFIX is used.]=] ON)
 option(OPENVDB_INSTALL_HOUDINI_PYTHONRC [=[Install a Houdini startup script that sets
 the visibilty of OpenVDB nodes and their native equivalents.]=] OFF)
+option(OPENVDB_HOUDINI_LOG_FORWARDING [=[Forward OpenVDB log messages to the
+Houdini error manager for all SOPs. Messages can land on an unrelated node, so this is
+off by default.]=] OFF)
 
 set(_OPENVDB_HOUDINI_OPHIDE_POLICY_OPTIONS none aswf native)
 if(NOT OPENVDB_HOUDINI_OPHIDE_POLICY)
@@ -199,6 +202,9 @@ target_link_libraries(openvdb_houdini PUBLIC
 )
 
 target_compile_definitions(openvdb_houdini PRIVATE "-DOPENVDB_HOUDINI_PRIVATE")
+if(OPENVDB_HOUDINI_LOG_FORWARDING)
+  target_compile_definitions(openvdb_houdini PRIVATE "-DOPENVDB_HOUDINI_LOG_FORWARDING")
+endif()
 
 set_target_properties(openvdb_houdini
   PROPERTIES
@@ -333,22 +339,6 @@ if(OPENVDB_BUILD_SOP_OpenVDB_AX)
     target_link_libraries(SOP_OpenVDB_AX PUBLIC OpenVDB::openvdb_ax)
   else()
     target_link_libraries(SOP_OpenVDB_AX PUBLIC openvdb_ax)
-  endif()
-endif()
-
-# These defines are in Platform.h when building against 8.1 and later
-if(OpenVDB_VERSION VERSION_LESS 8.1.0)
-  # This is only required for the OpenVDB Write SOP which enables a compression menu
-  # option if blosc and zlib are supported.
-  if(USE_BLOSC OR OpenVDB_USES_BLOSC)
-    if(TARGET SOP_OpenVDB_Write)
-      target_compile_definitions(SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_BLOSC")
-    endif()
-  endif()
-  if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
-    if(TARGET SOP_OpenVDB_Write)
-      target_compile_definitions(SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_ZLIB")
-    endif()
   endif()
 endif()
 

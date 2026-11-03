@@ -29,7 +29,7 @@ elseif(CMAKE_CXX_STANDARD LESS ${MINIMUM_CXX_STANDARD})
 endif()
 if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_CXX_STANDARD)
   if(CMAKE_CXX_STANDARD LESS ${FUTURE_MINIMUM_CXX_STANDARD})
-    message(DEPRECATION "C++ < 17 is deprecated and will be removed.")
+    message(DEPRECATION "C++ < ${FUTURE_MINIMUM_CXX_STANDARD} is deprecated and will be removed.")
   endif()
 endif()
 

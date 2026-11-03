@@ -341,11 +341,6 @@ TEST_F(TestVDBFunctions, ingroup)
 TEST_F(TestVDBFunctions, testValidContext)
 {
     std::shared_ptr<llvm::LLVMContext> C(new llvm::LLVMContext);
-#if LLVM_VERSION_MAJOR == 15
-    // This will not work from LLVM 16
-    // https://llvm.org/docs/OpaquePointers.html
-    C->setOpaquePointers(false);
-#endif
 
     openvdb::ax::Compiler compiler;
     openvdb::ax::FunctionOptions ops;

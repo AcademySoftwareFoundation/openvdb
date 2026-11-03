@@ -1,4 +1,0 @@
-NanoVDB:
-
-  Bug Fixes:
-  - Under nvcc, nanovdb/cuda/HandleStorage.h, nanovdb/tools/cuda/TopologyBuilder.cuh and nanovdb/tools/cuda/VoxelBlockManager.cuh failed to compile when included before nanovdb/cuda/GridHandle.cuh, and nanovdb/tools/cuda/GridChecksum.cuh, GridValidator.cuh and GridStats.cuh and nanovdb/util/cuda/MorphologyHelpers.cuh failed to compile as the first NanoVDB include. Every public CUDA header now compiles as the first include of a translation unit, and the CUDA unit-test build checks it.

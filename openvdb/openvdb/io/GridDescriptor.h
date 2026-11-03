@@ -69,12 +69,6 @@ public:
     /// given stream.
     void readStreamPos(std::istream&);
 
-    /// @brief Read a grid descriptor from the given stream.
-    /// @return an empty grid of the type specified by the grid descriptor.
-    /// @deprecated Use readHeader() followed by readStreamPos() instead.
-    OPENVDB_DEPRECATED_MESSAGE("Use readHeader() followed by readStreamPos() instead.")
-    GridBase::Ptr read(std::istream&);
-
     /// @brief Append the number @a n to the given name (separated by an ASCII
     /// "record separator" character) and return the resulting name.
     static Name addSuffix(const Name&, int n);

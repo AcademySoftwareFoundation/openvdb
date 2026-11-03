@@ -41,7 +41,7 @@ WENO5(const ValueType& v1,
       const ValueType& v5,
       RealT scale2 = 1.0)// openvdb uses scale2 = 0.01
 {
-    static const RealT C = 13.0 / 12.0;
+    static const RealT C = RealT(13.0 / 12.0);
     // WENO is formulated for non-dimensional equations, here the optional scale2
     // is a reference value (squared) for the function being interpolated.  For
     // example if 'v' is of order 1000, then scale2 = 10^6 is ok.  But in practice
@@ -343,9 +343,9 @@ public:
     ///     + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
     __hostdev__ inline ValueType interpolation(const Vec3<ValueType>& xyz) const
     {
-        const ValueType u = xyz[0] - mCenter[0];
-        const ValueType v = xyz[1] - mCenter[1];
-        const ValueType w = xyz[2] - mCenter[2];
+        const ValueType u = xyz[0] - ValueType(mCenter[0]);
+        const ValueType v = xyz[1] - ValueType(mCenter[1]);
+        const ValueType w = xyz[2] - ValueType(mCenter[2]);
 
         NANOVDB_ASSERT(u>=0 && u<=1);
         NANOVDB_ASSERT(v>=0 && v<=1);
@@ -375,9 +375,9 @@ public:
     ///     + v100 u(1-v)(1-w)     + v101 u(1-v)w     + v110 uv(1-w)     + v111 uvw
     __hostdev__ inline Vec3<ValueType> gradient(const Vec3<ValueType>& xyz) const
     {
-        const ValueType u = xyz[0] - mCenter[0];
-        const ValueType v = xyz[1] - mCenter[1];
-        const ValueType w = xyz[2] - mCenter[2];
+        const ValueType u = xyz[0] - ValueType(mCenter[0]);
+        const ValueType v = xyz[1] - ValueType(mCenter[1]);
+        const ValueType w = xyz[2] - ValueType(mCenter[2]);
 
         NANOVDB_ASSERT(u>=0 && u<=1);
         NANOVDB_ASSERT(v>=0 && v<=1);
@@ -957,15 +957,15 @@ private:
         mValues[18] = mAcc.getValue(ijk.offsetBy( 0,  1,  1));
     }
 
-    __hostdev__ inline RealT Dx()  const { return 0.5*(mValues[2] - mValues[1]); }// * 1/dx
-    __hostdev__ inline RealT Dy()  const { return 0.5*(mValues[4] - mValues[3]); }// * 1/dx
-    __hostdev__ inline RealT Dz()  const { return 0.5*(mValues[6] - mValues[5]); }// * 1/dx
+    __hostdev__ inline RealT Dx()  const { return RealT(0.5*(mValues[2] - mValues[1])); }// * 1/dx
+    __hostdev__ inline RealT Dy()  const { return RealT(0.5*(mValues[4] - mValues[3])); }// * 1/dx
+    __hostdev__ inline RealT Dz()  const { return RealT(0.5*(mValues[6] - mValues[5])); }// * 1/dx
     __hostdev__ inline RealT Dxx() const { return mValues[2] - 2 * mValues[0] + mValues[1]; }// * 1/dx2
     __hostdev__ inline RealT Dyy() const { return mValues[4] - 2 * mValues[0] + mValues[3]; }// * 1/dx2}
     __hostdev__ inline RealT Dzz() const { return mValues[6] - 2 * mValues[0] + mValues[5]; }// * 1/dx2
-    __hostdev__ inline RealT Dxy() const { return 0.25 * (mValues[10] - mValues[ 8] + mValues[ 7] - mValues[ 9]); }// * 1/dx2
-    __hostdev__ inline RealT Dxz() const { return 0.25 * (mValues[14] - mValues[12] + mValues[11] - mValues[13]); }// * 1/dx2
-    __hostdev__ inline RealT Dyz() const { return 0.25 * (mValues[18] - mValues[16] + mValues[15] - mValues[17]); }// * 1/dx2
+    __hostdev__ inline RealT Dxy() const { return RealT(0.25 * (mValues[10] - mValues[ 8] + mValues[ 7] - mValues[ 9])); }// * 1/dx2
+    __hostdev__ inline RealT Dxz() const { return RealT(0.25 * (mValues[14] - mValues[12] + mValues[11] - mValues[13])); }// * 1/dx2
+    __hostdev__ inline RealT Dyz() const { return RealT(0.25 * (mValues[18] - mValues[16] + mValues[15] - mValues[17])); }// * 1/dx2
 
     __hostdev__ inline bool meanCurvature(RealT& alpha, RealT& normGrad) const
     {

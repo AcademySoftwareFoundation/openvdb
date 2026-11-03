@@ -3,7 +3,7 @@
 
 #include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessable on both the host and device
 #include <nanovdb/NodeManager.h>
-#include <nanovdb/cuda/GridHandle.cuh>// required since GridHandle<CudaDeviceBuffer> has device code
+#include <nanovdb/cuda/GridHandle.cuh>// required since GridHandle<cuda::Buffer<std::byte>> has device code
 #include <nanovdb/cuda/NodeManager.cuh>
 #include <stdio.h> // for printf
 

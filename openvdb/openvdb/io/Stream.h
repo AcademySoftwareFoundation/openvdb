@@ -34,9 +34,6 @@ public:
     ///     partially unread, which a sequentially read stream cannot skip over.
     Stream(std::istream& is, const io::ReadOptions& readOptions);
 
-    OPENVDB_DEPRECATED_MESSAGE("Use Stream(std::istream&) instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    Stream(std::istream& is, bool /*delayLoad*/) : Stream(is) { }
-
     /// Construct an archive for stream output.
     Stream() = default;
     /// Construct an archive for output to the given stream.

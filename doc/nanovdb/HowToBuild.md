@@ -16,7 +16,7 @@ NanoVDB is now a module of the larger OpenVDB project. A user can build both lib
   ```console
   foo@bar:~$ mkdir build
   foo@bar:~$ cd build
-  foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DTBB_ROOT=/path/to/tbb -DBLOSC_ROOT=/path/to/blosc -DCMAKE_INSTALL_PREFIX=/install/path
+  foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DTBB_ROOT=/path/to/tbb -DCMAKE_INSTALL_PREFIX=/install/path
   foo@bar:~$ make -j 4 && make install
   ```
 Note that the default value of `NANOVDB_USE_OPENVDB` is linked to `OPENVDB_BUILD_CORE` option and can be overriden by passing on `-DNANOVDB_USE_OPENVDB=OFF`.
@@ -49,7 +49,21 @@ From the root OpenVDB directory:
   ```console
   foo@bar:~$ mkdir build
   foo@bar:~$ cd build
-  foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_BUILD_EXAMPLES=ON -DNANOVDB_BUILD_BENCHMARK=ON -DNANOVDB_USE_INTRINSICS=ON -DNANOVDB_USE_CUDA=ON -DNANOVDB_CUDA_KEEP_PTX=ON -DTBB_ROOT=/path/to/tbb -DBLOSC_ROOT=/path/to/blosc -DGTEST_ROOT=/path/to/gtest -DCMAKE_INSTALL_PREFIX=/install/path
+  foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_BUILD_EXAMPLES=ON -DNANOVDB_BUILD_BENCHMARK=ON -DNANOVDB_USE_INTRINSICS=ON -DNANOVDB_USE_CUDA=ON -DNANOVDB_CUDA_KEEP_PTX=ON -DTBB_ROOT=/path/to/tbb -DGTEST_ROOT=/path/to/gtest -DCMAKE_INSTALL_PREFIX=/install/path
   foo@bar:~$ make -j 4 && make install
   ```
 Note that if you already have the correct version of OpenVDB pre-installed, you can configure CMake to link against that library by passing the arguments `-DOPENVDB_BUILD_CORE=OFF -DOPENVDB_BUILD_BINARIES=OFF -DOPENVDB_ROOT=/path/to/openvdb` when invoking `cmake`.
+
+## Using an installed NanoVDB from CMake
+
+NanoVDB installs a CMake package config to `/install/path/lib/cmake/NanoVDB`. Its `NanoVDB::nanovdb` target carries the include path, the `NANOVDB_USE_*` definitions NanoVDB was configured with, and their dependencies:
+  ```cmake
+  list(APPEND CMAKE_PREFIX_PATH "/install/path")
+  find_package(NanoVDB CONFIG REQUIRED)
+  target_link_libraries(myapp NanoVDB::nanovdb)
+  ```
+When NanoVDB is installed with OpenVDB, `find_package(OpenVDB CONFIG COMPONENTS nanovdb)` provides the same target as `OpenVDB::nanovdb`.
+
+`find_package(NanoVDB 32 CONFIG)` only accepts an installation with the same major version, which tracks the NanoVDB ABI and file format. A NanoVDB installed with `NANOVDB_USE_CUDA=ON` requires CUDA 12.0 or newer and CCCL 2.8 or newer, which it looks for in the CUDA toolkit. `NanoVDB::nanovdb` sets the `NANOVDB_INCLUDE_DIR` target property to the directory holding the `nanovdb/` headers, for projects that bundle them.
+
+With `NANOVDB_USE_CUDA=ON`, a NanoVDB build uses a `CCCL::CCCL` target the parent project already defines, then the CUDA toolkit's CCCL. It clones the CCCL release named by `NANOVDB_CCCL_TAG` only when neither is found, or when `NANOVDB_FETCH_CCCL=ON`, which clones even with `CPM_USE_LOCAL_PACKAGES=ON`. The CCCL 2.8 minimum applies to every one of these sources, including a `CCCL::CCCL` target the parent project created. NCCL support in `nanovdb/cuda/DeviceMesh.h` is off unless `NANOVDB_USE_NCCL=ON`, and an installation built with it also requires NCCL.

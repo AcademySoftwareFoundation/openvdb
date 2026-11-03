@@ -942,20 +942,6 @@ TEST_F(TestPointDataLeaf, testReadWriteCompression)
             io::setStreamMetadataPtr(ss, nullMetadata);
         }
 
-#ifndef OPENVDB_USE_BLOSC
-        { // write to indicate Blosc compression
-            std::stringstream ssInvalid;
-
-            uint16_t bytes16(100); // clamp to 16-bit unsigned integer
-            ssInvalid.write(reinterpret_cast<const char*>(&bytes16), sizeof(uint16_t));
-
-            std::unique_ptr<PointDataIndex32[]> destBuf(new PointDataIndex32[count]);
-            EXPECT_THROW(io::readCompressedValues(ssInvalid, destBuf.get(),
-                count, valueMask, false), RuntimeError);
-        }
-#endif
-
-#ifdef OPENVDB_USE_BLOSC
         { // mis-matching destination bytes cause decompression failures
             std::unique_ptr<PointDataIndex32[]> destBuf(new PointDataIndex32[count]);
 
@@ -969,7 +955,6 @@ TEST_F(TestPointDataLeaf, testReadWriteCompression)
             EXPECT_THROW(io::readCompressedValues(ss, destBuf.get(),
                 1, valueMask, false), RuntimeError);
         }
-#endif
 
         { // seek
             ss.str("");
@@ -1046,6 +1031,8 @@ TEST_F(TestPointDataLeaf, testIO)
     leaf.setOffsetOn(1, 10);
     leaf.setOffsetOn(4, 20);
     leaf.setOffsetOn(7, 5);
+    // reading rejects offsets that exceed the point count (the last offset)
+    leaf.setOffsetOnly(LeafType::SIZE - 1, 20);
 
     // manually change some values in the density array
 
@@ -1299,6 +1286,8 @@ TEST_F(TestPointDataLeaf, testTreeIO)
     leaf.setOffsetOn(1, 10);
     leaf.setOffsetOn(4, 20);
     leaf.setOffsetOn(7, 5);
+    // reading rejects offsets that exceed the point count (the last offset)
+    leaf.setOffsetOnly(LeafType::SIZE - 1, 20);
 
     TypedAttributeArray<float>& attr =
         TypedAttributeArray<float>::cast(leaf.attributeArray("density"));

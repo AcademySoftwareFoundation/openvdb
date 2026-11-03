@@ -9,7 +9,6 @@
 #include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/GridHandle.cuh> // for cuda::mergeGridHandles
 #include <nanovdb/cuda/ManagedResource.h>
-#include <nanovdb/cuda/UnifiedBuffer.h> // the default buffer of DistributedPointsToGrid::getHandle
 #include <nanovdb/tools/CreatePrimitives.h>
 #include <nanovdb/tools/GridChecksum.h> // for validateChecksum
 
@@ -580,9 +579,9 @@ TEST(TestNanoVDBMultiGPU, FewTiles_DistributedCudaPointsToGrid)
 
     nanovdb::cuda::DeviceMesh deviceMesh;
     nanovdb::tools::cuda::DistributedPointsToGrid<BuildT> converter(deviceMesh);
-    auto handle = converter.getHandle(voxels, voxelCount);// the default buffer, DualUnifiedBuffer in 13.x
-    static_assert(std::is_same<decltype(handle), nanovdb::GridHandle<nanovdb::cuda::DualUnifiedBuffer>>::value,
-                  "getHandle without a buffer builds into the dual-space unified buffer");
+    auto handle = converter.getHandle(voxels, voxelCount);// the default buffer
+    static_assert(std::is_same<decltype(handle), nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ManagedResource>>>::value,
+                  "getHandle without a buffer builds into a managed cuda::Buffer");
 
     EXPECT_TRUE(handle.deviceData());
     EXPECT_TRUE(handle.deviceGrid<BuildT>());

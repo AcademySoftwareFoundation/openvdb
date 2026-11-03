@@ -51,8 +51,6 @@ inline void VolumeComputeGenerator::computek2(llvm::Function* compute, const Att
         OPENVDB_ASSERT(abuff);
         OPENVDB_ASSERT(mode);
 
-        OPENVDB_ASSERT(AssertOpaquePtrs(vbuff, vbuffT));
-        OPENVDB_ASSERT(AssertOpaquePtrs(abuff, abuffT));
 
         llvm::Function* base = B.GetInsertBlock()->getParent();
 
@@ -364,13 +362,11 @@ void VolumeComputeGenerator::getAccessorValue(const std::string& globalName, Val
         llvm::Value* offset = extractArgument(mFunction, "offset");
         OPENVDB_ASSERT(valueptr);
         OPENVDB_ASSERT(offset);
-        OPENVDB_ASSERT(AssertOpaquePtrs(valueptr, LLVMType<int8_t>::get(mContext)));
 
         OPENVDB_ASSERT(location.IsPtr());
         llvm::Type* type = location.GetValue()->getType(); // ValueType*
         valueptr = mBuilder.CreatePointerCast(valueptr, type);
 
-        OPENVDB_ASSERT(AssertOpaquePtrs(valueptr, location.GetUnderlyingType()));
         llvm::Value* value = mBuilder.CreateGEP(location.GetUnderlyingType(), valueptr, offset);
         mBuilder.CreateStore(value, *mInternalPtrs.get(globalName + "_vptr"));
         mBuilder.CreateBr(post);
@@ -392,8 +388,6 @@ void VolumeComputeGenerator::getAccessorValue(const std::string& globalName, Val
 
         llvm::Type* voidstar = LLVMType<void*>::get(mContext);
 
-        OPENVDB_ASSERT(AssertOpaquePtrs(accessorPtr, voidstar));
-        OPENVDB_ASSERT(AssertOpaquePtrs(transformPtr, voidstar));
 
         accessorPtr = mBuilder.CreateGEP(voidstar, accessorPtr, registeredIndex);
         llvm::Value* targetTransform = mBuilder.CreateGEP(voidstar, transformPtr, registeredIndex);
@@ -439,7 +433,6 @@ llvm::Value* VolumeComputeGenerator::accessorHandleFromToken(const std::string& 
     llvm::Type* voidstar = LLVMType<void*>::get(mContext);
     llvm::Value* accessorPtr = extractArgument(mFunction, "accessors");
     OPENVDB_ASSERT(accessorPtr);
-    OPENVDB_ASSERT(AssertOpaquePtrs(accessorPtr, voidstar));
 
     accessorPtr = mBuilder.CreateGEP(voidstar, accessorPtr, registeredIndex);
     // return loaded void** = void*

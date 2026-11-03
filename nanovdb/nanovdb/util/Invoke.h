@@ -86,12 +86,6 @@ int invoke(const Func &taskFunc1, Rest... taskFuncN) {
 
 }// namespace util
 
-template<typename Func, typename... Rest>
-[[deprecated("Use nanovdb::util::invoke instead")]]
-int invoke(const Func &taskFunc1, Rest... taskFuncN) {
-    return util::invoke<Func, Rest...>(taskFunc1, taskFuncN...);
-}
-
 }// namespace nanovdb
 
 #endif // NANOVDB_UTIL_INVOKE_H_HAS_BEEN_INCLUDED

@@ -29,13 +29,6 @@ Value::operator bool() const
         "Expected both a value and a type to exist, or both to be null");
     if (!mVal) return false;
 
-#if LLVM_VERSION_MAJOR <= 15
-    llvm::Type* base = mVal->getType();
-    while (base->isPointerTy()) base = base->getContainedType(0);
-    OPENVDB_ASSERT_MESSAGE(base == mUType,
-        "Base type of Value does not match stored underlying type");
-#endif
-
     [[maybe_unused]] llvm::Type* strtype = LLVMType<codegen::String>::get(mUType->getContext());
     // Underlying type should never be a ptr type
     OPENVDB_ASSERT_MESSAGE(!mUType->isPointerTy(),

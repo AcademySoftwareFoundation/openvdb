@@ -15,7 +15,7 @@
 #include <openvdb/util/Name.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/util/Assert.h>
-#include <openvdb/io/io.h> // MappedFile
+#include <openvdb/io/io.h>
 #include <openvdb/io/Compression.h> // COMPRESS_BLOSC
 
 #include "IndexIterator.h"
@@ -189,8 +189,10 @@ public:
     /// Return the number of bytes of memory used by this attribute.
     virtual size_t memUsage() const = 0;
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
     virtual size_t memUsageIfLoaded() const = 0;
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     /// Create a new attribute array of the given (registered) type, length and stride.
     /// @details If @a lock is non-null, the AttributeArray registry mutex
@@ -315,11 +317,13 @@ public:
     /// @param outputTransient if true, write out transient attributes
     virtual void writePagedBuffers(compression::PagedOutputStream&, bool outputTransient) const = 0;
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     virtual void loadData() const = 0;
 
     OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     virtual bool isDataLoaded() const = 0;
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     /// Check the compressed bytes and flags. If they are equal, perform a deeper
     /// comparison check necessary on the inherited types (TypedAttributeArray)
@@ -613,8 +617,10 @@ public:
     /// Return the number of bytes of memory used by this attribute.
     size_t memUsage() const override;
 
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
     size_t memUsageIfLoaded() const override { return memUsage(); }
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     /// Return the value at index @a n (assumes in-core)
     ValueType getUnsafe(Index n) const;
@@ -695,14 +701,13 @@ public:
     /// @param outputTransient if true, write out transient attributes
     void writePagedBuffers(compression::PagedOutputStream& os, bool outputTransient) const override;
 
-    OPENVDB_DEPRECATED_MESSAGE("Always returns false. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    bool isOutOfCore() const { return false; }
-
+#if OPENVDB_ABI_VERSION_NUMBER < 14
     OPENVDB_DEPRECATED_MESSAGE("This method is deprecated and will be removed. Delayed loading is no longer supported.")
     void loadData() const override { }
 
     OPENVDB_DEPRECATED_MESSAGE("Always returns true. This method is deprecated and will be removed. Delayed loading is no longer supported.")
     bool isDataLoaded() const override { return true; }
+#endif // OPENVDB_ABI_VERSION_NUMBER < 14
 
     /// Return the raw data buffer
     inline const StorageType* constData() const { return this->data(); }
@@ -1488,6 +1493,9 @@ TypedAttributeArray<ValueType_, Codec_>::readMetadata(std::istream& is)
 
     Index64 bytes = Index64(0);
     is.read(reinterpret_cast<char*>(&bytes), sizeof(Index64));
+    if (bytes < /*flags*/sizeof(Int16) + /*size*/sizeof(Index)) {
+        OPENVDB_THROW(IoError, "Invalid attribute array byte count for VDB file format.");
+    }
     bytes = bytes - /*flags*/sizeof(Int16) - /*size*/sizeof(Index);
 
     uint8_t flags = uint8_t(0);
@@ -1528,6 +1536,21 @@ TypedAttributeArray<ValueType_, Codec_>::readMetadata(std::istream& is)
     else {
         mStrideOrTotalSize = 1;
     }
+
+    // size and stride come from the file, so reject values that make dataSize()
+    // overflow or be smaller than size(), as point indices are checked against size()
+    if (mSize == 0) {
+        OPENVDB_THROW(IoError, "Invalid attribute array size for VDB file format.");
+    }
+    if (this->hasConstantStride()) {
+        if (mStrideOrTotalSize == 0 ||
+            Index64(mSize) * Index64(mStrideOrTotalSize) > Index64(std::numeric_limits<Index>::max())) {
+            OPENVDB_THROW(IoError, "Invalid attribute array stride for VDB file format.");
+        }
+    }
+    else if (mStrideOrTotalSize < mSize) {
+        OPENVDB_THROW(IoError, "Invalid attribute array total size for VDB file format.");
+    }
 }
 
 
@@ -1546,6 +1569,15 @@ TypedAttributeArray<ValueType_, Codec_>::readBuffers(std::istream& is)
     if (!mIsUniform)    is.read(reinterpret_cast<char*>(&bloscCompressed), sizeof(uint8_t));
 
     OPENVDB_ASSERT(mFlags & PARTIALREAD);
+
+    // the byte count and the element count are independent fields in the file,
+    // so check that uncompressed data holds every element
+    // (the blosc path checks the decompressed size instead)
+    if (bloscCompressed != uint8_t(1) && mCompressedBytes < this->arrayMemUsage()) {
+        OPENVDB_THROW(IoError, "Attribute array data is smaller than the array size.");
+    }
+
+    const size_t bytesRead = mCompressedBytes;
     std::unique_ptr<char[]> buffer(new char[mCompressedBytes]);
     is.read(buffer.get(), mCompressedBytes);
     mCompressedBytes = 0;
@@ -1557,6 +1589,7 @@ TypedAttributeArray<ValueType_, Codec_>::readBuffers(std::istream& is)
 
         // decompress buffer
 
+        compression::bloscValidateCompressedBytes(buffer.get(), bytesRead);
         const size_t inBytes = this->dataSize() * sizeof(StorageType);
         std::unique_ptr<char[]> newBuffer = compression::bloscDecompress(buffer.get(), inBytes);
         if (newBuffer)  buffer.reset(newBuffer.release());
@@ -1579,6 +1612,10 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
 
     if (is.sizeOnly())
     {
+        // the paged buffer becomes the array data, so it must hold every element
+        if (mCompressedBytes < this->arrayMemUsage()) {
+            OPENVDB_THROW(IoError, "Attribute array data is smaller than the array size.");
+        }
         size_t compressedBytes(mCompressedBytes);
         mCompressedBytes = 0; // if not set to zero, mPageHandle will attempt to destroy invalid memory
         mFlags = static_cast<uint8_t>(mFlags & ~PARTIALREAD); // mark data read as having completed
@@ -1764,7 +1801,7 @@ TypedAttributeArray<ValueType_, Codec_>::writePagedBuffers(compression::PagedOut
 {
     if (!outputTransient && this->isTransient())    return;
 
-    // paged compression only available when Blosc is enabled
+    // paged compression only applies when Blosc compression is requested
     bool bloscCompression = io::getDataCompression(os.getOutputStream()) & io::COMPRESS_BLOSC;
     if (!bloscCompression) {
         if (!os.sizeOnly())   this->writeBuffers(os.getOutputStream(), outputTransient);

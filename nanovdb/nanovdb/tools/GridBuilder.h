@@ -1349,7 +1349,6 @@ struct LeafNode<ValueMask>
     public:
         ValueIterator() : mParent(nullptr), mPos(1u << 3 * LOG2DIM) {}
         ValueIterator(const LeafNode* parent) :  mParent(parent), mPos(0) {NANOVDB_ASSERT(parent);}
-        ValueIterator& operator=(const ValueIterator&) = default;
         bool operator*() const { NANOVDB_ASSERT(*this); return mParent->mValueMask.isOn(mPos);}
         Coord getCoord() const { NANOVDB_ASSERT(*this); return mParent->offsetToGlobalCoord(mPos);}
         bool isActive() const { NANOVDB_ASSERT(*this); return mParent->mValueMask.isOn(mPos);}
@@ -1521,7 +1520,6 @@ struct LeafNode<bool>
     public:
         ValueIterator() : mParent(nullptr), mPos(1u << 3 * LOG2DIM) {}
         ValueIterator(const LeafNode* parent) :  mParent(parent), mPos(0) {NANOVDB_ASSERT(parent);}
-        ValueIterator& operator=(const ValueIterator&) = default;
         bool operator*() const { NANOVDB_ASSERT(*this); return mParent->mValues.isOn(mPos);}
         Coord getCoord() const { NANOVDB_ASSERT(*this); return mParent->offsetToGlobalCoord(mPos);}
         bool isActive() const { NANOVDB_ASSERT(*this); return mParent->mValueMask.isOn(mPos);}
@@ -1606,7 +1604,7 @@ struct LeafNode<bool>
     {
         const uint32_t n = CoordToOffset(ijk);
         mValueMask.setOn(n);
-        mValues.setOn(n);
+        mValues.set(n, value);
     }
 
     template<typename AccT>
@@ -1926,7 +1924,7 @@ struct Grid : public Tree<BuildT>
 
 template <typename BuildT>
 template <typename Func>
-void Grid<BuildT>::operator()(const Func& func, const CoordBBox& bbox, ValueType delta)
+void Grid<BuildT>::operator()(const Func& func, const CoordBBox& bbox, ValueType /*delta*/)
 {
     auto &root = this->tree().root();
 #if __cplusplus >= 201703L
@@ -2152,13 +2150,13 @@ sdfToLevelSet(NodeManagerT &mgr)
     // Note that the bottom-up flood filling is essential
     const auto outside = mgr.root().mBackground;
     util::forEach(0, mgr.leafCount(), 8, [&](const util::Range1D& r) {
-        for (auto i = r.begin(); i != r.end(); ++i) mgr.leaf(i).signedFloodFill(outside);
+        for (auto i = r.begin(); i != r.end(); ++i) mgr.leaf(static_cast<uint32_t>(i)).signedFloodFill(outside);
     });
     util::forEach(0, mgr.lowerCount(), 1, [&](const util::Range1D& r) {
-        for (auto i = r.begin(); i != r.end(); ++i) mgr.lower(i).signedFloodFill(outside);
+        for (auto i = r.begin(); i != r.end(); ++i) mgr.lower(static_cast<uint32_t>(i)).signedFloodFill(outside);
     });
     util::forEach(0, mgr.upperCount(), 1, [&](const util::Range1D& r) {
-        for (auto i = r.begin(); i != r.end(); ++i) mgr.upper(i).signedFloodFill(outside);
+        for (auto i = r.begin(); i != r.end(); ++i) mgr.upper(static_cast<uint32_t>(i)).signedFloodFill(outside);
     });
     mgr.root().signedFloodFill(outside);
 }// sdfToLevelSet
@@ -2181,13 +2179,13 @@ void levelSetToFog(NodeManagerT &mgr, bool rebuild = true)
     };
     util::forEach(0, mgr.leafCount(), 8, [&](const util::Range1D& r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
-            auto& leaf = mgr.leaf(i);
+            auto& leaf = mgr.leaf(static_cast<uint32_t>(i));
             for (uint32_t i = 0; i < 512u; ++i) leaf.mValueMask.set(i, op(leaf.mValues[i]));
         }
     });
     util::forEach(0, mgr.lowerCount(), 1, [&](const util::Range1D& r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
-            auto& node = mgr.lower(i);
+            auto& node = mgr.lower(static_cast<uint32_t>(i));
             for (uint32_t i = 0; i < 4096u; ++i) {
                 if (node.mChildMask.isOn(i)) {
                     auto* leaf = node.mTable[i].child;
@@ -2205,7 +2203,7 @@ void levelSetToFog(NodeManagerT &mgr, bool rebuild = true)
     });
     util::forEach(0, mgr.upperCount(), 1, [&](const util::Range1D& r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
-            auto& node = mgr.upper(i);
+            auto& node = mgr.upper(static_cast<uint32_t>(i));
             for (uint32_t i = 0; i < 32768u; ++i) {
                 if (node.mChildMask.isOn(i)) {// prune lower internal node
                     auto* child = node.mTable[i].child;

@@ -46,16 +46,6 @@ Index64 pointCount(const PointDataTreeT& tree,
 }
 
 
-template <typename PointDataTreeT, typename FilterT>
-OPENVDB_DEPRECATED_MESSAGE("Use pointCount() without inCoreOnly parameter instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-Index64 pointCount(const PointDataTreeT& tree,
-                   const FilterT& filter,
-                   const bool /*inCoreOnly*/,
-                   const bool threaded)
-{
-    return pointCount(tree, filter, threaded);
-}
-
 
 template <typename PointDataTreeT, typename FilterT>
 Index64 pointOffsets(   std::vector<Index64>& pointOffsets,
@@ -96,17 +86,6 @@ Index64 pointOffsets(   std::vector<Index64>& pointOffsets,
     return pointOffset;
 }
 
-
-template <typename PointDataTreeT, typename FilterT>
-OPENVDB_DEPRECATED_MESSAGE("Use pointOffsets() without inCoreOnly parameter instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-Index64 pointOffsets(   std::vector<Index64>& pointOffsets,
-                        const PointDataTreeT& tree,
-                        const FilterT& filter,
-                        const bool /*inCoreOnly*/,
-                        const bool threaded)
-{
-    return pointOffsets(pointOffsets, tree, filter, threaded);
-}
 
 
 template <typename PointDataGridT, typename GridT, typename FilterT>

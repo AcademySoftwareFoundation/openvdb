@@ -114,9 +114,6 @@ public:
     /// Return the number of bytes of memory used by this attribute set.
     size_t memUsage() const;
 
-    OPENVDB_DEPRECATED_MESSAGE("Use memUsage() instead. This method is deprecated and will be removed. Delayed loading is no longer supported.")
-    size_t memUsageIfLoaded() const { return memUsage(); }
-
     /// @brief  Return the position of the attribute array whose name is @a name,
     ///         or @c INVALID_POS if no match is found.
     size_t find(const std::string& name) const;

@@ -23,9 +23,9 @@ cnanovdb_coord_round(cnanovdb_coord *RESTRICT coord, const cnanovdb_Vec3F *RESTR
     coord->mVec[1] = floor(xyz->mVec[1]+0.5);
     coord->mVec[2] = floor(xyz->mVec[2]+0.5);
 #else
-    coord->mVec[0] = floorf(xyz->mVec[0]+0.5);
-    coord->mVec[1] = floorf(xyz->mVec[1]+0.5);
-    coord->mVec[2] = floorf(xyz->mVec[2]+0.5);
+    coord->mVec[0] = (int32_t)floorf(xyz->mVec[0]+0.5f);
+    coord->mVec[1] = (int32_t)floorf(xyz->mVec[1]+0.5f);
+    coord->mVec[2] = (int32_t)floorf(xyz->mVec[2]+0.5f);
 #endif
 }
 
@@ -44,13 +44,13 @@ cnanovdb_coord_fract(cnanovdb_coord *RESTRICT coord, cnanovdb_Vec3F *RESTRICT fr
     float               i0, i1, i2;
     i0 = floorf(xyz->mVec[0]);
     fraction->mVec[0] = xyz->mVec[0] - i0;
-    coord->mVec[0] = i0;
+    coord->mVec[0] = (int32_t)i0;
     i1 = floorf(xyz->mVec[1]);
     fraction->mVec[1] = xyz->mVec[1] - i1;
-    coord->mVec[1] = i1;
+    coord->mVec[1] = (int32_t)i1;
     i2 = floorf(xyz->mVec[2]);
     fraction->mVec[2] = xyz->mVec[2] - i2;
-    coord->mVec[2] = i2;
+    coord->mVec[2] = (int32_t)i2;
 #endif
 }
 
@@ -231,11 +231,11 @@ cnanovdb_sampleF_gradient(cnanovdb_Vec3F *RESTRICT ret, cnanovdb_readaccessor *R
     {
         float       sp, sm;
 
-        qxyz.mVec[i] -= 0.5;
+        qxyz.mVec[i] -= 0.5f;
         sm = cnanovdb_sampleF_trilinear(acc, &qxyz);
-        qxyz.mVec[i] += 1.0;
+        qxyz.mVec[i] += 1.0f;
         sp = cnanovdb_sampleF_trilinear(acc, &qxyz);
-        qxyz.mVec[i] -= 0.5;
+        qxyz.mVec[i] -= 0.5f;
         ret->mVec[i] = sp - sm;
     }
 }

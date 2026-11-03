@@ -35,10 +35,8 @@
 #ifndef _WIN32
 #include <unistd.h>
 #endif
-#ifdef OPENVDB_USE_BLOSC
-#include <blosc.h>
+#include <openvdb_blosc.h>
 #include <cstring> // for memset()
-#endif
 
 
 class TestFile: public ::testing::Test
@@ -48,12 +46,14 @@ public:
     void TearDown() override { openvdb::uninitialize(); }
 
     void testHeader();
+    void testHeaderVersionLimit();
     void testWriteGrid();
     void testWriteMultipleGrids();
     void testReadGridDescriptors();
     void testEmptyGridIO();
     void testOpen();
     void testNonVdbOpen();
+    void testStreamMetadataAfterRead();
 };
 
 
@@ -99,6 +99,39 @@ TestFile::testHeader()
     remove("something.vdb2");
 }
 TEST_F(TestFile, testHeader) { testHeader(); }
+
+
+// Versions up to the current one are read. Newer ones are read with a warning until
+// OPENVDB_UNSUPPORTED_FILE_VERSION. That version and later ones are refused.
+void
+TestFile::testHeaderVersionLimit()
+{
+    using namespace openvdb;
+
+    // Rewrite the version field of a real header, which follows the 8 byte magic number.
+    std::ostringstream ostr(std::ios_base::binary);
+    io::Stream(ostr).write(GridPtrVec());
+    const std::string bytes = ostr.str();
+
+    auto readHeaderWithVersion = [&](uint32_t version) {
+        std::string changed = bytes;
+        std::memcpy(&changed[sizeof(int64_t)], &version, sizeof(uint32_t));
+        std::istringstream istr(changed, std::ios_base::binary);
+        io::Archive archive;
+        archive.readHeader(istr);
+        return archive.fileVersion();
+    };
+
+    EXPECT_EQ(uint32_t(OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX),
+        readHeaderWithVersion(OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX));
+    EXPECT_EQ(uint32_t(OPENVDB_FILE_VERSION), readHeaderWithVersion(OPENVDB_FILE_VERSION));
+    EXPECT_EQ(uint32_t(OPENVDB_FILE_VERSION + 1), readHeaderWithVersion(OPENVDB_FILE_VERSION + 1));
+    EXPECT_EQ(OPENVDB_UNSUPPORTED_FILE_VERSION - 1,
+        readHeaderWithVersion(OPENVDB_UNSUPPORTED_FILE_VERSION - 1));
+    EXPECT_THROW(readHeaderWithVersion(OPENVDB_UNSUPPORTED_FILE_VERSION), IoError);
+    EXPECT_THROW(readHeaderWithVersion(OPENVDB_FILE_VERSION_FLOAT_FRUSTUM_BBOX - 1), IoError);
+}
+TEST_F(TestFile, testHeaderVersionLimit) { testHeaderVersionLimit(); }
 
 
 void
@@ -188,6 +221,172 @@ TestFile::testWriteGrid()
     remove("something.vdb2");
 }
 TEST_F(TestFile, testWriteGrid) { testWriteGrid(); }
+
+
+void
+TestFile::testStreamMetadataAfterRead()
+{
+    using namespace openvdb;
+
+    const char* filename = "something.vdb2";
+    SharedPtr<const char> scopedFile(filename, ::remove);
+
+    GridPtrVec grids;
+    for (const char* name : {"a", "b", "c"}) {
+        FloatGrid::Ptr grid = FloatGrid::create(0.0f);
+        grid->setName(name);
+        grid->tree().setValue(Coord(1, 2, 3), 1.0f);
+        grids.push_back(grid);
+    }
+    {
+        io::File file(filename);
+        file.write(grids);
+    }
+
+    io::File file(filename);
+    file.open();
+    const io::StreamMetadata::Ptr fileMetadata = io::getStreamMetadataPtr(file.inputStream());
+    ASSERT_TRUE(bool(fileMetadata));
+
+    // Each read must leave the stream pointing at the file-level metadata.
+    file.readGrid("a");
+    EXPECT_EQ(fileMetadata.get(), io::getStreamMetadataPtr(file.inputStream()).get());
+    file.readGrid("b");
+    EXPECT_EQ(fileMetadata.get(), io::getStreamMetadataPtr(file.inputStream()).get());
+    file.readGrids("c");
+    EXPECT_EQ(fileMetadata.get(), io::getStreamMetadataPtr(file.inputStream()).get());
+    file.readGridMetadata("a");
+    EXPECT_EQ(fileMetadata.get(), io::getStreamMetadataPtr(file.inputStream()).get());
+    file.readAllGridMetadata();
+    EXPECT_EQ(fileMetadata.get(), io::getStreamMetadataPtr(file.inputStream()).get());
+    file.getGrids();
+    EXPECT_EQ(fileMetadata.get(), io::getStreamMetadataPtr(file.inputStream()).get());
+    file.close();
+}
+
+TEST_F(TestFile, testStreamMetadataAfterRead) { testStreamMetadataAfterRead(); }
+
+
+TEST_F(TestFile, testMixedGridClassesAndHalfFloat)
+{
+    using namespace openvdb;
+
+    const char* filename = "something.vdb2";
+    SharedPtr<const char> scopedFile(filename, ::remove);
+
+    FloatGrid::Ptr levelSet = createLevelSet<FloatGrid>();
+    unittest_util::makeSphere(/*dim=*/Coord(100), /*ctr=*/Vec3f(50, 50, 50), /*r=*/20.0,
+        *levelSet, unittest_util::SPHERE_SPARSE_NARROW_BAND);
+    levelSet->setName("levelSet");
+
+    FloatGrid::Ptr fog = levelSet->deepCopy();
+    tools::sdfToFogVolume(*fog);
+    fog->setName("fog");
+
+    // Unknown class, with inactive voxels that hold non-zero values.
+    FloatGrid::Ptr unknown = FloatGrid::create(0.0f);
+    unknown->setName("unknown");
+    unknown->tree().setValueOff(Coord(1, 2, 3), 7.0f);
+    unknown->tree().setValue(Coord(4, 5, 6), 9.0f);
+
+    // Half float next to full float. The values are exact in 16 bit floats.
+    FloatGrid::Ptr half = FloatGrid::create(0.0f);
+    half->setName("half");
+    half->setSaveFloatAsHalf(true);
+    half->tree().setValueOff(Coord(1, 2, 3), 3.0f);
+    half->tree().setValue(Coord(4, 5, 6), 5.0f);
+
+    FloatGrid::Ptr full = FloatGrid::create(0.0f);
+    full->setName("full");
+    full->tree().setValueOff(Coord(1, 2, 3), 3.0f);
+    full->tree().setValue(Coord(4, 5, 6), 5.0f);
+
+    GridPtrVec grids{levelSet, fog, unknown, half, full};
+    {
+        io::File file(filename);
+        file.write(grids);
+    }
+
+    auto check = [&](const GridPtrVec& read) {
+        ASSERT_EQ(grids.size(), read.size());
+        // File::getGrids() does not return grids in the order they were written,
+        // so match them up by name.
+        for (const GridBase::Ptr& expectedBase : grids) {
+            GridBase::Ptr actualBase;
+            for (const GridBase::Ptr& candidate : read) {
+                if (candidate->getName() == expectedBase->getName()) actualBase = candidate;
+            }
+            ASSERT_TRUE(actualBase) << expectedBase->getName();
+            ASSERT_TRUE(actualBase->isType<FloatGrid>());
+            const FloatGrid& expected = static_cast<const FloatGrid&>(*expectedBase);
+            const FloatGrid& actual = static_cast<const FloatGrid&>(*actualBase);
+            EXPECT_EQ(int(expected.getGridClass()), int(actual.getGridClass()));
+            EXPECT_EQ(expected.saveFloatAsHalf(), actual.saveFloatAsHalf());
+            EXPECT_EQ(expected.activeVoxelCount(), actual.activeVoxelCount());
+            EXPECT_EQ(expected.background(), actual.background());
+            // Compare every voxel, including inactive ones.
+            for (auto iter = expected.tree().cbeginLeaf(); iter; ++iter) {
+                for (auto voxel = iter->cbeginValueAll(); voxel; ++voxel) {
+                    EXPECT_EQ(*voxel, actual.tree().getValue(voxel.getCoord()));
+                }
+            }
+        }
+    };
+
+    // File::getGrids()
+    {
+        io::File file(filename);
+        file.open();
+        check(*file.getGrids());
+        file.close();
+    }
+    // File::readGrid() by name
+    {
+        io::File file(filename);
+        file.open();
+        GridPtrVec read;
+        for (const GridBase::Ptr& grid : grids) read.push_back(file.readGrid(grid->getName()));
+        check(read);
+        file.close();
+    }
+    // Stream
+    {
+        std::ostringstream ostr(std::ios_base::binary);
+        io::Stream(ostr).write(grids);
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        io::Stream stream(istr);
+        check(*stream.getGrids());
+    }
+}
+
+
+TEST_F(TestFile, testStreamMetadataScope)
+{
+    using namespace openvdb;
+
+    std::ostringstream stream;
+    EXPECT_TRUE(!io::getStreamMetadataPtr(stream));
+
+    io::StreamMetadata::Ptr outer(new io::StreamMetadata);
+    io::setStreamMetadataPtr(stream, outer, /*transfer=*/false);
+
+    {
+        io::StreamMetadata::Ptr inner(new io::StreamMetadata);
+        io::StreamMetadataScope scope(stream, inner);
+        EXPECT_EQ(inner.get(), io::getStreamMetadataPtr(stream).get());
+    }
+
+    // The previous metadata is back once the scope has ended.
+    EXPECT_EQ(outer.get(), io::getStreamMetadataPtr(stream).get());
+
+    // A scope on a stream with no metadata clears it again on exit.
+    io::clearStreamMetadataPtr(stream);
+    {
+        io::StreamMetadataScope scope(stream, io::StreamMetadata::Ptr(new io::StreamMetadata));
+        EXPECT_TRUE(bool(io::getStreamMetadataPtr(stream)));
+    }
+    EXPECT_TRUE(!io::getStreamMetadataPtr(stream));
+}
 
 
 void
@@ -1950,18 +2149,10 @@ TEST_F(TestFile, testCompression)
     // and verify that they can be read back successfully.
     // See io/Compression.h for the flag values.
 
-#ifdef OPENVDB_USE_BLOSC
-    #ifdef OPENVDB_USE_ZLIB
-        std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3,0x4,0x6};
-    #else
-        std::vector<uint32_t> validFlags{0x0,0x2,0x4,0x6};
-    #endif
+#ifdef OPENVDB_USE_ZLIB
+    std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3,0x4,0x6};
 #else
-    #ifdef OPENVDB_USE_ZLIB
-        std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3};
-    #else
-        std::vector<uint32_t> validFlags{0x0,0x2};
-    #endif
+    std::vector<uint32_t> validFlags{0x0,0x2,0x4,0x6};
 #endif
     for (uint32_t flags : validFlags) {
 
@@ -2224,119 +2415,3 @@ TEST_F(TestFile, testAsync)
         }
     }
 }
-
-
-#ifdef OPENVDB_USE_BLOSC
-// This tests for a data corruption bug that existed in versions of Blosc prior to 1.5.0
-// (see https://github.com/Blosc/c-blosc/pull/63).
-TEST_F(TestFile, testBlosc)
-{
-    const unsigned char rawdata[] = {
-        0x93, 0xb0, 0x49, 0xaf, 0x62, 0xad, 0xe3, 0xaa, 0xe4, 0xa5, 0x43, 0x20, 0x24,
-        0x29, 0xc9, 0xaf, 0xee, 0xad, 0x0b, 0xac, 0x3d, 0xa8, 0x1f, 0x99, 0x53, 0x27,
-        0xb6, 0x2b, 0x16, 0xb0, 0x5f, 0xae, 0x89, 0xac, 0x51, 0xa9, 0xfc, 0xa1, 0xc9,
-        0x24, 0x59, 0x2a, 0x2f, 0x2d, 0xb4, 0xae, 0xeb, 0xac, 0x2f, 0xaa, 0xec, 0xa4,
-        0x53, 0x21, 0x31, 0x29, 0x8f, 0x2c, 0x8e, 0x2e, 0x31, 0xad, 0xd6, 0xaa, 0x6d,
-        0xa6, 0xad, 0x1b, 0x3e, 0x28, 0x0a, 0x2c, 0xfd, 0x2d, 0xf8, 0x2f, 0x45, 0xab,
-        0x81, 0xa7, 0x1f, 0x95, 0x02, 0x27, 0x3d, 0x2b, 0x85, 0x2d, 0x75, 0x2f, 0xb6,
-        0x30, 0x13, 0xa8, 0xb2, 0x9c, 0xf3, 0x25, 0x9c, 0x2a, 0x28, 0x2d, 0x0b, 0x2f,
-        0x7b, 0x30, 0x68, 0x9e, 0x51, 0x25, 0x31, 0x2a, 0xe6, 0x2c, 0xbc, 0x2e, 0x4e,
-        0x30, 0x5a, 0xb0, 0xe6, 0xae, 0x0e, 0xad, 0x59, 0xaa, 0x08, 0xa5, 0x89, 0x21,
-        0x59, 0x29, 0xb0, 0x2c, 0x57, 0xaf, 0x8c, 0xad, 0x6f, 0xab, 0x65, 0xa7, 0xd3,
-        0x12, 0xf5, 0x27, 0xeb, 0x2b, 0xf6, 0x2d, 0xee, 0xad, 0x27, 0xac, 0xab, 0xa8,
-        0xb1, 0x9f, 0xa2, 0x25, 0xaa, 0x2a, 0x4a, 0x2d, 0x47, 0x2f, 0x7b, 0xac, 0x6d,
-        0xa9, 0x45, 0xa3, 0x73, 0x23, 0x9d, 0x29, 0xb7, 0x2c, 0xa8, 0x2e, 0x51, 0x30,
-        0xf7, 0xa9, 0xec, 0xa4, 0x79, 0x20, 0xc5, 0x28, 0x3f, 0x2c, 0x24, 0x2e, 0x09,
-        0x30, 0xc8, 0xa5, 0xb1, 0x1c, 0x23, 0x28, 0xc3, 0x2b, 0xba, 0x2d, 0x9c, 0x2f,
-        0xc3, 0x30, 0x44, 0x18, 0x6e, 0x27, 0x3d, 0x2b, 0x6b, 0x2d, 0x40, 0x2f, 0x8f,
-        0x30, 0x02, 0x27, 0xed, 0x2a, 0x36, 0x2d, 0xfe, 0x2e, 0x68, 0x30, 0x66, 0xae,
-        0x9e, 0xac, 0x96, 0xa9, 0x7c, 0xa3, 0xa9, 0x23, 0xc5, 0x29, 0xd8, 0x2c, 0xd7,
-        0x2e, 0x0e, 0xad, 0x90, 0xaa, 0xe4, 0xa5, 0xf8, 0x1d, 0x82, 0x28, 0x2b, 0x2c,
-        0x1e, 0x2e, 0x0c, 0x30, 0x53, 0xab, 0x9c, 0xa7, 0xd4, 0x96, 0xe7, 0x26, 0x30,
-        0x2b, 0x7f, 0x2d, 0x6e, 0x2f, 0xb3, 0x30, 0x74, 0xa8, 0xb1, 0x9f, 0x36, 0x25,
-        0x3e, 0x2a, 0xfa, 0x2c, 0xdd, 0x2e, 0x65, 0x30, 0xfc, 0xa1, 0xe0, 0x23, 0x82,
-        0x29, 0x8f, 0x2c, 0x66, 0x2e, 0x23, 0x30, 0x2d, 0x22, 0xfb, 0x28, 0x3f, 0x2c,
-        0x0a, 0x2e, 0xde, 0x2f, 0xaa, 0x28, 0x0a, 0x2c, 0xc8, 0x2d, 0x8f, 0x2f, 0xb0,
-        0x30, 0xde, 0x2b, 0xa0, 0x2d, 0x5a, 0x2f, 0x8f, 0x30, 0x12, 0xac, 0x9d, 0xa8,
-        0x0f, 0xa0, 0x51, 0x25, 0x66, 0x2a, 0x1b, 0x2d, 0x0b, 0x2f, 0x82, 0x30, 0x7b,
-        0xa9, 0xea, 0xa3, 0x63, 0x22, 0x3f, 0x29, 0x7b, 0x2c, 0x60, 0x2e, 0x26, 0x30,
-        0x76, 0xa5, 0xf8, 0x1d, 0x4c, 0x28, 0xeb, 0x2b, 0xce, 0x2d, 0xb0, 0x2f, 0xd3,
-        0x12, 0x1d, 0x27, 0x15, 0x2b, 0x57, 0x2d, 0x2c, 0x2f, 0x85, 0x30, 0x0e, 0x26,
-        0x74, 0x2a, 0xfa, 0x2c, 0xc3, 0x2e, 0x4a, 0x30, 0x08, 0x2a, 0xb7, 0x2c, 0x74,
-        0x2e, 0x1d, 0x30, 0x8f, 0x2c, 0x3f, 0x2e, 0xf8, 0x2f, 0x24, 0x2e, 0xd0, 0x2f,
-        0xc3, 0x30, 0xdb, 0xa6, 0xd3, 0x0e, 0x38, 0x27, 0x3d, 0x2b, 0x78, 0x2d, 0x5a,
-        0x2f, 0xa3, 0x30, 0x68, 0x9e, 0x51, 0x25, 0x31, 0x2a, 0xe6, 0x2c, 0xbc, 0x2e,
-        0x4e, 0x30, 0xa9, 0x23, 0x59, 0x29, 0x6e, 0x2c, 0x38, 0x2e, 0x06, 0x30, 0xb8,
-        0x28, 0x10, 0x2c, 0xce, 0x2d, 0x95, 0x2f, 0xb3, 0x30, 0x9b, 0x2b, 0x7f, 0x2d,
-        0x39, 0x2f, 0x7f, 0x30, 0x4a, 0x2d, 0xf8, 0x2e, 0x58, 0x30, 0xd0, 0x2e, 0x3d,
-        0x30, 0x30, 0x30, 0x53, 0x21, 0xc5, 0x28, 0x24, 0x2c, 0xef, 0x2d, 0xc3, 0x2f,
-        0xda, 0x27, 0x58, 0x2b, 0x6b, 0x2d, 0x33, 0x2f, 0x82, 0x30, 0x9c, 0x2a, 0x00,
-        0x2d, 0xbc, 0x2e, 0x41, 0x30, 0xb0, 0x2c, 0x60, 0x2e, 0x0c, 0x30, 0x1e, 0x2e,
-        0xca, 0x2f, 0xc0, 0x30, 0x95, 0x2f, 0x9f, 0x30, 0x8c, 0x30, 0x23, 0x2a, 0xc4,
-        0x2c, 0x81, 0x2e, 0x23, 0x30, 0x5a, 0x2c, 0x0a, 0x2e, 0xc3, 0x2f, 0xc3, 0x30,
-        0xad, 0x2d, 0x5a, 0x2f, 0x88, 0x30, 0x0b, 0x2f, 0x5b, 0x30, 0x3a, 0x30, 0x7f,
-        0x2d, 0x2c, 0x2f, 0x72, 0x30, 0xc3, 0x2e, 0x37, 0x30, 0x09, 0x30, 0xb6, 0x30
-    };
-
-    const char* indata = reinterpret_cast<const char*>(rawdata);
-    size_t inbytes = sizeof(rawdata);
-
-    const int
-        compbufbytes = int(inbytes + BLOSC_MAX_OVERHEAD),
-        decompbufbytes = int(inbytes + BLOSC_MAX_OVERHEAD);
-
-    std::unique_ptr<char[]>
-        compresseddata(new char[compbufbytes]),
-        outdata(new char[decompbufbytes]);
-
-    for (int compcode = 0; compcode <= BLOSC_ZLIB; ++compcode) {
-        char* compname = nullptr;
-#if BLOSC_VERSION_MAJOR > 1 || (BLOSC_VERSION_MAJOR == 1 && BLOSC_VERSION_MINOR >= 15)
-        if (0 > blosc_compcode_to_compname(compcode, const_cast<const char**>(&compname)))
-#else
-        if (0 > blosc_compcode_to_compname(compcode, &compname))
-#endif
-            continue;
-        /// @todo This changes the compressor setting globally.
-        if (blosc_set_compressor(compname) < 0) continue;
-
-        for (int typesize = 1; typesize <= 4; ++typesize) {
-
-            // Compress the data.
-            ::memset(compresseddata.get(), 0, compbufbytes);
-            int compressedbytes = blosc_compress(
-                /*clevel=*/9,
-                /*doshuffle=*/true,
-                typesize,
-                /*srcsize=*/inbytes,
-                /*src=*/indata,
-                /*dest=*/compresseddata.get(),
-                /*destsize=*/compbufbytes);
-
-            EXPECT_TRUE(compressedbytes > 0);
-
-            // Decompress the data.
-            ::memset(outdata.get(), 0, decompbufbytes);
-            int outbytes = blosc_decompress(
-                compresseddata.get(), outdata.get(), decompbufbytes);
-
-            EXPECT_TRUE(outbytes > 0);
-            EXPECT_EQ(int(inbytes), outbytes);
-
-            // Compare original and decompressed data.
-            int diff = 0;
-            for (size_t i = 0; i < inbytes; ++i) {
-                if (outdata[i] != indata[i]) ++diff;
-            }
-            if (diff > 0) {
-                if (diff != 0) {
-                    FAIL() << "Your version of the Blosc library is most likely"
-                    " out of date; please install the latest version.  "
-                    "(Earlier versions have a bug that can cause data corruption.)";
-                }
-                return;
-            }
-        }
-    }
-}
-#endif
