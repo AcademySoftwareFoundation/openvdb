@@ -21,6 +21,7 @@
 #include <nanovdb/GridHandle.h> // for the handle cuda::copyTo transfers
 #include <nanovdb/HostBuffer.h> // for the BufferTraits detectors
 #include <nanovdb/cuda/Buffer.h> // for noInit and the resource concepts
+#include <nanovdb/cuda/Memcpy.h> // for cuda::memcpyAsync
 #include <nanovdb/util/cuda/Util.h> // for cudaCheck
 
 #include <utility> // for std::move
@@ -209,9 +210,11 @@ inline GridHandle<DstBufferT> copyTo(const GridHandle<SrcBufferT>& src, cudaStre
     const void* srcPtr;
     if constexpr (srcDev) srcPtr = src.deviceData();
     else                  srcPtr = src.data();
-    cudaCheck(cudaMemcpyAsync(dst.data(), srcPtr, bytes, cudaMemcpyDefault, stream));
-    if constexpr (!dstDev || BufferHasHostSingle<DstBufferT>::value)
+    cuda::memcpyAsync(dst.data(), srcPtr, bytes, stream);
+    if constexpr (!dstDev || BufferHasHostSingle<DstBufferT>::value) {
+        detail::ScopedDevice guard(detail::streamDevice(stream)); // the stream may belong to another device
         cudaCheck(cudaStreamSynchronize(stream)); // the host-readable result is the postcondition; covers the both-space (managed) destination, whose handle exposes host accessors immediately
+    }
     // The copy reuses the source's layout unchecked, so no kernel runs here,
     // which keeps this header host-includable. A device destination is
     // stream-ordered: use it on @a stream, or synchronize.
