@@ -232,25 +232,31 @@ __hostdev__ inline char* strncpy(char *dst, const char *src, size_t max)
 /// @brief converts a number to a string using a specific base
 /// @param dst destination string
 /// @param num signed number to be concatenated after @c dst
-/// @param bas base used when converting @c num to a string
+/// @param bas base used when converting @c num to a string, in the range [2, 36]
 /// @return destination string @c dst
 /// @note Emulates the behaviour of itoa, except this verion also works on the GPU.
+///       Negative numbers get a leading '-' in base 10 and are printed as
+///       unsigned two's complement in every other base.
 __hostdev__ inline char* strcpy(char* dst, int num, int bas = 10)
 {
-    NANOVDB_ASSERT(dst != nullptr && bas > 0);
-    int len = 0;// length of number once converted to a string
-    if (num == 0) dst[len++] = '0';
-    for (int abs = num < 0 && bas == 10 ? -num : num; abs; abs /= bas) {
-        const int rem = abs % bas;
-        dst[len++] = rem > 9 ? rem - 10 + 'a' : rem + '0';
-    }
-    if (num < 0) dst[len++] = '-';// append '-' if negative
-    for (char *a = dst, *b = a + len - 1; a < b; ++a, --b) {// reverse dst
-        dst[len] = *a;// use end of string as temp
-        *a = *b;
-        *b = dst[len];
-    }
-    dst[len] = '\0';// explicitly terminate end of string
+    NANOVDB_ASSERT(dst != nullptr && bas >= 2 && bas <= 36);
+    const bool neg = num < 0 && bas == 10;
+    unsigned int abs = neg ? 0u - static_cast<unsigned int>(num) : static_cast<unsigned int>(num);
+
+    // Collect digits in reverse order, then copy them out forward.
+    // An in-place reversal of dst crashes cicc in nvcc 13.4 for sm_100 and sm_120.
+    char tmp[32];// 32 digits covers any 32-bit value in base 2
+    int n = 0;
+    do {
+        const unsigned int rem = abs % static_cast<unsigned int>(bas);
+        tmp[n++] = static_cast<char>(rem > 9 ? rem - 10 + 'a' : rem + '0');
+        abs /= static_cast<unsigned int>(bas);
+    } while (abs);
+
+    int len = 0;
+    if (neg) dst[len++] = '-';
+    while (n > 0) dst[len++] = tmp[--n];
+    dst[len] = '\0';
     return dst;
 }// util::strcpy(char*, int, int)
 
