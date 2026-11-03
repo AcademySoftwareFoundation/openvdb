@@ -25,6 +25,7 @@
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/GridHandle.h>
+#include <nanovdb/cuda/DeviceBuffer.h>
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/tools/cuda/TopologyBuilder.cuh>
