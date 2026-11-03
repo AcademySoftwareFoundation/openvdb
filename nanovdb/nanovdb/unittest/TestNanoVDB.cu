@@ -16,6 +16,7 @@
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 #include <nanovdb/tools/cuda/IndexToGrid.cuh>
 #include <nanovdb/tools/cuda/ConnectedComponents.cuh>
+#include <nanovdb/tools/cuda/PropagateSign.cuh>
 #include <nanovdb/tools/cuda/AddBlindData.cuh>
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
 #include <nanovdb/tools/cuda/GridValidator.cuh>
@@ -23,6 +24,7 @@
 #include <nanovdb/tools/cuda/DilateGrid.cuh>
 #include <nanovdb/tools/cuda/MergeGrids.cuh>
 #include <nanovdb/tools/cuda/PruneGrid.cuh>
+#include <nanovdb/tools/cuda/PartitionGrid.cuh>
 #include <nanovdb/tools/cuda/CoarsenGrid.cuh>
 #include <nanovdb/tools/cuda/RefineGrid.cuh>
 #include <nanovdb/util/cuda/Injection.cuh>
@@ -4793,3 +4795,165 @@ TEST(TestNanoVDBCUDA, ConnectedComponents_InFlightGrid)
     cudaCheck(cudaFree(d_bytes));
     cudaCheck(cudaFreeHost(pinned));
 }// ConnectedComponents_InFlightGrid
+
+// PropagateSign on the narrow band of a sphere: the level set from createLevelSetSphere, active where the signed
+// distance d satisfies |d| < 3, converted to a ValueOnIndex grid whose blind data channel 0, the SDF sidecar, holds
+// d at the active voxels' value indices and the background 3 at index 0; the level set's inactive values are
+// dropped. The sphere straddles the origin, so the root has eight entries and coordinates are negative too. Every
+// invert mask bit is checked against the analytic answer: on for an inactive voxel, or a childless lower or upper
+// slot, inside the sphere. A childless slot holds no active voxel, so its voxels all have the sign of its origin.
+// The center lies in the middle of the 128^3 block [0,128)^3, which is inside the sphere clear of the band, so
+// upper bits are on as well; no absent root tile is inside. createLevelSetSphere fills an inside gap between root
+// entries with a root value tile, which PropagateSign rejects (precondition 4), but only once a whole 4096^3 root
+// tile lies inside the sphere, i.e. above a radius of about 3547; so this radius is safe, and inside absent root
+// tiles (stage 4) are left to a test of their own.
+TEST(TestNanoVDBCUDA, PropagateSign_Sphere)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    const nanovdb::Vec3d center(64.3, 63.7, 64.2);
+    const double radius = 120.0, halfWidth = 3.0;
+    auto sphereSdf = [&](const nanovdb::Coord& ijk) {// signed distance from the center of voxel ijk
+        return (nanovdb::Vec3d(ijk[0], ijk[1], ijk[2]) - center).length() - radius;
+    };
+
+    auto sphere = nanovdb::tools::createLevelSetSphere<float>(radius, center, 1.0, halfWidth);
+    auto handle = nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, BuildT>(*sphere.grid<float>(), 1u, false, false);// one channel, no stats or tiles
+    const auto* grid = handle.grid<BuildT>();
+    ASSERT_TRUE(grid);
+    const auto& tree = grid->tree();
+    EXPECT_EQ(8u, tree.nodeCount(2));
+    const float* sdf = grid->getBlindData<float>(0);
+    ASSERT_TRUE(sdf);
+
+    // The sidecar is blind data, so it lies at the same offset from the grid on the device as on the host
+    auto deviceHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle);
+    const auto* deviceGrid = deviceHandle.deviceGrid<BuildT>();
+    ASSERT_TRUE(deviceGrid);
+    const float* deviceSdf = nanovdb::util::PtrAdd<float>(deviceGrid, nanovdb::util::PtrDiff(sdf, grid));
+
+    nanovdb::cuda::Buffer<nanovdb::Mask<3>> deviceLeafMasks(cudaStream_t(0), tree.nodeCount(0), nanovdb::cuda::noInit);
+    nanovdb::cuda::Buffer<nanovdb::Mask<4>> deviceLowerMasks(cudaStream_t(0), tree.nodeCount(1), nanovdb::cuda::noInit);
+    nanovdb::cuda::Buffer<nanovdb::Mask<5>> deviceUpperMasks(cudaStream_t(0), tree.nodeCount(2), nanovdb::cuda::noInit);
+    nanovdb::tools::cuda::PropagateSign<BuildT> op(deviceGrid, deviceSdf);
+    auto [rootOrigins, hasInvertRootTiles] =
+        op.propagate(deviceLeafMasks.data(), deviceLowerMasks.data(), deviceUpperMasks.data());
+    EXPECT_FALSE(hasInvertRootTiles);
+    EXPECT_EQ(0u, rootOrigins.size());
+
+    std::vector<nanovdb::Mask<3>> leafMasks(tree.nodeCount(0));
+    std::vector<nanovdb::Mask<4>> lowerMasks(tree.nodeCount(1));
+    std::vector<nanovdb::Mask<5>> upperMasks(tree.nodeCount(2));
+    cudaCheck(cudaMemcpy(leafMasks.data(), deviceLeafMasks.data(), deviceLeafMasks.size_bytes(), cudaMemcpyDeviceToHost));
+    cudaCheck(cudaMemcpy(lowerMasks.data(), deviceLowerMasks.data(), deviceLowerMasks.size_bytes(), cudaMemcpyDeviceToHost));
+    cudaCheck(cudaMemcpy(upperMasks.data(), deviceUpperMasks.data(), deviceUpperMasks.size_bytes(), cudaMemcpyDeviceToHost));
+
+    // Compares the masks of one level with the analytic answer; the bits on are counted so that every level is
+    // seen to be exercised
+    auto check = [&](const auto* nodes, const auto& masks, auto isOccupied) {
+        uint64_t errors = 0, on = 0;
+        for (size_t i = 0; i < masks.size(); ++i)
+            for (uint32_t n = 0; n < nodes[i].SIZE; ++n) {
+                const bool inside = !isOccupied(nodes[i], n) && sphereSdf(nodes[i].offsetToGlobalCoord(n)) < 0;
+                errors += masks[i].isOn(n) != inside;
+                on += masks[i].isOn(n);
+            }
+        EXPECT_EQ(0u, errors);
+        EXPECT_GT(on, 0u);
+    };
+    check(tree.getFirstLeaf(), leafMasks, [](const auto& leaf, uint32_t n) { return leaf.isActive(n); });
+    check(tree.getFirstLower(), lowerMasks, [](const auto& node, uint32_t n) { return node.isChild(n); });
+    check(tree.getFirstUpper(), upperMasks, [](const auto& node, uint32_t n) { return node.isChild(n); });
+}// PropagateSign_Sphere
+
+// PartitionGridBinary on a few voxels: output 0 must hold exactly the voxels whose retain bit is on, and output 1 the
+// others.
+TEST(TestNanoVDBCUDA, PartitionGridBinary_ValueOnIndex)
+{
+    using BuildT  = nanovdb::ValueOnIndex;
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
+
+    // Two voxels in one leaf, the others in other leaves and root tiles
+    const std::vector<nanovdb::Coord> points = {{0, 0, 0}, {1, 0, 0}, {100, 5, 7}, {-3, 4096, 2}, {5000, 1, 1}};
+    const std::vector<bool> retained = {true, false, true, false, true};
+
+    nanovdb::cuda::Buffer<nanovdb::Coord> pointBuffer(cudaStream_t(0), points.size(), nanovdb::cuda::noInit);
+    cudaCheck(cudaMemcpy(pointBuffer.data(), points.data(), pointBuffer.size_bytes(), cudaMemcpyHostToDevice));
+    nanovdb::tools::cuda::PointsToGrid<BuildT> converter;
+    auto inputHandle = converter.getHandle<nanovdb::Coord*, BufferT>(pointBuffer.data(), points.size());
+    const auto* inputGrid = inputHandle.deviceGrid<BuildT>();
+    ASSERT_TRUE(inputGrid);
+
+    // The retain mask: for each retained voxel, its bit in the mask of its leaf
+    auto hostInput = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(inputHandle, cudaStream_t(0));
+    const auto& inputTree = hostInput.grid<BuildT>()->tree();
+    std::vector<nanovdb::Mask<3>> hostMask(inputTree.nodeCount(0));
+    for (size_t i = 0; i < points.size(); ++i)
+        if (retained[i])
+            hostMask[inputTree.root().probeLeaf(points[i]) - inputTree.getFirstLeaf()].setOn(
+                nanovdb::NanoLeaf<BuildT>::CoordToOffset(points[i]));
+    nanovdb::cuda::Buffer<nanovdb::Mask<3>> mask(cudaStream_t(0), hostMask.size(), nanovdb::cuda::noInit);
+    cudaCheck(cudaMemcpy(mask.data(), hostMask.data(), mask.size_bytes(), cudaMemcpyHostToDevice));
+
+    nanovdb::tools::cuda::PartitionGridBinary<BuildT> partitioner(inputGrid, mask.data());
+    auto outputs = partitioner.getHandles<BufferT>();
+    for (int side = 0; side < 2; ++side) {
+        SCOPED_TRACE(side);
+        auto hostOutput = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(outputs[side], cudaStream_t(0));
+        const auto* grid = hostOutput.grid<BuildT>();
+        ASSERT_TRUE(grid);
+        auto acc = grid->getAccessor();
+        uint64_t count = 0;
+        for (size_t i = 0; i < points.size(); ++i)
+            if (retained[i] == (side == 0)) {
+                ++count;
+                EXPECT_TRUE(acc.isActive(points[i]));
+            }
+        EXPECT_EQ(count, grid->activeVoxelCount());
+    }
+}// PartitionGridBinary_ValueOnIndex
+
+// PartitionGrid on a few voxels with different labels: there must be one output per label, holding exactly the voxels
+// with that label.
+TEST(TestNanoVDBCUDA, PartitionGrid_ValueOnIndex)
+{
+    using BuildT  = nanovdb::ValueOnIndex;
+    using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
+
+    // Two voxels in one leaf, the others in other leaves and root tiles
+    const std::vector<nanovdb::Coord> points = {{0, 0, 0}, {1, 0, 0}, {100, 5, 7}, {-3, 4096, 2}, {5000, 1, 1}};
+    const std::vector<uint32_t> pointLabels = {0, 1, 1, 2, 0};
+    const uint32_t labelCount = 3;
+
+    nanovdb::cuda::Buffer<nanovdb::Coord> pointBuffer(cudaStream_t(0), points.size(), nanovdb::cuda::noInit);
+    cudaCheck(cudaMemcpy(pointBuffer.data(), points.data(), pointBuffer.size_bytes(), cudaMemcpyHostToDevice));
+    nanovdb::tools::cuda::PointsToGrid<BuildT> converter;
+    auto inputHandle = converter.getHandle<nanovdb::Coord*, BufferT>(pointBuffer.data(), points.size());
+    const auto* inputGrid = inputHandle.deviceGrid<BuildT>();
+    ASSERT_TRUE(inputGrid);
+
+    // The labels, indexed by value index; the background slot keeps the all-ones value ConnectedComponents writes
+    auto hostInput = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(inputHandle, cudaStream_t(0));
+    auto inputAcc = hostInput.grid<BuildT>()->getAccessor();
+    std::vector<uint32_t> hostLabels(hostInput.grid<BuildT>()->valueCount(), ~0u);
+    for (size_t i = 0; i < points.size(); ++i) hostLabels[inputAcc.getValue(points[i])] = pointLabels[i];
+    nanovdb::cuda::Buffer<uint32_t> labels(cudaStream_t(0), hostLabels.size(), nanovdb::cuda::noInit);
+    cudaCheck(cudaMemcpy(labels.data(), hostLabels.data(), labels.size_bytes(), cudaMemcpyHostToDevice));
+
+    nanovdb::tools::cuda::PartitionGrid<BuildT> partitioner(inputGrid, labels.data(), labelCount);
+    auto outputs = partitioner.getHandles<BufferT>();
+    ASSERT_EQ(labelCount, outputs.size());
+    for (uint32_t l = 0; l < labelCount; ++l) {
+        SCOPED_TRACE(l);
+        auto hostOutput = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(outputs[l], cudaStream_t(0));
+        const auto* grid = hostOutput.grid<BuildT>();
+        ASSERT_TRUE(grid);
+        auto acc = grid->getAccessor();
+        uint64_t count = 0;
+        for (size_t i = 0; i < points.size(); ++i)
+            if (pointLabels[i] == l) {
+                ++count;
+                EXPECT_TRUE(acc.isActive(points[i]));
+            }
+        EXPECT_EQ(count, grid->activeVoxelCount());
+    }
+}// PartitionGrid_ValueOnIndex

@@ -1,0 +1,8 @@
+NanoVDB:
+  New Features:
+  - Added tools::cuda::MeshToSDF, which converts closed triangle meshes to a narrow-band signed distance field
+    on a ValueOnIndex grid on the GPU. It returns the grid and the signed distances of its active voxels;
+    tools::cuda::PropagateSign extends the sign beyond them. Nested surfaces, an offset isosurface and two
+    policies for signing the voxels next to the surface are supported.
+  - Added tools::cuda::MeshToGrid::getHandleAndUDFAndIndex, which also returns the nearest triangle of each
+    active voxel.

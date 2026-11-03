@@ -116,6 +116,8 @@ nanovdb_example(NAME "ex_refine_nanovdb_cuda" OPENVDB)
 nanovdb_example(NAME "ex_coarsen_nanovdb_cuda" OPENVDB)
 nanovdb_example(NAME "ex_mesh_to_grid_cuda" OPENVDB)
 nanovdb_example(NAME "ex_connected_components_cuda")
+nanovdb_example(NAME "ex_propagate_sign_nanovdb_cuda" OPENVDB)
+nanovdb_example(NAME "ex_partition_grid_cuda" OPENVDB)
 
 if(CUDAToolkit_FOUND)
   # ex_make_mgpu_nanovdb uses TF32 WMMA which requires SM_80+ (Ampere or newer).

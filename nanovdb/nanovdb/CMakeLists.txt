@@ -362,12 +362,15 @@ set(NANOVDB_INCLUDE_TOOLS_CUDA_FILES
   tools/cuda/TopologyBuilder.cuh
   tools/cuda/RefineGrid.cuh
   tools/cuda/PruneGrid.cuh
+  tools/cuda/PartitionGrid.cuh
   tools/cuda/DistributedPointsToGrid.cuh
   tools/cuda/DilateGrid.cuh
   tools/cuda/CoarsenGrid.cuh
   tools/cuda/VoxelBlockManager.cuh
   tools/cuda/MeshToGrid.cuh
   tools/cuda/ConnectedComponents.cuh
+  tools/cuda/PropagateSign.cuh
+  tools/cuda/MeshToSDF.cuh
 )
 
 # NanoVDB util header files

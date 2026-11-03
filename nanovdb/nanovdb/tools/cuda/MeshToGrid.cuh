@@ -33,6 +33,7 @@
 #include <nanovdb/util/cuda/Rasterization.cuh>
 #include <nanovdb/util/cuda/DeviceGridTraits.cuh>
 
+#include <tuple>
 #include <utility>
 
 namespace nanovdb {
@@ -181,7 +182,25 @@ public:
                                      BufferT(mStream, this->ref(), 0, nanovdb::cuda::noInit));
     }
 
+    /// @brief Like getHandleAndUDF, and also returns the triangle nearest to each active voxel. The distance and
+    ///        its triangle come from one packed atomic minimum, so they always agree. The index sidecar stores
+    ///        (activeVoxelCount+1) uint32_t values, indexed like the UDF sidecar:
+    ///          - index[0]   = 0xFFFFFFFF (background slot)
+    ///          - index[k>0] = nearest triangle of the k-th active voxel, or 0xFFFFFFFF if no triangle is
+    ///                         within the narrow band
+    /// @return std::tuple of grid handle, UDF sidecar and nearest-triangle sidecar
+    template<typename GridBufferT    = nanovdb::cuda::DualDeviceBuffer,
+             typename SidecarBufferT = nanovdb::cuda::DualDeviceBuffer>
+    std::tuple<GridHandle<GridBufferT>, SidecarBufferT, SidecarBufferT>
+    getHandleAndUDFAndIndex(const GridBufferT&    buffer        = GridBufferT(),
+                            const SidecarBufferT& sidecarBuffer = SidecarBufferT());
+
 private:
+    /// @brief The topology pipeline of getHandleAndUDF and getHandleAndUDFAndIndex: the rasterized grid, with
+    ///        the leaves that keep no active voxel pruned.
+    template<typename GridBufferT>
+    GridHandle<GridBufferT> buildPrunedGrid(const GridBufferT& buffer);
+
     void transformTriangles();
 
     void processRootTrianglePairs();
@@ -1065,14 +1084,36 @@ struct FinalizeSidecarFunctor
     }
 };
 
+/// @brief Fills each slot of the packed distance and triangle sidecar with the InitSidecarFunctor sentinel in
+///        its distance bits and no triangle (0xFFFFFFFF) in its triangle bits.
+struct InitPackedSidecarFunctor
+{
+    uint64_t *dPacked;
+    __device__ void operator()(size_t i) const { dPacked[i] = (uint64_t(0x7F7FFFFFu) << 32) | 0xFFFFFFFFu; }
+};
+
+/// @brief Splits the packed distance and triangle sidecar into a UDF sidecar, still holding squared distance bits
+///        for FinalizeSidecarFunctor, and a nearest-triangle sidecar.
+struct SplitPackedSidecarFunctor
+{
+    const uint64_t *dPacked;
+    float          *dUDF;
+    uint32_t       *dIndex;
+    __device__ void operator()(size_t i) const
+    {
+        const uint64_t p = dPacked[i];
+        dUDF[i]   = __uint_as_float(uint32_t(p >> 32));
+        dIndex[i] = uint32_t(p);
+    }
+};
+
 } // namespace topology::detail
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT, typename ResourceT>
-template<typename GridBufferT, typename SidecarBufferT>
-std::pair<GridHandle<GridBufferT>, SidecarBufferT>
-MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const SidecarBufferT& sidecarProto)
+template<typename GridBufferT>
+GridHandle<GridBufferT> MeshToGrid<BuildT, ResourceT>::buildPrunedGrid(const GridBufferT& buffer)
 {
     cudaStreamSynchronize(mStream);
 
@@ -1158,6 +1199,19 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
     }
     if (mVerbose==1) mTimer.stop();
 
+    return handle;
+} // MeshToGrid<BuildT, ResourceT>::buildPrunedGrid
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename BuildT, typename ResourceT>
+template<typename GridBufferT, typename SidecarBufferT>
+std::pair<GridHandle<GridBufferT>, SidecarBufferT>
+MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const SidecarBufferT& sidecarProto)
+{
+    auto handle = buildPrunedGrid(buffer);
+    int device = 0; cudaGetDevice(&device);
+
     // ---- UDF sidecar ----
 
     const float voxelSize = (float)mMap.getVoxelSize()[0];
@@ -1201,6 +1255,74 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
 
     return { std::move(handle), std::move(sidecarBuffer) };
 } // MeshToGrid<BuildT, ResourceT>::getHandleAndUDF
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename BuildT, typename ResourceT>
+template<typename GridBufferT, typename SidecarBufferT>
+std::tuple<GridHandle<GridBufferT>, SidecarBufferT, SidecarBufferT>
+MeshToGrid<BuildT, ResourceT>::getHandleAndUDFAndIndex(const GridBufferT& buffer, const SidecarBufferT& sidecarProto)
+{
+    auto handle = buildPrunedGrid(buffer);
+    int device = 0; cudaGetDevice(&device);
+
+    // ---- UDF and nearest-triangle sidecars, from one packed sidecar ----
+
+    const float voxelSize = (float)mMap.getVoxelSize()[0];
+
+    const uint64_t activeVoxelCount = util::cuda::DeviceGridTraits<BuildT>::getActiveVoxelCount(
+        handle.template deviceGrid<BuildT>(), mStream);
+
+    BufT<uint64_t> packedBuffer(mStream, this->ref(), activeVoxelCount + 1, nanovdb::cuda::noInit);
+    uint64_t *dPacked = packedBuffer.data();
+
+    if (mVerbose==1) mTimer.start("Initializing UDF and triangle sidecar");
+    util::cuda::lambdaKernel<<<numBlocks(activeVoxelCount + 1), mNumThreads, 0, mStream>>>(
+        activeVoxelCount + 1,
+        topology::detail::InitPackedSidecarFunctor{ dPacked });
+    cudaCheckError();
+    if (mVerbose==1) mTimer.stop();
+
+    if (mVerbose==1) mTimer.start("Computing UDF and nearest triangles via leaf/triangle pairs");
+    if (mBoxTrianglePairCount) {
+        using UDFFunctorT = util::rasterization::cuda::ComputeUDFAndIndexFunctor<BuildT, BoxTrianglePair, Triangle>;
+        util::cuda::operatorKernelInstance<UDFFunctorT>
+            <<<mBoxTrianglePairCount, UDFFunctorT::MaxThreadsPerBlock, 0, mStream>>>(
+                UDFFunctorT{ deviceBoxTrianglePairs(), deviceXformedTriangles(),
+                             handle.template deviceGrid<BuildT>(), dPacked,
+                             mBandWidth * mBandWidth });
+        cudaCheckError();
+        mXformedTriangles.destroy(mStream);
+        mBoxTrianglePairsBuffer.destroy(mStream);
+    }
+    if (mVerbose==1) mTimer.stop();
+
+    auto udfBuffer = nanovdb::cuda::detail::createDeviceStorage<SidecarBufferT>(
+        (activeVoxelCount + 1) * sizeof(float), &sidecarProto, device, mStream);
+    auto indexBuffer = nanovdb::cuda::detail::createDeviceStorage<SidecarBufferT>(
+        (activeVoxelCount + 1) * sizeof(uint32_t), &sidecarProto, device, mStream);
+    auto *dUDF   = static_cast<float*>(nanovdb::cuda::detail::deviceStorageData(udfBuffer));
+    auto *dIndex = static_cast<uint32_t*>(nanovdb::cuda::detail::deviceStorageData(indexBuffer));
+
+    if (mVerbose==1) mTimer.start("Splitting the packed sidecar");
+    util::cuda::lambdaKernel<<<numBlocks(activeVoxelCount + 1), mNumThreads, 0, mStream>>>(
+        activeVoxelCount + 1,
+        topology::detail::SplitPackedSidecarFunctor{ dPacked, dUDF, dIndex });
+    cudaCheckError();
+    packedBuffer.destroy(mStream);
+    if (mVerbose==1) mTimer.stop();
+
+    if (mVerbose==1) mTimer.start("Finalizing UDF sidecar (sqrt + clamp)");
+    util::cuda::lambdaKernel<<<numBlocks(activeVoxelCount + 1), mNumThreads, 0, mStream>>>(
+        activeVoxelCount + 1,
+        topology::detail::FinalizeSidecarFunctor{ dUDF, mBandWidth * voxelSize, voxelSize });
+    cudaCheckError();
+    if (mVerbose==1) mTimer.stop();
+
+    cudaStreamSynchronize(mStream);
+
+    return { std::move(handle), std::move(udfBuffer), std::move(indexBuffer) };
+} // MeshToGrid<BuildT, ResourceT>::getHandleAndUDFAndIndex
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
