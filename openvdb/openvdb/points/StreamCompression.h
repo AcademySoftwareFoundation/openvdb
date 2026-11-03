@@ -98,6 +98,15 @@ OPENVDB_API void bloscDecompress(char* uncompressedBuffer, const size_t expected
 OPENVDB_API std::unique_ptr<char[]> bloscDecompress(const char* buffer,
     const size_t expectedBytes, const bool resize = true);
 
+/// @brief Throws an IoError if the Blosc header of @a buffer does not fit in
+///        @a bufferBytes or reports more compressed bytes than @a bufferBytes.
+/// @note  Call this before decompressing data read from a stream, as Blosc
+///        trusts the sizes stored in its header.
+///
+/// @param buffer the compressed buffer
+/// @param bufferBytes the number of bytes available in @a buffer
+OPENVDB_API void bloscValidateCompressedBytes(const char* buffer, const size_t bufferBytes);
+
 
 ////////////////////////////////////////
 

@@ -14,6 +14,9 @@
 #include <gtest/gtest.h>
 #include "util.h" // for unittest_util::genPoints
 
+#include <cstring> // for std::memcpy()
+#include <sstream>
+
 namespace {
 
 class PointList {
@@ -613,6 +616,153 @@ TEST_F(TestPointCodec, testPointDataCodecEmptyGrid)
     EXPECT_EQ(codecGrid->activeVoxelCount(), Index64(0));
 
     std::remove(codecPath.c_str());
+}
+
+namespace {
+
+// Write the topology and buffers of a PointDataGrid using the codec into two strings,
+// so that the buffers can be modified before reading them back.
+void writePointDataCodec(const openvdb::points::PointDataGrid& grid,
+    std::string& topology, std::string& buffers)
+{
+    using namespace openvdb;
+    io::Codec* codec = io::CodecRegistry::get(points::PointDataGrid::gridType());
+    ASSERT_TRUE(codec);
+
+    std::ostringstream topologyStream(std::ios_base::binary);
+    io::setDataCompression(topologyStream, io::COMPRESS_NONE);
+    codec->writeTopology(topologyStream, grid, io::WriteOptions{});
+    topology = topologyStream.str();
+
+    std::ostringstream buffersStream(std::ios_base::binary);
+    io::setDataCompression(buffersStream, io::COMPRESS_NONE);
+    codec->writeBuffers(buffersStream, grid, io::WriteOptions{});
+    buffers = buffersStream.str();
+}
+
+openvdb::points::PointDataGrid::Ptr readPointDataCodec(
+    const std::string& topology, const std::string& buffers)
+{
+    using namespace openvdb;
+    io::Codec* codec = io::CodecRegistry::get(points::PointDataGrid::gridType());
+    if (!codec) return nullptr;
+
+    std::istringstream is(topology + buffers, std::ios_base::binary);
+    io::setCurrentVersion(is);
+    io::setDataCompression(is, io::COMPRESS_NONE);
+
+    io::CodecData::Ptr data = codec->createData();
+    io::ReadOptions options;
+    io::ReadDiagnostics diagnostics;
+    codec->readTopology(is, *data, options, diagnostics);
+    codec->readBuffers(is, /*size=*/-1, *data, options, diagnostics);
+    return gridPtrCast<points::PointDataGrid>(data->grid);
+}
+
+} // namespace
+
+// Voxel offsets and attribute array sizes are independent values in a file. A file
+// whose offsets exceed the array sizes must fail to read, as point iterators use
+// the offsets as array indices.
+TEST_F(TestPointCodec, testPointDataCodecOffsetsExceedArrays)
+{
+    using namespace openvdb;
+    using namespace openvdb::points;
+
+    openvdb::initialize();
+    io::CodecRegistry::clear();
+    io::internal::initialize();
+
+    const std::vector<Vec3f> positions = {
+        Vec3f(0.0f, 1.0f, 0.0f),
+        Vec3f(1.5f, 3.5f, 1.0f),
+        Vec3f(1.0f, 2.0f, 2.0f),
+        Vec3f(1.1f, 1.25f, 0.06f)
+    };
+    math::Transform::Ptr transform = math::Transform::createLinearTransform(1.0);
+    PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
+    ASSERT_EQ(grid->tree().leafCount(), Index64(1));
+
+    { // unmodified grid reads successfully
+        std::string topology, buffers;
+        writePointDataCodec(*grid, topology, buffers);
+        PointDataGrid::Ptr result;
+        EXPECT_NO_THROW(result = readPointDataCodec(topology, buffers));
+        ASSERT_TRUE(result);
+        EXPECT_EQ(pointCount(result->tree()), Index64(positions.size()));
+    }
+
+    // multiply every voxel offset so the offsets stay monotonic but exceed the arrays
+    PointDataTree::LeafNodeType* leaf = &*grid->tree().beginLeaf();
+    for (Index n = 0; n < PointDataTree::LeafNodeType::SIZE; ++n) {
+        leaf->setOffsetOnly(n, leaf->getValue(n) * 64);
+    }
+
+    {
+        std::string topology, buffers;
+        writePointDataCodec(*grid, topology, buffers);
+        EXPECT_THROW(readPointDataCodec(topology, buffers), IoError);
+    }
+
+    // a single voxel offset beyond the last offset
+    for (Index n = 0; n < PointDataTree::LeafNodeType::SIZE; ++n) {
+        leaf->setOffsetOnly(n, leaf->getValue(n) / 64);
+    }
+    leaf->setOffsetOnly(0, Index(positions.size()) + 1);
+
+    {
+        std::string topology, buffers;
+        writePointDataCodec(*grid, topology, buffers);
+        EXPECT_THROW(readPointDataCodec(topology, buffers), IoError);
+    }
+}
+
+// The number of attribute arrays to read is derived from the pass count in the file.
+// A pass count that is too small for the attributes declared in the descriptor
+// must fail to read, as the remaining arrays would never be read.
+TEST_F(TestPointCodec, testPointDataCodecPassCountTooSmall)
+{
+    using namespace openvdb;
+    using namespace openvdb::points;
+
+    openvdb::initialize();
+    io::CodecRegistry::clear();
+    io::internal::initialize();
+
+    const std::vector<Vec3f> positions = {
+        Vec3f(0.0f, 1.0f, 0.0f),
+        Vec3f(1.5f, 3.5f, 1.0f),
+        Vec3f(1.0f, 2.0f, 2.0f),
+        Vec3f(1.1f, 1.25f, 0.06f)
+    };
+    math::Transform::Ptr transform = math::Transform::createLinearTransform(1.0);
+    PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
+    appendAttribute<float>(grid->tree(), "a");
+
+    std::string topology, buffers;
+    writePointDataCodec(*grid, topology, buffers);
+
+    // the pass count is the first value of the buffers, 2 attributes require 8 passes
+    uint16_t numPasses;
+    std::memcpy(&numPasses, buffers.data(), sizeof(uint16_t));
+    ASSERT_EQ(numPasses, uint16_t(8));
+
+    { // unmodified grid reads successfully
+        PointDataGrid::Ptr result;
+        EXPECT_NO_THROW(result = readPointDataCodec(topology, buffers));
+        ASSERT_TRUE(result);
+        EXPECT_EQ(result->tree().cbeginLeaf()->attributeSet().size(), size_t(2));
+    }
+
+    // only one attribute array would be read
+    numPasses = 6;
+    std::memcpy(&buffers[0], &numPasses, sizeof(uint16_t));
+    EXPECT_THROW(readPointDataCodec(topology, buffers), IoError);
+
+    // no attribute arrays would be read
+    numPasses = 2;
+    std::memcpy(&buffers[0], &numPasses, sizeof(uint16_t));
+    EXPECT_THROW(readPointDataCodec(topology, buffers), IoError);
 }
 
 // Regression test for the fix in AttributeArray::skipPagedBuffers and

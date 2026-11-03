@@ -1493,6 +1493,9 @@ TypedAttributeArray<ValueType_, Codec_>::readMetadata(std::istream& is)
 
     Index64 bytes = Index64(0);
     is.read(reinterpret_cast<char*>(&bytes), sizeof(Index64));
+    if (bytes < /*flags*/sizeof(Int16) + /*size*/sizeof(Index)) {
+        OPENVDB_THROW(IoError, "Invalid attribute array byte count for VDB file format.");
+    }
     bytes = bytes - /*flags*/sizeof(Int16) - /*size*/sizeof(Index);
 
     uint8_t flags = uint8_t(0);
@@ -1533,6 +1536,21 @@ TypedAttributeArray<ValueType_, Codec_>::readMetadata(std::istream& is)
     else {
         mStrideOrTotalSize = 1;
     }
+
+    // size and stride come from the file, so reject values that make dataSize()
+    // overflow or be smaller than size(), as point indices are checked against size()
+    if (mSize == 0) {
+        OPENVDB_THROW(IoError, "Invalid attribute array size for VDB file format.");
+    }
+    if (this->hasConstantStride()) {
+        if (mStrideOrTotalSize == 0 ||
+            Index64(mSize) * Index64(mStrideOrTotalSize) > Index64(std::numeric_limits<Index>::max())) {
+            OPENVDB_THROW(IoError, "Invalid attribute array stride for VDB file format.");
+        }
+    }
+    else if (mStrideOrTotalSize < mSize) {
+        OPENVDB_THROW(IoError, "Invalid attribute array total size for VDB file format.");
+    }
 }
 
 
@@ -1551,6 +1569,15 @@ TypedAttributeArray<ValueType_, Codec_>::readBuffers(std::istream& is)
     if (!mIsUniform)    is.read(reinterpret_cast<char*>(&bloscCompressed), sizeof(uint8_t));
 
     OPENVDB_ASSERT(mFlags & PARTIALREAD);
+
+    // the byte count and the element count are independent fields in the file,
+    // so check that uncompressed data holds every element
+    // (the blosc path checks the decompressed size instead)
+    if (bloscCompressed != uint8_t(1) && mCompressedBytes < this->arrayMemUsage()) {
+        OPENVDB_THROW(IoError, "Attribute array data is smaller than the array size.");
+    }
+
+    const size_t bytesRead = mCompressedBytes;
     std::unique_ptr<char[]> buffer(new char[mCompressedBytes]);
     is.read(buffer.get(), mCompressedBytes);
     mCompressedBytes = 0;
@@ -1562,6 +1589,7 @@ TypedAttributeArray<ValueType_, Codec_>::readBuffers(std::istream& is)
 
         // decompress buffer
 
+        compression::bloscValidateCompressedBytes(buffer.get(), bytesRead);
         const size_t inBytes = this->dataSize() * sizeof(StorageType);
         std::unique_ptr<char[]> newBuffer = compression::bloscDecompress(buffer.get(), inBytes);
         if (newBuffer)  buffer.reset(newBuffer.release());
@@ -1584,6 +1612,10 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
 
     if (is.sizeOnly())
     {
+        // the paged buffer becomes the array data, so it must hold every element
+        if (mCompressedBytes < this->arrayMemUsage()) {
+            OPENVDB_THROW(IoError, "Attribute array data is smaller than the array size.");
+        }
         size_t compressedBytes(mCompressedBytes);
         mCompressedBytes = 0; // if not set to zero, mPageHandle will attempt to destroy invalid memory
         mFlags = static_cast<uint8_t>(mFlags & ~PARTIALREAD); // mark data read as having completed
