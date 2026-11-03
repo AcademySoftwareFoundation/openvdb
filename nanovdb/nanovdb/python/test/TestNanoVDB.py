@@ -339,6 +339,11 @@ class TestGridHandle(unittest.TestCase):
         self.assertFalse(nanovdb.GridHandle())
         self.assertTrue(nanovdb.tools.createLevelSetSphere(nanovdb.GridType.Float, 20))
 
+    def test_empty(self):
+        for name in ("empty", "isEmpty"):
+            self.assertTrue(getattr(nanovdb.GridHandle(), name)())
+            self.assertFalse(getattr(nanovdb.tools.createLevelSetSphere(nanovdb.GridType.Float, 20), name)())
+
 
 class TestGridHandleExchange(unittest.TestCase):
     def test_list_to_vector(self):

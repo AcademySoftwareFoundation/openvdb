@@ -326,8 +326,9 @@ public:
 
     //@{
     /// @brief Return true if this handle is empty, i.e. has no allocated memory
-    bool empty()   const { return mBuffer.size() == 0; }
-    bool isEmpty() const { return mBuffer.size() == 0; }
+    bool empty() const { return mBuffer.size() == 0; }
+    /// @deprecated Use GridHandle::empty, the spelling cuda::Buffer and the standard containers use.
+    [[deprecated("Use GridHandle::empty instead.")]] bool isEmpty() const { return this->empty(); }
     //@}
 
     /// @brief Return true if this handle is not empty, i.e. contains at least one grid
