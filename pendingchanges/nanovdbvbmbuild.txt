@@ -15,7 +15,16 @@ NanoVDB:
     build. Grids are described by VoxelBlockManagerBatchEntry records, read from a
     device array or produced by any device-callable entry source, so callers can derive
     them in the build kernel. Grids' block ranges may leave gaps between them.
+  - Documented the VoxelBlockManager's topology preconditions: an OnIndex grid's leaves
+    must each hold an active voxel and tile the value indices from 1 in leaf order, up
+    to at least the VBM's lastOffset. The default lastOffset is activeVoxelCount, which
+    also rules out active tiles. createNanoGrid meets them only with
+    includeStats and includeTiles off. The CPU and CUDA builders now share one per-leaf
+    routine, which asserts the preconditions in builds with assertions enabled.
   API Changes:
   - VoxelBlockManagerHandle gained an optional trailing leafCount constructor
     parameter and leafCount()/setLeafCount() accessors (defaulted; existing callers
     unaffected).
+  - Added tools::isVoxelBlockManagerCompatible, which checks a host-accessible
+    OnIndex grid against the VoxelBlockManager's topology preconditions, for the
+    whole grid or up to a given lastOffset.

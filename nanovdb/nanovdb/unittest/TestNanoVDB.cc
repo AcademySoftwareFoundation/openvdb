@@ -9922,6 +9922,61 @@ TEST_F(TestNanoVDB, VoxelBlockManager)
     }
 }// VoxelBlockManager
 
+TEST_F(TestNanoVDB, VoxelBlockManagerCompatible)
+{
+    using SrcGridT = nanovdb::tools::build::Grid<float>;
+    SrcGridT srcGrid(0.0f);
+    auto srcAcc = srcGrid.getAccessor();
+    const nanovdb::CoordBBox bbox = nanovdb::CoordBBox::createCube(125, 145);
+    for (auto it = bbox.begin(); it; it++)
+        srcAcc.setValue(*it, 1.0f);
+
+    // Leaves only, numbered from 1 without gaps: compatible.
+    auto handle = nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::ValueOnIndex>(srcGrid, 0u, false, false);
+    auto *grid = handle.grid<nanovdb::ValueOnIndex>();
+    ASSERT_TRUE(grid);
+    EXPECT_TRUE(nanovdb::tools::isVoxelBlockManagerCompatible(grid));
+
+    // The defaults index the internal nodes' stats ahead of the leaves.
+    auto defaultHandle = nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::ValueOnIndex>(srcGrid);
+    EXPECT_FALSE(nanovdb::tools::isVoxelBlockManagerCompatible(defaultHandle.grid<nanovdb::ValueOnIndex>()));
+
+    // Per-leaf stats leave a gap after each leaf.
+    auto statsHandle = nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::ValueOnIndex>(srcGrid, 0u, true, false);
+    EXPECT_FALSE(nanovdb::tools::isVoxelBlockManagerCompatible(statsHandle.grid<nanovdb::ValueOnIndex>()));
+
+    // Hand-made violations of a compatible grid.
+    auto *leaves = grid->tree().getFirstNode<0>();
+    const uint32_t leafCount = grid->tree().nodeCount(0);
+    ASSERT_GT(leafCount, 2u);
+
+    leaves[1].data()->mOffset += 1; // gap after leaf 0
+    EXPECT_FALSE(nanovdb::tools::isVoxelBlockManagerCompatible(grid));
+    leaves[1].data()->mOffset -= 1;
+    EXPECT_TRUE(nanovdb::tools::isVoxelBlockManagerCompatible(grid));
+
+    auto *last = leaves[leafCount - 1].data(); // empty leaf
+    last->mValueMask.setOff();
+    last->mPrefixSum = 0u;
+    EXPECT_FALSE(nanovdb::tools::isVoxelBlockManagerCompatible(grid));
+
+    // Active tiles have no leaf, so a VBM over the whole grid is out, but one that ends
+    // within the leaves is fine.
+    auto fog = nanovdb::tools::createFogVolumeSphere<float>(60.0, nanovdb::Vec3d(0), 1.0, 3.0);
+    auto fogHandle = nanovdb::tools::createNanoGrid<nanovdb::NanoGrid<float>, nanovdb::ValueOnIndex>(
+        *fog.grid<float>(), 0u, false, false);
+    auto *fogGrid = fogHandle.grid<nanovdb::ValueOnIndex>();
+    ASSERT_TRUE(fogGrid);
+    const auto *fogLast = fogGrid->tree().getFirstNode<0>() + (fogGrid->tree().nodeCount(0) - 1);
+    const uint64_t leafVoxels = fogLast->data()->firstOffset() + fogLast->data()->valueCount() - 1;
+    ASSERT_LT(leafVoxels, fogGrid->activeVoxelCount());
+    EXPECT_FALSE(nanovdb::tools::isVoxelBlockManagerCompatible(fogGrid));
+    EXPECT_TRUE(nanovdb::tools::isVoxelBlockManagerCompatible(fogGrid, leafVoxels));
+    EXPECT_FALSE(nanovdb::tools::isVoxelBlockManagerCompatible(fogGrid, leafVoxels + 1));
+    auto fogVbm = nanovdb::tools::buildVoxelBlockManager<7>(fogGrid, 1, leafVoxels);
+    EXPECT_EQ((leafVoxels + 127) / 128, fogVbm.blockCount());
+}// VoxelBlockManagerCompatible
+
 TEST_F(TestNanoVDB, GridHandleRejectsMalformedHostChain)
 {
     auto handle = nanovdb::tools::createLevelSetSphere<float>(20.0f, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");

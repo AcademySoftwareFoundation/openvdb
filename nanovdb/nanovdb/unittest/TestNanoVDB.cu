@@ -3442,6 +3442,7 @@ void testVoxelBlockManager()
     EXPECT_TRUE(hostHandle.data());
     auto grid = hostHandle.template grid<BuildT>();
     EXPECT_TRUE(grid);
+    EXPECT_TRUE(nanovdb::tools::isVoxelBlockManagerCompatible(grid));
     // Construct VBM structure
     auto vbmHandle = nanovdb::tools::cuda::buildVoxelBlockManager<Log2BlockWidth, BufferT>(
         deviceGrid);
@@ -3542,6 +3543,7 @@ void testVoxelBlockManagerBatch(bool gapped)
         const auto *grid = hostHandle.template grid<BuildT>();
         ASSERT_TRUE(grid);
         EXPECT_EQ(voxels.size(), grid->activeVoxelCount());
+        EXPECT_TRUE(nanovdb::tools::isVoxelBlockManagerCompatible(grid));
         entries[g].grid = handle.template deviceGrid<BuildT>();
         leafCount  += grid->tree().nodeCount(0);
         blockCount += (voxels.size() + BlockWidth - 1) / BlockWidth;

@@ -21,6 +21,21 @@
         voxel block, intended to be called once per block from a parallel loop.
       - nanovdb::util::shuffleDownMask: generic masked shuffle-down primitive
         used by the decode; a candidate for a future nanovdb/util/Algo.h.
+
+    \par Preconditions
+      The VBM addresses an OnIndex grid's active voxels by value index, so the
+      grid's leaves must tile the indices it covers in leaf order:
+      - every leaf holds at least one active voxel;
+      - leaf 0 starts at index 1, and each later leaf starts where the previous
+        one ends;
+      - the VBM's lastOffset is at most the last leaf's last index. The default
+        lastOffset is activeVoxelCount, so a VBM over the whole grid also needs
+        a grid without active tiles, whose voxels have no leaf.
+      tools::cuda::voxelsToGrid produces such grids. tools::createNanoGrid does
+      only with includeStats = false and includeTiles = false (both default to
+      true): indexed tiles precede the leaves, and per-leaf stats leave gaps
+      between them. isVoxelBlockManagerCompatible checks a host-accessible grid,
+      and builds with assertions enabled check each leaf.
 */
 
 
@@ -218,6 +233,27 @@ public:
 
 }; // VoxelBlockManagerHandle
 
+namespace detail {
+
+/// @brief True when leaf @c leafIndex meets the VoxelBlockManager's topology preconditions
+///        (see the file documentation) for a VBM ending at @c lastOffset: it holds an active
+///        voxel, its value indices continue the previous leaf's from 1, and the last leaf
+///        reaches lastOffset.
+__hostdev__ inline bool
+isLeafRangeContiguous(const NanoGrid<ValueOnIndex> *grid, uint32_t leafIndex, uint32_t leafCount,
+                      uint64_t lastOffset)
+{
+    const auto *leaf = grid->tree().getFirstNode<0>();
+    const uint64_t first = leaf[leafIndex].data()->firstOffset();
+    const uint64_t count = leaf[leafIndex].data()->valueCount();
+    if (!count) return false;
+    if (leafIndex == 0 && first != 1) return false;
+    if (leafIndex + 1 < leafCount) return leaf[leafIndex + 1].data()->firstOffset() == first + count;
+    return first + count - 1 >= lastOffset;
+}
+
+} // namespace detail
+
 // --------------------------> VoxelBlockManagerBase <----------------------------------------
 
 /// @brief Compile-time geometry parameters and output sentinels shared by the CPU
@@ -234,7 +270,72 @@ struct VoxelBlockManagerBase
     static constexpr uint32_t UnusedLeafIndex   = ~uint32_t{0};
     /// Sentinel written to voxelOffset slots with no active voxel in this block
     static constexpr uint16_t UnusedVoxelOffset = ~uint16_t{0};
+
+    /// @brief Record one leaf in the VBM covering [firstOffset, lastOffset]: the leaf becomes
+    ///        the firstLeafID of every block whose first slot it holds, and marks the jumpMap
+    ///        bit of the slot where it starts when that slot is not a block's first. Shared by
+    ///        the CPU and CUDA builders. Leaves write disjoint firstLeafID entries when the
+    ///        grid meets the preconditions; jumpMap words are shared, hence the atomic OR.
+    /// @param leafCount  Number of leaves in the grid; read only by the precondition assert
+    __hostdev__ static void
+    buildLeaf(
+        const NanoGrid<ValueOnIndex> *grid,
+        uint32_t leafIndex,
+        uint32_t leafCount,
+        uint64_t firstOffset,
+        uint64_t lastOffset,
+        uint64_t nBlocks,
+        uint32_t *firstLeafID,
+        uint64_t *jumpMap)
+    {
+        NANOVDB_ASSERT(detail::isLeafRangeContiguous(grid, leafIndex, leafCount, lastOffset));
+        (void)leafCount;
+
+        const auto& leaf = grid->tree().getFirstNode<0>()[leafIndex];
+        const uint64_t leafFirstOffset = leaf.data()->firstOffset();
+        const uint64_t leafValueCount = leaf.data()->valueCount();
+        const uint64_t leafLastOffset = leafFirstOffset + leafValueCount - 1;
+
+        if ( ( leafFirstOffset > lastOffset ) || (leafLastOffset < firstOffset) ) return;
+
+        uint64_t lastBlock = (leafLastOffset - firstOffset) >> Log2BlockWidth;
+        if (lastBlock > nBlocks - 1) lastBlock = nBlocks - 1;
+        const uint64_t firstBlock = (leafFirstOffset < firstOffset) ? 0 :
+            (leafFirstOffset - firstOffset) >> Log2BlockWidth;
+
+        // For all but the first block touched, mark the firstLeaf as being this one
+        for ( uint64_t b = lastBlock; b > firstBlock; --b )
+            firstLeafID[b] = leafIndex;
+        if (leafFirstOffset < firstOffset) { firstLeafID[0] = leafIndex; return; }
+
+        const uint64_t offsetInBlock = (leafFirstOffset - 1) & (BlockWidth - 1);
+        if ( !offsetInBlock ) {
+            // The leaf starts exactly at the beginning of a block: register it in firstLeafID
+            firstLeafID[firstBlock] = leafIndex;
+        } else {
+            // Otherwise mark it in the jumpMap, at word offsetInBlock / 64 and bit offsetInBlock % 64
+            util::atomicOr(&jumpMap[firstBlock * JumpMapLength + (offsetInBlock >> 6)],
+                           UINT64_C(1) << (offsetInBlock & 0x3f));
+        }
+    }
 }; // VoxelBlockManagerBase
+
+/// @brief Checks the VoxelBlockManager's topology preconditions (see the file documentation)
+///        on a host-accessible grid: sequential layout, no empty leaves, and leaf value indices
+///        that tile [1, lastOffset] or more in leaf order. Linear in the leaf count.
+/// @param lastOffset  Last value index the VBM covers; 0 (default) means activeVoxelCount,
+///                    the whole grid, as in buildVoxelBlockManager's default
+inline bool isVoxelBlockManagerCompatible(const NanoGrid<ValueOnIndex>* grid, uint64_t lastOffset = 0)
+{
+    if (!grid || !grid->isSequential()) return false;
+    if (!lastOffset) lastOffset = grid->tree().activeVoxelCount();
+    const uint32_t leafCount = grid->tree().nodeCount(0);
+    if (!leafCount) return lastOffset == 0;
+    for (uint32_t i = 0; i < leafCount; ++i) {
+        if (!detail::isLeafRangeContiguous(grid, i, leafCount, lastOffset)) return false;
+    }
+    return true;
+}
 
 // --------------------------> VoxelBlockManager (CPU) <--------------------------------------
 
@@ -353,14 +454,14 @@ struct VoxelBlockManager : VoxelBlockManagerBase<Log2BlockWidth>
 ///        and computes both metadata arrays, with no memory allocation.
 /// @tparam Log2BlockWidth Log2 of the number of active voxels per VBM block
 /// @tparam BufferT Buffer type of the handle (must provide host-accessible data())
-/// @param grid Host-accessible ValueOnIndex grid (must satisfy isSequential())
+/// @param grid Host-accessible ValueOnIndex grid; must be sequential and meet the
+///             Preconditions in the file documentation
 /// @param handle Pre-allocated handle whose blockCount/firstOffset/lastOffset are
 ///               already set to match the grid
 template<int Log2BlockWidth, typename BufferT>
 void buildVoxelBlockManager(const NanoGrid<ValueOnIndex>* grid, VoxelBlockManagerHandle<BufferT>& handle)
 {
     using Base = VoxelBlockManagerBase<Log2BlockWidth>;
-    constexpr auto BlockWidth    = Base::BlockWidth;
     constexpr auto JumpMapLength = Base::JumpMapLength;
 
     NANOVDB_ASSERT(grid->isSequential());
@@ -372,56 +473,26 @@ void buildVoxelBlockManager(const NanoGrid<ValueOnIndex>* grid, VoxelBlockManage
     const uint64_t firstOffset = handle.firstOffset();
     const uint64_t lastOffset = handle.lastOffset();
 
-    NANOVDB_ASSERT(!((firstOffset - 1) & (BlockWidth - 1))); // firstOffset == 1 (mod BlockWidth)
+    NANOVDB_ASSERT(!((firstOffset - 1) & (Base::BlockWidth - 1))); // firstOffset == 1 (mod BlockWidth)
 
     std::memset(jumpMap, 0, nBlocks * JumpMapLength * sizeof(uint64_t));
 
-    const auto &tree = grid->tree();
-    const auto *firstLeaf = tree.getFirstNode<0>();
-    const uint32_t leafCount = tree.nodeCount(0);
+    const uint32_t leafCount = grid->tree().nodeCount(0);
 
     util::forEach(0, leafCount, 1, [&](const util::Range1D& range) {
         for (auto leafIndex = range.begin(); leafIndex < range.end(); ++leafIndex) {
-            const auto& leaf = firstLeaf[leafIndex];
-            const uint64_t leafFirstOffset = leaf.data()->firstOffset();
-            const uint64_t leafValueCount = leaf.data()->valueCount();
-            const uint64_t leafLastOffset = leafFirstOffset + leafValueCount - 1;
-
-            if (leafFirstOffset > lastOffset || leafLastOffset < firstOffset) continue;
-
-            const uint64_t lastBlock = std::min<uint64_t>(
-                (leafLastOffset - firstOffset) >> Log2BlockWidth, nBlocks - 1);
-            const uint64_t firstBlock = (leafFirstOffset < firstOffset) ? 0 :
-                (leafFirstOffset - firstOffset) >> Log2BlockWidth;
-
-            // For blocks after firstBlock, this leaf is the first leaf of each
-            for (uint64_t b = lastBlock; b > firstBlock; --b)
-                firstLeafID[b] = static_cast<uint32_t>(leafIndex);
-
-            if (leafFirstOffset < firstOffset) {
-                firstLeafID[0] = static_cast<uint32_t>(leafIndex);
-                continue;
-            }
-
-            const uint64_t offsetInBlock = (leafFirstOffset - 1) & (BlockWidth - 1);
-            if (!offsetInBlock) {
-                // Leaf starts exactly at a block boundary: register in firstLeafID
-                firstLeafID[firstBlock] = static_cast<uint32_t>(leafIndex);
-            } else {
-                // Leaf starts in the interior of a block: mark in jumpMap with atomic OR
-                util::atomicOr(&jumpMap[firstBlock * JumpMapLength + (offsetInBlock >> 6)],
-                               uint64_t(1) << (offsetInBlock & 0x3f));
-            }
+            Base::buildLeaf(grid, static_cast<uint32_t>(leafIndex), leafCount,
+                            firstOffset, lastOffset, nBlocks, firstLeafID, jumpMap);
         }
     });
 }
 
 /// @brief Allocate buffers and build a VoxelBlockManager on the host from a
-///        ValueOnIndex grid. Uses nanovdb::util::forEach to process lower internal
-///        nodes in parallel.
+///        ValueOnIndex grid. Uses nanovdb::util::forEach to process leaves in parallel.
 /// @tparam Log2BlockWidth  Log2 of the number of active voxels per VBM block
 /// @tparam BufferT         Buffer type for the returned handle (default: HostBuffer)
-/// @param grid         Host-accessible ValueOnIndex grid (must satisfy isSequential())
+/// @param grid         Host-accessible ValueOnIndex grid; must be sequential and meet the
+///                     Preconditions in the file documentation
 /// @param firstOffset  First active-voxel offset covered by this VBM; must satisfy
 ///                     firstOffset == 1 (mod BlockWidth). Pass 0 (default) to use 1,
 ///                     which covers the full grid from the first active voxel.
