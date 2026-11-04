@@ -44,7 +44,6 @@
 #include <gtest/gtest.h>
 #include <algorithm>// for std::sort
 #include <cstring> // for std::memcpy
-#include <random>// for std::mt19937 in the batched voxelsToGrid tests
 #include <unordered_set>
 #include <iomanip> // for std::setw, std::setfill
 #include <random> // for std::mt19937, std::bernoulli_distribution
@@ -891,9 +890,10 @@ std::vector<uint8_t> downloadBytes(const nanovdb::GridHandle<BufferT> &handle)
     return bytes;
 }
 
-/// @brief Builds every set in one batched voxelsToGrid call, and through the voxel-set
-///        overload, and checks both byte for byte against one build per set merged with
-///        cuda::mergeGridHandles
+/// @brief Checks batched builds byte for byte against one build per set merged with
+///        cuda::mergeGridHandles: the offsets overload with every set, the offsets overload
+///        with the whole list as one grid, and the voxel-set overload with a different voxel
+///        size per set over Coord, Vec3f and fancy pointers
 template<typename BuildT>
 void testVoxelsToGridBatch()
 {
@@ -905,35 +905,62 @@ void testVoxelsToGridBatch()
         voxels.insert(voxels.end(), s.begin(), s.end());
         offsets.push_back(voxels.size());
     }
+    std::vector<nanovdb::Vec3f> points;// inside each voxel, so building from them rounds back to it
+    for (auto &v : voxels) points.emplace_back(v[0] + 0.3f, v[1] - 0.4f, v[2] + 0.1f);
+    const std::vector<uint64_t> wholeOffsets{0u, voxels.size()};
+
     const cudaStream_t stream = 0;
     nanovdb::cuda::Buffer<nanovdb::Coord> voxelBuffer(stream, voxels.size(), nanovdb::cuda::noInit);
+    nanovdb::cuda::Buffer<nanovdb::Vec3f> pointBuffer(stream, points.size(), nanovdb::cuda::noInit);
     nanovdb::cuda::Buffer<uint64_t> offsetBuffer(stream, offsets.size(), nanovdb::cuda::noInit);
+    nanovdb::cuda::Buffer<uint64_t> wholeOffsetBuffer(stream, wholeOffsets.size(), nanovdb::cuda::noInit);
     auto *d_voxels = voxelBuffer.data();
+    auto *d_points = pointBuffer.data();
     auto *d_offsets = offsetBuffer.data();
     ASSERT_EQ(cudaSuccess, cudaMemcpy(d_voxels, voxels.data(), voxels.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_points, points.data(), points.size() * sizeof(nanovdb::Vec3f), cudaMemcpyHostToDevice));
     ASSERT_EQ(cudaSuccess, cudaMemcpy(d_offsets, offsets.data(), offsets.size() * sizeof(uint64_t), cudaMemcpyHostToDevice));
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(wholeOffsetBuffer.data(), wholeOffsets.data(), wholeOffsets.size() * sizeof(uint64_t), cudaMemcpyHostToDevice));
     const uint32_t gridCount = static_cast<uint32_t>(sets.size());
 
-    std::vector<nanovdb::GridHandle<BufferT>> singles;
-    std::vector<std::tuple<const nanovdb::Coord* const, size_t, double>> voxelSets;
+    auto voxelSize = [](uint32_t g) { return 0.5 + 0.25 * g; };
+    std::vector<nanovdb::GridHandle<BufferT>> singles, scaled;
+    std::vector<std::tuple<const nanovdb::Coord* const, size_t, double>> coordSets;
+    std::vector<std::tuple<const nanovdb::Vec3f* const, size_t, double>> pointSets;
+    std::vector<std::tuple<const nanovdb::fancy_ptr<nanovdb::Coord>, size_t, double>> fancySets;
     for (uint32_t g = 0; g < gridCount; ++g) {
-        singles.push_back(nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_voxels + offsets[g], sets[g].size(), 1.0, stream));
-        voxelSets.emplace_back(d_voxels + offsets[g], sets[g].size(), 1.0);
+        const size_t count = sets[g].size();
+        singles.push_back(nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_voxels + offsets[g], count, 1.0, stream));
+        scaled.push_back(nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_voxels + offsets[g], count, voxelSize(g), stream));
+        coordSets.emplace_back(d_voxels + offsets[g], count, voxelSize(g));
+        pointSets.emplace_back(d_points + offsets[g], count, voxelSize(g));
+        fancySets.emplace_back(nanovdb::make_fancy(d_voxels + offsets[g]), count, voxelSize(g));
     }
     const BufferT proto(stream, nanovdb::cuda::default_resource<nanovdb::cuda::DeviceResource>(), 0, nanovdb::cuda::noInit);
     auto merged = nanovdb::cuda::mergeGridHandles<BufferT, std::vector>(singles, stream, &proto);
+    auto mergedScaled = nanovdb::cuda::mergeGridHandles<BufferT, std::vector>(scaled, stream, &proto);
+    auto whole = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_voxels, voxels.size(), 1.0, stream);
+
     auto batched = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_voxels, voxels.size(), d_offsets, gridCount, 1.0, stream);
-    auto fromSets = nanovdb::tools::cuda::voxelsToGrid<BuildT, const nanovdb::Coord*>(voxelSets, stream);
+    auto batchOfOne = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_voxels, voxels.size(), wholeOffsetBuffer.data(), 1, 1.0, stream);
+    auto fromCoords = nanovdb::tools::cuda::voxelsToGrid<BuildT, const nanovdb::Coord*>(coordSets, stream);
+    auto fromPoints = nanovdb::tools::cuda::voxelsToGrid<BuildT, const nanovdb::Vec3f*>(pointSets, stream);
+    auto fromFancy  = nanovdb::tools::cuda::voxelsToGrid<BuildT, nanovdb::fancy_ptr<nanovdb::Coord>>(fancySets, stream);
 
     ASSERT_EQ(gridCount, batched.gridCount());
-    ASSERT_EQ(gridCount, fromSets.gridCount());
+    ASSERT_EQ(gridCount, fromCoords.gridCount());
+    ASSERT_EQ(1u, batchOfOne.gridCount());
     for (uint32_t g = 0; g < gridCount; ++g) {
         EXPECT_EQ(merged.gridSize(g), batched.gridSize(g));
         EXPECT_EQ(merged.gridType(g), batched.gridType(g));
     }
-    const auto expected = downloadBytes(merged);
-    EXPECT_TRUE(expected == downloadBytes(batched));
-    EXPECT_TRUE(expected == downloadBytes(fromSets));
+    EXPECT_TRUE(downloadBytes(merged) == downloadBytes(batched));
+    EXPECT_TRUE(downloadBytes(whole) == downloadBytes(batchOfOne));
+    const auto expectedScaled = downloadBytes(mergedScaled);
+    EXPECT_TRUE(expectedScaled != downloadBytes(merged));// the voxel sizes reach the output
+    EXPECT_TRUE(expectedScaled == downloadBytes(fromCoords));
+    EXPECT_TRUE(expectedScaled == downloadBytes(fromPoints));
+    EXPECT_TRUE(expectedScaled == downloadBytes(fromFancy));
 }
 
 }// anonymous namespace
@@ -987,6 +1014,17 @@ TEST(TestNanoVDBCUDA, voxelsToGridBatchBadOffsets)
     EXPECT_THROW(build({0, 4, 3}), std::invalid_argument);// decreasing, and out of range in between
     EXPECT_THROW(nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex>(d_voxels, voxels.size(), d_offsets, 2, -1.0, stream),
                  std::invalid_argument);
+
+    auto buildEmpty = [&](std::vector<uint64_t> offsets) {
+        EXPECT_EQ(cudaSuccess, cudaMemcpy(d_offsets, offsets.data(), offsets.size() * sizeof(uint64_t), cudaMemcpyHostToDevice));
+        return nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex>(d_voxels, 0, d_offsets, 2, 1.0, stream);
+    };
+    EXPECT_NO_THROW(buildEmpty({0, 0, 0}));
+    EXPECT_THROW(buildEmpty({0, 5, 0}), std::invalid_argument);// checked without voxels too
+    EXPECT_THROW(nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex>(d_voxels, voxels.size(), static_cast<const uint64_t*>(nullptr), 2, 1.0, stream),
+                 std::invalid_argument);// null offsets
+    EXPECT_THROW(nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex>(d_voxels, voxels.size(), d_offsets, 0, 1.0, stream),
+                 std::invalid_argument);// voxels but no grids
 }// voxelsToGridBatchBadOffsets
 TEST(TestNanoVDBCUDA, mergePointGridsAligned)
 {

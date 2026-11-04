@@ -175,7 +175,7 @@ voxelsToGrid(const std::vector<std::tuple<const PtrT, size_t, double>> &pointSet
 /// @param voxelSize Size of a voxel in world units, shared by every grid
 /// @param buffer Instance of the device buffer used for memory allocation
 /// @return Returns a handle with @c gridCount grids of type NanoGrid<BuildT>
-/// @note A grid without voxels is a valid empty grid, and @c gridCount == 0 yields an empty handle.
+/// @note A grid without voxels is a valid empty grid, and @c gridCount == 0 with @c voxelCount == 0 yields an empty handle.
 /// @throw std::invalid_argument if the voxel size is not positive and finite, or the offsets are not as described
 template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::Buffer<std::byte>, typename ResourceT = nanovdb::cuda::DeviceResource>
 nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
@@ -423,6 +423,18 @@ struct PointsToGridData {
     __hostdev__ GridBlindMetaData& getMeta() const { return *util::PtrAdd<GridBlindMetaData>(d_bufferPtr, meta);};
      template<typename Vec3T>
     __hostdev__ Vec3T& getPoint(int i) const {return *(util::PtrAdd<Vec3T>(d_bufferPtr, blind)+i);}
+
+    /// @brief Sets the byte offsets of the grid, tree, root and nodes from nodeCount.
+    ///        @c meta ends up where the leaf nodes end.
+    __hostdev__ void setNodeOffsets() {
+        grid  = 0;// grid is always stored at the start of the buffer!
+        tree  = NanoGrid<BuildT>::memUsage(); // grid ends and tree begins
+        root  = tree  + NanoTree<BuildT>::memUsage(); // tree ends and root node begins
+        upper = root  + NanoRoot<BuildT>::memUsage(nodeCount[2]); // root node ends and upper internal nodes begin
+        lower = upper + NanoUpper<BuildT>::memUsage()*nodeCount[2]; // upper internal nodes ends and lower internal nodes begin
+        leaf  = lower + NanoLower<BuildT>::memUsage()*nodeCount[1]; // lower internal nodes ends and leaf nodes begin
+        meta  = leaf  + NanoLeaf<BuildT>::DataType::memUsage()*nodeCount[0];// leaf nodes end and blind meta data begins
+    }
 };// PointsToGridData
 
 
@@ -619,6 +631,24 @@ private:
     BufferT getBuffer(const PtrT points, size_t pointCount, const BufferT &buffer);
 };// tools::cuda::PointsToGrid<BuildT, ResourceT>
 
+namespace detail {
+
+/// @brief Packs the running active-voxel counts of @a leaf's first seven mask words
+///        into its mPrefixSum, 9 bits each
+template<typename LeafT>
+__device__ inline void setLeafPrefixSum(LeafT &leaf)
+{
+    const uint64_t *w = leaf.mValueMask.words();
+    uint64_t sum = util::countOn(*w++), prefixSum = sum;
+    for (int n = 9; n < 55; n += 9) {// n=i*9 where i=1,2,..6
+        sum += util::countOn(*w++);
+        prefixSum |= sum << n;// each pre-fixed sum is encoded in 9 bits
+    }
+    leaf.mPrefixSum = prefixSum;
+}
+
+}// namespace detail
+
 namespace kernels {
 /// @details Used by cuda::PointsToGrid<BuildT, ResourceT>::processLeafNodes before the computation
 /// of prefix-sum for index grid.
@@ -647,13 +677,7 @@ __global__ void leafPrefixSumKernel(const size_t numItems, unsigned int offset, 
 
     auto &leaf = d_data->getLeaf(tid + offset);
     leaf.mOffset = 1u;// will be re-set below
-    const uint64_t *w = leaf.mValueMask.words();
-    uint64_t &prefixSum = leaf.mPrefixSum, sum = util::countOn(*w++);
-    prefixSum = sum;
-    for (int n = 9; n < 55; n += 9) {// n=i*9 where i=1,2,..6
-        sum += util::countOn(*w++);
-        prefixSum |= sum << n;// each pre-fixed sum is encoded in 9 bits
-    }
+    detail::setLeafPrefixSum(leaf);
     if ((tid + offset) == 0) {
         d_data->getGrid().mData1 = 1u + devValueIndexPrefix[d_data->nodeCount[0]-1];// set total count
         d_data->getTree().mVoxelCount = devValueIndexPrefix[d_data->nodeCount[0]-1];
@@ -1053,13 +1077,7 @@ inline BufferT PointsToGrid<BuildT, ResourceT>::getBuffer(const PtrT, size_t poi
         }
     };
 
-    mData.grid  = 0;// grid is always stored at the start of the buffer!
-    mData.tree  = NanoGrid<BuildT>::memUsage(); // grid ends and tree begins
-    mData.root  = mData.tree  + NanoTree<BuildT>::memUsage(); // tree ends and root node begins
-    mData.upper = mData.root  + NanoRoot<BuildT>::memUsage(mData.nodeCount[2]); // root node ends and upper internal nodes begin
-    mData.lower = mData.upper + NanoUpper<BuildT>::memUsage()*mData.nodeCount[2]; // upper internal nodes ends and lower internal nodes begin
-    mData.leaf  = mData.lower + NanoLower<BuildT>::memUsage()*mData.nodeCount[1]; // lower internal nodes ends and leaf nodes begin
-    mData.meta  = mData.leaf  + NanoLeaf<BuildT>::DataType::memUsage()*mData.nodeCount[0];// leaf nodes end and blind meta data begins
+    mData.setNodeOffsets();
     mData.blind = mData.meta  + sizeof(GridBlindMetaData)*int( mPointType!=PointType::Disable ); // meta data ends and blind data begins
     // padded like GridBlindMetaData::blindDataSize, so the grid size stays a multiple of
     // NANOVDB_DATA_ALIGNMENT and the next grid in a multi-grid buffer starts aligned
@@ -1747,13 +1765,7 @@ struct BatchLeafPrefixSumFunctor {
         const uint64_t first = leafStarts[g], base = first ? prefix[first - 1] : 0u;
         auto &data = d_data[g];
         auto &leaf = data.getLeaf(tid - first);
-        const uint64_t *w = leaf.mValueMask.words();
-        uint64_t &prefixSum = leaf.mPrefixSum, sum = util::countOn(*w++);
-        prefixSum = sum;
-        for (int n = 9; n < 55; n += 9) {// n=i*9 where i=1,2,..6
-            sum += util::countOn(*w++);
-            prefixSum |= sum << n;// each pre-fixed sum is encoded in 9 bits
-        }
+        setLeafPrefixSum(leaf);
         if (tid == first) {
             const uint64_t voxelCount = prefix[first + data.nodeCount[0] - 1] - base;
             data.getGrid().mData1 = 1u + voxelCount;// set total count
@@ -1905,15 +1917,15 @@ void VoxelsToGridBatch<BuildT, ResourceT>::countNodes(const PtrT voxels, size_t 
         indxScratch.destroy();
         indx.destroy();
 
-        // One readback: every grid's node and voxel counts, and the offsets that delimit the grids
+        // Every grid's node and voxel counts, read back together with the offsets below
         BufT<detail::NodeCounts> countsScratch(mStream, this->ref(), gridCount, nanovdb::cuda::noInit);
         const auto segmentBegin = ::cuda::make_transform_iterator(::cuda::make_counting_iterator<uint32_t>(0), detail::ClampedOffset{d_offsets, pointCount});
         CALL_CUBS(DeviceSegmentedReduce::Reduce, ::cuda::make_transform_iterator(pointIndex, detail::NodeStarts{d_keys}), countsScratch.data(),
                   gridCount, segmentBegin, segmentBegin + 1, detail::SumNodeCounts(), detail::NodeCounts{0u, 0u, 0u, 0u});
         cudaCheck(cudaMemcpyAsync(counts.data(), countsScratch.data(), gridCount * sizeof(detail::NodeCounts), cudaMemcpyDeviceToHost, mStream));
-        cudaCheck(cudaMemcpyAsync(offsets.data(), d_offsets, (gridCount + 1u) * sizeof(uint64_t), cudaMemcpyDeviceToHost, mStream));
-        cudaCheck(cudaStreamSynchronize(mStream));
     }
+    cudaCheck(cudaMemcpyAsync(offsets.data(), d_offsets, (gridCount + 1u) * sizeof(uint64_t), cudaMemcpyDeviceToHost, mStream));
+    cudaCheck(cudaStreamSynchronize(mStream));
     if (offsets[0] != 0u || offsets[gridCount] != voxelCount)
         throw std::invalid_argument("VoxelsToGridBatch: the offsets must run from 0 to the voxel count");
     for (uint32_t g = 0; g < gridCount; ++g) {
@@ -1981,13 +1993,7 @@ BufferT VoxelsToGridBatch<BuildT, ResourceT>::getBuffer(const BufferT &pool, std
     uint64_t size = 0u;
     for (uint32_t g = 0; g < mGridCount; ++g) {// each grid laid out as PointsToGrid::getBuffer lays out a grid without points
         auto &data = mData[g];
-        data.grid  = 0;
-        data.tree  = NanoGrid<BuildT>::memUsage();
-        data.root  = data.tree  + NanoTree<BuildT>::memUsage();
-        data.upper = data.root  + NanoRoot<BuildT>::memUsage(data.nodeCount[2]);
-        data.lower = data.upper + NanoUpper<BuildT>::memUsage()*data.nodeCount[2];
-        data.leaf  = data.lower + NanoLower<BuildT>::memUsage()*data.nodeCount[1];
-        data.meta  = data.leaf  + NanoLeaf<BuildT>::DataType::memUsage()*data.nodeCount[0];
+        data.setNodeOffsets();
         data.blind = data.meta;
         data.size  = data.blind;
         meta[g] = GridHandleMetaData{size, data.size, toGridType<BuildT>()};
@@ -2007,6 +2013,7 @@ template<typename BuildT, typename ResourceT>
 template<typename PtrT, typename BufferT>
 GridHandle<BufferT> VoxelsToGridBatch<BuildT, ResourceT>::getHandle(const PtrT voxels, size_t voxelCount, const uint64_t *d_offsets, const BufferT &pool)
 {
+    if (d_offsets == nullptr) throw std::invalid_argument("VoxelsToGridBatch: the offsets are null");
     this->countNodes(voxels, voxelCount, d_offsets);
     std::vector<GridHandleMetaData> meta;
     auto buffer = this->getBuffer(pool, meta);
@@ -2194,7 +2201,10 @@ voxelsToGrid(const PtrT d_ijk, size_t voxelCount, const uint64_t *d_offsets, uin
     static_assert(!std::is_arithmetic<BufferT>::value && !std::is_null_pointer<BufferT>::value,
                   "voxelsToGrid: pass a cudaStream_t, e.g. cudaStream_t(0), to select the resource form");
     const Map map(detail::checkVoxelSize(voxelSize, "voxelsToGrid"), Vec3d(0.0));
-    if (gridCount == 0) return detail::mergeBuiltHandles(std::vector<GridHandle<BufferT>>(), buffer, stream);
+    if (gridCount == 0) {
+        if (voxelCount != 0) throw std::invalid_argument("voxelsToGrid: voxels were given but no grids");
+        return detail::mergeBuiltHandles(std::vector<GridHandle<BufferT>>(), buffer, stream);
+    }
     VoxelsToGridBatch<BuildT, ResourceT> builder(std::vector<Map>(gridCount, map), stream);
     return builder.getHandle(d_ijk, voxelCount, d_offsets, buffer);
 }
@@ -2286,7 +2296,10 @@ voxelsToGrid(const PtrT d_ijk, size_t voxelCount, const uint64_t *d_offsets, uin
     using BufferT = nanovdb::cuda::Buffer<std::byte, ResourceT>;
     const BufferT proto(stream, resource, 0, nanovdb::cuda::noInit);
     const Map map(detail::checkVoxelSize(voxelSize, "voxelsToGrid"), Vec3d(0.0));
-    if (gridCount == 0) return detail::mergeBuiltHandles(std::vector<GridHandle<BufferT>>(), proto, stream);
+    if (gridCount == 0) {
+        if (voxelCount != 0) throw std::invalid_argument("voxelsToGrid: voxels were given but no grids");
+        return detail::mergeBuiltHandles(std::vector<GridHandle<BufferT>>(), proto, stream);
+    }
     VoxelsToGridBatch<BuildT, ResourceT> builder(std::vector<Map>(gridCount, map), stream, resource);
     return builder.getHandle(d_ijk, voxelCount, d_offsets, proto);
 }
