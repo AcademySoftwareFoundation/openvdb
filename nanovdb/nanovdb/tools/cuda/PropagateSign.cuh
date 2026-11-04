@@ -240,6 +240,8 @@ namespace floodfill::detail {
 // The reference result is a flood fill at voxel resolution from the active voxels with a negative SDF value,
 // through face-adjacent inactive voxels, stopped by the other active voxels. The inactive voxels it reaches are
 // marked in the invert masks: the background value there is the negative of the one in slot 0 of the sidecar.
+// The locations it covers, its seeds and the inactive voxels it reaches, are the interior (by preconditions 2 and 3,
+// the bounded side of the zero crossing); a childless slot of a lower or upper node is interior if its voxels are.
 // Under preconditions 1-4 the fill can be done node by node, finest level first:
 // - A leaf's fill is exact on its own: a marked region within a leaf borders only negative voxels (2) and is not
 //   the whole leaf (1), so it touches a negative voxel of that leaf.
@@ -311,12 +313,20 @@ __hostdev__ uint32_t facesWithOnSlots(const util::morphology::Mask2D<LOG2DIM>& s
 
 // Seeding coarser levels across node faces.
 //
-// Each face of a filled node that has an inside slot seeds the region across that face, if that region is
-// a childless slot of a coarser level: a lower or upper slot, or a root-tile position. Pushing seeds from
-// the filled nodes (scatter), rather than having every childless slot look at its neighbors (gather),
-// keeps the work proportional to the filled nodes: most childless slots touch no node, and one childless
-// slot can border many finer nodes. One probe per face suffices: nodes are aligned to their size, so the
-// block of the same size across a face lies inside a single slot of every coarser level.
+// Trigger: a face of a filled node that holds an interior slot, meaning either
+// - an active voxel with a negative SDF value (leaves only; its invert bit is off), or
+// - a slot marked in the node's invert mask by its fill.
+// Any one interior slot on the face triggers it.
+//
+// Outcome: the coordinate across a trigger face (the node's origin, shifted by the node's size) is looked up in the
+// tree. If the lookup ends at a level coarser than the node's, it ends at a slot without a child, and that slot is
+// marked:
+// - in an upper or lower node: its bit in the upper or lower masks, from which that level's fill starts.
+// - at the root, where the lookup ends because there is no root-table entry: face bit f in the root seed word of the
+//   node's own root-table entry, from which stage 4 starts.
+// If the lookup instead reaches a node of the seeding node's level, nothing is marked: that node is filled on its own.
+// Any coordinate of the node-sized block across the face gives the same result, since nodes are aligned to their
+// size, so one lookup per face suffices.
 
 /// @brief The coordinate @a distance away from @a origin across @a face.
 __device__ inline nanovdb::Coord faceNeighbor(nanovdb::Coord origin, Face face, int distance)
@@ -332,15 +342,11 @@ __device__ inline nanovdb::Coord faceNeighbor(nanovdb::Coord origin, Face face, 
     }
 }
 
-/// @brief Seeds the region across @a face of the Level node at @a origin if it is a childless slot of a coarser
-///        level. The tree is descended toward the block across the face, and the seed goes where the descent ends:
-///        - at the root, which has no entry there: an absent root-tile position, recorded as bit @a face of the
-///          @a rootFaceSeeds word of the root-table entry that holds the node. The node lies in that entry's
-///          upper node, so a face of the node that borders another root tile lies on the same face of the upper
-///          node, and the position across it is the entry's neighbor across that face.
-///        - at an upper or lower node without a child there: that slot's bit in @a upperMasks or @a lowerMasks.
-///        A descent that reaches a node of the seeding node's level seeds nothing. Many nodes may set the same
-///        bit, and the nodes of one root-table entry set bits of the same word, so every bit is set atomically.
+/// @brief Seeds across @a face of the Level node at @a origin (see the outcome above). The tree is descended toward
+///        the block across the face, until the lookup ends or reaches a node of the seeding node's level. At the root,
+///        the lookup can leave the node's upper node only across the same face of the upper node, so bit @a face of
+///        the node's own root-table entry stands for the region across it. Bits are set atomically: many nodes may
+///        set the same bit, and the nodes of one root-table entry share its word.
 template <typename BuildT, int Level>
 __device__ inline void seedAcrossFace(const NanoGrid<BuildT>& grid, const nanovdb::Coord& origin, Face face,
                                       nanovdb::Mask<4>* lowerMasks, nanovdb::Mask<5>* upperMasks,
@@ -351,30 +357,30 @@ __device__ inline void seedAcrossFace(const NanoGrid<BuildT>& grid, const nanovd
     const nanovdb::Coord ijk = faceNeighbor(origin, face, NanoNode<BuildT, Level>::type::DIM);
 
     const auto* tile = root.probeTile(ijk);
-    if (!tile) { // ends at the root: an absent root-tile position
+    if (!tile) { // the lookup ends at the root: no root-table entry there
         const auto* ownTile = root.probeTile(origin); // the seeding node's own entry, which always exists
         NANOVDB_ASSERT(ownTile);
         atomicOr(&rootFaceSeeds[ownTile - root.tile(0)], 1u << face);
         return;
     }
     NANOVDB_ASSERT(tile->isChild()); // precondition 4, checked by initializeMasks(): no root value tiles
-    if (uint32_t(Level) == NanoUpper<BuildT>::LEVEL) return; // an upper node across: our own level, which fills itself
+    if (uint32_t(Level) == NanoUpper<BuildT>::LEVEL) return; // reaches an upper node: our own level
 
     const auto* upper = root.getChild(tile);
     const auto* lower = upper->probeChild(ijk);
-    if (!lower) { // ends at an upper node: a childless upper slot
+    if (!lower) { // ends at an upper slot without a child
         upperMasks[upper - tree.template getFirstNode<2>()].setOnAtomic(NanoUpper<BuildT>::CoordToOffset(ijk));
         return;
     }
-    if (uint32_t(Level) == NanoLower<BuildT>::LEVEL) return; // a lower node across: our own level, which fills itself
+    if (uint32_t(Level) == NanoLower<BuildT>::LEVEL) return; // reaches a lower node: our own level
 
     const uint32_t slot = NanoLower<BuildT>::CoordToOffset(ijk);
-    if (!lower->childMask().isOn(slot)) // ends at a lower node: a childless lower slot
+    if (!lower->childMask().isOn(slot)) // ends at a lower slot without a child
         lowerMasks[lower - tree.template getFirstNode<1>()].setOnAtomic(slot);
 }
 
 /// @brief Fills one leaf (Level 0), lower (1) or upper (2) node, one warp per node, stores its invert mask in
-///        @a masks, then seeds the childless slots of coarser levels across the node's inside faces.
+///        @a masks, then seeds across the node's trigger faces (see seedAcrossFace).
 ///        Warp-collective: all 32 lanes of a warp call it together, and lane x holds x-slice x of the node.
 template <typename BuildT, typename ValueT, int Level>
 struct BitFloodFunctor
@@ -403,7 +409,7 @@ struct BitFloodFunctor
         // upper node. The other lanes hold empty slices, and take part only in the warp's collective operations.
         const bool  hasSlice = x < Dim;
 
-        // Interior starts as the seeds; open slots are those the interior may spread into.
+        // The interior starts as the seeds; open slots are those the fill may spread into.
         SliceT interior{}, open{};
         if constexpr (Level == 0) {
             // Leaf: seeds are active voxels with a negative SDF value; inactive voxels are open.
@@ -413,21 +419,20 @@ struct BitFloodFunctor
                 open.toggle();
             }
         } else if (hasSlice) {
-            // Lower/upper: seeds were written into masks by the finer level; childless slots are open.
+            // Lower/upper: seeds were marked in masks by finer levels (seedAcrossFace); childless slots are open.
             open = SliceT::load(node.childMask(), x);
             open.toggle();
             interior = SliceT::load(masks[nodeID], x) & open;
         }
 
-        // Each sweep adds the open face neighbors of the previous interior. A sweep that changes nothing ends
+        // Each sweep adds the open face neighbors of the interior slots so far. A sweep that changes nothing ends
         // the fill; any other sweep adds at least one slot, so SlotCount + 1 sweeps suffice for any input.
-        // Under preconditions 1 and 2 (see PropagateSign), a Manhattan-shortest walk from an inside open slot to
-        // the nearest wall (in the Manhattan metric) crosses only inside open slots, since any wall on it would be
-        // nearer, and ends on a seed: the wall itself in a leaf (a voxel with a negative SDF value), the slot just
-        // before it in a lower or upper node (seeded across the child's face, see the stage comment above).
-        // So no slot is farther from a seed than the node's Manhattan diameter, 3 * (Dim - 1): at most that
-        // many sweeps turn slots on in a leaf, one fewer in a lower or upper node, and one more sweep changes
-        // nothing: MaxSweeps, i.e. 22, 45 and 93.
+        // Under preconditions 1 and 2 (see PropagateSign), a Manhattan-shortest walk from an interior open slot to the
+        // nearest wall crosses only interior open slots, since any wall on it would be nearer, and ends on a seed: the
+        // wall itself in a leaf (an active voxel with a negative SDF value), or the slot just before it in a lower or
+        // upper node (seeded across the child's face, see seedAcrossFace). So no slot is farther from a seed than the
+        // node's Manhattan diameter, 3 * (Dim - 1): at most that many sweeps turn slots on in a leaf, one fewer in a
+        // lower or upper node, and one more sweep changes nothing: MaxSweeps, i.e. 22, 45 and 93.
         int sweep = 0;
         for (; sweep <= SlotCount; ++sweep) {
             SliceT neighbors{};
@@ -437,28 +442,27 @@ struct BitFloodFunctor
             util::morphology::cuda::MaskShift< 0,  1,  0>(interior, neighbors);
             util::morphology::cuda::MaskShift< 0,  0, -1>(interior, neighbors);
             util::morphology::cuda::MaskShift< 0,  0,  1>(interior, neighbors);
-            // Only open slots are entered, so active voxels keep their start: seeds, or walls if nonnegative. A
-            // leaf's seeds may spread into any open neighbor by precondition 2: no voxel with a negative SDF value
-            // is face-adjacent to an inactive outside voxel. Beyond that, face-adjacent open slots share a label.
+            // Only open slots are entered, so active voxels keep their start: seeds if negative, walls otherwise.
+            // By precondition 2, the face-connected open slots around a seed are all interior.
             const SliceT next = interior | (open & neighbors);
             if (!__any_sync(0xFFFFFFFFu, next != interior)) break;
             interior = next;
         }
         NANOVDB_ASSERT(sweep < MaxSweeps); // the input breaks preconditions 1 or 2
 
-        // The invert mask holds only the open inside slots: a leaf's inside active voxels take their own
-        // values, so their bits are off (in lower and upper nodes the interior is already within open). The
-        // face seeding below still uses the whole interior, since a face of inside active voxels seeds too.
+        // The invert mask holds only the open interior slots: a leaf's interior active voxels take their own
+        // values, so their bits are off (in lower and upper nodes all interior slots are open). The face test below
+        // still uses all of them, since any interior slot triggers a face (see seedAcrossFace).
         if (hasSlice) (interior & open).store(masks[nodeID], x);
 
-        // Bit f is set if face f holds an inside slot. Each lane first finds the faces on which its own slice
-        // has an inside slot; the xor-shuffle butterfly then ORs these sets over all 32 lanes, so every lane
-        // ends up with the set for the whole node.
-        uint32_t faceHasInside = facesWithOnSlots(interior, x);
-        for (int offset = 16; offset > 0; offset >>= 1) faceHasInside |= __shfl_xor_sync(0xFFFFFFFFu, faceHasInside, offset);
+        // Bit f is set if face f is triggered: it holds an interior slot. Each lane first finds the faces on which
+        // its own slice has one; the xor-shuffle butterfly then ORs these sets over all 32 lanes, so every lane ends
+        // up with the set for the whole node.
+        uint32_t triggerFaces = facesWithOnSlots(interior, x);
+        for (int offset = 16; offset > 0; offset >>= 1) triggerFaces |= __shfl_xor_sync(0xFFFFFFFFu, triggerFaces, offset);
 
-        // Lane f seeds across face f if that face has an inside slot.
-        if (x < faceCount && ((faceHasInside >> x) & 1u))
+        // Lane f seeds across face f if it is triggered.
+        if (x < faceCount && ((triggerFaces >> x) & 1u))
             seedAcrossFace<BuildT, Level>(*grid, node.origin(), Face(x), lowerMasks, upperMasks, rootFaceSeeds);
     }
 }; // BitFloodFunctor
