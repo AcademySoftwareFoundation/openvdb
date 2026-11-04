@@ -886,7 +886,7 @@ void DistributedPointsToGrid<BuildT, ResourceT>::countNodes(const PtrT coords, s
                 CUB_LAUNCH(DeviceRunLengthEncode::Encode, mTempDevicePools[deviceId], stream, deviceOutputKeys, deviceInputKeys, devicePointsPerVoxel, mVoxelCounts + deviceId, mStripeCounts[deviceId]);
                 cudaCheck(cudaEventRecord(voxelCountEvents[deviceId], stream));
 
-                CUB_LAUNCH(DeviceRunLengthEncode::Encode, mTempDevicePools[deviceId], stream, thrust::make_transform_iterator(deviceOutputKeys, ShiftRight<9>()), deviceInputKeys, devicePointsPerLeaf, deviceNodeCount(deviceId), mStripeCounts[deviceId]);
+                CUB_LAUNCH(DeviceRunLengthEncode::Encode, mTempDevicePools[deviceId], stream, ::cuda::make_transform_iterator(deviceOutputKeys, ShiftRight<9>()), deviceInputKeys, devicePointsPerLeaf, deviceNodeCount(deviceId), mStripeCounts[deviceId]);
                 cudaCheck(cudaEventRecord(leafCountEvents[deviceId], stream));
             } else {
                 cudaCheck(cudaMemsetAsync(mVoxelCounts + deviceId, 0, sizeof(uint32_t), stream));
@@ -921,7 +921,7 @@ void DistributedPointsToGrid<BuildT, ResourceT>::countNodes(const PtrT coords, s
         uint64_t* deviceOutputKeys = mData->d_keys + mStripeOffsets[deviceId];
 
         if (mStripeCounts[deviceId]) {
-            CUB_LAUNCH(DeviceSelect::Unique, mTempDevicePools[deviceId], stream, thrust::make_transform_iterator(deviceOutputKeys, ShiftRight<21>()), deviceInputKeys, deviceNodeCount(deviceId) + 1, mStripeCounts[deviceId]);
+            CUB_LAUNCH(DeviceSelect::Unique, mTempDevicePools[deviceId], stream, ::cuda::make_transform_iterator(deviceOutputKeys, ShiftRight<21>()), deviceInputKeys, deviceNodeCount(deviceId) + 1, mStripeCounts[deviceId]);
         } else {
             cudaCheck(cudaMemsetAsync(deviceNodeCount(deviceId) + 1, 0, sizeof(uint32_t), stream));
         }

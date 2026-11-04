@@ -190,12 +190,33 @@ if(NANOVDB_USE_CUDA)
   find_package(CUDAToolkit ${MINIMUM_CUDA_VERSION} REQUIRED)
 
   # NanoVDB uses the CCCL a parent project provides, then the CUDA toolkit's
-  # CCCL, and clones the pinned NANOVDB_CCCL_TAG release only when neither
-  # exists or NANOVDB_FETCH_CCCL is set.
+  # CCCL, and clones the pinned NANOVDB_CCCL_TAG release when neither exists,
+  # when the toolkit's CCCL is older than MINIMUM_CCCL_VERSION, or when
+  # NANOVDB_FETCH_CCCL is set.
   set(NANOVDB_CCCL_TAG "v3.4.2" CACHE STRING "Git tag of the CCCL release to fetch")
   if(NOT TARGET CCCL::CCCL AND NOT NANOVDB_FETCH_CCCL)
-    find_package(CCCL CONFIG QUIET
-      HINTS "${CUDAToolkit_TARGET_DIR}/lib/cmake" "${CUDAToolkit_LIBRARY_DIR}/cmake")
+    # CCCL's version file rejects a CCCL older than the requested version
+    # before it creates any targets, so a too-old toolkit CCCL leaves the
+    # fetch below free to define CCCL::CCCL. The file also rejects other
+    # major versions, so the next major is looked for first.
+    string(REGEX MATCH "^[0-9]+" _nanovdb_cccl_major ${MINIMUM_CCCL_VERSION})
+    math(EXPR _nanovdb_cccl_next_major "${_nanovdb_cccl_major} + 1")
+    # A failed find_package overwrites CCCL_DIR, so each request restores it.
+    set(_nanovdb_cccl_dir "${CCCL_DIR}")
+    foreach(_nanovdb_cccl_request ${_nanovdb_cccl_next_major}.0 ${MINIMUM_CCCL_VERSION})
+      if(NOT TARGET CCCL::CCCL)
+        if(_nanovdb_cccl_dir)
+          set(CCCL_DIR "${_nanovdb_cccl_dir}" CACHE PATH
+            "The directory containing a CMake configuration file for CCCL." FORCE)
+        endif()
+        find_package(CCCL ${_nanovdb_cccl_request} CONFIG QUIET
+          HINTS "${CUDAToolkit_TARGET_DIR}/lib/cmake" "${CUDAToolkit_LIBRARY_DIR}/cmake")
+      endif()
+    endforeach()
+    unset(_nanovdb_cccl_major)
+    unset(_nanovdb_cccl_next_major)
+    unset(_nanovdb_cccl_request)
+    unset(_nanovdb_cccl_dir)
   endif()
   if(NOT TARGET CCCL::CCCL)
     include(../../cmake/CPM.cmake)

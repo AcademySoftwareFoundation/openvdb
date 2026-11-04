@@ -15,11 +15,15 @@
 #ifndef NANOVDB_TOOLS_CUDA_POINTSTOGRID_CUH_HAS_BEEN_INCLUDED
 #define NANOVDB_TOOLS_CUDA_POINTSTOGRID_CUH_HAS_BEEN_INCLUDED
 
+#include <cuda/version>
+
+#if CCCL_VERSION < 3002000
+#error "nanovdb/tools/cuda/PointsToGrid.cuh requires CCCL 3.2 or newer"
+#endif
+
 #include <cub/cub.cuh>
-#include <thrust/binary_search.h>
-#include <thrust/execution_policy.h>
-#include <thrust/iterator/counting_iterator.h>
-#include <thrust/iterator/transform_iterator.h>
+#include <cuda/iterator> // for ::cuda::make_counting_iterator, ::cuda::make_transform_iterator
+#include <cuda/std/algorithm> // for ::cuda::std::upper_bound
 #include <vector>
 #include <tuple>
 #include <cinttypes>
@@ -754,7 +758,7 @@ struct BulkVoxelKeyFunctor {
                 uint64_t(NanoLower<BuildT>::CoordToOffset(ijk)) <<  9 | // leaf  offset: 16^3 = 2^12,   i.e. next 12 bits
                 uint64_t(NanoLeaf< BuildT>::CoordToOffset(ijk));        // voxel offset:  8^3 =  2^9,   i.e. first 9 bits
         };// voxelKey lambda functor
-        const uint64_t tileID = tileIdOffset + (thrust::upper_bound(thrust::seq, d_tile_offsets, d_tile_offsets + numTiles + 1, uint32_t(tid)) - d_tile_offsets - 1);
+        const uint64_t tileID = tileIdOffset + (::cuda::std::upper_bound(d_tile_offsets, d_tile_offsets + numTiles + 1, uint32_t(tid)) - d_tile_offsets - 1);
         Vec3T p = points[d_indx[tid]];
         if constexpr(util::is_same<BuildT, Point>::value) p = util::is_same<Vec3T, Vec3f>::value ? d_data->map.applyInverseMapF(p) : d_data->map.applyInverseMap(p);
         d_keys[tid] = voxelKey(tileID, p.round());
@@ -877,7 +881,7 @@ void PointsToGrid<BuildT, ResourceT>::countNodes(const PtrT points, size_t point
     BufT<uint32_t> runCountScratch(mStream, this->ref(), 1, nanovdb::cuda::noInit);// run counts the host already has
     uint64_t *d_keys = nullptr;
     uint32_t *d_indx = nullptr;
-    const auto pointIndex = thrust::make_counting_iterator<uint32_t>(0);
+    const auto pointIndex = ::cuda::make_counting_iterator<uint32_t>(0);
 
     // Bisection search for the voxel size dx that yields the target point
     // density: each iteration builds tile and voxel keys at the current dx,
@@ -912,13 +916,13 @@ void PointsToGrid<BuildT, ResourceT>::countNodes(const PtrT points, size_t point
         d_indx = indxScratch.data();// free: receives the tile ranks
 
         if (mVerbose==2) mTimer.restart("Generate voxel keys");
-        CALL_CUBS(DeviceScan::InclusiveSum, thrust::make_transform_iterator(pointIndex, detail::TileStartFlag{mData.d_keys}), d_indx, pointCount);
+        CALL_CUBS(DeviceScan::InclusiveSum, ::cuda::make_transform_iterator(pointIndex, detail::TileStartFlag{mData.d_keys}), d_indx, pointCount);
         util::cuda::lambdaKernel<<<numBlocks(pointCount), mNumThreads, 0, mStream>>>(pointCount, detail::RankedVoxelKeyFunctor<BuildT, PtrT>(), mDeviceData, points, mData.d_indx, d_indx, mData.d_keys, d_keys);
         cudaCheckError();
         indxScratch.destroy(); d_indx = nullptr;
 
         if (mVerbose==2) mTimer.restart("Count nodes and voxels");
-        CALL_CUBS(DeviceReduce::Reduce, thrust::make_transform_iterator(pointIndex, detail::NodeStarts{mData.d_keys}), countsScratch.data(), pointCount, detail::SumNodeCounts(), detail::NodeCounts{0u, 0u, 0u, 0u});
+        CALL_CUBS(DeviceReduce::Reduce, ::cuda::make_transform_iterator(pointIndex, detail::NodeStarts{mData.d_keys}), countsScratch.data(), pointCount, detail::SumNodeCounts(), detail::NodeCounts{0u, 0u, 0u, 0u});
         detail::NodeCounts counts;
         cudaCheck(cudaMemcpyAsync(&counts, countsScratch.data(), sizeof(counts), cudaMemcpyDeviceToHost, mStream));
         cudaCheck(cudaStreamSynchronize(mStream));
@@ -986,7 +990,7 @@ void PointsToGrid<BuildT, ResourceT>::countNodes(const PtrT points, size_t point
     mData.pointsPerLeaf = mPointsPerLeafBuf.data();
     mLeafKeysBuf = BufT<uint64_t>(mStream, this->ref(), mData.nodeCount[0], nanovdb::cuda::noInit);
     mData.d_leaf_keys = mLeafKeysBuf.data();
-    CALL_CUBS(DeviceRunLengthEncode::Encode, thrust::make_transform_iterator(mData.d_keys, ShiftRight<9>()), mData.d_leaf_keys, mData.pointsPerLeaf, runCountScratch.data(), pointCount);
+    CALL_CUBS(DeviceRunLengthEncode::Encode, ::cuda::make_transform_iterator(mData.d_keys, ShiftRight<9>()), mData.d_leaf_keys, mData.pointsPerLeaf, runCountScratch.data(), pointCount);
 
     if constexpr(util::is_same<BuildT, Point>::value) {
         BufT<uint32_t> maxPointsPerLeafScratch(mStream, this->ref(), 1, nanovdb::cuda::noInit);
@@ -1006,7 +1010,7 @@ void PointsToGrid<BuildT, ResourceT>::countNodes(const PtrT points, size_t point
 
     mLowerKeysBuf = BufT<uint64_t>(mStream, this->ref(), mData.nodeCount[1], nanovdb::cuda::noInit);
     mData.d_lower_keys = mLowerKeysBuf.data();
-    CALL_CUBS(DeviceSelect::Unique, thrust::make_transform_iterator(mData.d_leaf_keys, ShiftRight<12>()), mData.d_lower_keys, runCountScratch.data(), mData.nodeCount[0]);// lower nodes
+    CALL_CUBS(DeviceSelect::Unique, ::cuda::make_transform_iterator(mData.d_leaf_keys, ShiftRight<12>()), mData.d_lower_keys, runCountScratch.data(), mData.nodeCount[0]);// lower nodes
 
     if (mVerbose==2) mTimer.stop();
 

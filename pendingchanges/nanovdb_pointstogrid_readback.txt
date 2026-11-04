@@ -2,3 +2,6 @@ NanoVDB:
 
   Improvements:
   - tools::cuda::PointsToGrid and voxelsToGrid now read their node and voxel counts back to the host once per build instead of once per tree level, and sort voxel keys with two global radix sorts instead of a per-tile or segmented sort. Output grids are unchanged.
+
+  Build:
+  - NanoVDB's CUDA tools now require CCCL 3.2 or newer. A NanoVDB build whose CUDA toolkit bundles an older CCCL clones NANOVDB_CCCL_TAG instead, and an installed NanoVDB needs CCCL_DIR set to a newer CCCL. tools::cuda::PointsToGrid uses libcu++ (cuda::make_counting_iterator, cuda::make_transform_iterator and cuda::std::upper_bound) instead of Thrust.
