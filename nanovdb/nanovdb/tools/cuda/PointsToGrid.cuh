@@ -698,83 +698,10 @@ namespace detail {
 __hostdev__ inline uint64_t tileKey(const Coord &ijk)
 {
     // Note: int32_t has a range of -2^31 to 2^31 - 1 whereas uint32_t has a range of 0 to 2^32 - 1
-    static constexpr int64_t kOffset = 1 << 31;
+    static constexpr int64_t kOffset = int64_t(1) << 31;
     return (uint64_t(uint32_t(int64_t(ijk[2]) + kOffset) >> 12)      ) | // z is the lower 21 bits
            (uint64_t(uint32_t(int64_t(ijk[1]) + kOffset) >> 12) << 21) | // y is the middle 21 bits
            (uint64_t(uint32_t(int64_t(ijk[0]) + kOffset) >> 12) << 42);  // x is the upper 21 bits
-}
-
-}// namespace detail
-
-template<typename BuildT, typename PtrT>
-struct TileKeyFunctor {
-    using Vec3T = typename util::remove_const<typename pointer_traits<PtrT>::element_type>::type;
-
-    __device__
-    void operator()(size_t tid, const PointsToGridData<BuildT> *d_data, const PtrT points, uint64_t* d_keys, uint32_t* d_indx) {
-        d_indx[tid] = uint32_t(tid);
-        uint64_t &key = d_keys[tid];
-        if constexpr(util::is_same<BuildT, Point>::value) {// points are in world space
-            if constexpr(util::is_same<Vec3T, Vec3f>::value) {
-                key = detail::tileKey(d_data->map.applyInverseMapF(points[tid]).round());
-            } else {// points are Vec3d
-                key = detail::tileKey(d_data->map.applyInverseMap(points[tid]).round());
-            }
-        } else if constexpr(util::is_same<Vec3T, Coord>::value) {// points Coord are in index space
-            key = detail::tileKey(points[tid]);
-        } else {// points are Vec3f or Vec3d in index space
-            key = detail::tileKey(points[tid].round());
-        }
-    }
-};
-
-template<typename BuildT, typename PtrT>
-struct VoxelKeyFunctor {
-    using Vec3T = typename util::remove_const<typename pointer_traits<PtrT>::element_type>::type;
-
-    __device__
-    void operator()(size_t tid, const PointsToGridData<BuildT> *d_data, const PtrT points, uint64_t id, uint64_t *d_keys, const uint32_t *d_indx) {
-        auto voxelKey = [] __device__ (uint64_t tileID, const Coord &ijk){
-            return tileID << 36 |                                       // upper offset: 64-15-12-9=28, i.e. last 28 bits
-                uint64_t(NanoUpper<BuildT>::CoordToOffset(ijk)) << 21 | // lower offset: 32^3 = 2^15,   i.e. next 15 bits
-                uint64_t(NanoLower<BuildT>::CoordToOffset(ijk)) <<  9 | // leaf  offset: 16^3 = 2^12,   i.e. next 12 bits
-                uint64_t(NanoLeaf< BuildT>::CoordToOffset(ijk));        // voxel offset:  8^3 =  2^9,   i.e. first 9 bits
-        };// voxelKey lambda functor
-        Vec3T p = points[d_indx[tid]];
-        if constexpr(util::is_same<BuildT, Point>::value) p = util::is_same<Vec3T, Vec3f>::value ? d_data->map.applyInverseMapF(p) : d_data->map.applyInverseMap(p);
-        d_keys[tid] = voxelKey(id, p.round());
-    }
-};
-
-template<typename BuildT, typename PtrT>
-struct BulkVoxelKeyFunctor {
-    using Vec3T = typename util::remove_const<typename pointer_traits<PtrT>::element_type>::type;
-
-    __device__
-    void operator()(size_t tid, const PointsToGridData<BuildT> *d_data, const PtrT points, const uint32_t *d_tile_offsets, uint32_t numTiles, uint64_t *d_keys, const uint32_t *d_indx, uint32_t tileIdOffset) {
-        auto voxelKey = [] __device__ (uint64_t tileID, const Coord &ijk){
-            return tileID << 36 |                                       // upper offset: 64-15-12-9=28, i.e. last 28 bits
-                uint64_t(NanoUpper<BuildT>::CoordToOffset(ijk)) << 21 | // lower offset: 32^3 = 2^15,   i.e. next 15 bits
-                uint64_t(NanoLower<BuildT>::CoordToOffset(ijk)) <<  9 | // leaf  offset: 16^3 = 2^12,   i.e. next 12 bits
-                uint64_t(NanoLeaf< BuildT>::CoordToOffset(ijk));        // voxel offset:  8^3 =  2^9,   i.e. first 9 bits
-        };// voxelKey lambda functor
-        const uint64_t tileID = tileIdOffset + (::cuda::std::upper_bound(d_tile_offsets, d_tile_offsets + numTiles + 1, uint32_t(tid)) - d_tile_offsets - 1);
-        Vec3T p = points[d_indx[tid]];
-        if constexpr(util::is_same<BuildT, Point>::value) p = util::is_same<Vec3T, Vec3f>::value ? d_data->map.applyInverseMapF(p) : d_data->map.applyInverseMap(p);
-        d_keys[tid] = voxelKey(tileID, p.round());
-    }
-};
-
-namespace detail {
-
-/// @brief Index-space voxel of point @a i, mapped from world space first when BuildT is Point
-template<typename BuildT, typename PtrT>
-__device__ inline Coord pointToVoxel(const PointsToGridData<BuildT> *d_data, const PtrT points, size_t i)
-{
-    using Vec3T = typename util::remove_const<typename pointer_traits<PtrT>::element_type>::type;
-    Vec3T p = points[i];
-    if constexpr(util::is_same<BuildT, Point>::value) p = util::is_same<Vec3T, Vec3f>::value ? d_data->map.applyInverseMapF(p) : d_data->map.applyInverseMap(p);
-    return p.round();
 }
 
 /// @brief Offset of @a ijk within its root tile: upper (15 bits), lower (12) and leaf (9) offsets
@@ -785,6 +712,49 @@ __hostdev__ inline uint64_t tileOffsetKey(const Coord &ijk)
            uint64_t(NanoLower<BuildT>::CoordToOffset(ijk)) <<  9 |
            uint64_t(NanoLeaf< BuildT>::CoordToOffset(ijk));
 }
+
+/// @brief Index-space voxel of point @a i, mapped from world space first when BuildT is Point
+///
+/// @note Every key kernel calls this one out-of-line body, so all of them round a point to the
+///       same voxel. Inlined copies could contract the inverse map into FMAs differently.
+template<typename BuildT, typename PtrT>
+__device__ __noinline__ Coord pointToVoxel(const PointsToGridData<BuildT> *d_data, const PtrT points, size_t i)
+{
+    using Vec3T = typename util::remove_const<typename pointer_traits<PtrT>::element_type>::type;
+    Vec3T p = points[i];
+    if constexpr(util::is_same<BuildT, Point>::value) p = util::is_same<Vec3T, Vec3f>::value ? d_data->map.applyInverseMapF(p) : d_data->map.applyInverseMap(p);
+    return p.round();
+}
+
+}// namespace detail
+
+template<typename BuildT, typename PtrT>
+struct TileKeyFunctor {
+    __device__
+    void operator()(size_t tid, const PointsToGridData<BuildT> *d_data, const PtrT points, uint64_t* d_keys, uint32_t* d_indx) {
+        d_indx[tid] = uint32_t(tid);
+        d_keys[tid] = detail::tileKey(detail::pointToVoxel(d_data, points, tid));
+    }
+};
+
+template<typename BuildT, typename PtrT>
+struct VoxelKeyFunctor {
+    __device__
+    void operator()(size_t tid, const PointsToGridData<BuildT> *d_data, const PtrT points, uint64_t id, uint64_t *d_keys, const uint32_t *d_indx) {
+        d_keys[tid] = id << 36 | detail::tileOffsetKey<BuildT>(detail::pointToVoxel(d_data, points, d_indx[tid]));
+    }
+};
+
+template<typename BuildT, typename PtrT>
+struct BulkVoxelKeyFunctor {
+    __device__
+    void operator()(size_t tid, const PointsToGridData<BuildT> *d_data, const PtrT points, const uint32_t *d_tile_offsets, uint32_t numTiles, uint64_t *d_keys, const uint32_t *d_indx, uint32_t tileIdOffset) {
+        const uint64_t tileID = tileIdOffset + (::cuda::std::upper_bound(d_tile_offsets, d_tile_offsets + numTiles + 1, uint32_t(tid)) - d_tile_offsets - 1);
+        d_keys[tid] = tileID << 36 | detail::tileOffsetKey<BuildT>(detail::pointToVoxel(d_data, points, d_indx[tid]));
+    }
+};
+
+namespace detail {
 
 /// @brief Writes each point's in-tile offset key and the identity permutation
 template<typename BuildT, typename PtrT>
