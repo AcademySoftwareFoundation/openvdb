@@ -112,9 +112,9 @@ public:
     /// @param firstOffset  Sequential index of the first voxel covered by this VBM
     /// @param lastOffset   Sequential index of the last voxel covered by this VBM
     /// @param leafCount    Number of leaf nodes in the source grid, or 0 if unknown.
-    ///                     A launch-sizing hint: caching it lets device rebuilds skip
-    ///                     reading it back from device memory (which would synchronize
-    ///                     the stream). The device build kernel bounds-checks against
+    ///                     A launch-sizing hint: caching it lets device builds through
+    ///                     this handle skip reading it back from device memory (which would
+    ///                     synchronize the stream). The device build kernel bounds-checks against
     ///                     the grid's own node count, so a stale value affects launch
     ///                     geometry only, never correctness.
     VoxelBlockManagerHandle(BufferT&& firstLeafID, BufferT&& jumpMap,
@@ -198,9 +198,9 @@ public:
     /// @brief Returns the cached number of leaf nodes in the source grid, or 0 if unknown
     uint32_t leafCount() const { return mLeafCount; }
 
-    /// @brief Caches the number of leaf nodes in the source grid, so device rebuilds
-    ///        need not read it back from device memory. A launch-sizing hint only;
-    ///        a stale value cannot affect the correctness of a rebuild.
+    /// @brief Caches the number of leaf nodes in the source grid, so device builds
+    ///        through this handle need not read it back from device memory. A
+    ///        launch-sizing hint only; a stale value cannot affect the build's output.
     void setLeafCount(uint32_t leafCount) { mLeafCount = leafCount; }
 
     //@{
@@ -349,8 +349,8 @@ struct VoxelBlockManager : VoxelBlockManagerBase<Log2BlockWidth>
 
 // --------------------------> buildVoxelBlockManager (CPU) <---------------------------------
 
-/// @brief Rebuild a VoxelBlockManager in-place using a pre-allocated handle.
-///        Zeros the jumpMap and recomputes both metadata arrays. No memory allocation.
+/// @brief Build a VoxelBlockManager into a pre-allocated handle: zeros the jumpMap
+///        and computes both metadata arrays, with no memory allocation.
 /// @tparam Log2BlockWidth Log2 of the number of active voxels per VBM block
 /// @tparam BufferT Buffer type of the handle (must provide host-accessible data())
 /// @param grid Host-accessible ValueOnIndex grid (must satisfy isSequential())

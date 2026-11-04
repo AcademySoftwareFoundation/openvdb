@@ -411,10 +411,11 @@ struct BuildVoxelBlockManagerBatchFunctor
     }
 };
 
-/// @brief Rebuild a VoxelBlockManager in-place using a pre-allocated handle.
-///        Zeros the jumpMap on-stream and relaunches the build kernel. No memory
-///        allocation is performed; the handle must already have correctly-sized
-///        device buffers. Suitable for repeated builds and benchmarking.
+/// @brief Build a VoxelBlockManager into a pre-allocated handle: zeros the jumpMap
+///        on-stream and launches the build kernel, with no memory allocation. This is
+///        the fill step of the allocating overload, and the entry point for callers
+///        that own the firstLeafID and jumpMap memory themselves. It can also be
+///        called repeatedly on the same handle, e.g. for benchmarking.
 ///        Fully asynchronous when the handle carries a cached leafCount (as set
 ///        by the allocating overload); otherwise the leaf count is read back
 ///        from device memory once (synchronizing) and cached in the handle.
@@ -446,7 +447,7 @@ void buildVoxelBlockManager(
 
     // The cached count only sizes the launch (the kernel reads the authoritative
     // count from the device-resident tree); if absent, read it once (synchronizes)
-    // and cache it for subsequent rebuilds.
+    // and cache it for later builds through this handle.
     uint32_t leafCount = handle.leafCount();
     if (!leafCount) {
         using Traits = util::cuda::DeviceGridTraits<ValueOnIndex>;
@@ -493,7 +494,7 @@ buildVoxelBlockManager(
 
     using Traits = util::cuda::DeviceGridTraits<ValueOnIndex>;
     // One synchronous D2H copy yields both the active voxel count and the leaf
-    // count; the latter is cached in the handle so rebuilds are fully async.
+    // count; the latter is cached in the handle so later builds through it are fully async.
     const auto treeData = Traits::getTreeData(d_grid, stream);
     if (!firstOffset) firstOffset = 1;
     if (!lastOffset)  lastOffset  = treeData.mVoxelCount;
