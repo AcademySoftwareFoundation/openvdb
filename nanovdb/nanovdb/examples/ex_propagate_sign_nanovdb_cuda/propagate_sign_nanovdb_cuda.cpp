@@ -96,8 +96,8 @@ int main(int argc, char *argv[])
         mainPropagateSign(deviceGrid, deviceSdf, leafMasks, lowerMasks, upperMasks, rootOrigins);
 
         // The invert bit of the element of the band that contains c: descend from the root to the first element
-        // without a child (for an absent root tile, the bit is whether its origin was returned)
-        auto isInvert = [&](const openvdb::Coord &c) {
+        // without a child (for a region without a root-table entry, the bit is whether its origin was returned)
+        auto isInverted = [&](const openvdb::Coord &c) {
             using UpperT = nanovdb::NanoUpper<BuildT>;
             using LowerT = nanovdb::NanoLower<BuildT>;
             using LeafT = nanovdb::NanoLeaf<BuildT>;
@@ -119,7 +119,7 @@ int main(int argc, char *argv[])
         cpuTimer.start("Checking the invert masks against the level set");
         uint64_t mismatches = 0;
         for (auto it = grid->tree().cbeginValueOff(); it; ++it)
-            if ((*it < 0) != isInvert(it.getCoord())) ++mismatches;
+            if ((*it < 0) != isInverted(it.getCoord())) ++mismatches;
         for (const auto &origin : rootOrigins)
             if (!(grid->tree().getValue(openvdb::Coord(origin[0], origin[1], origin[2])) < 0)) ++mismatches;
         cpuTimer.stop();
