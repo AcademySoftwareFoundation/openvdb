@@ -257,7 +257,8 @@ void RefineGrid<BuildT, ResourceT>::processGridTreeRoot()
     // Copy GridData from source grid
     // By convention: this will duplicate grid name and map. Others will be reset later
     cudaCheck(cudaMemcpyAsync(&mBuilder.data()->getGrid(), mDeviceSrcGrid->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
-    util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), mBuilder.deviceData());
+    util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>{0.5}, mBuilder.deviceData());
+
     cudaCheckError();
 }// RefineGrid<BuildT, ResourceT>::processGridTreeRoot
 
