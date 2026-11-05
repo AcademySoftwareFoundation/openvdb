@@ -493,16 +493,26 @@ public:
         return mJumpMap + this->blockBase(g) * JumpMapLength;
     }
 
+    /// @brief The last grid whose first block is at or before batch-wide block b, or
+    ///        UnusedGridIndex if b precedes the first grid. A binary search over the grids'
+    ///        block bases, without gridOfBlock's check that b lies within that grid: b may
+    ///        be a gap block after it. For callers that check the result against the grid's
+    ///        extent anyway, e.g. a slot's voxel index against voxelCount(g).
+    NANOVDB_HOSTDEV_DISABLE_WARNING
+    __hostdev__ uint32_t lastGridAtOrBefore(uint64_t b) const
+    {
+        return detail::countAtOrBelow(mGridCount, b,
+            [this](uint32_t g) { return this->blockBase(g); }) - 1; // 0 - 1 is UnusedGridIndex
+    }
+
     /// @brief The grid that owns batch-wide block b, or UnusedGridIndex for a gap block
     ///        (before, between or after the grids). The owner's slice holds b at local
     ///        block b - blockBase(owner). A binary search over the grids' block bases.
     NANOVDB_HOSTDEV_DISABLE_WARNING
     __hostdev__ uint32_t gridOfBlock(uint64_t b) const
     {
-        const uint32_t n = detail::countAtOrBelow(mGridCount, b,
-            [this](uint32_t g) { return this->blockBase(g); });
-        if (n == 0) return UnusedGridIndex;
-        const uint32_t g = n - 1;
+        const uint32_t g = this->lastGridAtOrBefore(b);
+        if (g == UnusedGridIndex) return UnusedGridIndex;
         return b - this->blockBase(g) < this->blockCount(g) ? g : UnusedGridIndex;
     }
 

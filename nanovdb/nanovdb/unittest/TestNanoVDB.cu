@@ -3699,13 +3699,15 @@ struct VoxelBlockManagerBatchHookSource
 
 // Decodes every voxel of a batch through a VoxelBlockManagerBatchView, one CUDA block per
 // VBM block, and counts the voxels decoded and those whose value index is not their slot's.
+// Finds each block's grid with lastGridAtOrBefore, as a caller that checks voxel counts would.
 template<int Log2BlockWidth, typename ViewT>
 __global__ void testBatchViewDecodeKernel(const ViewT view, unsigned long long *decoded, unsigned long long *errors)
 {
     using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
     const uint64_t b = blockIdx.x;
     const int p = threadIdx.x;
-    const uint32_t g = view.gridOfBlock(b);
+    // The cheaper lookup: a gap block after grid g maps to g and fails the voxel-count check.
+    const uint32_t g = view.lastGridAtOrBefore(b);
     if (g == ViewT::UnusedGridIndex) return;
     const uint64_t localBlock = b - view.blockBase(g);
     const uint64_t i = localBlock * VBM::BlockWidth + p; // 0-based voxel in grid g
@@ -3852,8 +3854,11 @@ void testVoxelBlockManagerBatch(bool gapped, bool derived)
         using ViewT = std::decay_t<decltype(view)>;
         EXPECT_EQ(gridCount, view.gridCount());
         EXPECT_EQ(blockCount, view.blockCount());
+        uint32_t lastAtOrBefore = ViewT::UnusedGridIndex;
         for (uint64_t b = 0; b < blockCount; ++b) {
             EXPECT_EQ(owner[b] == ~uint32_t(0) ? ViewT::UnusedGridIndex : owner[b], view.gridOfBlock(b)) << "block " << b;
+            while (lastAtOrBefore + 1 < gridCount && entries[lastAtOrBefore + 1].blockBase <= b) ++lastAtOrBefore;
+            EXPECT_EQ(lastAtOrBefore, view.lastGridAtOrBefore(b)) << "block " << b;
         }
         EXPECT_EQ(ViewT::UnusedGridIndex, view.gridOfBlock(blockCount));
         for (uint32_t g = 0; g < gridCount; ++g) {
