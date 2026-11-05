@@ -1000,18 +1000,20 @@ TEST(TestNanoVDBCUDA, voxelsToGridBatchBadOffsets)
     const cudaStream_t stream = 0;
     const std::vector<nanovdb::Coord> voxels{nanovdb::Coord(0), nanovdb::Coord(1), nanovdb::Coord(2)};
     nanovdb::cuda::Buffer<nanovdb::Coord> voxelBuffer(stream, voxels.size(), nanovdb::cuda::noInit);
-    nanovdb::cuda::Buffer<uint64_t> offsetBuffer(stream, 3, nanovdb::cuda::noInit);
+    nanovdb::cuda::Buffer<uint64_t> offsetBuffer(stream, 4, nanovdb::cuda::noInit);
     auto *d_voxels = voxelBuffer.data();
     auto *d_offsets = offsetBuffer.data();
     ASSERT_EQ(cudaSuccess, cudaMemcpy(d_voxels, voxels.data(), voxels.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
     auto build = [&](std::vector<uint64_t> offsets) {
         EXPECT_EQ(cudaSuccess, cudaMemcpy(d_offsets, offsets.data(), offsets.size() * sizeof(uint64_t), cudaMemcpyHostToDevice));
-        return nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex>(d_voxels, voxels.size(), d_offsets, 2, 1.0, stream);
+        const uint32_t gridCount = static_cast<uint32_t>(offsets.size() - 1);
+        return nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex>(d_voxels, voxels.size(), d_offsets, gridCount, 1.0, stream);
     };
     EXPECT_NO_THROW(build({0, 1, 3}));
     EXPECT_THROW(build({0, 1, 2}), std::invalid_argument);// does not end at the voxel count
     EXPECT_THROW(build({1, 1, 3}), std::invalid_argument);// does not start at zero
     EXPECT_THROW(build({0, 4, 3}), std::invalid_argument);// decreasing, and out of range in between
+    EXPECT_THROW(build({0, 2, 1, 3}), std::invalid_argument);// decreasing within range
     EXPECT_THROW(nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex>(d_voxels, voxels.size(), d_offsets, 2, -1.0, stream),
                  std::invalid_argument);
 
