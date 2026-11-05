@@ -259,6 +259,7 @@ endforeach()
 unset(_openvdb_ax_llvm_include_dir)
 
 set(OPENVDB_AX_PUBLIC_DEFINES ${LLVM_DEFINITIONS})
+separate_arguments(OPENVDB_AX_PUBLIC_DEFINES)
 set(OPENVDB_AX_PRIVATE_DEFINES "")
 set(OPENVDB_AX_PUBLIC_OPTIONS "")
 
