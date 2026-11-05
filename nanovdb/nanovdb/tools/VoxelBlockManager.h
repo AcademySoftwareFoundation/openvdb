@@ -266,10 +266,22 @@ struct VoxelBlockManagerBase
     static_assert(Log2BlockWidth >= 6, "BlockWidth must be at least 64 (one jumpMap word per block)");
     static constexpr int JumpMapLength = BlockWidth / 64; ///< number of uint64_t words per block in the jumpMap
 
-    /// Sentinel written to leafIndex slots with no active voxel in this block
+    /// Sentinel written to leafIndex slots with no active voxel in this block, and to the
+    /// firstLeafID of blocks that cover no voxel (capacity past the last voxel, or the gaps
+    /// between grids of a batched build). Such blocks decode to sentinels.
     static constexpr uint32_t UnusedLeafIndex   = ~uint32_t{0};
     /// Sentinel written to voxelOffset slots with no active voxel in this block
     static constexpr uint16_t UnusedVoxelOffset = ~uint16_t{0};
+
+    /// @brief Number of blocks that cover voxels of [firstOffset, lastOffset], capped at the
+    ///        nBlocks allocated. The builders set firstLeafID to UnusedLeafIndex past it.
+    __hostdev__ static uint64_t
+    usedBlockCount(uint64_t firstOffset, uint64_t lastOffset, uint64_t nBlocks)
+    {
+        if (lastOffset < firstOffset) return 0;
+        const uint64_t used = (lastOffset - firstOffset + BlockWidth) >> Log2BlockWidth;
+        return used < nBlocks ? used : nBlocks;
+    }
 
     /// @brief Record one leaf in the VBM covering [firstOffset, lastOffset]: the leaf becomes
     ///        the firstLeafID of every block whose first slot it holds, and marks the jumpMap
@@ -364,6 +376,7 @@ struct VoxelBlockManager : VoxelBlockManagerBase<Log2BlockWidth>
     ///                      index is beyond the last active voxel.
     ///   - voxelOffset[p] = local (0..511) offset of that voxel within its leaf,
     ///                      or UnusedVoxelOffset.
+    /// A block whose firstLeafID is UnusedLeafIndex covers no voxel and decodes to sentinels.
     ///
     /// The CPU analogue of the CUDA decodeInverseMaps. Single-threaded per block;
     /// SIMD is used internally. The caller is responsible for parallelism across blocks.
@@ -395,6 +408,7 @@ struct VoxelBlockManager : VoxelBlockManagerBase<Log2BlockWidth>
         // Initialize outputs to sentinel values
         std::fill(leafIndex, leafIndex + BlockWidth, UnusedLeafIndex);
         std::fill(voxelOffset, voxelOffset + BlockWidth, UnusedVoxelOffset);
+        if (firstLeafID == UnusedLeafIndex) return; // the block covers no voxel
 
         const auto &tree = grid->tree();
         for (auto leafID = firstLeafID; leafID <= firstLeafID + nExtraLeaves; leafID++) {
@@ -451,7 +465,8 @@ struct VoxelBlockManager : VoxelBlockManagerBase<Log2BlockWidth>
 // --------------------------> buildVoxelBlockManager (CPU) <---------------------------------
 
 /// @brief Build a VoxelBlockManager into a pre-allocated handle: zeros the jumpMap
-///        and computes both metadata arrays, with no memory allocation.
+///        and computes both metadata arrays, with no memory allocation. Blocks past the
+///        last voxel get firstLeafID UnusedLeafIndex.
 /// @tparam Log2BlockWidth Log2 of the number of active voxels per VBM block
 /// @tparam BufferT Buffer type of the handle (must provide host-accessible data())
 /// @param grid Host-accessible ValueOnIndex grid; must be sequential and meet the
@@ -485,6 +500,9 @@ void buildVoxelBlockManager(const NanoGrid<ValueOnIndex>* grid, VoxelBlockManage
                             firstOffset, lastOffset, nBlocks, firstLeafID, jumpMap);
         }
     });
+
+    std::fill(firstLeafID + Base::usedBlockCount(firstOffset, lastOffset, nBlocks),
+              firstLeafID + nBlocks, Base::UnusedLeafIndex);
 }
 
 /// @brief Allocate buffers and build a VoxelBlockManager on the host from a
@@ -500,7 +518,8 @@ void buildVoxelBlockManager(const NanoGrid<ValueOnIndex>* grid, VoxelBlockManage
 ///                     to use grid->activeVoxelCount(), covering the full grid.
 /// @param nBlocks      Allocated capacity in blocks; must be >=
 ///                     ceil((lastOffset - firstOffset + 1) / BlockWidth). Pass 0
-///                     (default) to use the minimum required capacity.
+///                     (default) to use the minimum required capacity. Blocks past
+///                     the last voxel get firstLeafID UnusedLeafIndex.
 /// @param pool         Optional pool buffer for allocation (passed to BufferT::create)
 /// @return A fully constructed VoxelBlockManagerHandle
 template<int Log2BlockWidth, typename BufferT = HostBuffer>

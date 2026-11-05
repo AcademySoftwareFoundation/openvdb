@@ -21,6 +21,10 @@ NanoVDB:
     also rules out active tiles. createNanoGrid meets them only with
     includeStats and includeTiles off. The CPU and CUDA builders now share one per-leaf
     routine, which asserts the preconditions in builds with assertions enabled.
+  - Every VoxelBlockManager block that covers no voxel, from extra capacity in a
+    single-grid build or a gap in a batched build, now gets UnusedLeafIndex as its
+    firstLeafID and a zero jumpMap, on both CPU and CUDA. The CPU and CUDA decodes
+    return sentinels for such a block instead of reading an invalid leaf.
   API Changes:
   - VoxelBlockManagerHandle gained an optional trailing leafCount constructor
     parameter and leafCount()/setLeafCount() accessors (defaulted; existing callers

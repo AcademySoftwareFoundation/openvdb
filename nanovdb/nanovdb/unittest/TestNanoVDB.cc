@@ -9977,6 +9977,50 @@ TEST_F(TestNanoVDB, VoxelBlockManagerCompatible)
     EXPECT_EQ((leafVoxels + 127) / 128, fogVbm.blockCount());
 }// VoxelBlockManagerCompatible
 
+TEST_F(TestNanoVDB, VoxelBlockManagerTail)
+{
+    // A handle with more blocks than the voxels need: the extra blocks get the sentinel
+    // firstLeafID and a zero jumpMap, and decode to sentinels.
+    using SrcGridT = nanovdb::tools::build::Grid<float>;
+    SrcGridT srcGrid(0.0f);
+    auto srcAcc = srcGrid.getAccessor();
+    const nanovdb::CoordBBox bbox = nanovdb::CoordBBox::createCube(125, 145);
+    for (auto it = bbox.begin(); it; it++)
+        srcAcc.setValue(*it, 1.0f);
+    auto handle = nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::ValueOnIndex>(srcGrid, 0u, false, false);
+    auto *grid = handle.grid<nanovdb::ValueOnIndex>();
+    ASSERT_TRUE(grid);
+
+    constexpr int Log2BlockWidth = 7;
+    using VBM = nanovdb::tools::VoxelBlockManager<Log2BlockWidth>;
+    const uint64_t used = (grid->activeVoxelCount() + VBM::BlockWidth - 1) / VBM::BlockWidth;
+    const uint64_t nBlocks = used + 3;
+    auto vbm = nanovdb::tools::buildVoxelBlockManager<Log2BlockWidth>(grid, 0, 0, nBlocks);
+    ASSERT_EQ(nBlocks, vbm.blockCount());
+
+    // Garbage-fill the whole arrays, then rebuild in place.
+    std::memset(vbm.hostFirstLeafID(), 0xab, nBlocks * sizeof(uint32_t));
+    std::memset(vbm.hostJumpMap(), 0xab, nBlocks * VBM::JumpMapLength * sizeof(uint64_t));
+    nanovdb::tools::buildVoxelBlockManager<Log2BlockWidth>(grid, vbm);
+
+    const uint32_t *firstLeafID = vbm.hostFirstLeafID();
+    const uint64_t *jumpMap = vbm.hostJumpMap();
+    for (uint64_t b = 0; b < used; ++b) EXPECT_NE(VBM::UnusedLeafIndex, firstLeafID[b]) << "block " << b;
+    for (uint64_t b = used; b < nBlocks; ++b) {
+        EXPECT_EQ(VBM::UnusedLeafIndex, firstLeafID[b]) << "tail block " << b;
+        for (int w = 0; w < VBM::JumpMapLength; ++w) EXPECT_EQ(0u, jumpMap[b * VBM::JumpMapLength + w]);
+    }
+
+    std::vector<uint32_t> leafIndex(VBM::BlockWidth);
+    std::vector<uint16_t> voxelOffset(VBM::BlockWidth);
+    VBM::decodeInverseMaps(grid, firstLeafID[used], jumpMap + used * VBM::JumpMapLength,
+                           1 + used * VBM::BlockWidth, leafIndex.data(), voxelOffset.data());
+    for (int p = 0; p < VBM::BlockWidth; ++p) {
+        EXPECT_EQ(VBM::UnusedLeafIndex, leafIndex[p]);
+        EXPECT_EQ(VBM::UnusedVoxelOffset, voxelOffset[p]);
+    }
+}// VoxelBlockManagerTail
+
 TEST_F(TestNanoVDB, GridHandleRejectsMalformedHostChain)
 {
     auto handle = nanovdb::tools::createLevelSetSphere<float>(20.0f, nanovdb::Vec3d(0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
