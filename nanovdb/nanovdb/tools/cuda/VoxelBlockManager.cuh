@@ -382,9 +382,14 @@ __hostdev__ inline uint32_t countAtOrBelow(uint32_t n, uint64_t x, const KeyT &k
     return lo;
 }
 
-/// @brief Detects an entry source's optional blockBase(g) and voxelCount(g). A source that
-///        can produce those fields more cheaply than a whole entry, e.g. from one compact
-///        array, provides them so that searches and per-grid lookups read only what they need.
+/// @brief Detects an entry source's optional leafBase(g), blockBase(g) and voxelCount(g). A
+///        source that can produce those fields more cheaply than a whole entry, e.g. from one
+///        compact array, provides them so that searches and per-grid lookups read only what
+///        they need.
+template<typename T, typename = void>
+struct HasLeafBase : std::false_type {};
+template<typename T>
+struct HasLeafBase<T, std::void_t<decltype(std::declval<const T&>().leafBase(uint32_t(0)))>> : std::true_type {};
 template<typename T, typename = void>
 struct HasBlockBase : std::false_type {};
 template<typename T>
@@ -393,6 +398,14 @@ template<typename T, typename = void>
 struct HasVoxelCount : std::false_type {};
 template<typename T>
 struct HasVoxelCount<T, std::void_t<decltype(std::declval<const T&>().voxelCount(uint32_t(0)))>> : std::true_type {};
+
+NANOVDB_HOSTDEV_DISABLE_WARNING
+template<typename EntrySource>
+__hostdev__ inline uint64_t entryLeafBase(const EntrySource &entries, uint32_t g)
+{
+    if constexpr (HasLeafBase<EntrySource>::value) return uint64_t(entries.leafBase(g));
+    else return entries(g).leafBase;
+}
 
 NANOVDB_HOSTDEV_DISABLE_WARNING
 template<typename EntrySource>
@@ -528,9 +541,12 @@ struct BuildVoxelBlockManagerBatchFunctor
         for (uint64_t tID = tID0; tID < leafCount; tID += stride)
         {
             // The last grid whose leaf base does not exceed tID; grids without leaves share
-            // their successor's base and are skipped that way.
+            // their successor's base and are skipped that way. The first leaf base is 0, so
+            // some grid always qualifies; a source that breaks that contract skips the leaf.
             const uint32_t n = detail::countAtOrBelow(gridCount, tID,
-                [&entries](uint32_t g) { return uint64_t(entries(g).leafBase); });
+                [&entries](uint32_t g) { return detail::entryLeafBase(entries, g); });
+            NANOVDB_ASSERT(n > 0);
+            if (!n) continue;
             const VoxelBlockManagerBatchEntry entry = entries(n - 1);
             const uint32_t leafIndex = uint32_t(tID) - entry.leafBase;
             if (!entry.voxelCount) continue;
@@ -675,7 +691,9 @@ buildVoxelBlockManager(
 ///        materializing an array first.
 /// @tparam Log2BlockWidth  Log2 of the number of active voxels per VBM block
 /// @tparam EntrySource     Device-callable, copyable to the device by value, with
-///                         VoxelBlockManagerBatchEntry operator()(uint32_t g) const
+///                         VoxelBlockManagerBatchEntry operator()(uint32_t g) const. It may
+///                         also provide leafBase(g), which the kernel's per-leaf grid search
+///                         then reads instead of whole entries.
 /// @param entries        Source of the gridCount entries. The leaf bases must be exclusive
 ///                       prefix sums of the grids' exact leaf counts, so empty grids repeat
 ///                       their successor's leaf base. The block bases must be ascending, with
@@ -691,7 +709,8 @@ buildVoxelBlockManager(
 /// @param d_jumpMap      Device array of blockCount * JumpMapLength words; zeroed, then built
 /// @param stream         CUDA stream (default 0)
 template<int Log2BlockWidth, typename EntrySource,
-         typename = std::enable_if_t<!std::is_pointer_v<EntrySource>>>
+         typename = std::enable_if_t<
+             std::is_invocable_r_v<VoxelBlockManagerBatchEntry, const EntrySource&, uint32_t>>>
 void buildVoxelBlockManagerBatch(
     const EntrySource& entries,
     uint32_t           gridCount,

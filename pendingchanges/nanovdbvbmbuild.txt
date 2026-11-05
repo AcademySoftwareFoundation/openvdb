@@ -13,7 +13,9 @@ NanoVDB:
     no host synchronization. Each grid's slice is byte-identical to its single-grid
     build. Grids are described by VoxelBlockManagerBatchEntry records, read from a
     device array or produced by any device-callable entry source, so callers can derive
-    them in the build kernel. Grids' block ranges may leave gaps between them.
+    them in the build kernel. A source may also provide leafBase(g), which the kernel's
+    per-leaf grid search then reads instead of whole entries. Grids' block ranges may
+    leave gaps between them.
   - Documented the VoxelBlockManager's topology preconditions: an OnIndex grid's leaves
     must each hold an active voxel and tile the value indices from 1 in leaf order, up
     to at least the VBM's lastOffset. The default lastOffset is activeVoxelCount, which
