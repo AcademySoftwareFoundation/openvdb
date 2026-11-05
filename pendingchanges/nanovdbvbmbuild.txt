@@ -1,14 +1,13 @@
 NanoVDB:
   Improvements:
-  - Reworked the CUDA VoxelBlockManager build to launch one thread per leaf over the
-    dense leaf array instead of one thread per lower-node child slot gated on the
-    childMask, and removed the synchronous device read of the node count from the
-    build into a pre-allocated handle by caching the leaf count in the handle. Builds
-    through a handle are now fully stream-asynchronous and measured 1.6-2x faster;
-    outputs are byte-identical.
-    The cached count is a launch-sizing hint only: the kernel reads the authoritative
-    leaf count from the device-resident tree and iterates with a grid-stride loop, so
-    a stale cache cannot cause out-of-bounds access or wrong output.
+  - Reworked the CUDA VoxelBlockManager build to loop over the dense leaf array, one
+    leaf per thread, instead of over every lower-node child slot gated on the
+    childMask; outputs are byte-identical and builds measured 1.6-2x faster. The
+    kernel reads the leaf count from the device-resident tree and loops grid-stride,
+    and its launch is sized to fill the device, so a build into a pre-allocated handle
+    no longer reads the node count back from the device and is fully
+    stream-asynchronous. The allocating overload reads the active voxel count back
+    only when lastOffset is not given.
   - Added tools::cuda::buildVoxelBlockManagerBatch, which builds the VoxelBlockManagers
     of a batch of grids into shared arrays with one memset and one kernel launch and
     no host synchronization. Each grid's slice is byte-identical to its single-grid
@@ -26,9 +25,6 @@ NanoVDB:
     firstLeafID and a zero jumpMap, on both CPU and CUDA. The CPU and CUDA decodes
     return sentinels for such a block instead of reading an invalid leaf.
   API Changes:
-  - VoxelBlockManagerHandle gained an optional trailing leafCount constructor
-    parameter and leafCount()/setLeafCount() accessors (defaulted; existing callers
-    unaffected).
   - Added tools::isVoxelBlockManagerCompatible, which checks a host-accessible
     OnIndex grid against the VoxelBlockManager's topology preconditions, for the
     whole grid or up to a given lastOffset.

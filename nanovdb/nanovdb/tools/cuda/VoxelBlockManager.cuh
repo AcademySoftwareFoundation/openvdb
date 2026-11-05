@@ -43,6 +43,7 @@
 #include <nanovdb/util/cuda/DeviceGridTraits.cuh>
 #include <nanovdb/tools/VoxelBlockManager.h>
 #include <nanovdb/cuda/HandleStorage.h>
+#include <atomic>
 #include <cstddef> // for std::byte
 
 #include <type_traits>
@@ -271,13 +272,37 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
     }
 };
 
+namespace detail {
+
+/// @brief Number of CTAs of @c blockSize threads that fill the current device with @c kernel:
+///        resident CTAs per SM times the SM count. Computed once per device and cached, so
+///        launches of a grid-stride kernel need nothing from the data they process.
+template<typename KernelT>
+inline unsigned deviceFillingGridSize(KernelT kernel, int blockSize)
+{
+    constexpr int MaxCachedDevices = 64;
+    static std::atomic<unsigned> cache[MaxCachedDevices]; // zero-initialized: not yet computed
+    int device = 0;
+    cudaCheck(cudaGetDevice(&device));
+    if (device < MaxCachedDevices) {
+        if (const unsigned n = cache[device].load(std::memory_order_relaxed)) return n;
+    }
+    int smCount = 0, perSM = 0;
+    cudaCheck(cudaDeviceGetAttribute(&smCount, cudaDevAttrMultiProcessorCount, device));
+    cudaCheck(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&perSM, kernel, blockSize, 0));
+    const unsigned n = unsigned(smCount > 0 ? smCount : 1) * unsigned(perSM > 0 ? perSM : 1);
+    if (device < MaxCachedDevices) cache[device].store(n, std::memory_order_relaxed);
+    return n;
+}
+
+} // namespace detail
+
 /// @brief This functor calculates the firstLeafID and jumpMap for the
 /// VoxelBlockManager over the subset of the Tree nodes specified by
 /// firstOffset, lastOffset, and nBlocks. One leaf per loop iteration; since
 /// the grid is sequential the leaf array is dense and indexed directly. The
-/// authoritative leaf count is read from the device-resident tree, and the
-/// grid-stride loop covers all leaves for any launch size, so the host-side
-/// count used to size the launch affects performance only, never correctness.
+/// leaf count is read from the device-resident tree, and the grid-stride loops
+/// cover all leaves and all blocks past the last voxel for any launch size.
 template<int Log2BlockWidth>
 struct BuildVoxelBlockManagerFunctor
 {
@@ -541,13 +566,9 @@ struct BuildVoxelBlockManagerBatchFunctor
 ///        that own the firstLeafID and jumpMap memory themselves. It can also be
 ///        called repeatedly on the same handle, e.g. for benchmarking. Blocks past the
 ///        last voxel get firstLeafID UnusedLeafIndex.
-///        Fully asynchronous when the handle carries a cached leafCount (as set
-///        by the allocating overload); otherwise the leaf count is read back
-///        from device memory once (synchronizing) and cached in the handle.
-///        The cached count only sizes the kernel launch: the kernel bounds-checks
-///        against the grid's own device-resident node count, so a stale cache
-///        (e.g. after regenerating the grid in place) degrades launch geometry
-///        but cannot cause out-of-bounds access or wrong output.
+///        Fully stream-asynchronous: nothing is read back from the device. The kernel
+///        loops grid-stride over the grid's device-resident leaves, so the launch is
+///        sized to fill the device rather than to the grid.
 /// @tparam Log2BlockWidth  Log2 of the number of active voxels per VBM block
 /// @tparam BufferT         Device buffer type (deduced from handle)
 /// @param d_grid  Device-side grid pointer passed to the build kernel; must meet the
@@ -566,35 +587,22 @@ void buildVoxelBlockManager(
     if (!handle.blockCount()) return;
     NANOVDB_ASSERT(!((handle.firstOffset() - 1) & (BlockWidth - 1))); // firstOffset == 1 (mod BlockWidth)
 
-    // the buffers are allocated uninitialized (noInit); jumpMap must be zeroed
-    // each build, including when the kernel launch below is skipped
+    // the buffers are allocated uninitialized (noInit); jumpMap must be zeroed each build
     cudaCheck(cudaMemsetAsync(handle.deviceJumpMap(), 0,
         handle.blockCount() * JumpMapLength * sizeof(uint64_t), stream));
 
-    // The cached count only sizes the launch (the kernel reads the authoritative
-    // count from the device-resident tree); if absent, read it once (synchronizes)
-    // and cache it for later builds through this handle.
-    uint32_t leafCount = handle.leafCount();
-    if (!leafCount) {
-        using Traits = util::cuda::DeviceGridTraits<ValueOnIndex>;
-        leafCount = Traits::getTreeData(d_grid, stream).mNodeCount[0];
-        handle.setLeafCount(leafCount);
-    }
     using Op = BuildVoxelBlockManagerFunctor<Log2BlockWidth>;
-    const uint64_t tailBlocks = handle.blockCount() -
-        Op::Base::usedBlockCount(handle.firstOffset(), handle.lastOffset(), handle.blockCount());
-    const uint64_t threads = leafCount > tailBlocks ? uint64_t(leafCount) : tailBlocks;
-    if (!threads) return;
-
-    util::cuda::operatorKernel<Op>
-        <<<util::cuda::blocksPerGrid(threads, Op::MaxThreadsPerBlock), Op::MaxThreadsPerBlock, 0, stream>>>(
-            handle.firstOffset(), handle.lastOffset(), handle.blockCount(),
-            d_grid, handle.deviceFirstLeafID(), handle.deviceJumpMap());
+    constexpr auto kernel = util::cuda::operatorKernel<Op, uint64_t, uint64_t, uint64_t,
+        NanoGrid<ValueOnIndex>*, uint32_t*, uint64_t*>;
+    kernel<<<detail::deviceFillingGridSize(kernel, Op::MaxThreadsPerBlock), Op::MaxThreadsPerBlock, 0, stream>>>(
+        handle.firstOffset(), handle.lastOffset(), handle.blockCount(),
+        d_grid, handle.deviceFirstLeafID(), handle.deviceJumpMap());
 }
 
 /// @brief Allocate device buffers and build a VoxelBlockManager on the device.
 ///        Returns a fully-constructed VoxelBlockManagerHandle backed by device memory.
-///        Grid dimensions (when not supplied) are read from device memory via DeviceGridTraits.
+///        Grid dimensions (when not supplied) are read from device memory via DeviceGridTraits,
+///        which synchronizes; with an explicit lastOffset the build is fully asynchronous.
 /// @tparam Log2BlockWidth  Log2 of the number of active voxels per VBM block
 /// @tparam BufferT         Device buffer type (default: nanovdb::cuda::Buffer<std::byte>)
 /// @param d_grid       Device-side grid pointer; must meet the topology preconditions in
@@ -624,11 +632,8 @@ buildVoxelBlockManager(
     static constexpr uint64_t JumpMapLength = BlockWidth / 64;
 
     using Traits = util::cuda::DeviceGridTraits<ValueOnIndex>;
-    // One synchronous D2H copy yields both the active voxel count and the leaf
-    // count; the latter is cached in the handle so later builds through it are fully async.
-    const auto treeData = Traits::getTreeData(d_grid, stream);
     if (!firstOffset) firstOffset = 1;
-    if (!lastOffset)  lastOffset  = treeData.mVoxelCount;
+    if (!lastOffset)  lastOffset  = Traits::getActiveVoxelCount(d_grid, stream); // synchronizes
     if (lastOffset < firstOffset) {// empty grid: an empty handle, through the pool's resource when one is needed
         if constexpr (BufferIsDefaultConstructible<BufferT>::value) {
             return nanovdb::tools::VoxelBlockManagerHandle<BufferT>{};
@@ -650,7 +655,7 @@ buildVoxelBlockManager(
 
     nanovdb::tools::VoxelBlockManagerHandle<BufferT> handle(
         std::move(firstLeafIDBuf), std::move(jumpMapBuf),
-        nBlocks, firstOffset, lastOffset, treeData.mNodeCount[0]);
+        nBlocks, firstOffset, lastOffset);
 
     buildVoxelBlockManager<Log2BlockWidth>(d_grid, handle, stream);
     return handle;

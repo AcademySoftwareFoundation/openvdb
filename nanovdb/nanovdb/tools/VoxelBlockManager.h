@@ -117,7 +117,6 @@ class VoxelBlockManagerHandle
     uint64_t mBlockCount{0};
     uint64_t mFirstOffset{0};
     uint64_t mLastOffset{0};
-    uint32_t mLeafCount{0};
 
 public:
     /// @brief Constructor from metadata buffers (used by buildVoxelBlockManager)
@@ -126,21 +125,13 @@ public:
     /// @param blockCount   Number of voxel blocks (allocated capacity of the buffers)
     /// @param firstOffset  Sequential index of the first voxel covered by this VBM
     /// @param lastOffset   Sequential index of the last voxel covered by this VBM
-    /// @param leafCount    Number of leaf nodes in the source grid, or 0 if unknown.
-    ///                     A launch-sizing hint: caching it lets device builds through
-    ///                     this handle skip reading it back from device memory (which would
-    ///                     synchronize the stream). The device build kernel bounds-checks against
-    ///                     the grid's own node count, so a stale value affects launch
-    ///                     geometry only, never correctness.
     VoxelBlockManagerHandle(BufferT&& firstLeafID, BufferT&& jumpMap,
-        uint64_t blockCount, uint64_t firstOffset, uint64_t lastOffset,
-        uint32_t leafCount = 0)
+        uint64_t blockCount, uint64_t firstOffset, uint64_t lastOffset)
         : mFirstLeafID(std::move(firstLeafID))
         , mJumpMap(std::move(jumpMap))
         , mBlockCount(blockCount)
         , mFirstOffset(firstOffset)
-        , mLastOffset(lastOffset)
-        , mLeafCount(leafCount) {}
+        , mLastOffset(lastOffset) {}
 
     VoxelBlockManagerHandle() = default;
     VoxelBlockManagerHandle(const VoxelBlockManagerHandle&) = delete;
@@ -152,7 +143,6 @@ public:
         mBlockCount  = std::exchange(other.mBlockCount,  0);
         mFirstOffset = std::exchange(other.mFirstOffset, 0);
         mLastOffset  = std::exchange(other.mLastOffset,  0);
-        mLeafCount   = std::exchange(other.mLeafCount,   0u);
         return *this;
     }
 
@@ -162,12 +152,10 @@ public:
         , mBlockCount(other.mBlockCount)
         , mFirstOffset(other.mFirstOffset)
         , mLastOffset(other.mLastOffset)
-        , mLeafCount(other.mLeafCount)
     {
         other.mBlockCount = 0;
         other.mFirstOffset = 0;
         other.mLastOffset = 0;
-        other.mLeafCount = 0;
     }
 
     ~VoxelBlockManagerHandle() { this->reset(); }
@@ -181,7 +169,6 @@ public:
             mJumpMap.clear();
         }
         mBlockCount = 0;
-        mLeafCount = 0;
     }
 
     //@{
@@ -209,14 +196,6 @@ public:
 
     /// @brief Returns the last voxel index (linear offset) associated with this VoxelBlockManager
     uint64_t lastOffset() const { return mLastOffset; }
-
-    /// @brief Returns the cached number of leaf nodes in the source grid, or 0 if unknown
-    uint32_t leafCount() const { return mLeafCount; }
-
-    /// @brief Caches the number of leaf nodes in the source grid, so device builds
-    ///        through this handle need not read it back from device memory. A
-    ///        launch-sizing hint only; a stale value cannot affect the build's output.
-    void setLeafCount(uint32_t leafCount) { mLeafCount = leafCount; }
 
     //@{
     /// @brief Returns pointers to the host-side firstLeafID and jumpMap data; not
@@ -546,7 +525,7 @@ buildVoxelBlockManager(
 
     VoxelBlockManagerHandle<BufferT> handle(
         std::move(firstLeafIDBuf), std::move(jumpMapBuf),
-        nBlocks, firstOffset, lastOffset, grid->tree().nodeCount(0));
+        nBlocks, firstOffset, lastOffset);
 
     buildVoxelBlockManager<Log2BlockWidth>(grid, handle);
     return handle;

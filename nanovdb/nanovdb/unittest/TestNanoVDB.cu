@@ -3564,6 +3564,36 @@ void testVoxelBlockManagerTail()
         for (uint64_t w = 0; w < JumpMapLength; ++w) EXPECT_EQ(0u, jumpMap[b * JumpMapLength + w]) << "tail block " << b;
     }
     expectVoxelBlockDecodesToSentinels<Log2BlockWidth>(d_grid, vbm.deviceFirstLeafID(), vbm.deviceJumpMap(), used);
+
+    // A caller-owned handle built inside a CUDA graph capture, which fails on any read
+    // back from the device: building into a handle must be fully stream-asynchronous.
+    using BufferT = nanovdb::cuda::Buffer<std::byte>;
+    nanovdb::tools::VoxelBlockManagerHandle<BufferT> owned(
+        BufferT(cudaStream_t(0), nBlocks * sizeof(uint32_t), nanovdb::cuda::noInit),
+        BufferT(cudaStream_t(0), nBlocks * JumpMapLength * sizeof(uint64_t), nanovdb::cuda::noInit),
+        nBlocks, 1, voxels.size());
+    cudaCheck(cudaMemset(owned.deviceFirstLeafID(), 0xab, nBlocks * sizeof(uint32_t)));
+    cudaCheck(cudaMemset(owned.deviceJumpMap(), 0xab, nBlocks * JumpMapLength * sizeof(uint64_t)));
+    cudaCheck(cudaDeviceSynchronize());
+    cudaStream_t stream;
+    cudaCheck(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+    cudaGraph_t graph;
+    cudaGraphExec_t graphExec;
+    cudaCheck(cudaStreamBeginCapture(stream, cudaStreamCaptureModeGlobal));
+    nanovdb::tools::cuda::buildVoxelBlockManager<Log2BlockWidth>(d_grid, owned, stream);
+    cudaCheck(cudaStreamEndCapture(stream, &graph));
+    cudaCheck(cudaGraphInstantiate(&graphExec, graph, 0));
+    cudaCheck(cudaGraphLaunch(graphExec, stream));
+    cudaCheck(cudaStreamSynchronize(stream));
+    std::vector<uint32_t> ownedFirstLeafID(nBlocks);
+    std::vector<uint64_t> ownedJumpMap(nBlocks * JumpMapLength);
+    cudaCheck(cudaMemcpy(ownedFirstLeafID.data(), owned.deviceFirstLeafID(), ownedFirstLeafID.size() * sizeof(uint32_t), cudaMemcpyDeviceToHost));
+    cudaCheck(cudaMemcpy(ownedJumpMap.data(), owned.deviceJumpMap(), ownedJumpMap.size() * sizeof(uint64_t), cudaMemcpyDeviceToHost));
+    EXPECT_EQ(firstLeafID, ownedFirstLeafID);
+    EXPECT_EQ(jumpMap, ownedJumpMap);
+    cudaCheck(cudaGraphExecDestroy(graphExec));
+    cudaCheck(cudaGraphDestroy(graph));
+    cudaCheck(cudaStreamDestroy(stream));
 }
 
 TEST(TestNanoVDBCUDA, VoxelBlockManagerTail_ValueOnIndex)
