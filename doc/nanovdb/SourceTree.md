@@ -29,7 +29,6 @@ $ tree
 ├── CNanoVDB.h
 ├── cuda
 │   ├── Buffer.h
-│   ├── DeviceBuffer.h
 │   ├── DeviceMesh.h
 │   ├── DeviceResource.h
 │   ├── DeviceStreamMap.h
@@ -38,8 +37,7 @@ $ tree
 │   ├── ManagedResource.h
 │   ├── NodeManager.cuh
 │   ├── PinnedResource.h
-│   ├── TempPool.h
-│   └── UnifiedBuffer.h
+│   └── TempPool.h
 ├── docs
 │   ├── CMakeLists.txt
 │   ├── codingstyle.txt
@@ -160,7 +158,6 @@ $ tree
 │   └── TestOpenVDB.cc
 └── util
     ├── cuda
-    │   ├── CudaDeviceBuffer.h
     │   ├── DeviceGridTraits.cuh
     │   ├── Injection.cuh
     │   ├── Morphology.cuh
