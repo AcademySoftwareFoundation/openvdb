@@ -274,11 +274,12 @@ struct VoxelBlockManager : nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>
 
 namespace detail {
 
-/// @brief Number of CTAs of @c blockSize threads that fill the current device with @c kernel:
-///        resident CTAs per SM times the SM count. Computed once per device and cached, so
-///        launches of a grid-stride kernel need nothing from the data they process.
-template<typename KernelT>
-inline unsigned deviceFillingGridSize(KernelT kernel, int blockSize)
+/// @brief Number of CTAs of @c BlockSize threads that fill the current device with @c Kernel:
+///        resident CTAs per SM times the SM count. Computed once per device and cached for
+///        each kernel and block size, so launches of a grid-stride kernel need nothing from
+///        the data they process.
+template<auto Kernel, int BlockSize>
+inline unsigned deviceFillingGridSize()
 {
     constexpr int MaxCachedDevices = 64;
     static std::atomic<unsigned> cache[MaxCachedDevices]; // zero-initialized: not yet computed
@@ -289,7 +290,7 @@ inline unsigned deviceFillingGridSize(KernelT kernel, int blockSize)
     }
     int smCount = 0, perSM = 0;
     cudaCheck(cudaDeviceGetAttribute(&smCount, cudaDevAttrMultiProcessorCount, device));
-    cudaCheck(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&perSM, kernel, blockSize, 0));
+    cudaCheck(cudaOccupancyMaxActiveBlocksPerMultiprocessor(&perSM, Kernel, BlockSize, 0));
     const unsigned n = unsigned(smCount > 0 ? smCount : 1) * unsigned(perSM > 0 ? perSM : 1);
     if (device < MaxCachedDevices) cache[device].store(n, std::memory_order_relaxed);
     return n;
@@ -610,7 +611,7 @@ void buildVoxelBlockManager(
     using Op = BuildVoxelBlockManagerFunctor<Log2BlockWidth>;
     constexpr auto kernel = util::cuda::operatorKernel<Op, uint64_t, uint64_t, uint64_t,
         NanoGrid<ValueOnIndex>*, uint32_t*, uint64_t*>;
-    kernel<<<detail::deviceFillingGridSize(kernel, Op::MaxThreadsPerBlock), Op::MaxThreadsPerBlock, 0, stream>>>(
+    kernel<<<detail::deviceFillingGridSize<kernel, Op::MaxThreadsPerBlock>(), Op::MaxThreadsPerBlock, 0, stream>>>(
         handle.firstOffset(), handle.lastOffset(), handle.blockCount(),
         d_grid, handle.deviceFirstLeafID(), handle.deviceJumpMap());
 }
