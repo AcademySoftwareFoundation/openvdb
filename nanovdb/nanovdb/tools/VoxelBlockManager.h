@@ -267,7 +267,14 @@ struct VoxelBlockManagerBase
     ///        bit of the slot where it starts when that slot is not a block's first. Shared by
     ///        the CPU and CUDA builders. Leaves write disjoint firstLeafID entries when the
     ///        grid meets the preconditions; jumpMap words are shared, hence the atomic OR.
-    /// @param leafCount  Number of leaves in the grid; read only by the precondition assert
+    /// @param grid         Grid that meets the topology preconditions
+    /// @param leafIndex    Index of the leaf to record
+    /// @param leafCount    Number of leaves in the grid; read only by the precondition assert
+    /// @param firstOffset  First value index the VBM covers
+    /// @param lastOffset   Last value index the VBM covers
+    /// @param nBlocks      Number of blocks in firstLeafID and jumpMap
+    /// @param firstLeafID  The VBM's firstLeafID array
+    /// @param jumpMap      The VBM's jumpMap array, zeroed before the first leaf is recorded
     __hostdev__ static void
     buildLeaf(
         const NanoGrid<ValueOnIndex> *grid,
@@ -314,6 +321,7 @@ struct VoxelBlockManagerBase
 /// @brief Checks the VoxelBlockManager's topology preconditions (see the file documentation)
 ///        on a host-accessible grid: sequential layout, no empty leaves, and leaf value indices
 ///        that tile [1, lastOffset] or more in leaf order. Linear in the leaf count.
+/// @param grid        Host-accessible grid to check; null is reported incompatible
 /// @param lastOffset  Last value index the VBM covers; 0 (default) means activeVoxelCount,
 ///                    the whole grid, as in buildVoxelBlockManager's default
 inline bool isVoxelBlockManagerCompatible(const NanoGrid<ValueOnIndex>* grid, uint64_t lastOffset = 0)
