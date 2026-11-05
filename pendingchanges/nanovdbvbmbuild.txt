@@ -1,0 +1,38 @@
+NanoVDB:
+  Improvements:
+  - Reworked the CUDA VoxelBlockManager build to loop over the dense leaf array, one
+    leaf per thread, instead of over every lower-node child slot gated on the
+    childMask; outputs are byte-identical and builds measured 1.6-2x faster. The
+    kernel reads the leaf count from the device-resident tree and loops grid-stride,
+    and its launch is sized to fill the device, so a build into a pre-allocated handle
+    no longer reads the node count back from the device and is fully
+    stream-asynchronous. The allocating overload reads the active voxel count back
+    only when lastOffset is not given.
+  - Added tools::cuda::buildVoxelBlockManagerBatch, which builds the VoxelBlockManagers
+    of a batch of grids into shared arrays with one memset and one kernel launch and
+    no host synchronization. Each grid's slice is byte-identical to its single-grid
+    build. Grids are described by VoxelBlockManagerBatchEntry records, read from a
+    device array or produced by any device-callable entry source, so callers can derive
+    them in the build kernel. A source may also provide leafBase(g), which the kernel's
+    per-leaf grid search then reads instead of whole entries. Grids' block ranges may
+    leave gaps between them.
+  - Documented the VoxelBlockManager's topology preconditions: an OnIndex grid's leaves
+    must each hold an active voxel and tile the value indices from 1 in leaf order, up
+    to at least the VBM's lastOffset. The default lastOffset is activeVoxelCount, which
+    also rules out active tiles. createNanoGrid meets them only with
+    includeStats and includeTiles off. The CPU and CUDA builders now share one per-leaf
+    routine, which asserts the preconditions in builds with assertions enabled.
+  - Every VoxelBlockManager block that covers no voxel, from extra capacity in a
+    single-grid build or a gap in a batched build, now gets UnusedLeafIndex as its
+    firstLeafID and a zero jumpMap, on both CPU and CUDA. The CPU and CUDA decodes
+    return sentinels for such a block instead of reading an invalid leaf.
+  API Changes:
+  - Added tools::isVoxelBlockManagerCompatible, which checks a host-accessible
+    OnIndex grid against the VoxelBlockManager's topology preconditions, for the
+    whole grid or up to a given lastOffset.
+  - Added tools::cuda::VoxelBlockManagerBatchView, a host- and device-callable view of a
+    batched VoxelBlockManager build. It gives each grid's slice of the shared arrays and
+    the grid that owns a batch-wide block, or UnusedGridIndex for a gap, and a cheaper
+    lastGridAtOrBefore(b) for callers that check the grid's extent themselves. Entry sources
+    may provide blockBase(g) and voxelCount(g), which the view then reads instead of
+    whole entries. VoxelBlockManagerBatchEntryArray is now callable on the host too.
