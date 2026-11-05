@@ -15,6 +15,11 @@
 #ifndef NANOVDB_TOOLS_CUDA_POINTSTOGRID_CUH_HAS_BEEN_INCLUDED
 #define NANOVDB_TOOLS_CUDA_POINTSTOGRID_CUH_HAS_BEEN_INCLUDED
 
+// Older CCCL releases lack <cuda/version>, so report them with the same message
+#if !__has_include(<cuda/version>)
+#error "nanovdb/tools/cuda/PointsToGrid.cuh requires CCCL 3.2 or newer"
+#endif
+
 #include <cuda/version>
 
 #if CCCL_VERSION < 3002000

@@ -199,24 +199,32 @@ if(NANOVDB_USE_CUDA)
     # before it creates any targets, so a too-old toolkit CCCL leaves the
     # fetch below free to define CCCL::CCCL. The file also rejects other
     # major versions, so the next major is looked for first.
-    string(REGEX MATCH "^[0-9]+" _nanovdb_cccl_major ${MINIMUM_CCCL_VERSION})
-    math(EXPR _nanovdb_cccl_next_major "${_nanovdb_cccl_major} + 1")
-    # A failed find_package overwrites CCCL_DIR, so each request restores it.
-    set(_nanovdb_cccl_dir "${CCCL_DIR}")
-    foreach(_nanovdb_cccl_request ${_nanovdb_cccl_next_major}.0 ${MINIMUM_CCCL_VERSION})
-      if(NOT TARGET CCCL::CCCL)
-        if(_nanovdb_cccl_dir)
-          set(CCCL_DIR "${_nanovdb_cccl_dir}" CACHE PATH
-            "The directory containing a CMake configuration file for CCCL." FORCE)
+    #
+    # MINIMUM_CCCL_VERSION is empty when DISABLE_DEPENDENCY_VERSION_CHECKS is
+    # ON, and any CCCL is then accepted.
+    if(MINIMUM_CCCL_VERSION)
+      string(REGEX MATCH "^[0-9]+" _nanovdb_cccl_major "${MINIMUM_CCCL_VERSION}")
+      math(EXPR _nanovdb_cccl_next_major "${_nanovdb_cccl_major} + 1")
+      # A failed find_package overwrites CCCL_DIR, so each request restores it.
+      set(_nanovdb_cccl_dir "${CCCL_DIR}")
+      foreach(_nanovdb_cccl_request ${_nanovdb_cccl_next_major}.0 ${MINIMUM_CCCL_VERSION})
+        if(NOT TARGET CCCL::CCCL)
+          if(_nanovdb_cccl_dir)
+            set(CCCL_DIR "${_nanovdb_cccl_dir}" CACHE PATH
+              "The directory containing a CMake configuration file for CCCL." FORCE)
+          endif()
+          find_package(CCCL ${_nanovdb_cccl_request} CONFIG QUIET
+            HINTS "${CUDAToolkit_TARGET_DIR}/lib/cmake" "${CUDAToolkit_LIBRARY_DIR}/cmake")
         endif()
-        find_package(CCCL ${_nanovdb_cccl_request} CONFIG QUIET
-          HINTS "${CUDAToolkit_TARGET_DIR}/lib/cmake" "${CUDAToolkit_LIBRARY_DIR}/cmake")
-      endif()
-    endforeach()
-    unset(_nanovdb_cccl_major)
-    unset(_nanovdb_cccl_next_major)
-    unset(_nanovdb_cccl_request)
-    unset(_nanovdb_cccl_dir)
+      endforeach()
+      unset(_nanovdb_cccl_major)
+      unset(_nanovdb_cccl_next_major)
+      unset(_nanovdb_cccl_request)
+      unset(_nanovdb_cccl_dir)
+    else()
+      find_package(CCCL CONFIG QUIET
+        HINTS "${CUDAToolkit_TARGET_DIR}/lib/cmake" "${CUDAToolkit_LIBRARY_DIR}/cmake")
+    endif()
   endif()
   if(NOT TARGET CCCL::CCCL)
     include(../../cmake/CPM.cmake)
@@ -232,20 +240,22 @@ if(NANOVDB_USE_CUDA)
   # CCCL's version file only accepts its own major version, so NanoVDB checks
   # the minimum itself, whichever source provided CCCL::CCCL. CPM records the
   # version of a CCCL it added in CPM_PACKAGE_CCCL_VERSION.
-  if(CCCL_VERSION)
-    set(_nanovdb_cccl_version ${CCCL_VERSION})
-  else()
-    set(_nanovdb_cccl_version ${CPM_PACKAGE_CCCL_VERSION})
+  if(MINIMUM_CCCL_VERSION)
+    if(CCCL_VERSION)
+      set(_nanovdb_cccl_version ${CCCL_VERSION})
+    else()
+      set(_nanovdb_cccl_version ${CPM_PACKAGE_CCCL_VERSION})
+    endif()
+    if(NOT _nanovdb_cccl_version)
+      message(WARNING "Could not determine the version of CCCL::CCCL, so NanoVDB "
+        "cannot check that it is at least ${MINIMUM_CCCL_VERSION}.")
+    elseif(_nanovdb_cccl_version VERSION_LESS MINIMUM_CCCL_VERSION)
+      message(FATAL_ERROR "NanoVDB requires CCCL ${MINIMUM_CCCL_VERSION} or newer, but found "
+        "${_nanovdb_cccl_version}. Set CCCL_DIR to a newer CCCL, or set "
+        "NANOVDB_FETCH_CCCL=ON to clone CCCL ${NANOVDB_CCCL_TAG}.")
+    endif()
+    unset(_nanovdb_cccl_version)
   endif()
-  if(NOT _nanovdb_cccl_version)
-    message(WARNING "Could not determine the version of CCCL::CCCL, so NanoVDB "
-      "cannot check that it is at least ${MINIMUM_CCCL_VERSION}.")
-  elseif(_nanovdb_cccl_version VERSION_LESS MINIMUM_CCCL_VERSION)
-    message(FATAL_ERROR "NanoVDB requires CCCL ${MINIMUM_CCCL_VERSION} or newer, but found "
-      "${_nanovdb_cccl_version}. Set CCCL_DIR to a newer CCCL, or set "
-      "NANOVDB_FETCH_CCCL=ON to clone CCCL ${NANOVDB_CCCL_TAG}.")
-  endif()
-  unset(_nanovdb_cccl_version)
 
   if(NANOVDB_USE_NCCL)
     find_package(NCCL REQUIRED)
