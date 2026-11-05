@@ -3584,6 +3584,46 @@ struct VoxelBlockManagerBatchTestSource
     }
 };
 
+// Entry source whose whole entries carry wrong block bases and voxel counts, and whose
+// blockBase(g) and voxelCount(g) are right, so a view built on it is right only if it reads
+// those two through the hooks. The hooks take int64_t, as fvdb's BatchVbmLayout does.
+struct VoxelBlockManagerBatchHookSource
+{
+    const nanovdb::tools::cuda::VoxelBlockManagerBatchEntry *entries;
+
+    __hostdev__ nanovdb::tools::cuda::VoxelBlockManagerBatchEntry operator()(uint32_t g) const
+    {
+        auto entry = entries[g];
+        entry.blockBase = entry.voxelCount = ~uint64_t(0);
+        return entry;
+    }
+    __hostdev__ uint64_t blockBase(int64_t g) const { return entries[g].blockBase; }
+    __hostdev__ uint64_t voxelCount(int64_t g) const { return entries[g].voxelCount; }
+};
+
+// Decodes every voxel of a batch through a VoxelBlockManagerBatchView, one CUDA block per
+// VBM block, and counts the voxels decoded and those whose value index is not their slot's.
+template<int Log2BlockWidth, typename ViewT>
+__global__ void testBatchViewDecodeKernel(const ViewT view, unsigned long long *decoded, unsigned long long *errors)
+{
+    using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
+    const uint64_t b = blockIdx.x;
+    const int p = threadIdx.x;
+    const uint32_t g = view.gridOfBlock(b);
+    if (g == ViewT::UnusedGridIndex) return;
+    const uint64_t localBlock = b - view.blockBase(g);
+    const uint64_t i = localBlock * VBM::BlockWidth + p; // 0-based voxel in grid g
+    if (i >= view.voxelCount(g)) return;
+    const auto *grid = view.entry(g).grid;
+    uint32_t leafIndex;
+    uint16_t voxelOffset;
+    VBM::decodeInverseMap(grid, view.firstLeafID(g)[localBlock], view.jumpMap(g) + localBlock * VBM::JumpMapLength,
+                          1 + localBlock * VBM::BlockWidth, p, leafIndex, voxelOffset);
+    atomicAdd(decoded, 1ull);
+    if (leafIndex == VBM::UnusedLeafIndex ||
+        grid->tree().template getFirstNode<0>()[leafIndex].getValue(voxelOffset) != i + 1) atomicAdd(errors, 1ull);
+}
+
 // gapped: leave one unused block before the first grid and after every grid, and build
 // through an entry source.
 template<int Log2BlockWidth>
@@ -3703,6 +3743,55 @@ void testVoxelBlockManagerBatch(bool gapped)
     }
     EXPECT_EQ(gapped ? gridCount + 1 : 0u, gapCount);
     if (gapped) expectVoxelBlockDecodesToSentinels<Log2BlockWidth>(entries[1].grid, d_firstLeafID, d_jumpMap, 0);
+
+    // The view on the host: every block's owner, and each grid's slice. The hook source is
+    // right only through blockBase(g) and voxelCount(g).
+    std::vector<uint32_t> owner(blockCount, ~uint32_t(0));
+    for (uint32_t g = 0; g < gridCount; ++g) {
+        const uint64_t nBlocks = (entries[g].voxelCount + BlockWidth - 1) / BlockWidth;
+        for (uint64_t b = 0; b < nBlocks; ++b) owner[entries[g].blockBase + b] = g;
+    }
+    auto checkHostView = [&](const auto &view) {
+        using ViewT = std::decay_t<decltype(view)>;
+        EXPECT_EQ(gridCount, view.gridCount());
+        EXPECT_EQ(blockCount, view.blockCount());
+        for (uint64_t b = 0; b < blockCount; ++b) {
+            EXPECT_EQ(owner[b] == ~uint32_t(0) ? ViewT::UnusedGridIndex : owner[b], view.gridOfBlock(b)) << "block " << b;
+        }
+        EXPECT_EQ(ViewT::UnusedGridIndex, view.gridOfBlock(blockCount));
+        for (uint32_t g = 0; g < gridCount; ++g) {
+            EXPECT_EQ((entries[g].voxelCount + BlockWidth - 1) / BlockWidth, view.blockCount(g)) << "grid " << g;
+            EXPECT_EQ(firstLeafID.data() + entries[g].blockBase, view.firstLeafID(g)) << "grid " << g;
+            EXPECT_EQ(jumpMap.data() + entries[g].blockBase * JumpMapLength, view.jumpMap(g)) << "grid " << g;
+        }
+    };
+    checkHostView(nanovdb::tools::cuda::VoxelBlockManagerBatchView<Log2BlockWidth>(
+        nanovdb::tools::cuda::VoxelBlockManagerBatchEntryArray{entries.data()}, gridCount, blockCount,
+        firstLeafID.data(), jumpMap.data()));
+    checkHostView(nanovdb::tools::cuda::VoxelBlockManagerBatchView<Log2BlockWidth, VoxelBlockManagerBatchHookSource>(
+        VoxelBlockManagerBatchHookSource{entries.data()}, gridCount, blockCount, firstLeafID.data(), jumpMap.data()));
+
+    // The view on the device: decode every voxel of the batch through it.
+    uint64_t voxelCount = 0;
+    for (const auto &entry : entries) voxelCount += entry.voxelCount;
+    unsigned long long *d_counts;
+    cudaCheck(cudaMalloc(&d_counts, 2 * sizeof(unsigned long long)));
+    cudaCheck(cudaMemset(d_counts, 0, 2 * sizeof(unsigned long long)));
+    if (gapped) {
+        const nanovdb::tools::cuda::VoxelBlockManagerBatchView<Log2BlockWidth, VoxelBlockManagerBatchTestSource> view(
+            VoxelBlockManagerBatchTestSource{d_entries}, gridCount, blockCount, d_firstLeafID, d_jumpMap);
+        testBatchViewDecodeKernel<Log2BlockWidth><<<blockCount, BlockWidth>>>(view, d_counts, d_counts + 1);
+    } else {
+        const nanovdb::tools::cuda::VoxelBlockManagerBatchView<Log2BlockWidth> view(
+            nanovdb::tools::cuda::VoxelBlockManagerBatchEntryArray{d_entries}, gridCount, blockCount, d_firstLeafID, d_jumpMap);
+        testBatchViewDecodeKernel<Log2BlockWidth><<<blockCount, BlockWidth>>>(view, d_counts, d_counts + 1);
+    }
+    cudaCheck(cudaGetLastError());
+    unsigned long long counts[2];
+    cudaCheck(cudaMemcpy(counts, d_counts, sizeof(counts), cudaMemcpyDeviceToHost));
+    cudaCheck(cudaFree(d_counts));
+    EXPECT_EQ(voxelCount, counts[0]);
+    EXPECT_EQ(0u, counts[1]);
 
     cudaCheck(cudaFree(d_entries));
     cudaCheck(cudaFree(d_firstLeafID));

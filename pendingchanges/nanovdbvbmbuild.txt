@@ -32,3 +32,8 @@ NanoVDB:
   - Added tools::isVoxelBlockManagerCompatible, which checks a host-accessible
     OnIndex grid against the VoxelBlockManager's topology preconditions, for the
     whole grid or up to a given lastOffset.
+  - Added tools::cuda::VoxelBlockManagerBatchView, a host- and device-callable view of a
+    batched VoxelBlockManager build. It gives each grid's slice of the shared arrays and
+    the grid that owns a batch-wide block, or UnusedGridIndex for a gap. Entry sources
+    may provide blockBase(g) and voxelCount(g), which the view then reads instead of
+    whole entries. VoxelBlockManagerBatchEntryArray is now callable on the host too.

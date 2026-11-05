@@ -19,6 +19,8 @@
         jumpMap on the GPU from a device-resident NanoGrid.
       - buildVoxelBlockManagerBatch (device): builds the VBMs of a batch of grids
         into shared arrays with one kernel launch and no host synchronization.
+      - VoxelBlockManagerBatchView (host/device): each grid's slice of a batched
+        build, and the grid that owns a batch-wide block.
       - decodeInverseMap (device): per-slot, thread-local decode of one inverse
         map entry (sequential active-voxel index -> leaf ID + intra-leaf voxel
         offset) into registers; no shared memory or synchronization, callable
@@ -330,12 +332,147 @@ struct VoxelBlockManagerBatchEntry
     uint32_t leafBase;                  // exclusive prefix sum of the grids' leaf counts
 };
 
-/// @brief Entry source over a device array of VoxelBlockManagerBatchEntry records.
+/// @brief Entry source over an array of VoxelBlockManagerBatchEntry records, in device memory
+///        for the build and in either memory space for a VoxelBlockManagerBatchView.
 struct VoxelBlockManagerBatchEntryArray
 {
     const VoxelBlockManagerBatchEntry *entries;
 
-    __device__ VoxelBlockManagerBatchEntry operator()(uint32_t g) const { return entries[g]; }
+    __hostdev__ VoxelBlockManagerBatchEntry operator()(uint32_t g) const { return entries[g]; }
+};
+
+namespace detail {
+
+/// @brief Number of the n ascending keys key(0), ..., key(n - 1) that do not exceed x.
+///        The last of them, at that count minus one, is the owner of x in a list of bases.
+NANOVDB_HOSTDEV_DISABLE_WARNING
+template<typename KeyT>
+__hostdev__ inline uint32_t countAtOrBelow(uint32_t n, uint64_t x, const KeyT &key)
+{
+    uint32_t lo = 0, hi = n;
+    while (lo < hi) {
+        const uint32_t mid = (lo + hi) >> 1;
+        if (key(mid) <= x) lo = mid + 1; else hi = mid;
+    }
+    return lo;
+}
+
+/// @brief Detects an entry source's optional blockBase(g) and voxelCount(g). A source that
+///        can produce those fields more cheaply than a whole entry, e.g. from one compact
+///        array, provides them so that searches and per-grid lookups read only what they need.
+template<typename T, typename = void>
+struct HasBlockBase : std::false_type {};
+template<typename T>
+struct HasBlockBase<T, std::void_t<decltype(std::declval<const T&>().blockBase(uint32_t(0)))>> : std::true_type {};
+template<typename T, typename = void>
+struct HasVoxelCount : std::false_type {};
+template<typename T>
+struct HasVoxelCount<T, std::void_t<decltype(std::declval<const T&>().voxelCount(uint32_t(0)))>> : std::true_type {};
+
+NANOVDB_HOSTDEV_DISABLE_WARNING
+template<typename EntrySource>
+__hostdev__ inline uint64_t entryBlockBase(const EntrySource &entries, uint32_t g)
+{
+    if constexpr (HasBlockBase<EntrySource>::value) return uint64_t(entries.blockBase(g));
+    else return entries(g).blockBase;
+}
+
+NANOVDB_HOSTDEV_DISABLE_WARNING
+template<typename EntrySource>
+__hostdev__ inline uint64_t entryVoxelCount(const EntrySource &entries, uint32_t g)
+{
+    if constexpr (HasVoxelCount<EntrySource>::value) return uint64_t(entries.voxelCount(g));
+    else return entries(g).voxelCount;
+}
+
+} // namespace detail
+
+/// @brief Read-only view of a batched VoxelBlockManager build: the shared firstLeafID and
+///        jumpMap arrays plus the entry source that placed the grids in them. Gives each
+///        grid's slice of the arrays, and maps a batch-wide block to its grid. Grid g's slice
+///        decodes with the usual per-grid calls, at block offsets relative to the slice.
+///        Callable on the host and the device, wherever the entry source and arrays live.
+/// @tparam Log2BlockWidth  Log2 of the number of active voxels per VBM block
+/// @tparam EntrySource     Callable with VoxelBlockManagerBatchEntry operator()(uint32_t g)
+///                         const, as for buildVoxelBlockManagerBatch. It may also provide
+///                         blockBase(g) and voxelCount(g); the view then reads those instead
+///                         of whole entries.
+template<int Log2BlockWidth, typename EntrySource = VoxelBlockManagerBatchEntryArray>
+class VoxelBlockManagerBatchView
+{
+public:
+    using Base = nanovdb::tools::VoxelBlockManagerBase<Log2BlockWidth>;
+    static constexpr int BlockWidth = Base::BlockWidth;
+    static constexpr int JumpMapLength = Base::JumpMapLength;
+    /// Returned by gridOfBlock for a block that belongs to no grid
+    static constexpr uint32_t UnusedGridIndex = ~uint32_t{0};
+
+    /// @param entries      Entry source the batch was built from
+    /// @param gridCount    Number of grids in the batch
+    /// @param blockCount   Total blocks in the batch, gaps included
+    /// @param firstLeafID  The batch's firstLeafID array of blockCount entries
+    /// @param jumpMap      The batch's jumpMap array of blockCount * JumpMapLength words
+    __hostdev__ VoxelBlockManagerBatchView(const EntrySource &entries, uint32_t gridCount, uint64_t blockCount,
+                                           const uint32_t *firstLeafID, const uint64_t *jumpMap)
+        : mEntries(entries), mGridCount(gridCount), mBlockCount(blockCount)
+        , mFirstLeafID(firstLeafID), mJumpMap(jumpMap) {}
+
+    __hostdev__ uint32_t gridCount() const { return mGridCount; }
+
+    /// @brief Total blocks in the batch, gaps included
+    __hostdev__ uint64_t blockCount() const { return mBlockCount; }
+
+    /// @brief The batch's whole firstLeafID array; gap blocks hold UnusedLeafIndex
+    __hostdev__ const uint32_t *firstLeafID() const { return mFirstLeafID; }
+
+    /// @brief The batch's whole jumpMap array; gap blocks are zero
+    __hostdev__ const uint64_t *jumpMap() const { return mJumpMap; }
+
+    NANOVDB_HOSTDEV_DISABLE_WARNING
+    __hostdev__ VoxelBlockManagerBatchEntry entry(uint32_t g) const { return mEntries(g); }
+
+    /// @brief First block of grid g in the batch's arrays
+    NANOVDB_HOSTDEV_DISABLE_WARNING
+    __hostdev__ uint64_t blockBase(uint32_t g) const { return detail::entryBlockBase(mEntries, g); }
+
+    /// @brief Active voxels in grid g
+    NANOVDB_HOSTDEV_DISABLE_WARNING
+    __hostdev__ uint64_t voxelCount(uint32_t g) const { return detail::entryVoxelCount(mEntries, g); }
+
+    /// @brief Number of blocks of grid g: ceil(voxelCount / BlockWidth), 0 for an empty grid
+    __hostdev__ uint64_t blockCount(uint32_t g) const
+    {
+        return (this->voxelCount(g) + BlockWidth - 1) >> Log2BlockWidth;
+    }
+
+    /// @brief Grid g's slice of the firstLeafID array, blockCount(g) entries long
+    __hostdev__ const uint32_t *firstLeafID(uint32_t g) const { return mFirstLeafID + this->blockBase(g); }
+
+    /// @brief Grid g's slice of the jumpMap array, blockCount(g) * JumpMapLength words long
+    __hostdev__ const uint64_t *jumpMap(uint32_t g) const
+    {
+        return mJumpMap + this->blockBase(g) * JumpMapLength;
+    }
+
+    /// @brief The grid that owns batch-wide block b, or UnusedGridIndex for a gap block
+    ///        (before, between or after the grids). The owner's slice holds b at local
+    ///        block b - blockBase(owner). A binary search over the grids' block bases.
+    NANOVDB_HOSTDEV_DISABLE_WARNING
+    __hostdev__ uint32_t gridOfBlock(uint64_t b) const
+    {
+        const uint32_t n = detail::countAtOrBelow(mGridCount, b,
+            [this](uint32_t g) { return this->blockBase(g); });
+        if (n == 0) return UnusedGridIndex;
+        const uint32_t g = n - 1;
+        return b - this->blockBase(g) < this->blockCount(g) ? g : UnusedGridIndex;
+    }
+
+private:
+    EntrySource mEntries;
+    uint32_t mGridCount;
+    uint64_t mBlockCount;
+    const uint32_t *mFirstLeafID;
+    const uint64_t *mJumpMap;
 };
 
 /// @brief Builds the VBMs of a batch of grids, one thread per leaf across the batch. Each
@@ -367,12 +504,9 @@ struct BuildVoxelBlockManagerBatchFunctor
         {
             // The last grid whose leaf base does not exceed tID; grids without leaves share
             // their successor's base and are skipped that way.
-            uint32_t lo = 0, hi = gridCount;
-            while (lo < hi) {
-                const uint32_t mid = (lo + hi) >> 1;
-                if (entries(mid).leafBase <= tID) lo = mid + 1; else hi = mid;
-            }
-            const VoxelBlockManagerBatchEntry entry = entries(lo - 1);
+            const uint32_t n = detail::countAtOrBelow(gridCount, tID,
+                [&entries](uint32_t g) { return uint64_t(entries(g).leafBase); });
+            const VoxelBlockManagerBatchEntry entry = entries(n - 1);
             const uint32_t leafIndex = uint32_t(tID) - entry.leafBase;
             if (!entry.voxelCount) continue;
             const uint32_t gridLeafCount = entry.grid->tree().nodeCount(0);
