@@ -1713,6 +1713,18 @@ struct ClampedOffset {
     __hostdev__ uint64_t operator()(uint32_t g) const { return offsets[g] < count ? offsets[g] : count; }
 };
 
+/// @brief End of segment @a g, clamped to the point count and to the segment's begin
+///
+/// @details CUB treats a segment as empty only when its begin equals its end, so decreasing
+///          offsets the host has not yet validated would otherwise give it a negative length.
+struct ClampedSegmentEnd {
+    ClampedOffset begin;
+    __hostdev__ uint64_t operator()(uint32_t g) const {
+        const uint64_t b = begin(g), e = begin(g + 1u);
+        return e < b ? b : e;
+    }
+};
+
 /// @brief Moves batch-wide tile indices to per-grid ones: key i, owned by the grid whose
 ///        range of @a starts holds it, drops that grid's first tile index shifted by @a shift
 struct RebaseTileFunctor {
@@ -1919,9 +1931,11 @@ void VoxelsToGridBatch<BuildT, ResourceT>::countNodes(const PtrT voxels, size_t 
 
         // Every grid's node and voxel counts, read back together with the offsets below
         BufT<detail::NodeCounts> countsScratch(mStream, this->ref(), gridCount, nanovdb::cuda::noInit);
-        const auto segmentBegin = ::cuda::make_transform_iterator(::cuda::make_counting_iterator<uint32_t>(0), detail::ClampedOffset{d_offsets, pointCount});
+        const detail::ClampedOffset clampedOffset{d_offsets, pointCount};
+        const auto segmentBegin = ::cuda::make_transform_iterator(pointIndex, clampedOffset);
+        const auto segmentEnd = ::cuda::make_transform_iterator(pointIndex, detail::ClampedSegmentEnd{clampedOffset});
         CALL_CUBS(DeviceSegmentedReduce::Reduce, ::cuda::make_transform_iterator(pointIndex, detail::NodeStarts{d_keys}), countsScratch.data(),
-                  gridCount, segmentBegin, segmentBegin + 1, detail::SumNodeCounts(), detail::NodeCounts{0u, 0u, 0u, 0u});
+                  gridCount, segmentBegin, segmentEnd, detail::SumNodeCounts(), detail::NodeCounts{0u, 0u, 0u, 0u});
         cudaCheck(cudaMemcpyAsync(counts.data(), countsScratch.data(), gridCount * sizeof(detail::NodeCounts), cudaMemcpyDeviceToHost, mStream));
     }
     cudaCheck(cudaMemcpyAsync(offsets.data(), d_offsets, (gridCount + 1u) * sizeof(uint64_t), cudaMemcpyDeviceToHost, mStream));
