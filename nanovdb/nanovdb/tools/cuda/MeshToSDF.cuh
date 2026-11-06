@@ -428,8 +428,7 @@ anchorGeometry(uint64_t nv, const nanovdb::Coord& nijk, const float* dSDF, float
 /// @brief Whether the anchor with @a base and @a dir places @a q outside: on the same side of the surface as itself.
 __hostdev__ inline bool isExteriorBy(const nanovdb::Vec3f& base, const nanovdb::Vec3f& dir, const nanovdb::Vec3f& q)
 {
-    nanovdb::Vec3f dq = q - base; dq.normalize();  // surface -> q
-    return dir.dot(dq) > 0.f;
+    return dir.dot(q - base) > 0.f;
 }
 
 /// @brief Negate the distance of every barrier voxel; slot 0, the background, is left as is.
