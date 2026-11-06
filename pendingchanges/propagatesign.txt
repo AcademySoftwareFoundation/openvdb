@@ -3,6 +3,13 @@ NanoVDB:
   - Added tools::cuda::PropagateSign: given the SDF values of the active voxels of a ValueOnIndex level set,
     it computes which inactive voxels, at every tree level, take the background value with its sign inverted,
     without modifying the grid. It fills caller-allocated masks per level (leaf, lower, upper) and returns the
-    origins of the inverted upper-node-sized regions without a root-table entry. Added a companion
-    ex_propagate_sign_nanovdb_cuda example, which checks the masks against an OpenVDB level set, and unit
-    tests.
+    origins of the upper-node-sized regions without a root-table entry that it finds to be interior. Added a
+    companion ex_propagate_sign_nanovdb_cuda example, which checks the masks against an OpenVDB level set,
+    and unit tests.
+  Improvements:
+  - Added nanovdb::util::cuda::DeviceGridTraits::getFlags, which reads a device grid's GridFlags back to the
+    host; like the other getters, it blocks on the given stream.
+  - Added nanovdb::util::morphology::Mask2D, one x-slice of a leaf, lower or upper node Mask held in
+    registers, with a 2D MaskShift within the slice, and a warp-cooperative overload of
+    util::morphology::cuda::MaskShift that shifts a whole node Mask held by a warp as Mask2D slices, one per
+    lane.
