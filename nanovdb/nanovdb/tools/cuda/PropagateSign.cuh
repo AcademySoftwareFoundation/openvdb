@@ -177,7 +177,8 @@ private:
     void fillLowerAndSeedCoarserLevels();
     void fillUpperAndSeedCoarserLevels();
 
-    // Stage 4: if stages 1-3 set any root seed, expand the seeds through the tiles without a root-table entry.
+    // Stage 4: if stages 1-3 set any root seed, expand the seeds through the tiles without a root-table entry. It
+    // forwards to floodfill::detail::fillRootInvertTiles, which takes its inputs explicitly, so that tests reach it.
     void fillRootInvertTiles();
 
     /// @brief Borrowed handle to the injected resource, for the scratch allocated after construction.
@@ -621,26 +622,49 @@ struct RootTileOriginFunctor
     }
 }; // RootTileOriginFunctor
 
-} // namespace floodfill::detail
-
-template <typename BuildT, typename ValueT, typename ResourceT>
-void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
+/// @brief Stage 4 of PropagateSign: the origins of the interior tiles without a root-table entry, from the root face
+///        seeds that stages 1-3 set (see seedAcrossFace).
+/// @param deviceGrid Device grid; only its root table and its root's index bounding box are read.
+/// @param deviceRootFaceSeeds Device array of one word per root-table entry, in table order: bit f (see Face) is set
+///        if the tile across face f of the entry, which has no root-table entry, is interior.
+/// @param entryCount The number of root-table entries.
+/// @param stream Stream on which all work and allocations are ordered.
+/// @param resource Resource that the result and the scratch are allocated from.
+/// @param tempPool Pool for cub's temporary storage, drawing on @a resource.
+/// @return The origins, in increasing (x, y, z) order; empty if there are none.
+/// @throw std::runtime_error if the interior reaches past the bounding box of the root-table entries (preconditions 2
+///        or 3 of PropagateSign).
+template <typename BuildT, typename ResourceT>
+nanovdb::cuda::Buffer<nanovdb::Coord, nanovdb::cuda::ResourceRef<ResourceT>>
+fillRootInvertTiles(const NanoGrid<BuildT>* deviceGrid, const uint32_t* deviceRootFaceSeeds, uint32_t entryCount,
+                    cudaStream_t stream, ResourceT& resource, nanovdb::cuda::TempPool<ResourceT>& tempPool)
 {
+    using RefT          = nanovdb::cuda::ResourceRef<ResourceT>;
+    using KeyBufferT    = nanovdb::cuda::Buffer<uint64_t, RefT>;
+    using FlagBufferT   = nanovdb::cuda::Buffer<uint8_t, RefT>;
+    using CountsBufferT = nanovdb::cuda::Buffer<RoundCounts, RefT>;
+    using CoordBufferT  = nanovdb::cuda::Buffer<nanovdb::Coord, RefT>;
+
+    // CALL_CUBS draws on mTempDevicePool and orders its calls on mStream, by name.
+    nanovdb::cuda::TempPool<ResourceT>& mTempDevicePool = tempPool;
+    const cudaStream_t                  mStream = stream;
+    const RefT                          ref(resource);
+    CoordBufferT                        origins(mStream, ref, 0, nanovdb::cuda::noInit);
+
     // Decide: read the root face seeds back; if no flag is set, no tile without a root-table entry is interior.
-    const uint32_t entryCount = uint32_t(mRootFaceSeeds.size());
-    if (entryCount == 0) return; // null grid, no root tiles
+    if (entryCount == 0) return origins; // null grid, no root tiles
     std::vector<uint32_t> faceSeeds(entryCount);
-    cudaCheck(cudaMemcpyAsync(faceSeeds.data(), mRootFaceSeeds.data(), mRootFaceSeeds.size_bytes(),
+    cudaCheck(cudaMemcpyAsync(faceSeeds.data(), deviceRootFaceSeeds, entryCount * sizeof(uint32_t),
                               cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaStreamSynchronize(mStream));
     if (std::none_of(faceSeeds.begin(), faceSeeds.end(), [](uint32_t seeds) { return seeds != 0; }))
-        return;
+        return origins;
 
     // Expand. The entries' keys, in table order so that round 1 pairs them with their face seeds.
     static constexpr unsigned int threadsPerBlock = 128;
-    BufferT<uint64_t> entryKeys(mStream, this->ref(), entryCount, nanovdb::cuda::noInit);
+    KeyBufferT entryKeys(mStream, ref, entryCount, nanovdb::cuda::noInit);
     util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(entryCount, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
-        entryCount, floodfill::detail::RootEntryKeyFunctor<BuildT>{}, mDeviceGrid, entryKeys.data());
+        entryCount, RootEntryKeyFunctor<BuildT>{}, deviceGrid, entryKeys.data());
     cudaCheckError();
 
     // The search state, kept across rounds; each key list has its count.
@@ -651,15 +675,15 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
     // - added: the tiles added so far, sorted: the result.
     // - counts: the round's device-side results (see RoundCounts), zeroed once; uniqueCount, newCount and escaped
     //   point to its members.
-    BufferT<uint64_t> frontier = std::move(entryKeys);
-    BufferT<uint64_t> known(mStream, this->ref(), entryCount, nanovdb::cuda::noInit);
-    BufferT<uint64_t> added(mStream, this->ref(), 0, nanovdb::cuda::noInit);
-    BufferT<floodfill::detail::RoundCounts> counts(mStream, this->ref(), 1, nanovdb::cuda::noInit);
-    int*              uniqueCount = &counts.data()->uniqueCount;
-    int*              newCount = &counts.data()->newCount;
-    int*              escaped = &counts.data()->escaped;
-    uint32_t          frontierCount = entryCount, knownCount = entryCount, addedCount = 0;
-    const uint32_t*   frontierFaces = mRootFaceSeeds.data();
+    KeyBufferT      frontier = std::move(entryKeys);
+    KeyBufferT      known(mStream, ref, entryCount, nanovdb::cuda::noInit);
+    KeyBufferT      added(mStream, ref, 0, nanovdb::cuda::noInit);
+    CountsBufferT   counts(mStream, ref, 1, nanovdb::cuda::noInit);
+    int*            uniqueCount = &counts.data()->uniqueCount;
+    int*            newCount = &counts.data()->newCount;
+    int*            escaped = &counts.data()->escaped;
+    uint32_t        frontierCount = entryCount, knownCount = entryCount, addedCount = 0;
+    const uint32_t* frontierFaces = deviceRootFaceSeeds;
     CALL_CUBS(DeviceRadixSort::SortKeys, frontier.data(), known.data(), int(entryCount), 0, 64);
     cudaCheck(cudaMemsetAsync(counts.data(), 0, counts.size_bytes(), mStream));
     while (true) {
@@ -668,28 +692,27 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
         // - sorted, unique: the candidates sorted, then without repeats (uniqueCount of them);
         // - isNew: 1 where a unique candidate is a tile not in known;
         // - next: the new tiles, sorted (newCount of them): the next frontier.
-        const uint32_t    candidateCount = floodfill::detail::faceCount * frontierCount;
-        BufferT<uint64_t> candidates(mStream, this->ref(), candidateCount, nanovdb::cuda::noInit);
-        BufferT<uint64_t> sorted(mStream, this->ref(), candidateCount, nanovdb::cuda::noInit);
-        BufferT<uint64_t> unique(mStream, this->ref(), candidateCount, nanovdb::cuda::noInit);
-        BufferT<uint8_t>  isNew(mStream, this->ref(), candidateCount, nanovdb::cuda::noInit);
-        BufferT<uint64_t> next(mStream, this->ref(), candidateCount, nanovdb::cuda::noInit);
+        const uint32_t candidateCount = faceCount * frontierCount;
+        KeyBufferT     candidates(mStream, ref, candidateCount, nanovdb::cuda::noInit);
+        KeyBufferT     sorted(mStream, ref, candidateCount, nanovdb::cuda::noInit);
+        KeyBufferT     unique(mStream, ref, candidateCount, nanovdb::cuda::noInit);
+        FlagBufferT    isNew(mStream, ref, candidateCount, nanovdb::cuda::noInit);
+        KeyBufferT     next(mStream, ref, candidateCount, nanovdb::cuda::noInit);
 
         util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(frontierCount, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
-            frontierCount, floodfill::detail::RootNeighborFunctor<BuildT>{}, mDeviceGrid, frontier.data(),
-            frontierFaces, candidates.data(), escaped);
+            frontierCount, RootNeighborFunctor<BuildT>{}, deviceGrid, frontier.data(), frontierFaces, candidates.data(),
+            escaped);
         cudaCheckError();
         CALL_CUBS(DeviceRadixSort::SortKeys, candidates.data(), sorted.data(), int(candidateCount), 0, 64);
         CALL_CUBS(DeviceSelect::Unique, sorted.data(), unique.data(), uniqueCount, int(candidateCount));
         util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(candidateCount, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
-            candidateCount, floodfill::detail::NewRootTileFunctor{}, unique.data(), uniqueCount, known.data(),
-            knownCount, isNew.data());
+            candidateCount, NewRootTileFunctor{}, unique.data(), uniqueCount, known.data(), knownCount, isNew.data());
         cudaCheckError();
         CALL_CUBS(DeviceSelect::Flagged, unique.data(), isNew.data(), next.data(), newCount, int(candidateCount));
 
         // The host sizes the next round from this one, so each round reads back its counts: the new count, and the
         // escaped flag.
-        floodfill::detail::RoundCounts hostCounts{};
+        RoundCounts hostCounts{};
         cudaCheck(cudaMemcpyAsync(&hostCounts, counts.data(), counts.size_bytes(), cudaMemcpyDeviceToHost, mStream));
         cudaCheck(cudaStreamSynchronize(mStream));
         if (hostCounts.escaped)
@@ -700,8 +723,8 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
 
         // Merge the new tiles, sorted and disjoint from both, into known and into added: each merge writes a
         // new list, which replaces the old one.
-        BufferT<uint64_t> mergedKnown(mStream, this->ref(), knownCount + nextCount, nanovdb::cuda::noInit);
-        BufferT<uint64_t> mergedAdded(mStream, this->ref(), addedCount + nextCount, nanovdb::cuda::noInit);
+        KeyBufferT mergedKnown(mStream, ref, knownCount + nextCount, nanovdb::cuda::noInit);
+        KeyBufferT mergedAdded(mStream, ref, addedCount + nextCount, nanovdb::cuda::noInit);
         CALL_CUBS(DeviceMerge::MergeKeys, known.data(), int64_t(knownCount), next.data(), int64_t(nextCount),
                   mergedKnown.data(), ::cuda::std::less<uint64_t>{});
         CALL_CUBS(DeviceMerge::MergeKeys, added.data(), int64_t(addedCount), next.data(), int64_t(nextCount),
@@ -715,11 +738,22 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
         frontierFaces = nullptr;
     }
 
-    if (addedCount == 0) return;
-    mRootInvertTileOrigins = BufferT<nanovdb::Coord>(mStream, this->ref(), addedCount, nanovdb::cuda::noInit);
+    if (addedCount == 0) return origins;
+    origins = CoordBufferT(mStream, ref, addedCount, nanovdb::cuda::noInit);
     util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(addedCount, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
-        addedCount, floodfill::detail::RootTileOriginFunctor{}, added.data(), mRootInvertTileOrigins.data());
+        addedCount, RootTileOriginFunctor{}, added.data(), origins.data());
     cudaCheckError();
+    return origins;
+}// fillRootInvertTiles
+
+} // namespace floodfill::detail
+
+template <typename BuildT, typename ValueT, typename ResourceT>
+void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
+{
+    mRootInvertTileOrigins = floodfill::detail::fillRootInvertTiles(mDeviceGrid, mRootFaceSeeds.data(),
+                                                                     uint32_t(mRootFaceSeeds.size()), mStream,
+                                                                     *mResource, mTempDevicePool);
 }// PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles
 
 //----------------------------------------------------------------------------------------------------------------------
