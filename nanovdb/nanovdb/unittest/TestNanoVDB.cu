@@ -4341,6 +4341,201 @@ TEST(TestNanoVDBCUDA, DeterministicOutput_CudaPointsToGrid)
     EXPECT_EQ(buildChecksum(), buildChecksum());
 }// DeterministicOutput_CudaPointsToGrid
 
+TEST(TestNanoVDBCUDA, CoarsenGrid_DirectVoxelSize)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+
+    const std::vector<nanovdb::Coord> points = {
+        {0, 0, 0},
+        {1, 1, 1},
+        {8, 0, 0},
+        {16, 8, 8},
+        {-8, -8, -8}
+    };
+
+    nanovdb::cuda::Buffer<nanovdb::Coord> buffer(
+        cudaStream_t(0), points.size(), nanovdb::cuda::noInit);
+
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(
+        buffer.data(), points.data(),
+        points.size() * sizeof(nanovdb::Coord),
+        cudaMemcpyHostToDevice));
+
+    auto inputHandle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(
+        buffer.data(), points.size(), 1.0, SingleBufT());
+
+    ASSERT_NE(inputHandle.deviceGrid<BuildT>(), nullptr);
+
+    nanovdb::tools::cuda::CoarsenGrid<BuildT> coarsener(
+        inputHandle.deviceGrid<BuildT>());
+
+    auto outputHandle = coarsener.getHandle(SingleBufT());
+
+    ASSERT_NE(outputHandle.deviceGrid<BuildT>(), nullptr);
+
+    auto hostInput = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(
+        inputHandle, cudaStream_t(0));
+
+    auto hostOutput = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(
+        outputHandle, cudaStream_t(0));
+
+    const auto* input = hostInput.grid<BuildT>();
+    const auto* output = hostOutput.grid<BuildT>();
+
+    ASSERT_NE(input, nullptr);
+    ASSERT_NE(output, nullptr);
+
+    EXPECT_EQ(nanovdb::Vec3d(1.0), input->voxelSize());
+    EXPECT_EQ(nanovdb::Vec3d(2.0), output->voxelSize());
+
+    const nanovdb::Vec3d coarseIndex(2.0, 3.0, 4.0);
+    const nanovdb::Vec3d fineIndex(4.0, 6.0, 8.0);
+
+    const auto expectedWorld = input->indexToWorld(fineIndex);
+    const auto actualWorld = output->indexToWorld(coarseIndex);
+    const auto recoveredIndex = output->worldToIndex(expectedWorld);
+
+    for (int i = 0; i < 3; ++i) {
+        EXPECT_DOUBLE_EQ(expectedWorld[i], actualWorld[i]);
+        EXPECT_DOUBLE_EQ(coarseIndex[i], recoveredIndex[i]);
+    }
+
+    auto accessor = output->getAccessor();
+    EXPECT_TRUE(accessor.isActive(nanovdb::Coord(0, 0, 0)));
+    EXPECT_TRUE(accessor.isActive(nanovdb::Coord(4, 0, 0)));
+    EXPECT_TRUE(accessor.isActive(nanovdb::Coord(-4, -4, -4)));
+}
+
+TEST(TestNanoVDBCUDA, RefineCoarsen_TranslatedNonUniformMap)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+
+    const std::vector<nanovdb::Coord> points = {
+        {0, 0, 0},
+        {4, 0, 0},
+        {0, 16, 0},
+        {0, 0, 32}
+    };
+
+    nanovdb::cuda::Buffer<nanovdb::Coord> buffer(
+        cudaStream_t(0), points.size(), nanovdb::cuda::noInit);
+
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(
+        buffer.data(), points.data(),
+        points.size() * sizeof(nanovdb::Coord),
+        cudaMemcpyHostToDevice));
+
+    auto initialHandle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(
+        buffer.data(), points.size(), 1.0, SingleBufT());
+
+    auto hostInput = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(
+        initialHandle, cudaStream_t(0));
+
+    auto* input = hostInput.grid<BuildT>();
+    ASSERT_NE(input, nullptr);
+
+    auto& map = input->data()->mMap;
+
+    const double scale[3] = {1.25, 2.5, 4.0};
+    const double translation[3] = {10.0, -5.0, 3.0};
+
+    for (int i = 0; i < 3; ++i) {
+        const int diagonal = 4 * i;
+
+        map.mMatD[diagonal] = scale[i];
+        map.mMatF[diagonal] = static_cast<float>(scale[i]);
+
+        map.mInvMatD[diagonal] = 1.0 / scale[i];
+        map.mInvMatF[diagonal] = static_cast<float>(1.0 / scale[i]);
+
+        map.mVecD[i] = translation[i];
+        map.mVecF[i] = static_cast<float>(translation[i]);
+    }
+
+    input->data()->mVoxelSize = map.getVoxelSize();
+
+    auto deviceInput = nanovdb::cuda::copyTo<SingleBufT>(
+        hostInput, cudaStream_t(0));
+
+    ASSERT_NE(deviceInput.deviceGrid<BuildT>(), nullptr);
+
+    nanovdb::tools::cuda::RefineGrid<BuildT> refiner(
+        deviceInput.deviceGrid<BuildT>());
+
+    auto refinedHandle = refiner.getHandle(SingleBufT());
+
+    ASSERT_NE(refinedHandle.deviceGrid<BuildT>(), nullptr);
+
+    nanovdb::tools::cuda::CoarsenGrid<BuildT> coarsener(
+        refinedHandle.deviceGrid<BuildT>());
+
+    auto coarsenedHandle = coarsener.getHandle(SingleBufT());
+
+    ASSERT_NE(coarsenedHandle.deviceGrid<BuildT>(), nullptr);
+
+    auto hostRefined = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(
+        refinedHandle, cudaStream_t(0));
+
+    auto hostCoarsened = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(
+        coarsenedHandle, cudaStream_t(0));
+
+    const auto* refined = hostRefined.grid<BuildT>();
+    const auto* coarsened = hostCoarsened.grid<BuildT>();
+
+    ASSERT_NE(refined, nullptr);
+    ASSERT_NE(coarsened, nullptr);
+
+    const auto inputSize = input->voxelSize();
+    const auto refinedSize = refined->voxelSize();
+    const auto coarsenedSize = coarsened->voxelSize();
+
+    for (int i = 0; i < 3; ++i) {
+        EXPECT_DOUBLE_EQ(scale[i], inputSize[i]);
+        EXPECT_DOUBLE_EQ(scale[i] * 0.5, refinedSize[i]);
+        EXPECT_DOUBLE_EQ(scale[i], coarsenedSize[i]);
+    }
+
+    const nanovdb::Vec3d index(2.0, 4.0, 6.0);
+    const nanovdb::Vec3d refinedIndex(4.0, 8.0, 12.0);
+
+    const auto world = input->indexToWorld(index);
+    const auto refinedWorld = refined->indexToWorld(refinedIndex);
+    const auto coarsenedWorld = coarsened->indexToWorld(index);
+
+    const auto refinedInverse = refined->worldToIndex(world);
+    const auto coarsenedInverse = coarsened->worldToIndex(world);
+
+    for (int i = 0; i < 3; ++i) {
+        EXPECT_DOUBLE_EQ(translation[i], input->indexToWorld(
+            nanovdb::Vec3d(0.0))[i]);
+
+        EXPECT_DOUBLE_EQ(world[i], refinedWorld[i]);
+        EXPECT_DOUBLE_EQ(world[i], coarsenedWorld[i]);
+
+        EXPECT_DOUBLE_EQ(refinedIndex[i], refinedInverse[i]);
+        EXPECT_DOUBLE_EQ(index[i], coarsenedInverse[i]);
+
+        EXPECT_DOUBLE_EQ(
+            translation[i],
+            refined->indexToWorld(nanovdb::Vec3d(0.0))[i]);
+
+        EXPECT_DOUBLE_EQ(
+            translation[i],
+            coarsened->indexToWorld(nanovdb::Vec3d(0.0))[i]);
+    }
+
+    const auto& refinedMap = refined->data()->mMap;
+    const auto& coarsenedMap = coarsened->data()->mMap;
+
+    for (int i = 0; i < 9; ++i) {
+        EXPECT_DOUBLE_EQ(map.mMatD[i] * 0.5, refinedMap.mMatD[i]);
+        EXPECT_DOUBLE_EQ(map.mMatD[i], coarsenedMap.mMatD[i]);
+
+        EXPECT_DOUBLE_EQ(map.mInvMatD[i] * 2.0, refinedMap.mInvMatD[i]);
+        EXPECT_DOUBLE_EQ(map.mInvMatD[i], coarsenedMap.mInvMatD[i]);
+    }
+}
+
 TEST(TestNanoVDBCUDA, RefineCoarsen_ValueOnIndex)
 {
     using BuildT = nanovdb::ValueOnIndex;
@@ -4383,10 +4578,44 @@ TEST(TestNanoVDBCUDA, RefineCoarsen_ValueOnIndex)
 
     // The coarsened grid should be identical to the original input
     auto hostInput     = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(inputHandle, cudaStream_t(0));
+    auto hostRefined   = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(refinedHandle, cudaStream_t(0));
     auto hostCoarsened = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(coarsenedHandle, cudaStream_t(0));
-    EXPECT_TRUE(hostInput.grid<BuildT>());
-    EXPECT_TRUE(hostCoarsened.grid<BuildT>());
-    EXPECT_EQ(hostInput.grid<BuildT>()->mChecksum.full(), hostCoarsened.grid<BuildT>()->mChecksum.full());
+
+    const auto* original  = hostInput.grid<BuildT>();
+    const auto* refined   = hostRefined.grid<BuildT>();
+    const auto* coarsened = hostCoarsened.grid<BuildT>();
+
+    ASSERT_NE(original, nullptr);
+    ASSERT_NE(refined, nullptr);
+    ASSERT_NE(coarsened, nullptr);
+
+    const auto originalSize  = original->voxelSize();
+    const auto refinedSize   = refined->voxelSize();
+    const auto coarsenedSize = coarsened->voxelSize();
+
+    for (int i = 0; i < 3; ++i) {
+        EXPECT_DOUBLE_EQ(refinedSize[i] * 2.0, originalSize[i]);
+        EXPECT_DOUBLE_EQ(coarsenedSize[i], originalSize[i]);
+    }
+
+    const nanovdb::Vec3d index(2.0, 4.0, 6.0);
+    const nanovdb::Vec3d refinedIndex(4.0, 8.0, 12.0);
+
+    const auto originalWorld = original->indexToWorld(index);
+    const auto refinedWorld = refined->indexToWorld(refinedIndex);
+    const auto coarsenedWorld = coarsened->indexToWorld(index);
+
+    const auto refinedInverse = refined->worldToIndex(originalWorld);
+    const auto coarsenedInverse = coarsened->worldToIndex(originalWorld);
+
+    for (int i = 0; i < 3; ++i) {
+        EXPECT_DOUBLE_EQ(originalWorld[i], refinedWorld[i]);
+        EXPECT_DOUBLE_EQ(originalWorld[i], coarsenedWorld[i]);
+        EXPECT_DOUBLE_EQ(refinedIndex[i], refinedInverse[i]);
+        EXPECT_DOUBLE_EQ(index[i], coarsenedInverse[i]);
+    }
+
+    EXPECT_EQ(original->mChecksum.full(), coarsened->mChecksum.full());
 }// RefineCoarsen_ValueOnIndex
 
 namespace {
