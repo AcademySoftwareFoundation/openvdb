@@ -678,13 +678,13 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
         CALL_CUBS(DeviceSelect::Flagged, unique.data(), isNew.data(), next.data(), newCount.data(),
                   int(candidateCount));
 
-        // The host sizes the next round from this one, so each round reads its counts back
+        // The host sizes the next round from this one, so each round reads back its new count, and the escaped flag.
         int hostNewCount = 0, hostEscaped = 0;
         cudaCheck(cudaMemcpyAsync(&hostNewCount, newCount.data(), sizeof(int), cudaMemcpyDeviceToHost, mStream));
         cudaCheck(cudaMemcpyAsync(&hostEscaped, escaped.data(), sizeof(int), cudaMemcpyDeviceToHost, mStream));
         cudaCheck(cudaStreamSynchronize(mStream));
         if (hostEscaped)
-            throw std::runtime_error("PropagateSign: the inside reaches past the bounding box of the root-table "
+            throw std::runtime_error("PropagateSign: the interior reaches past the bounding box of the root-table "
                                      "entries");
         const uint32_t nextCount = uint32_t(hostNewCount);
         if (nextCount == 0) break;
