@@ -552,6 +552,16 @@ __hostdev__ inline nanovdb::Coord tileSortKeyToOrigin(uint64_t key)
 /// @brief Sentinel for a candidate slot that holds no candidate: it is no tile's key, and sorts after every key.
 constexpr uint64_t NoRootTile = ~uint64_t(0);
 
+/// @brief The device-side results of a round, read back together: uniqueCount, the candidates left after removing
+///        repeats; newCount, the new tiles among them (both written by cub each round); and escaped, set if a
+///        neighbor fell outside the hull (never cleared: the host throws once it is set).
+struct RoundCounts
+{
+    int uniqueCount;
+    int newCount;
+    int escaped;
+}; // RoundCounts
+
 /// @brief keys[i] = the topology::detail::tileSortKey of root-table entry i's origin, in table order, so that
 ///        keys[i] pairs with the root face seeds of entry i.
 template <typename BuildT>
@@ -639,19 +649,19 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
     //   and all faces later (null).
     // - known: the entries and the tiles added so far, sorted; a candidate in it is not new.
     // - added: the tiles added so far, sorted: the result.
-    // Each round also writes three ints on the device: uniqueCount, the candidates left after removing repeats;
-    // newCount, the new tiles among them; and escaped, set if a neighbor fell outside the hull (never cleared:
-    // the host throws once it is set).
+    // - counts: the round's device-side results (see RoundCounts), zeroed once; uniqueCount, newCount and escaped
+    //   point to its members.
     BufferT<uint64_t> frontier = std::move(entryKeys);
     BufferT<uint64_t> known(mStream, this->ref(), entryCount, nanovdb::cuda::noInit);
     BufferT<uint64_t> added(mStream, this->ref(), 0, nanovdb::cuda::noInit);
-    BufferT<int>      uniqueCount(mStream, this->ref(), 1, nanovdb::cuda::noInit);
-    BufferT<int>      newCount(mStream, this->ref(), 1, nanovdb::cuda::noInit);
-    BufferT<int>      escaped(mStream, this->ref(), 1, nanovdb::cuda::noInit);
+    BufferT<floodfill::detail::RoundCounts> counts(mStream, this->ref(), 1, nanovdb::cuda::noInit);
+    int*              uniqueCount = &counts.data()->uniqueCount;
+    int*              newCount = &counts.data()->newCount;
+    int*              escaped = &counts.data()->escaped;
     uint32_t          frontierCount = entryCount, knownCount = entryCount, addedCount = 0;
     const uint32_t*   frontierFaces = mRootFaceSeeds.data();
     CALL_CUBS(DeviceRadixSort::SortKeys, frontier.data(), known.data(), int(entryCount), 0, 64);
-    cudaCheck(cudaMemsetAsync(escaped.data(), 0, sizeof(int), mStream));
+    cudaCheck(cudaMemsetAsync(counts.data(), 0, counts.size_bytes(), mStream));
     while (true) {
         // The round's scratch, one slot per face of each frontier tile:
         // - candidates: the keys of the neighbors the round emits, NoRootTile in unused slots;
@@ -667,26 +677,25 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
 
         util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(frontierCount, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
             frontierCount, floodfill::detail::RootNeighborFunctor<BuildT>{}, mDeviceGrid, frontier.data(),
-            frontierFaces, candidates.data(), escaped.data());
+            frontierFaces, candidates.data(), escaped);
         cudaCheckError();
         CALL_CUBS(DeviceRadixSort::SortKeys, candidates.data(), sorted.data(), int(candidateCount), 0, 64);
-        CALL_CUBS(DeviceSelect::Unique, sorted.data(), unique.data(), uniqueCount.data(), int(candidateCount));
+        CALL_CUBS(DeviceSelect::Unique, sorted.data(), unique.data(), uniqueCount, int(candidateCount));
         util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(candidateCount, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
-            candidateCount, floodfill::detail::NewRootTileFunctor{}, unique.data(), uniqueCount.data(), known.data(),
+            candidateCount, floodfill::detail::NewRootTileFunctor{}, unique.data(), uniqueCount, known.data(),
             knownCount, isNew.data());
         cudaCheckError();
-        CALL_CUBS(DeviceSelect::Flagged, unique.data(), isNew.data(), next.data(), newCount.data(),
-                  int(candidateCount));
+        CALL_CUBS(DeviceSelect::Flagged, unique.data(), isNew.data(), next.data(), newCount, int(candidateCount));
 
-        // The host sizes the next round from this one, so each round reads back its new count, and the escaped flag.
-        int hostNewCount = 0, hostEscaped = 0;
-        cudaCheck(cudaMemcpyAsync(&hostNewCount, newCount.data(), sizeof(int), cudaMemcpyDeviceToHost, mStream));
-        cudaCheck(cudaMemcpyAsync(&hostEscaped, escaped.data(), sizeof(int), cudaMemcpyDeviceToHost, mStream));
+        // The host sizes the next round from this one, so each round reads back its counts: the new count, and the
+        // escaped flag.
+        floodfill::detail::RoundCounts hostCounts{};
+        cudaCheck(cudaMemcpyAsync(&hostCounts, counts.data(), counts.size_bytes(), cudaMemcpyDeviceToHost, mStream));
         cudaCheck(cudaStreamSynchronize(mStream));
-        if (hostEscaped)
+        if (hostCounts.escaped)
             throw std::runtime_error("PropagateSign: the interior reaches past the bounding box of the root-table "
                                      "entries");
-        const uint32_t nextCount = uint32_t(hostNewCount);
+        const uint32_t nextCount = uint32_t(hostCounts.newCount);
         if (nextCount == 0) break;
 
         // Merge the new tiles, sorted and disjoint from both, into known and into added: each merge writes a
