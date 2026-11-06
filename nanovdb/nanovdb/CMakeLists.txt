@@ -368,6 +368,7 @@ set(NANOVDB_INCLUDE_TOOLS_CUDA_FILES
   tools/cuda/VoxelBlockManager.cuh
   tools/cuda/MeshToGrid.cuh
   tools/cuda/ConnectedComponents.cuh
+  tools/cuda/PropagateSign.cuh
 )
 
 # NanoVDB util header files
