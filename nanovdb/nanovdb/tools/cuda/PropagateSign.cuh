@@ -514,24 +514,25 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillUpperAndSeedCoarserLevels()
 
 namespace floodfill::detail {
 
-// Stage 4: the interior absent root-tile positions.
+// Stage 4: the interior upper-node-sized regions without a root-table entry.
 //
-// Stages 1-3 record each seed at the root as a face bit of a root-table entry (see seedAcrossFace). If no bit is
-// set, no absent root-tile position is interior: every connected set of interior ones borders an upper node
-// whose face toward it is inside, and that face seeds it. Otherwise the known positions, i.e. the entries and the
-// interior positions found so far, grow in rounds. Round 1 adds the seeded positions; each later round adds the
-// face neighbors of the positions the previous round added that are not known yet. These are absent and interior
-// too: absent positions hold no active voxel, so face-adjacent ones share a label. The rounds stop when one adds
-// nothing. A round sorts and deduplicates its candidates and looks them up in the sorted known positions, so its
-// work follows the positions it adds, not the extent of the active voxels.
+// In stages 1-3, whenever the flood fill needs to extend into a region without a root-table entry, it records that
+// need as a directional flag on the neighboring entry, the one that holds the trigger face: bit f of the entry's
+// root face seeds stands for the region across its face f (see seedAcrossFace). The flood fill can only enter such a
+// region across a trigger face, so if no flag is set, no such region is interior. Otherwise the flagged regions grow
+// in rounds, one face-neighbor step at a time, filling the cavity of such regions that they belong to: nothing stops
+// the fill there, since these regions hold no active voxels. By precondition 3 the cavity is bounded, and with each
+// step spanning an upper node, the rounds are few compared with the work of stages 1-3 on the narrow band around it.
 //
-// Under the preconditions the interior lies within the bounding box of the entries' positions (the hull), so the
-// rounds never leave it. A neighbor outside it means that the input breaks preconditions 2 or 3; it is not added,
-// and fillRootInvertTiles() throws once its round ends. Positions are kept as topology::detail::tileSortKey keys,
-// which sort by position.
+// So the cavity lies within the bounding box of the root-table entries (the hull), since every region outside it
+// connects to infinity. A candidate outside the hull means that the input breaks preconditions 2 or 3: it is not
+// added, and fillRootInvertTiles() throws once its round ends, so the rounds end for any input. Regions are kept as
+// the topology::detail::tileSortKey of their origins, which sort by origin.
 
 /// @brief The origin of the root tile whose topology::detail::tileSortKey is @a key: the inverse of tileSortKey,
 ///        up to the tile, i.e. tileSortKeyToOrigin(tileSortKey(ijk)) == ijk & ~4095.
+/// todo: Move next to tileSortKey, in a shared header for the tree sort keys that several CUDA tools duplicate,
+///       so that the encoding and its inverse live in one place.
 __hostdev__ inline nanovdb::Coord tileSortKeyToOrigin(uint64_t key)
 {
     // unbias, then scale rather than shift (a left shift of a negative value is undefined before C++20)
