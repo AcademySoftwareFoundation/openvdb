@@ -123,12 +123,12 @@ public:
     void setVerbose(int level = 1) { mVerbose = level; }
 
     /// @brief Compute the invert masks: fill the caller's leaf, lower and upper masks, and return the origins of the
-    ///        inverted regions without a root-table entry.
+    ///        upper-node-sized regions without a root-table entry that it finds to be interior.
     /// @param leafMasks, lowerMasks, upperMasks Device arrays of one mask per leaf, lower and upper node, indexed
     ///        like the grid's nodes; need not be initialized.
     /// @return { origins, hasInvertRootTiles }: a device buffer with those origins, and whether there is any.
     /// @throw std::runtime_error if the grid has active tiles or root value tiles (precondition 4), or if the
-    ///        inverted regions reach past the bounding box of the root-table entries (preconditions 2 or 3).
+    ///        interior reaches past the bounding box of the root-table entries (preconditions 2 or 3).
     /// @note The stream is synchronized before this method returns.
     std::pair<BufferT<nanovdb::Coord>, bool> propagate(nanovdb::Mask<3>* leafMasks, nanovdb::Mask<4>* lowerMasks,
                                                        nanovdb::Mask<5>* upperMasks)
@@ -153,7 +153,7 @@ public:
         fillUpperAndSeedCoarserLevels();
         if (mVerbose==1) mTimer.stop();
 
-        if (mVerbose==1) mTimer.start("Root region expansion");
+        if (mVerbose==1) mTimer.start("Root tile expansion");
         fillRootInvertTiles();
         if (mVerbose==1) mTimer.stop();
 
@@ -177,7 +177,7 @@ private:
     void fillLowerAndSeedCoarserLevels();
     void fillUpperAndSeedCoarserLevels();
 
-    // Stage 4: if stages 1-3 set any root seed, expand the seeds through the regions without a root-table entry.
+    // Stage 4: if stages 1-3 set any root seed, expand the seeds through the tiles without a root-table entry.
     void fillRootInvertTiles();
 
     /// @brief Borrowed handle to the injected resource, for the scratch allocated after construction.
@@ -192,13 +192,13 @@ private:
     nanovdb::cuda::TempPool<ResourceT> mTempDevicePool;
     typename NanoTree<BuildT>::DataType mTreeData{}; // host copy of the grid's tree header, read by initializeMasks()
 
-    // Outputs: the caller's invert masks, and the origins of the inverted regions without a root-table entry.
+    // Outputs: the caller's invert masks, and the origins of the tiles without a root-table entry found to be interior.
     nanovdb::Mask<3>*         mLeafInvertMasks{nullptr};
     nanovdb::Mask<4>*         mLowerInvertMasks{nullptr};
     nanovdb::Mask<5>*         mUpperInvertMasks{nullptr};
     BufferT<nanovdb::Coord>   mRootInvertTileOrigins;
 
-    // Root seeds, one word per root-table entry: bit f (see floodfill::detail::Face) is set if the region across
+    // Root seeds, one word per root-table entry: bit f (see floodfill::detail::Face) is set if the tile across
     // face f, which has no root-table entry, is inverted.
     BufferT<uint32_t>         mRootFaceSeeds;
 }; // tools::cuda::PropagateSign<BuildT, ValueT, ResourceT>
@@ -220,6 +220,11 @@ void PropagateSign<BuildT, ValueT, ResourceT>::initializeMasks()
         throw std::runtime_error("PropagateSign: the grid has active tiles");
     if (entryCount != mTreeData.mNodeCount[2])
         throw std::runtime_error("PropagateSign: the root holds value tiles");
+
+    // Stage 4 bounds its search by the root's index bounding box, which NanoVDB's builders compute. An empty grid
+    // has none, and needs none. Debug builds only: the flags read back (blocking) is compiled out with the assert.
+    NANOVDB_ASSERT(entryCount == 0 ||
+                   util::cuda::DeviceGridTraits<BuildT>::getFlags(mDeviceGrid, mStream).isMaskOn(GridFlags::HasBBox));
 
     // Stage 1 writes every leaf mask whole. Lower and upper masks receive seeds (atomic ORs) before their own
     // fill, so they start at zero.
@@ -345,8 +350,9 @@ __device__ inline nanovdb::Coord faceNeighbor(nanovdb::Coord origin, Face face, 
 /// @brief Seeds across @a face of the Level node at @a origin (see the outcome above). The tree is descended toward
 ///        the block across the face, until the lookup ends or reaches a node of the seeding node's level. At the root,
 ///        the lookup can leave the node's upper node only across the same face of the upper node, so bit @a face of
-///        the node's own root-table entry stands for the region across it. Bits are set atomically: many nodes may
-///        set the same bit, and the nodes of one root-table entry share its word.
+///        the node's own root-table entry stands for the upper-node-sized region across that face of the upper node.
+///        Bits are set atomically: many nodes may set the same bit, and the nodes of one root-table entry share its
+///        word.
 template <typename BuildT, int Level>
 __device__ inline void seedAcrossFace(const NanoGrid<BuildT>& grid, const nanovdb::Coord& origin, Face face,
                                       nanovdb::Mask<4>* lowerMasks, nanovdb::Mask<5>* upperMasks,
@@ -516,20 +522,23 @@ namespace floodfill::detail {
 
 // Stage 4: the interior upper-node-sized regions without a root-table entry.
 //
-// In stages 1-3, whenever the flood fill needs to extend into a region without a root-table entry, it records that
-// need as a directional flag on the neighboring entry, the one that holds the trigger face: bit f of the entry's
-// root face seeds stands for the region across its face f (see seedAcrossFace). The flood fill can only enter such a
-// region across a trigger face, so if no flag is set, no such region is interior. Otherwise the flagged regions grow
-// in rounds, one face-neighbor step at a time, filling the cavity of such regions that they belong to: nothing stops
-// the fill there, since these regions hold no active voxels. By precondition 3 the cavity is bounded, and with each
+// Here a tile means a root tile: an upper-node-sized region of index space aligned to its size. Besides the tiles of
+// the root table, this includes the potential new entries needed to cover the interior, even though they hold no
+// active voxels. In stages 1-3, whenever the flood fill needs to extend into a tile without a root-table entry, it
+// records that need as a directional flag on the neighboring entry, the one that holds the trigger face: bit f of the
+// entry's root face seeds stands for the tile across its face f (see seedAcrossFace). The flood fill can only enter
+// such a tile across a trigger face, so if no flag is set, no such tile is interior. Otherwise the flagged tiles grow
+// in rounds, one face-neighbor step at a time, filling the cavity of such tiles that they belong to: nothing stops
+// the fill there, since these tiles hold no active voxels. By precondition 3 the cavity is bounded, and with each
 // step spanning an upper node, the rounds are few compared with the work of stages 1-3 on the narrow band around it.
 //
-// So the cavity lies within the bounding box of the root-table entries (the hull), since every region outside it
+// So the cavity lies within the bounding box of the root-table entries (the hull), since every tile outside it
 // connects to infinity. A candidate outside the hull means that the input breaks preconditions 2 or 3: it is not
-// added, and fillRootInvertTiles() throws once its round ends, so the rounds end for any input. Regions are kept as
-// the topology::detail::tileSortKey of their origins, which sort by origin.
+// added, and fillRootInvertTiles() throws once its round ends, so the rounds end for any input. The hull is derived
+// from the root's index bounding box (see RootNeighborFunctor). Tiles are kept as the
+// topology::detail::tileSortKey of their origins, their keys, which sort by origin.
 
-/// @brief The origin of the root tile whose topology::detail::tileSortKey is @a key: the inverse of tileSortKey,
+/// @brief The origin of the tile whose topology::detail::tileSortKey is @a key: the inverse of tileSortKey,
 ///        up to the tile, i.e. tileSortKeyToOrigin(tileSortKey(ijk)) == ijk & ~4095.
 /// todo: Move next to tileSortKey, in a shared header for the tree sort keys that several CUDA tools duplicate,
 ///       so that the encoding and its inverse live in one place.
@@ -540,10 +549,11 @@ __hostdev__ inline nanovdb::Coord tileSortKeyToOrigin(uint64_t key)
     return nanovdb::Coord(field(key >> 42), field(key >> 21), field(key));
 }
 
-/// @brief A key of no root-tile position, which sorts after all of them.
+/// @brief Sentinel for a candidate slot that holds no candidate: it is no tile's key, and sorts after every key.
 constexpr uint64_t NoRootTile = ~uint64_t(0);
 
-/// @brief The topology::detail::tileSortKey of root-table entry @a i, in table order.
+/// @brief keys[i] = the topology::detail::tileSortKey of root-table entry i's origin, in table order, so that
+///        keys[i] pairs with the root face seeds of entry i.
 template <typename BuildT>
 struct RootEntryKeyFunctor
 {
@@ -553,16 +563,20 @@ struct RootEntryKeyFunctor
     }
 }; // RootEntryKeyFunctor
 
-/// @brief The candidates of position @a positions[i], at candidates[6 i + f]: the key of its neighbor across face
-///        f if f is in @a faces[i] (in every face if @a faces is null) and the neighbor lies in @a hull, else
-///        NoRootTile. A neighbor outside @a hull sets *escaped.
+/// @brief The candidates of the tile with key @a tiles[i], at candidates[6 i + f]: the key of its neighbor across
+///        face f if f is in @a faces[i] (in every face if @a faces is null) and the neighbor lies in the hull, else
+///        NoRootTile. A neighbor outside the hull sets *escaped. The hull, the bounding box of the root-table entries'
+///        origins, is the root's index bounding box with its min rounded down to an origin; its max needs no
+///        rounding, since only origins are tested against it.
 template <typename BuildT>
 struct RootNeighborFunctor
 {
-    __device__ void operator()(size_t i, const uint64_t* positions, const uint32_t* faces, nanovdb::CoordBBox hull,
+    __device__ void operator()(size_t i, const NanoGrid<BuildT>* grid, const uint64_t* tiles, const uint32_t* faces,
                                uint64_t* candidates, int* escaped) const
     {
-        const nanovdb::Coord p = tileSortKeyToOrigin(positions[i]);
+        const nanovdb::CoordBBox& bbox = grid->tree().root().bbox();
+        const nanovdb::CoordBBox  hull(bbox.min() & ~int(NanoUpper<BuildT>::DIM - 1), bbox.max());
+        const nanovdb::Coord p = tileSortKeyToOrigin(tiles[i]);
         const uint32_t emitted = faces ? faces[i] : (1u << faceCount) - 1;
         for (int f = 0; f < faceCount; ++f) {
             uint64_t key = NoRootTile;
@@ -576,7 +590,7 @@ struct RootNeighborFunctor
     }
 }; // RootNeighborFunctor
 
-/// @brief isNew[i] = 1 if candidate i, of the first *uniqueCount candidates (sorted and unique), is a position that
+/// @brief isNew[i] = 1 if candidate i, of the first *uniqueCount candidates (sorted and unique), is a tile that
 ///        is not in the sorted @a known, else 0.
 struct NewRootTileFunctor
 {
@@ -588,7 +602,7 @@ struct NewRootTileFunctor
     }
 }; // NewRootTileFunctor
 
-/// @brief origins[i] = the origin of the root-tile position of @a keys[i].
+/// @brief origins[i] = the origin of the tile whose key is @a keys[i].
 struct RootTileOriginFunctor
 {
     __device__ void operator()(size_t i, const uint64_t* keys, nanovdb::Coord* origins) const
@@ -602,9 +616,9 @@ struct RootTileOriginFunctor
 template <typename BuildT, typename ValueT, typename ResourceT>
 void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
 {
-    // Decide: read the face seeds back; if none is set, no absent root-tile position is interior.
+    // Decide: read the root face seeds back; if no flag is set, no tile without a root-table entry is interior.
     const uint32_t entryCount = uint32_t(mRootFaceSeeds.size());
-    if (entryCount == 0) return;
+    if (entryCount == 0) return; // null grid, no root tiles
     std::vector<uint32_t> faceSeeds(entryCount);
     cudaCheck(cudaMemcpyAsync(faceSeeds.data(), mRootFaceSeeds.data(), mRootFaceSeeds.size_bytes(),
                               cudaMemcpyDeviceToHost, mStream));
@@ -612,27 +626,21 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
     if (std::none_of(faceSeeds.begin(), faceSeeds.end(), [](uint32_t seeds) { return seeds != 0; }))
         return;
 
-    // Expand. The entries' keys, in table order so that round 1 pairs them with their face seeds, and their hull.
+    // Expand. The entries' keys, in table order so that round 1 pairs them with their face seeds.
     static constexpr unsigned int threadsPerBlock = 128;
     BufferT<uint64_t> entryKeys(mStream, this->ref(), entryCount, nanovdb::cuda::noInit);
     util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(entryCount, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
         entryCount, floodfill::detail::RootEntryKeyFunctor<BuildT>{}, mDeviceGrid, entryKeys.data());
     cudaCheckError();
-    std::vector<uint64_t> hostEntryKeys(entryCount);
-    cudaCheck(cudaMemcpyAsync(hostEntryKeys.data(), entryKeys.data(), entryKeys.size_bytes(), cudaMemcpyDeviceToHost,
-                              mStream));
-    cudaCheck(cudaStreamSynchronize(mStream));
-    nanovdb::CoordBBox hull; // empty until expanded
-    for (const uint64_t key : hostEntryKeys) hull.expand(floodfill::detail::tileSortKeyToOrigin(key));
 
     // The search state, kept across rounds; each key list has its count.
-    // - frontier: the positions a round emits candidates from: the entries in round 1, in table order, then the
-    //   positions the previous round added. frontierFaces: the faces it emits across, the face seeds in round 1
+    // - frontier: the tiles a round emits candidates from: the entries in round 1, in table order, then the
+    //   tiles the previous round added. frontierFaces: the faces it emits across, the face seeds in round 1
     //   and all faces later (null).
-    // - known: the entries and the positions added so far, sorted; a candidate in it is not new.
-    // - added: the positions added so far, sorted: the result.
+    // - known: the entries and the tiles added so far, sorted; a candidate in it is not new.
+    // - added: the tiles added so far, sorted: the result.
     // Each round also writes three ints on the device: uniqueCount, the candidates left after removing repeats;
-    // newCount, the new positions among them; and escaped, set if a neighbor fell outside the hull (never cleared:
+    // newCount, the new tiles among them; and escaped, set if a neighbor fell outside the hull (never cleared:
     // the host throws once it is set).
     BufferT<uint64_t> frontier = std::move(entryKeys);
     BufferT<uint64_t> known(mStream, this->ref(), entryCount, nanovdb::cuda::noInit);
@@ -645,11 +653,11 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
     CALL_CUBS(DeviceRadixSort::SortKeys, frontier.data(), known.data(), int(entryCount), 0, 64);
     cudaCheck(cudaMemsetAsync(escaped.data(), 0, sizeof(int), mStream));
     while (true) {
-        // The round's scratch, one slot per face of each frontier position:
+        // The round's scratch, one slot per face of each frontier tile:
         // - candidates: the keys of the neighbors the round emits, NoRootTile in unused slots;
         // - sorted, unique: the candidates sorted, then without repeats (uniqueCount of them);
-        // - isNew: 1 where a unique candidate is a position not in known;
-        // - next: the new positions, sorted (newCount of them): the next frontier.
+        // - isNew: 1 where a unique candidate is a tile not in known;
+        // - next: the new tiles, sorted (newCount of them): the next frontier.
         const uint32_t    candidateCount = floodfill::detail::faceCount * frontierCount;
         BufferT<uint64_t> candidates(mStream, this->ref(), candidateCount, nanovdb::cuda::noInit);
         BufferT<uint64_t> sorted(mStream, this->ref(), candidateCount, nanovdb::cuda::noInit);
@@ -658,8 +666,8 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
         BufferT<uint64_t> next(mStream, this->ref(), candidateCount, nanovdb::cuda::noInit);
 
         util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(frontierCount, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
-            frontierCount, floodfill::detail::RootNeighborFunctor<BuildT>{}, frontier.data(), frontierFaces, hull,
-            candidates.data(), escaped.data());
+            frontierCount, floodfill::detail::RootNeighborFunctor<BuildT>{}, mDeviceGrid, frontier.data(),
+            frontierFaces, candidates.data(), escaped.data());
         cudaCheckError();
         CALL_CUBS(DeviceRadixSort::SortKeys, candidates.data(), sorted.data(), int(candidateCount), 0, 64);
         CALL_CUBS(DeviceSelect::Unique, sorted.data(), unique.data(), uniqueCount.data(), int(candidateCount));
@@ -681,7 +689,7 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
         const uint32_t nextCount = uint32_t(hostNewCount);
         if (nextCount == 0) break;
 
-        // Merge the new positions, sorted and disjoint from both, into known and into added: each merge writes a
+        // Merge the new tiles, sorted and disjoint from both, into known and into added: each merge writes a
         // new list, which replaces the old one.
         BufferT<uint64_t> mergedKnown(mStream, this->ref(), knownCount + nextCount, nanovdb::cuda::noInit);
         BufferT<uint64_t> mergedAdded(mStream, this->ref(), addedCount + nextCount, nanovdb::cuda::noInit);
