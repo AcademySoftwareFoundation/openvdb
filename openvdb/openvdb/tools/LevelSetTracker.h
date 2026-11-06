@@ -29,8 +29,11 @@
 
 #include <tbb/parallel_for.h>
 
+#include <algorithm>
+#include <array>
 #include <functional>
 #include <type_traits>
+#include <vector>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -48,6 +51,192 @@ enum class TrimMode {
     kExterior, ///< Set out-of-band exterior voxels to the background value
     kAll       ///< Set all out-of-band voxels to the background value
 };
+
+namespace internal {
+
+/// @brief Replaces an axis-aligned math:: star stencil in the tracker and advection kernels.
+///
+/// @details Reads the star from the current leaf and its six face neighbors, whose buffers
+/// are cached once per leaf, instead of performing 6 * @a Radius ValueAccessor lookups per
+/// voxel. It has the same value layout as the stencil it replaces and reads the same values.
+/// Results can only differ in the last bits, where a compiler fuses multiply-adds differently.
+///
+/// @tparam GridT   the type of the grid to read from
+/// @tparam Radius  the reach along each axis: 1 replaces math::SevenPointStencil,
+///                 2 math::ThirteenPointStencil and 3 math::NineteenPointStencil
+///
+/// @note setLeaf() must be called for each leaf before moveTo() on any of its voxels.
+/// @warning Leaves must be at least @a Radius voxels wide, which LeafStencil ensures.
+template<typename GridT, int Radius>
+class LeafStarStencil
+{
+public:
+    using TreeType = typename GridT::TreeType;
+    using ValueType = typename GridT::ValueType;
+    using LeafType = typename TreeType::LeafNodeType;
+
+    /// @param grid  the grid to read from, which must outlive this stencil
+    /// @note Allocates the six tile proxy buffers on the heap, once per stencil, so that the
+    /// stack footprint does not grow with the leaf size.
+    explicit LeafStarStencil(const GridT& grid)
+        : mAcc(grid.tree()), mTile(6 * LeafType::SIZE) {}
+
+    /// Not copyable, because mBuf can point into this stencil's own mTile.
+    LeafStarStencil(const LeafStarStencil&) = delete;
+    LeafStarStencil& operator=(const LeafStarStencil&) = delete;
+
+    /// @brief Cache the buffers of @a leaf and its six face neighbors.
+    /// @param leaf  the leaf whose voxels the following moveTo() calls will visit
+    /// @details A face neighbor that is not a leaf lies inside a tile or the background, so it
+    /// is replaced by a proxy buffer filled with that constant value.
+    void setLeaf(const LeafType& leaf)
+    {
+        // Face neighbors in the order -x, +x, -y, +y, -z, +z, stored in mBuf[1] to mBuf[6].
+        const std::array<std::array<int, 3>, 6> faces = {{
+            {{-1, 0, 0}}, {{1, 0, 0}}, {{0, -1, 0}}, {{0, 1, 0}}, {{0, 0, -1}}, {{0, 0, 1}} }};
+        const int dim = int(LeafType::DIM);
+
+        mBuf[0] = leaf.buffer().data();
+        for (size_t n = 0; n < faces.size(); ++n) {
+            const Coord p = leaf.origin().offsetBy(
+                faces[n][0] * dim, faces[n][1] * dim, faces[n][2] * dim);
+
+            if (const LeafType* neighbor = mAcc.probeConstLeaf(p)) {
+                mBuf[n + 1] = neighbor->buffer().data();
+            } else {
+                ValueType* tile = mTile.data() + n * LeafType::SIZE;
+                std::fill(tile, tile + LeafType::SIZE, mAcc.getValue(p));
+                mBuf[n + 1] = tile;
+            }
+        }
+    }
+
+    /// @brief Read the star around a voxel of the current leaf.
+    /// @param iter  a value iterator of the leaf passed to setLeaf()
+    template<typename IterT>
+    void moveTo(const IterT& iter) { this->gather(iter.getCoord(), iter.pos(), *iter); }
+
+    /// @brief Read the star around a voxel of the current leaf.
+    /// @param ijk          the coordinates of a voxel in the leaf passed to setLeaf()
+    /// @param centerValue  the value to use for the center of the star
+    void moveTo(const Coord& ijk, const ValueType& centerValue)
+    {
+        this->gather(ijk, LeafType::coordToOffset(ijk), centerValue);
+    }
+
+    /// Return the value at the center of the star.
+    const ValueType& getValue() const { return mValues[0]; }
+
+    /// Return the value at offset (i, j, k) from the center, e.g. getValue<0, -2, 0>().
+    template<int i, int j, int k>
+    const ValueType& getValue() const { return mValues[pos<i, j, k>()]; }
+
+    /// Return the coordinates of the voxel at the center of the star.
+    const Coord& getCenterCoord() const { return mCenter; }
+
+private:
+    static const int SIZE = 1 + 6 * Radius;
+
+    /// @brief Return the index of the value at offset (i, j, k) from the center.
+    /// @note The offset must lie on a single axis, at most @a Radius from the center.
+    template<int i, int j, int k>
+    static constexpr unsigned pos()
+    {
+        static_assert((i != 0) + (j != 0) + (k != 0) <= 1,
+            "LeafStarStencil: the offset must lie on a single axis");
+        static_assert(-Radius <= i && i <= Radius && -Radius <= j && j <= Radius
+            && -Radius <= k && k <= Radius, "LeafStarStencil: the offset must be at most Radius");
+        if (i != 0) return slot(0, i);
+        if (j != 0) return slot(1, j);
+        if (k != 0) return slot(2, k);
+        return 0; // the center
+    }
+
+    /// @brief Return the index in mValues of a neighbor, in the layout of the math:: stencils:
+    /// the center at 0, then six slots per distance from 1 to Radius, in the order
+    /// +x, +y, +z, -x, -y, -z.
+    /// @param axis  0 for x, 1 for y, 2 for z
+    /// @param d     the signed distance from the center, from -Radius to Radius, but not 0
+    static constexpr unsigned slot(int axis, int d)
+    {
+        const int distance = d > 0 ? d : -d;
+        const int direction = d > 0 ? axis : axis + 3; // 0 to 5 for +x, +y, +z, -x, -y, -z
+        return unsigned(1 + 6 * (distance - 1) + direction);
+    }
+
+    /// @brief Read the 6 * Radius neighbors of a voxel of the current leaf into mValues.
+    /// @details A neighbor outside the leaf is read from the face neighbor on that side, at
+    /// the same position shifted by one leaf width.
+    /// @param ijk          the coordinates of the voxel
+    /// @param n            the linear offset of the voxel in the leaf
+    /// @param centerValue  the value to store for the center of the star
+    void gather(const Coord& ijk, Index n, const ValueType& centerValue)
+    {
+        const int dim = int(LeafType::DIM);
+        const std::array<int, 3> stride = {{ dim * dim, dim, 1 }}; // offset step along x, y, z
+        const Coord local = LeafType::offsetToLocalCoord(n);
+
+        mCenter = ijk;
+        mValues[0] = centerValue;
+        for (int axis = 0; axis < 3; ++axis) {
+            for (int d = -Radius; d <= Radius; ++d) {
+                if (d == 0) continue;
+                const int t = local[axis] + d; // neighbor coordinate along this axis
+                int buffer = 0, shift = d;     // the current leaf
+
+                if (t < 0) {
+                    buffer = 1 + 2 * axis;     // the neighbor on the negative side
+                    shift += dim;
+                } else if (t >= dim) {
+                    buffer = 2 + 2 * axis;     // the neighbor on the positive side
+                    shift -= dim;
+                }
+                mValues[slot(axis, d)] = mBuf[buffer][int(n) + shift * stride[axis]];
+            }
+        }
+    }
+
+    tree::ValueAccessor<const TreeType> mAcc;
+    std::array<const ValueType*, 7> mBuf; // the leaf, then its -x, +x, -y, +y, -z, +z neighbors
+    std::vector<ValueType> mTile;
+    std::array<ValueType, SIZE> mValues;
+    Coord mCenter;
+};
+
+/// @brief Selects the stencil type that the tracker and advection kernels use.
+/// @details @c Type is LeafStarStencil in place of math::SevenPointStencil (FIRST_BIAS),
+/// math::ThirteenPointStencil (SECOND_BIAS) and math::NineteenPointStencil (THIRD_BIAS,
+/// WENO5_BIAS, HJWENO5_BIAS) if leaves are at least 4 voxels wide, so that offsets of +-3 never
+/// reach past the face neighbors, and @a StencilT otherwise.
+/// setLeaf() prepares the selected stencil for a leaf, and does nothing for a math:: stencil.
+template<typename GridT, typename StencilT, bool = (GridT::TreeType::LeafNodeType::DIM >= 4)>
+struct LeafStencil
+{
+    using Type = StencilT;
+    template<typename LeafT> static void setLeaf(Type&, const LeafT&) {}
+};
+
+/// The LeafStencil members for a LeafStarStencil of the given radius.
+template<typename GridT, int Radius>
+struct LeafStarStencilSelector
+{
+    using Type = LeafStarStencil<GridT, Radius>;
+    template<typename LeafT> static void setLeaf(Type& s, const LeafT& leaf) { s.setLeaf(leaf); }
+};
+
+template<typename GridT>
+struct LeafStencil<GridT, math::SevenPointStencil<GridT>, true>
+    : LeafStarStencilSelector<GridT, 1> {};
+
+template<typename GridT>
+struct LeafStencil<GridT, math::ThirteenPointStencil<GridT>, true>
+    : LeafStarStencilSelector<GridT, 2> {};
+
+template<typename GridT>
+struct LeafStencil<GridT, math::NineteenPointStencil<GridT>, true>
+    : LeafStarStencilSelector<GridT, 3> {};
+
+} // namespace internal
 
 } // namespace lstrack
 
@@ -213,7 +402,9 @@ private:
     struct Normalizer
     {
         using SchemeT = math::BIAS_SCHEME<SpatialScheme>;
-        using StencilT = typename SchemeT::template ISStencil<GridType>::StencilType;
+        using LeafStencilT = lstrack::internal::LeafStencil<GridType,
+            typename SchemeT::template ISStencil<GridType>::StencilType>;
+        using StencilT = typename LeafStencilT::Type;
         using MaskLeafT = typename MaskT::LeafNodeType;
         using MaskIterT = typename MaskLeafT::ValueOnCIter;
         using VoxelIterT = typename LeafType::ValueOnCIter;
@@ -657,6 +848,7 @@ euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
     StencilT stencil(mTracker.grid());
 
     for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
+        LeafStencilT::setLeaf(stencil, *leafIter);
         const ValueType* phi = leafIter.buffer(phiBuffer).data();
         ValueType* result = leafIter.buffer(resultBuffer).data();
         if (mMask == nullptr) {
