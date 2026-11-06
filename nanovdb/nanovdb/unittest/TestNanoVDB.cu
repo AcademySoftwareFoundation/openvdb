@@ -5272,10 +5272,10 @@ TEST(TestNanoVDBCUDA, ConnectedComponents_InFlightGrid)
 // invert mask bit is checked against the analytic answer: on for an inactive voxel, or a childless lower or upper
 // slot, inside the sphere. A childless slot holds no active voxel, so its voxels all have the sign of its origin.
 // The center lies in the middle of the 128^3 block [0,128)^3, which is inside the sphere clear of the band, so
-// upper bits are on as well; no absent root tile is inside. createLevelSetSphere fills an inside gap between root
-// entries with a root value tile, which PropagateSign rejects (precondition 4), but only once a whole 4096^3 root
-// tile lies inside the sphere, i.e. above a radius of about 3547; so this radius is safe, and inside absent root
-// tiles (stage 4) are left to a test of their own.
+// upper bits are on as well; no upper-node-sized region without a root-table entry is interior. createLevelSetSphere
+// fills an inside gap between root entries with a root value tile, which PropagateSign rejects (precondition 4), but
+// only once a whole 4096^3 root tile lies inside the sphere, i.e. above a radius of about 3547; so this radius is
+// safe, and interior regions without a root-table entry (stage 4) are left to a test of their own.
 TEST(TestNanoVDBCUDA, PropagateSign_Sphere)
 {
     using BuildT = nanovdb::ValueOnIndex;

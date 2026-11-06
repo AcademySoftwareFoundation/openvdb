@@ -677,8 +677,8 @@ TEST(TestMemoryResource, ConnectedComponents_NonBlockingStream)
 // root-tile origins it returns through an injected resource instance;
 // the caller allocates the invert masks. The input is the narrow band of
 // a small sphere, the level set from createLevelSetSphere converted to a
-// ValueOnIndex grid whose blind data channel 0 is the SDF sidecar; it has
-// no inside absent root tile.
+// ValueOnIndex grid whose blind data channel 0 is the SDF sidecar; no
+// upper-node-sized region without a root-table entry is interior.
 //======================================================================
 
 TEST(TestMemoryResource, PropagateSign_InjectedResourceSeam)
