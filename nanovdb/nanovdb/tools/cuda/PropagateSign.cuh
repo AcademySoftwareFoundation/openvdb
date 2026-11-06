@@ -530,12 +530,13 @@ namespace floodfill::detail {
 // and fillRootInvertTiles() throws once its round ends. Positions are kept as topology::detail::tileSortKey keys,
 // which sort by position.
 
-/// @brief The root-tile position (voxel coordinates >> 12, as in tileSortKey) whose topology::detail::tileSortKey
-///        is @a key: each 21-bit field holds a coordinate biased by 2^19.
-__hostdev__ inline nanovdb::Coord rootTileOf(uint64_t key)
+/// @brief The origin of the root tile whose topology::detail::tileSortKey is @a key: the inverse of tileSortKey,
+///        up to the tile, i.e. tileSortKeyToOrigin(tileSortKey(ijk)) == ijk & ~4095.
+__hostdev__ inline nanovdb::Coord tileSortKeyToOrigin(uint64_t key)
 {
-    auto coord = [](uint64_t field) { return int32_t(field & ((uint64_t(1) << 21) - 1)) - (1 << 19); };
-    return nanovdb::Coord(coord(key >> 42), coord(key >> 21), coord(key));
+    // unbias, then scale rather than shift (a left shift of a negative value is undefined before C++20)
+    auto field = [](uint64_t f) { return (int32_t(f & ((uint64_t(1) << 21) - 1)) - (1 << 19)) * (1 << 12); };
+    return nanovdb::Coord(field(key >> 42), field(key >> 21), field(key));
 }
 
 /// @brief A key of no root-tile position, which sorts after all of them.
@@ -560,13 +561,13 @@ struct RootNeighborFunctor
     __device__ void operator()(size_t i, const uint64_t* positions, const uint32_t* faces, nanovdb::CoordBBox hull,
                                uint64_t* candidates, int* escaped) const
     {
-        const nanovdb::Coord p = rootTileOf(positions[i]);
+        const nanovdb::Coord p = tileSortKeyToOrigin(positions[i]);
         const uint32_t emitted = faces ? faces[i] : (1u << faceCount) - 1;
         for (int f = 0; f < faceCount; ++f) {
             uint64_t key = NoRootTile;
             if ((emitted >> f) & 1u) {
-                const nanovdb::Coord q = faceNeighbor(p, Face(f), 1);
-                if (hull.isInside(q)) key = topology::detail::tileSortKey(q << NanoUpper<BuildT>::TOTAL);
+                const nanovdb::Coord q = faceNeighbor(p, Face(f), NanoUpper<BuildT>::DIM);
+                if (hull.isInside(q)) key = topology::detail::tileSortKey(q);
                 else *escaped = 1;
             }
             candidates[faceCount * i + f] = key;
@@ -587,12 +588,11 @@ struct NewRootTileFunctor
 }; // NewRootTileFunctor
 
 /// @brief origins[i] = the origin of the root-tile position of @a keys[i].
-template <typename BuildT>
 struct RootTileOriginFunctor
 {
     __device__ void operator()(size_t i, const uint64_t* keys, nanovdb::Coord* origins) const
     {
-        origins[i] = rootTileOf(keys[i]) << NanoUpper<BuildT>::TOTAL;
+        origins[i] = tileSortKeyToOrigin(keys[i]);
     }
 }; // RootTileOriginFunctor
 
@@ -622,7 +622,7 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
                               mStream));
     cudaCheck(cudaStreamSynchronize(mStream));
     nanovdb::CoordBBox hull; // empty until expanded
-    for (const uint64_t key : hostEntryKeys) hull.expand(floodfill::detail::rootTileOf(key));
+    for (const uint64_t key : hostEntryKeys) hull.expand(floodfill::detail::tileSortKeyToOrigin(key));
 
     // The search state, kept across rounds; each key list has its count.
     // - frontier: the positions a round emits candidates from: the entries in round 1, in table order, then the
@@ -700,7 +700,7 @@ void PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles()
     if (addedCount == 0) return;
     mRootInvertTileOrigins = BufferT<nanovdb::Coord>(mStream, this->ref(), addedCount, nanovdb::cuda::noInit);
     util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(addedCount, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
-        addedCount, floodfill::detail::RootTileOriginFunctor<BuildT>{}, added.data(), mRootInvertTileOrigins.data());
+        addedCount, floodfill::detail::RootTileOriginFunctor{}, added.data(), mRootInvertTileOrigins.data());
     cudaCheckError();
 }// PropagateSign<BuildT, ValueT, ResourceT>::fillRootInvertTiles
 
