@@ -255,14 +255,19 @@ namespace sdf::detail {
 
 // Barrier pruning.
 
-/// @brief Whether a voxel at unsigned distance @a udf from the mesh lies in the barrier: within half a voxel
-///        diagonal, sqrt(3)/2 voxel, of the signed surface {udf == isoValue}. All values are in world units.
+/// @brief Half-width, in voxels, of the barrier around the signed surface {udf == isoValue}. Two face neighbours on
+///        opposite sides of it are one voxel apart, so the distances of both from it sum to at most one voxel: at
+///        least one lies within half a voxel. A barrier slightly wider than half a voxel therefore leaves no face
+///        neighbours on opposite sides outside it; the 0.001 margin covers float error in the distances.
+static constexpr float BarrierHalfWidth = 0.501f;
+
+/// @brief Whether a voxel at unsigned distance @a udf from the mesh lies in the barrier: within BarrierHalfWidth
+///        voxels of the signed surface {udf == isoValue}. All values are in world units.
 /// @note Pruning and barrier signing must classify a voxel alike, so both use this test. Signing negates the
 ///       distance exactly, so the test gives the same answer on the magnitude of a signed distance.
 __hostdev__ inline bool isBarrier(float udf, float isoValue, float voxelSize)
 {
-    const float d = udf - isoValue;
-    return d * d < 0.75f * voxelSize * voxelSize;
+    return fabsf(udf - isoValue) < BarrierHalfWidth * voxelSize;
 }
 
 /// @brief Retain the voxels outside the barrier.
@@ -400,15 +405,20 @@ namespace sdf::detail {
 
 static constexpr uint32_t INVALID_TRIANGLE = 0xFFFFFFFFu;
 
-/// @brief Whether voxel @a nv at @a nijk is an anchor, an exterior non-barrier voxel with a nearest triangle. If so,
-///        @a dir is the unit direction from the triangle towards it and @a base the point of the signed surface
-///        below it.
+/// @brief Least distance, in voxels, of an anchor from the signed surface: half a voxel diagonal, as in OpenVDB's
+///        meshToLevelSet. A single anchor can place a barrier voxel outside, and anchors nearer the surface, down
+///        to BarrierHalfWidth, place interior voxels next to it outside far more often.
+static constexpr float AnchorMinDistance = 0.8660254f;
+
+/// @brief Whether voxel @a nv at @a nijk is an anchor: an exterior voxel at least AnchorMinDistance voxels from the
+///        signed surface, with a nearest triangle. If so, @a dir is the unit direction from the triangle towards it
+///        and @a base the point of the signed surface below it.
 __hostdev__ inline bool
 anchorGeometry(uint64_t nv, const nanovdb::Coord& nijk, const float* dSDF, float isoValue, float voxelSize,
                const uint32_t* dTriangleIndex, const nanovdb::Vec3f* dPoints, const nanovdb::Vec3i* dTriangles,
                const nanovdb::Map& map, float isoValueIndex, nanovdb::Vec3f& base, nanovdb::Vec3f& dir)
 {
-    if (isBarrier(fabsf(dSDF[nv]), isoValue, voxelSize) || signbit(dSDF[nv])) return false;
+    if (signbit(dSDF[nv]) || fabsf(fabsf(dSDF[nv]) - isoValue) < AnchorMinDistance * voxelSize) return false;
     const uint32_t tid = dTriangleIndex[nv];
     if (tid == INVALID_TRIANGLE) return false;
 
@@ -799,8 +809,8 @@ void MeshToSDF<BuildT, ResourceT>::finalizeDistances()
 
     const float voxelSize = float(mMap.getVoxelSize()[0]);
 
-    // Match the half-diagonal barrier used during signing.
-    const float interiorFloor = 0.8660254f * voxelSize;
+    // Match the barrier used during signing.
+    const float interiorFloor = sdf::detail::BarrierHalfWidth * voxelSize;
 
     // The floor test reads the signs of the neighbours, so the floored voxels are marked first, and a second kernel
     // writes every distance.
