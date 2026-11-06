@@ -4181,6 +4181,8 @@ TEST(TestNanoVDBCUDA, NonBlockingStreamDeviceGridTraits)
     queueUpload();
     EXPECT_EQ(hostGrid->gridSize(), TraitsT::getGridSize(d_grid, nb));
     queueUpload();
+    EXPECT_EQ(hostGrid->data()->mFlags.data(), TraitsT::getFlags(d_grid, nb).data());
+    queueUpload();
     EXPECT_EQ(hostGrid->tree().root().bbox(), TraitsT::getIndexBBox(d_grid, hostTreeData, nb));
     queueUpload();
     EXPECT_EQ(hostGrid->tree().root().tileCount(), TraitsT::getRootTableSize(d_grid, hostTreeData, nb));
