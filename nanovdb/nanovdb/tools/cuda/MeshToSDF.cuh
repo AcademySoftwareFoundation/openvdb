@@ -269,7 +269,7 @@ __hostdev__ inline bool isBarrier(float udf, float isoValue, float voxelSize)
 template <typename BuildT>
 struct UDFBarrierPruneMaskFunctor
 {
-    static constexpr int MaxThreadsPerBlock         = NanoLeaf<BuildT>::SIZE;
+    static constexpr int MaxThreadsPerBlock         = NanoLeaf<BuildT>::SIZE / 2;
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
     __device__ void operator()(
@@ -279,21 +279,18 @@ struct UDFBarrierPruneMaskFunctor
         float                            voxelSize,       // world
         nanovdb::Mask<3>*                dDstLeafMasks)
     {
-        const int leafID   = blockIdx.x;
-        const int threadID = threadIdx.x;
+        const int leafID = blockIdx.x, warpID = threadIdx.x >> 5, laneID = threadIdx.x & 31;
+        const auto& leaf = dGrid->tree().template getFirstNode<0>()[leafID];
+        const uint32_t n0 = 64 * warpID + laneID, n1 = n0 + 32;
 
-        const auto& leaf       = dGrid->tree().template getFirstNode<0>()[leafID];
-        auto&       resultMask = dDstLeafMasks[leafID];
+        const bool keep0 = leaf.isActive(n0) && !isBarrier(dUDF[leaf.getValue(n0)], isoValue, voxelSize);
+        const bool keep1 = leaf.isActive(n1) && !isBarrier(dUDF[leaf.getValue(n1)], isoValue, voxelSize);
 
-        // Clear the leaf's mask words in parallel, then fill the retain bits.
-        if (threadID < nanovdb::Mask<3>::WORD_COUNT)
-            resultMask.words()[threadID] = 0UL;
-        __syncthreads();
-
-        if (auto n = leaf.data()->getValue(threadID)) {  // n != 0 => active voxel
-            if (!isBarrier(dUDF[n], isoValue, voxelSize))
-                resultMask.setOnAtomic(threadID);
-        }
+        // Every lane participates, including inactive voxels. Each warp writes one complete mask word.
+        const uint32_t low  = __ballot_sync(0xFFFFFFFFu, keep0);
+        const uint32_t high = __ballot_sync(0xFFFFFFFFu, keep1);
+        if (laneID == 0)
+            dDstLeafMasks[leafID].words()[warpID] = uint64_t(low) | (uint64_t(high) << 32);
     }
 };
 
