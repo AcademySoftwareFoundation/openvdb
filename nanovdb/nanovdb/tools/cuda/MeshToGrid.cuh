@@ -279,11 +279,6 @@ GridHandle<BufferT> MeshToGrid<BuildT, ResourceT>::getHandle(const BufferT &buff
     buildRasterizedRoot();
     if (mVerbose==1) mTimer.stop();
 
-    // Allocate (zero-filled) upper/lower mask buffers sized from the root tile count
-    if (mVerbose==1) mTimer.start("Allocating internal mask buffers");
-    mBuilder.allocateInternalMaskBuffers(mStream);
-    if (mVerbose==1) mTimer.stop();
-
     // Scatter leaf/triangle pair origins into upper/lower topology masks
     if (mVerbose==1) mTimer.start("Rasterizing internal nodes");
     rasterizeInternalNodes();
@@ -891,18 +886,16 @@ void MeshToGrid<BuildT, ResourceT>::buildRasterizedRoot()
 template<typename BuildT, typename ResourceT>
 void MeshToGrid<BuildT, ResourceT>::rasterizeInternalNodes()
 {
-    if (mBoxTrianglePairCount == 0) return;
-
-    using RasterizerT = util::rasterization::cuda::RasterizeInternalNodesFunctor<BuildT, BoxTrianglePair>;
-
-    auto *dUpperMasks = mBuilder.deviceUpperMasks();
-    auto *dLowerMasks = mBuilder.deviceLowerMasks();
-
-    util::cuda::lambdaKernel<<<numBlocks(mBoxTrianglePairCount), mNumThreads, 0, mStream>>>(
-        mBoxTrianglePairCount,
-        RasterizerT{ deviceBoxTrianglePairs(), mBuilder.deviceProcessedRoot(), dUpperMasks, dLowerMasks }
-    );
-    cudaCheckError();
+    // Each leaf/triangle pair marks one (tile, upper child), which bounds the lower-mask rows
+    mBuilder.buildInternalMasks(mStream, mBoxTrianglePairCount, [&](Mask<5> *upperMasks, auto lowerMasks) {
+        if (mBoxTrianglePairCount == 0) return;
+        using RasterizerT = util::rasterization::cuda::RasterizeInternalNodesFunctor<BuildT, BoxTrianglePair, decltype(lowerMasks)>;
+        util::cuda::lambdaKernel<<<numBlocks(mBoxTrianglePairCount), mNumThreads, 0, mStream>>>(
+            mBoxTrianglePairCount,
+            RasterizerT{ deviceBoxTrianglePairs(), mBuilder.deviceProcessedRoot(), upperMasks, lowerMasks }
+        );
+        cudaCheckError();
+    });
 
 } // MeshToGrid<BuildT, ResourceT>::rasterizeInternalNodes
 
@@ -1096,10 +1089,6 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
 
     if (mVerbose==1) mTimer.start("Building rasterized root node");
     buildRasterizedRoot();
-    if (mVerbose==1) mTimer.stop();
-
-    if (mVerbose==1) mTimer.start("Allocating internal mask buffers");
-    mBuilder.allocateInternalMaskBuffers(mStream);
     if (mVerbose==1) mTimer.stop();
 
     if (mVerbose==1) mTimer.start("Rasterizing internal nodes");

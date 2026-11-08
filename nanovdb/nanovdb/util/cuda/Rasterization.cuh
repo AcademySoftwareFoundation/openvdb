@@ -16,6 +16,9 @@
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/math/Proximity.h>
+#include <nanovdb/util/cuda/LowerMasks.cuh>
+
+#include <type_traits>
 
 namespace nanovdb::util {
 
@@ -35,7 +38,9 @@ namespace cuda {
 ///        Both setOnAtomic() calls are required since multiple pairs can share
 ///        the same upper node (competing for the upper mask) or the same lower
 ///        node (competing for the lower mask).
-template<typename BuildT, typename PairT>
+///        @a LowerMasksT is a view from nanovdb/util/cuda/LowerMasks.cuh, or the raw
+///        Mask<4>(*)[Mask<5>::SIZE] array of TopologyBuilder's dense path.
+template<typename BuildT, typename PairT, typename LowerMasksT = Mask<4> (*)[Mask<5>::SIZE]>
 struct RasterizeInternalNodesFunctor
 {
     using RootT  = NanoRoot<BuildT>;
@@ -45,7 +50,7 @@ struct RasterizeInternalNodesFunctor
     const PairT *dPairs;
     const RootT *dRoot;
     Mask<5> *dUpperMasks;
-    Mask<4> (*dLowerMasks)[Mask<5>::SIZE];
+    LowerMasksT dLowerMasks;
 
     __device__ void operator()(size_t pairID) const
     {
@@ -60,7 +65,10 @@ struct RasterizeInternalNodesFunctor
         const uint32_t lowerBit = LowerT::CoordToOffset(pair.origin);
 
         dUpperMasks[tileIdx].setOnAtomic(upperBit);
-        dLowerMasks[tileIdx][upperBit].setOnAtomic(lowerBit);
+        if constexpr (std::is_pointer_v<LowerMasksT>)
+            dLowerMasks[tileIdx][upperBit].setOnAtomic(lowerBit);
+        else
+            dLowerMasks.setOnAtomic(tileIdx, upperBit, lowerBit);
     }
 };
 

@@ -4393,8 +4393,8 @@ namespace {
 
 /// Drives RefineInternalNodesFunctor over every source leaf of a batch: the leaf's member is
 /// found from the per-grid leaf offsets, and the member's processed root and mask rows are
-/// selected by pointer offset.
-template <typename BuildT>
+/// selected by tile offset. LowerMasksT is a lower-mask view, or the deprecated raw dense array.
+template <typename BuildT, typename LowerMasksT>
 struct BatchRefineInternalNodes
 {
     const nanovdb::NanoGrid<BuildT>* const* srcGrids;
@@ -4402,13 +4402,20 @@ struct BatchRefineInternalNodes
     const uint32_t* tileBase;
     const uint32_t* leafStart;
     nanovdb::Mask<5>* upperMasks;
-    nanovdb::Mask<4> (*lowerMasks)[nanovdb::Mask<5>::SIZE];
+    LowerMasksT lowerMasks;
 
     __device__ void operator()(size_t leaf) const {
         uint32_t g = 0;
         while (leafStart[g + 1] <= leaf) ++g;
-        nanovdb::util::morphology::cuda::RefineInternalNodesFunctor<BuildT>()(
-            leaf - leafStart[g], srcGrids[g], roots[g], upperMasks + tileBase[g], lowerMasks + tileBase[g]);
+        if constexpr (std::is_pointer_v<LowerMasksT>) {
+            NANOVDB_SUPPRESS_DEPRECATION_BEGIN
+            nanovdb::util::morphology::cuda::RefineInternalNodesFunctor<BuildT>()(
+                leaf - leafStart[g], srcGrids[g], roots[g], upperMasks + tileBase[g], lowerMasks + tileBase[g]);
+            NANOVDB_SUPPRESS_DEPRECATION_END
+        } else {
+            nanovdb::util::morphology::cuda::RefineInternalNodesFunctor<BuildT>()(
+                leaf - leafStart[g], srcGrids[g], roots[g], upperMasks + tileBase[g], lowerMasks.offsetTiles(tileBase[g]));
+        }
     }
 };
 
@@ -4445,7 +4452,8 @@ static_assert(std::is_move_constructible_v<nanovdb::tools::cuda::MergeGrids<nano
 // built twice on one builder without draining the stream in between, on a non-blocking
 // stream, so the second build relies on getBuffer's own wait for the node counts and on the
 // builder ordering its reuse of the host staging after the first build's copies. The second
-// build also computes full checksums.
+// build also computes full checksums. Both builds run through the deprecated dense masks and
+// through buildInternalMasks.
 TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
 {
     using BuildT  = nanovdb::ValueOnIndex;
@@ -4553,12 +4561,11 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
     };
 
     // One batched refinement; returns the output buffer without draining the stream
-    auto buildBatch = [&](nanovdb::tools::cuda::TopologyBuilder<BuildT> &builder, bool waitForNodeCounts, nanovdb::CheckMode checksum) {
+    auto buildBatch = [&](nanovdb::tools::cuda::TopologyBuilder<BuildT> &builder, bool waitForNodeCounts, nanovdb::CheckMode checksum, bool sparse) {
         builder.mChecksum = checksum;
         builder.allocateProcessedRoots(tileCounts);
         for (uint32_t g = 0; g < gridCount; ++g) topo::packProcessedRoot(tiles[g], builder.hostProcessedRoot(g));
         builder.uploadProcessedRoot(stream);
-        builder.allocateInternalMaskBuffers(stream);
 
         // Per-grid dispatch tables for the mask kernel: processed root and mask row base of every member
         std::vector<const RootT*> roots(gridCount);
@@ -4569,11 +4576,20 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
         }
         auto dRoots    = upload(roots);
         auto dTileBase = upload(tileBase);
-        if (srcLeafCount) {
+        auto launch = [&](nanovdb::Mask<5> *upperMasks, auto lowerMasks) {
+            if (srcLeafCount == 0) return;
             nanovdb::util::cuda::lambdaKernel<<<(srcLeafCount + 127) / 128, 128, 0, stream>>>(srcLeafCount,
-                BatchRefineInternalNodes<BuildT>{d_srcGrids, dRoots.data(), dTileBase.data(), d_leafStart,
-                                                 builder.deviceUpperMasks(), builder.deviceLowerMasks()});
+                BatchRefineInternalNodes<BuildT, decltype(lowerMasks)>{d_srcGrids, dRoots.data(), dTileBase.data(), d_leafStart,
+                                                                       upperMasks, lowerMasks});
             cudaCheckError();
+        };
+        if (sparse) {
+            builder.buildInternalMasks(stream, 0, launch);
+        } else {
+            NANOVDB_SUPPRESS_DEPRECATION_BEGIN
+            builder.allocateInternalMaskBuffers(stream);
+            launch(builder.deviceUpperMasks(), builder.deviceLowerMasks());
+            NANOVDB_SUPPRESS_DEPRECATION_END
         }
 
         builder.countNodes(stream);
@@ -4604,14 +4620,17 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
     };
 
     nanovdb::tools::cuda::TopologyBuilder<BuildT> builder(stream);
-    const std::vector<nanovdb::CheckMode> checksums = {nanovdb::CheckMode::Disable, nanovdb::CheckMode::Full};
+    const std::vector<nanovdb::CheckMode> checksums = {nanovdb::CheckMode::Disable, nanovdb::CheckMode::Full,
+                                                       nanovdb::CheckMode::Disable, nanovdb::CheckMode::Full};
     std::vector<DevBufT> buffers;
-    buffers.push_back(buildBatch(builder, true, checksums[0]));
-    buffers.push_back(buildBatch(builder, false, checksums[1]));
+    for (bool sparse : {false, true}) {
+        buffers.push_back(buildBatch(builder, true, checksums[buffers.size()], sparse));
+        buffers.push_back(buildBatch(builder, false, checksums[buffers.size()], sparse));
+    }
     cudaCheck(cudaStreamSynchronize(stream));
 
     for (size_t build = 0; build < buffers.size(); ++build) {
-        SCOPED_TRACE("build " + std::to_string(build));
+        SCOPED_TRACE(std::string(build < 2 ? "dense" : "sparse") + " build " + std::to_string(build % 2));
         // The device buffer holds a valid chain of gridCount grids (the single-space handle ctor validates it)
         nanovdb::GridHandle<DevBufT> device(std::move(buffers[build]));
         ASSERT_EQ(device.gridCount(), gridCount);
@@ -4645,6 +4664,268 @@ TEST(TestNanoVDBCUDA, TopologyBuilderBatch_ValueOnIndex)
         EXPECT_EQ(batch.grid<BuildT>(3)->tree().activeVoxelCount(), 8u * members[3].size());
     }
 }// TopologyBuilderBatch_ValueOnIndex
+
+namespace {
+
+using TopoBuildT = nanovdb::ValueOnIndex;
+using TopoGridT  = nanovdb::NanoGrid<TopoBuildT>;
+using TopoRootT  = nanovdb::NanoRoot<TopoBuildT>;
+using TopoDevBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>;
+
+enum class TopoOp { Refine, Coarsen, Dilate };
+
+/// Device resource that records the peak bytes it holds at once
+struct PeakResource : nanovdb::cuda::SyncFromAsync<PeakResource>
+{
+    static constexpr size_t DEFAULT_ALIGNMENT = nanovdb::cuda::DeviceResource::DEFAULT_ALIGNMENT;
+    size_t current = 0, peak = 0;
+    void* allocate_async(size_t bytes, size_t alignment, cudaStream_t stream) {
+        void *p = nanovdb::cuda::DeviceResource{}.allocate_async(bytes, alignment, stream);
+        if (p) { current += bytes; peak = std::max(peak, current); }
+        return p;
+    }
+    void deallocate_async(void *p, size_t bytes, size_t alignment, cudaStream_t stream) {
+        if (p) current -= bytes;
+        nanovdb::cuda::DeviceResource{}.deallocate_async(p, bytes, alignment, stream);
+    }
+    // state is inline, so only the same instance keeps one account
+    [[maybe_unused]] friend bool operator==(const PeakResource &a, const PeakResource &b) { return &a == &b; }
+    [[maybe_unused]] friend bool operator!=(const PeakResource &a, const PeakResource &b) { return !(a == b); }
+};
+
+/// Voxels of a one-voxel-thick spherical shell
+std::vector<nanovdb::Coord> topoShell(nanovdb::Vec3d c, double r)
+{
+    std::vector<nanovdb::Coord> v;
+    for (int i = int(std::floor(c[0] - r - 1)); i <= int(std::ceil(c[0] + r + 1)); ++i)
+    for (int j = int(std::floor(c[1] - r - 1)); j <= int(std::ceil(c[1] + r + 1)); ++j)
+    for (int k = int(std::floor(c[2] - r - 1)); k <= int(std::ceil(c[2] + r + 1)); ++k) {
+        const double d = std::sqrt((i - c[0]) * (i - c[0]) + (j - c[1]) * (j - c[1]) + (k - c[2]) * (k - c[2]));
+        if (std::abs(d - r) <= 0.87) v.emplace_back(i, j, k);
+    }
+    return v;
+}
+
+nanovdb::GridHandle<TopoDevBufT> topoGrid(const std::vector<nanovdb::Coord> &points, cudaStream_t stream)
+{
+    if (points.empty()) {
+        nanovdb::tools::build::Grid<float> buildGrid(0.0f);
+        auto hostHandle = nanovdb::tools::createNanoGrid<nanovdb::tools::build::Grid<float>, TopoBuildT, nanovdb::HostBuffer>(buildGrid);
+        auto handle = nanovdb::cuda::copyTo<TopoDevBufT>(hostHandle, stream);
+        cudaCheck(cudaStreamSynchronize(stream));
+        return handle;
+    }
+    nanovdb::cuda::Buffer<nanovdb::Coord> pointBuffer(stream, points.size(), nanovdb::cuda::noInit);
+    cudaCheck(cudaMemcpyAsync(pointBuffer.data(), points.data(), pointBuffer.size_bytes(), cudaMemcpyHostToDevice, stream));
+    nanovdb::tools::cuda::PointsToGrid<TopoBuildT> converter(1.0, nanovdb::Vec3d(0), stream);
+    auto handle = converter.getHandle<nanovdb::Coord*, TopoDevBufT>(pointBuffer.data(), points.size());
+    cudaCheck(cudaStreamSynchronize(stream));
+    return handle;
+}
+
+/// A source grid with the speculative root tiles RefineGrid, CoarsenGrid and DilateGrid derive from it
+struct TopoSource
+{
+    const TopoGridT *grid;
+    nanovdb::TreeData tree;
+    nanovdb::tools::cuda::topology::detail::ProcessedTileMap<TopoRootT> tiles[3];
+
+    TopoSource(const TopoGridT *g, cudaStream_t stream) : grid(g)
+    {
+        namespace topo = nanovdb::tools::cuda::topology::detail;
+        namespace morph = nanovdb::util::morphology;
+        tree = nanovdb::util::cuda::DeviceGridTraits<TopoBuildT>::getTreeData(grid, stream);
+        if (!tree.mVoxelCount) return;
+        auto deviceRoot = static_cast<const TopoRootT*>(nanovdb::util::PtrAdd(grid, TopoGridT::memUsage() + tree.mNodeOffset[3]));
+        const uint64_t bytes = tree.mNodeOffset[1] - tree.mNodeOffset[3];
+        auto host = nanovdb::HostBuffer::create(bytes);
+        cudaCheck(cudaMemcpy(host.data(), deviceRoot, bytes, cudaMemcpyDeviceToHost));
+        auto root = static_cast<TopoRootT*>(host.data());
+        for (uint32_t t = 0; t < root->tileCount(); ++t) {
+            const auto bbox = root->getChild(root->tile(t))->bbox();
+            topo::insertProcessedTiles<TopoRootT>(tiles[int(TopoOp::Refine)], nanovdb::CoordBBox(
+                morph::refineCoord(bbox.min()), morph::refineCoord(bbox.max()).offsetBy(1)));
+            topo::insertProcessedTile<TopoRootT>(tiles[int(TopoOp::Coarsen)], morph::coarsenCoord(root->tile(t)->origin()));
+            topo::insertProcessedTiles<TopoRootT>(tiles[int(TopoOp::Dilate)], bbox.expandBy(1));
+        }
+    }
+};
+
+/// The consumers' bound on (tile, upper child) pairs: lower nodes each source lower node can produce
+uint64_t topoMaxRows(const std::vector<TopoSource> &src, TopoOp op)
+{
+    uint64_t rows = 0;
+    for (const auto &s : src) rows += uint64_t(op == TopoOp::Refine ? 8 : op == TopoOp::Coarsen ? 1 : 27) * s.tree.mNodeCount[1];
+    return rows;
+}
+
+/// Builds every source through one TopologyBuilder, with the deprecated dense masks or with
+/// buildInternalMasks and @a maxRows, and returns the output buffer after the stream drains
+template <typename ResourceT, typename OutBufT>
+OutBufT topoBuildBatch(nanovdb::tools::cuda::TopologyBuilder<TopoBuildT, ResourceT> &builder, const std::vector<TopoSource> &src,
+                       TopoOp op, bool sparse, uint64_t maxRows, const OutBufT &prototype, cudaStream_t stream)
+{
+    namespace topo  = nanovdb::tools::cuda::topology::detail;
+    namespace morph = nanovdb::util::morphology::cuda;
+    using DilateInternal = morph::DilateInternalNodesFunctor<TopoBuildT, nanovdb::tools::morphology::NN_FACE_EDGE_VERTEX>;
+    using DilateLeaf     = morph::DilateLeafNodesFunctor<TopoBuildT, nanovdb::tools::morphology::NN_FACE_EDGE_VERTEX>;
+    const uint32_t n = uint32_t(src.size());
+    std::vector<uint32_t> tileCounts(n);
+    for (uint32_t g = 0; g < n; ++g) tileCounts[g] = uint32_t(src[g].tiles[int(op)].size());
+    builder.allocateProcessedRoots(tileCounts);
+    for (uint32_t g = 0; g < n; ++g) topo::packProcessedRoot(src[g].tiles[int(op)], builder.hostProcessedRoot(g));
+    builder.uploadProcessedRoot(stream);
+
+    auto launch = [&](nanovdb::Mask<5> *upperMasks, auto lowerMasks) {
+        for (uint32_t g = 0; g < n; ++g) {
+            const auto &s = src[g];
+            const uint32_t tileBase = builder.data(g)->tileBase;
+            const auto *root = builder.deviceProcessedRoot(g);
+            const uint32_t leaves = uint32_t(s.tree.mNodeCount[0]), lowers = uint32_t(s.tree.mNodeCount[1]);
+            if (op == TopoOp::Refine && leaves)
+                nanovdb::util::cuda::lambdaKernel<<<(leaves + 127) / 128, 128, 0, stream>>>(leaves, morph::RefineInternalNodesFunctor<TopoBuildT>(),
+                    s.grid, root, upperMasks + tileBase, lowerMasks.offsetTiles(tileBase));
+            else if (op == TopoOp::Coarsen && leaves)
+                nanovdb::util::cuda::lambdaKernel<<<(leaves + 127) / 128, 128, 0, stream>>>(leaves, morph::CoarsenInternalNodesFunctor<TopoBuildT>(),
+                    s.grid, root, upperMasks + tileBase, lowerMasks.offsetTiles(tileBase));
+            else if (op == TopoOp::Dilate && lowers)
+                nanovdb::util::cuda::operatorKernel<DilateInternal>
+                    <<<dim3(lowers, DilateInternal::SlicesPerLowerNode, 1), DilateInternal::MaxThreadsPerBlock, 0, stream>>>(
+                    s.grid, root, upperMasks + tileBase, lowerMasks.offsetTiles(tileBase));
+        }
+        cudaCheckError();
+    };
+    if (sparse) {
+        builder.buildInternalMasks(stream, maxRows, launch);
+    } else {
+        NANOVDB_SUPPRESS_DEPRECATION_BEGIN
+        builder.allocateInternalMaskBuffers(stream);
+        if (builder.deviceUpperMasks()) launch(builder.deviceUpperMasks(), morph::DenseLowerMasks{{}, builder.deviceLowerMasks()[0]});
+        NANOVDB_SUPPRESS_DEPRECATION_END
+    }
+
+    builder.countNodes(stream);
+    auto buffer = builder.getBuffer(prototype, stream);
+    for (uint32_t g = 0; g < n; ++g)
+        cudaCheck(cudaMemcpyAsync(&builder.data(g)->getGrid(), src[g].grid->data(), TopoGridT::memUsage(), cudaMemcpyDeviceToDevice, stream));
+    builder.processGridTreeRoot(stream);
+    builder.processUpperNodes(stream);
+    builder.processLowerNodes(stream);
+    for (uint32_t g = 0; g < n; ++g) {
+        const auto &s = src[g];
+        TopoGridT *dst = &builder.data(g)->getGrid();
+        const uint32_t leaves = uint32_t(s.tree.mNodeCount[0]), dstLowers = builder.data(g)->nodeCount[1];
+        if (op == TopoOp::Refine && leaves)
+            nanovdb::util::cuda::lambdaKernel<<<(leaves + 127) / 128, 128, 0, stream>>>(leaves, morph::RefineLeafMasksFunctor<TopoBuildT>(), s.grid, dst);
+        else if (op == TopoOp::Coarsen && leaves)
+            nanovdb::util::cuda::lambdaKernel<<<(leaves + 127) / 128, 128, 0, stream>>>(leaves, morph::CoarsenLeafMasksFunctor<TopoBuildT>(), s.grid, dst);
+        else if (op == TopoOp::Dilate && dstLowers)
+            nanovdb::util::cuda::operatorKernel<DilateLeaf>
+                <<<dim3(dstLowers, DilateLeaf::SlicesPerLowerNode, 1), DilateLeaf::MaxThreadsPerBlock, 0, stream>>>(s.grid, dst);
+    }
+    cudaCheckError();
+    builder.processLeafOffsets(stream);
+    builder.processBBox(stream);
+    builder.postProcessGridTree(stream);
+    cudaCheck(cudaStreamSynchronize(stream));
+    return buffer;
+}
+
+std::vector<uint8_t> topoHostBytes(const TopoDevBufT &buffer)
+{
+    std::vector<uint8_t> bytes(buffer.size());
+    cudaCheck(cudaMemcpy(bytes.data(), buffer.data(), bytes.size(), cudaMemcpyDeviceToHost));
+    return bytes;
+}
+
+}// anonymous namespace
+
+// buildInternalMasks stores lower masks only for the upper-node children the functors touch.
+// Refine, coarsen and dilate a batch through it and through the deprecated dense masks, and
+// require byte-identical output. The batch holds a shell touching ijk = 0 (its dilation reaches
+// 8 tiles), an empty grid, small shells scattered over many tiles and voxels across tile
+// boundaries. The sparse path runs with the consumers' row bound and with no bound.
+TEST(TestNanoVDBCUDA, TopologyBuilder_SparseMatchesDense)
+{
+    cudaStream_t stream;
+    cudaCheck(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+    std::unique_ptr<CUstream_st, decltype(&cudaStreamDestroy)> streamGuard(stream, &cudaStreamDestroy);
+
+    std::vector<std::vector<nanovdb::Coord>> members(4);
+    members[0] = topoShell({19.0, 19.0, 19.0}, 19.0);
+    std::mt19937 rng(7);
+    std::uniform_real_distribution<double> pos(-20000.0, 20000.0);
+    for (int o = 0; o < 8; ++o) { auto v = topoShell({pos(rng), pos(rng), pos(rng)}, 6.0); members[2].insert(members[2].end(), v.begin(), v.end()); }
+    members[3] = {{-1,-1,-1}, {4095,0,0}, {4096,0,0}, {-4097,8,8}, {7,-4096,2047}, {0,0,-129}};
+
+    std::vector<nanovdb::GridHandle<TopoDevBufT>> handles;
+    std::vector<TopoSource> src;
+    for (const auto &points : members) handles.push_back(topoGrid(points, stream));
+    for (auto &h : handles) src.emplace_back(h.deviceGrid<TopoBuildT>(), stream);
+    EXPECT_EQ(src[0].tiles[int(TopoOp::Dilate)].size(), 8u);
+
+    nanovdb::tools::cuda::TopologyBuilder<TopoBuildT> builder(stream);
+    for (TopoOp op : {TopoOp::Refine, TopoOp::Coarsen, TopoOp::Dilate}) {
+        SCOPED_TRACE("op " + std::to_string(int(op)));
+        const auto dense = topoHostBytes(topoBuildBatch(builder, src, op, false, 0, TopoDevBufT(), stream));
+        for (uint64_t maxRows : {topoMaxRows(src, op), uint64_t(0)}) {
+            SCOPED_TRACE("maxRows " + std::to_string(maxRows));
+            const auto sparse = topoHostBytes(topoBuildBatch(builder, src, op, true, maxRows, TopoDevBufT(), stream));
+            ASSERT_EQ(sparse.size(), dense.size());
+            EXPECT_EQ(0, std::memcmp(sparse.data(), dense.data(), dense.size()));
+        }
+    }
+}// TopologyBuilder_SparseMatchesDense
+
+// A maxRows bound smaller than the (tile, upper child) pairs the functors touch makes getBuffer
+// throw, and the builder still builds correctly afterwards
+TEST(TestNanoVDBCUDA, TopologyBuilder_SparseRowOverflow)
+{
+    cudaStream_t stream;
+    cudaCheck(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+    std::unique_ptr<CUstream_st, decltype(&cudaStreamDestroy)> streamGuard(stream, &cudaStreamDestroy);
+
+    auto handle = topoGrid(topoShell({100.0, 100.0, 100.0}, 90.0), stream);
+    std::vector<TopoSource> src;
+    src.emplace_back(handle.deviceGrid<TopoBuildT>(), stream);
+    ASSERT_GT(src[0].tree.mNodeCount[1], 1u);
+
+    nanovdb::tools::cuda::TopologyBuilder<TopoBuildT> builder(stream);
+    EXPECT_THROW(topoBuildBatch(builder, src, TopoOp::Refine, true, 1, TopoDevBufT(), stream), std::runtime_error);
+    cudaCheck(cudaStreamSynchronize(stream));
+
+    const auto dense  = topoHostBytes(topoBuildBatch(builder, src, TopoOp::Refine, false, 0, TopoDevBufT(), stream));
+    const auto sparse = topoHostBytes(topoBuildBatch(builder, src, TopoOp::Refine, true, topoMaxRows(src, TopoOp::Refine), TopoDevBufT(), stream));
+    ASSERT_EQ(sparse.size(), dense.size());
+    EXPECT_EQ(0, std::memcmp(sparse.data(), dense.data(), dense.size()));
+}// TopologyBuilder_SparseRowOverflow
+
+// Sixteen small shells, one tile each: the dense masks need 16 MiB per tile, while the sparse
+// masks keep the whole build within twice its output
+TEST(TestNanoVDBCUDA, TopologyBuilder_SparseScratchScalesWithOutput)
+{
+    cudaStream_t stream;
+    cudaCheck(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking));
+    std::unique_ptr<CUstream_st, decltype(&cudaStreamDestroy)> streamGuard(stream, &cudaStreamDestroy);
+
+    std::vector<nanovdb::GridHandle<TopoDevBufT>> handles;
+    std::vector<TopoSource> src;
+    for (int g = 0; g < 16; ++g) handles.push_back(topoGrid(topoShell({1000.5, 1000.5, 1000.5}, 30.0), stream));
+    for (auto &h : handles) src.emplace_back(h.deviceGrid<TopoBuildT>(), stream);
+
+    using OutBufT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<PeakResource>>;
+    PeakResource resource;
+    nanovdb::tools::cuda::TopologyBuilder<TopoBuildT, PeakResource> builder(stream, resource);
+    for (TopoOp op : {TopoOp::Refine, TopoOp::Coarsen, TopoOp::Dilate}) {
+        SCOPED_TRACE("op " + std::to_string(int(op)));
+        cudaCheck(cudaStreamSynchronize(stream));
+        resource.peak = resource.current;
+        const size_t base = resource.current;
+        const OutBufT prototype(stream, nanovdb::cuda::ResourceRef<PeakResource>(resource), 0, nanovdb::cuda::noInit);
+        auto buffer = topoBuildBatch(builder, src, op, true, topoMaxRows(src, op), prototype, stream);
+        EXPECT_LT(resource.peak - base, 2 * buffer.size()) << "output " << buffer.size() << " bytes";
+    }
+}// TopologyBuilder_SparseScratchScalesWithOutput
 
 // RefineGrid and DilateGrid enumerate their speculative root tiles with insertProcessedTiles.
 // This checks it against the per-tile loops and offset-shifted key it replaced, for upper-node
