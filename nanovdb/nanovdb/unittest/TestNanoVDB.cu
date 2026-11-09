@@ -4949,65 +4949,92 @@ TEST(TestNanoVDBCUDA, TopologyBuilder_SparseUnwrittenRow)
 
 namespace {
 
-/// Writes from a block of 8 × 4 × 2 threads. Lanes skip their write when (y + z) % 3 == 0, so
-/// the writers diverge, and lanes of a warp share slots, so they must agree on one row per slot.
-__global__ void sparseClaimKernel(nanovdb::util::morphology::cuda::SparseLowerMasks view, uint32_t rounds)
+/// The writes thread @a t of an 8 × 4 × 2 block makes under divergence pattern @a pattern, as
+/// write(tile, upper child, bit, viaWord). Shared by the kernel and the host replay.
+///   0: lanes skip their writes by block position
+///   1: uneven trip counts per lane, with early exits
+///   2: two write call sites in one warp (setOnAtomic and atomicOrWord) on shared slots
+///   3: one writing lane per warp
+#pragma nv_exec_check_disable
+template <typename WriteT>
+__hostdev__ void sparseClaimWrites(uint32_t t, uint32_t y, uint32_t z, int pattern, WriteT &&write)
+{
+    if (pattern == 0) {
+        if ((y + z) % 3 == 0) return;
+        for (uint32_t r = 0; r < 5; ++r) write(t % 3, (t * 7 + r * 13) % 97, (t + r) % 4096, false);
+    } else if (pattern == 1) {
+        for (uint32_t r = 0; r < 1 + t % 7; ++r) {
+            if ((t + r) % 11 == 0) break;
+            write(t % 2, (t * 3 + r) % 41, (t * 5 + r) % 4096, r % 2 == 1);
+        }
+    } else if (pattern == 2) {
+        for (uint32_t r = 0; r < 4; ++r) write(0, (t + r + (t & 1)) % 23, (t * 9 + r) % 4096, (t & 1) == 1);
+    } else if ((t & 31) == 5) {
+        for (uint32_t r = 0; r < 3; ++r) write(t % 3, (t / 32 + r) % 50, r * 100, false);
+    }
+}
+
+template <int Pattern>
+__global__ void sparseClaimKernel(nanovdb::util::morphology::cuda::SparseLowerMasks view)
 {
     const uint32_t t = threadIdx.x + blockDim.x * (threadIdx.y + blockDim.y * threadIdx.z) + blockIdx.x * 64;
-    if ((threadIdx.y + threadIdx.z) % 3 == 0) return;
-    for (uint32_t r = 0; r < rounds; ++r) {
-        const uint32_t uc = (t * 7 + r * 13) % 97;
-        view.setOnAtomic(t % 3, uc, (t + r) % 4096);
-    }
+    sparseClaimWrites(t, threadIdx.y, threadIdx.z, Pattern, [&](uint32_t tile, uint32_t uc, uint32_t bit, bool viaWord) {
+        if (viaWord) view.atomicOrWord(tile, uc, bit >> 6, uint64_t(1) << (bit & 63));
+        else view.setOnAtomic(tile, uc, bit);
+    });
 }
 
 }// anonymous namespace
 
 // SparseLowerMasks gives each touched (tile, upper child) exactly one row, holding every bit
-// written to it, when writers are divergent, share slots across lanes and warps, and run in
-// multi-dimensional blocks
+// written to it, under several divergence patterns, with writers sharing slots across lanes
+// and warps, in multi-dimensional blocks
 TEST(TestNanoVDBCUDA, TopologyBuilder_SparseLowerMasksClaims)
 {
     namespace morph = nanovdb::util::morphology::cuda;
     using Mask4 = nanovdb::Mask<4>;
-    constexpr uint32_t tiles = 3, slots = tiles * nanovdb::Mask<5>::SIZE, capacity = 512, blocks = 40, rounds = 5;
+    constexpr uint32_t tiles = 3, slots = tiles * nanovdb::Mask<5>::SIZE, capacity = 512, blocks = 40;
 
-    nanovdb::cuda::Buffer<uint32_t> index(cudaStream_t(0), slots, nanovdb::cuda::noInit), state(cudaStream_t(0), 2, nanovdb::cuda::noInit);
-    nanovdb::cuda::Buffer<Mask4> pool(cudaStream_t(0), capacity, nanovdb::cuda::noInit);
-    cudaCheck(cudaMemset(index.data(), 0xFF, index.size_bytes()));
-    cudaCheck(cudaMemset(state.data(), 0, state.size_bytes()));
-    cudaCheck(cudaMemset(pool.data(), 0, pool.size_bytes()));
-    const morph::SparseLowerMasks view{{}, index.data(), pool.data(), state.data(), state.data() + 1, capacity};
-    sparseClaimKernel<<<blocks, dim3(8, 4, 2)>>>(view, rounds);
-    cudaCheckError();
-    cudaCheck(cudaDeviceSynchronize());
+    for (int pattern = 0; pattern < 4; ++pattern) {
+        SCOPED_TRACE("pattern " + std::to_string(pattern));
+        nanovdb::cuda::Buffer<uint32_t> index(cudaStream_t(0), slots, nanovdb::cuda::noInit), state(cudaStream_t(0), 2, nanovdb::cuda::noInit);
+        nanovdb::cuda::Buffer<Mask4> pool(cudaStream_t(0), capacity, nanovdb::cuda::noInit);
+        cudaCheck(cudaMemset(index.data(), 0xFF, index.size_bytes()));
+        cudaCheck(cudaMemset(state.data(), 0, state.size_bytes()));
+        cudaCheck(cudaMemset(pool.data(), 0, pool.size_bytes()));
+        const morph::SparseLowerMasks view{{}, index.data(), pool.data(), state.data(), state.data() + 1, capacity};
+        const dim3 block(8, 4, 2);
+        if (pattern == 0) sparseClaimKernel<0><<<blocks, block>>>(view);
+        else if (pattern == 1) sparseClaimKernel<1><<<blocks, block>>>(view);
+        else if (pattern == 2) sparseClaimKernel<2><<<blocks, block>>>(view);
+        else sparseClaimKernel<3><<<blocks, block>>>(view);
+        cudaCheckError();
+        cudaCheck(cudaDeviceSynchronize());
 
-    // Expected bits per slot, replaying the kernel on the host
-    std::map<uint32_t, std::set<uint32_t>> expected;
-    for (uint32_t b = 0; b < blocks; ++b)
-    for (uint32_t z = 0; z < 2; ++z) for (uint32_t y = 0; y < 4; ++y) for (uint32_t x = 0; x < 8; ++x) {
-        if ((y + z) % 3 == 0) continue;
-        const uint32_t t = x + 8 * (y + 4 * z) + b * 64;
-        for (uint32_t r = 0; r < rounds; ++r)
-            expected[(t % 3) * nanovdb::Mask<5>::SIZE + (t * 7 + r * 13) % 97].insert((t + r) % 4096);
-    }
+        std::map<uint32_t, std::set<uint32_t>> expected;// bits per slot, replaying the kernel
+        for (uint32_t b = 0; b < blocks; ++b)
+        for (uint32_t z = 0; z < 2; ++z) for (uint32_t y = 0; y < 4; ++y) for (uint32_t x = 0; x < 8; ++x)
+            sparseClaimWrites(x + 8 * (y + 4 * z) + b * 64, y, z, pattern, [&](uint32_t tile, uint32_t uc, uint32_t bit, bool) {
+                expected[tile * nanovdb::Mask<5>::SIZE + uc].insert(bit);
+            });
 
-    std::vector<uint32_t> hostIndex(slots), hostState(2);
-    std::vector<Mask4> hostPool(capacity);
-    cudaCheck(cudaMemcpy(hostIndex.data(), index.data(), index.size_bytes(), cudaMemcpyDeviceToHost));
-    cudaCheck(cudaMemcpy(hostState.data(), state.data(), state.size_bytes(), cudaMemcpyDeviceToHost));
-    cudaCheck(cudaMemcpy(hostPool.data(), pool.data(), pool.size_bytes(), cudaMemcpyDeviceToHost));
-    EXPECT_EQ(hostState[0], expected.size()) << "one claim per touched slot";
-    EXPECT_EQ(hostState[1], 0u) << "no overflow";
-    std::set<uint32_t> rows;
-    for (uint32_t s = 0; s < slots; ++s) {
-        const auto it = expected.find(s);
-        if (it == expected.end()) { EXPECT_EQ(hostIndex[s], morph::UnclaimedRow) << "slot " << s; continue; }
-        const uint32_t row = hostIndex[s];
-        ASSERT_LT(row, capacity) << "slot " << s;
-        EXPECT_TRUE(rows.insert(row).second) << "row " << row << " shared by two slots";
-        EXPECT_EQ(hostPool[row].countOn(), it->second.size()) << "slot " << s;
-        for (uint32_t bit : it->second) EXPECT_TRUE(hostPool[row].isOn(bit)) << "slot " << s << " bit " << bit;
+        std::vector<uint32_t> hostIndex(slots), hostState(2);
+        std::vector<Mask4> hostPool(capacity);
+        cudaCheck(cudaMemcpy(hostIndex.data(), index.data(), index.size_bytes(), cudaMemcpyDeviceToHost));
+        cudaCheck(cudaMemcpy(hostState.data(), state.data(), state.size_bytes(), cudaMemcpyDeviceToHost));
+        cudaCheck(cudaMemcpy(hostPool.data(), pool.data(), pool.size_bytes(), cudaMemcpyDeviceToHost));
+        EXPECT_EQ(hostState[0], expected.size()) << "one claim per touched slot";
+        EXPECT_EQ(hostState[1], 0u) << "no overflow";
+        std::set<uint32_t> rows;
+        for (uint32_t s = 0; s < slots; ++s) {
+            const auto it = expected.find(s);
+            if (it == expected.end()) { EXPECT_EQ(hostIndex[s], morph::UnclaimedRow) << "slot " << s; continue; }
+            const uint32_t row = hostIndex[s];
+            ASSERT_LT(row, capacity) << "slot " << s;
+            EXPECT_TRUE(rows.insert(row).second) << "row " << row << " shared by two slots";
+            EXPECT_EQ(hostPool[row].countOn(), it->second.size()) << "slot " << s;
+            for (uint32_t bit : it->second) EXPECT_TRUE(hostPool[row].isOn(bit)) << "slot " << s << " bit " << bit;
+        }
     }
 }// TopologyBuilder_SparseLowerMasksClaims
 

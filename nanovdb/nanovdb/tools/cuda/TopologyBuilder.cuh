@@ -551,8 +551,6 @@ void TopologyBuilder<BuildT, ResourceT>::allocateDenseMasks(cudaStream_t stream)
 
 namespace topology::detail {
 
-namespace lm = util::morphology::cuda;
-
 /// @brief Pool row holding the lower mask of lower node @a lowerID, or nullptr for a marked
 ///        upper child whose functors never wrote its lower mask
 __device__ inline const Mask<4>* lowerRow(const Mask<4> *pool, const uint32_t *rowOf, uint32_t capacity, uint32_t lowerID)
@@ -568,8 +566,8 @@ struct EmitRowKeysFunctor
     __device__ void operator()(size_t i, const Mask<5> *upperMasks, const uint32_t *wordPrefix, uint32_t capacity,
                                uint64_t *rowKeys, const uint32_t *rowIndex, uint32_t *rowOf, uint32_t *overflow)
     {
-        const uint64_t tile = i / lm::UpperMaskWords;
-        const uint32_t w = uint32_t(i % lm::UpperMaskWords);
+        const uint64_t tile = i / util::morphology::cuda::UpperMaskWords;
+        const uint32_t w = uint32_t(i % util::morphology::cuda::UpperMaskWords);
         uint64_t word = upperMasks[tile].words()[w];
         uint32_t r = wordPrefix[i];
         for (; word; word &= word - 1, ++r) {
@@ -582,18 +580,21 @@ struct EmitRowKeysFunctor
 };
 
 /// @brief One warp per lower node: its leaf count. 8 warps per block.
-static __global__ void countRowLeavesKernel(const Mask<4> *pool, const uint32_t *rowOf, uint32_t capacity,
+template <typename BuildT>
+__global__ void countRowLeavesKernel(const Mask<4> *pool, const uint32_t *rowOf, uint32_t capacity,
                                      const uint32_t *lowerTotal, uint32_t *leafCounts)
 {
-    const uint32_t lane = threadIdx.x & 31, lowerID = blockIdx.x * 8 + (threadIdx.x >> 5);
-    if (lowerID >= capacity) return;// whole warps exit together
-    uint32_t count = 0;
-    if (lowerID < *lowerTotal) {
-        if (const Mask<4> *row = lowerRow(pool, rowOf, capacity, lowerID))
+    // Warps stride over the lower nodes the functors produced, read on the device and capped
+    // at the pool (an overflowed build has more); leafCounts past them stay zero from the
+    // caller's memset
+    const uint32_t lane = threadIdx.x & 31, warps = gridDim.x * (blockDim.x >> 5), total = min(*lowerTotal, capacity);
+    for (uint64_t lowerID = uint64_t(blockIdx.x) * (blockDim.x >> 5) + (threadIdx.x >> 5); lowerID < total; lowerID += warps) {
+        uint32_t count = 0;
+        if (const Mask<4> *row = lowerRow(pool, rowOf, capacity, uint32_t(lowerID)))
             count = __popcll(row->words()[2 * lane]) + __popcll(row->words()[2 * lane + 1]);
+        for (int offset = 16; offset; offset >>= 1) count += __shfl_down_sync(0xFFFFFFFFu, count, offset);
+        if (lane == 0) leafCounts[lowerID] = count;
     }
-    for (int offset = 16; offset; offset >>= 1) count += __shfl_down_sync(0xFFFFFFFFu, count, offset);
-    if (lane == 0) leafCounts[lowerID] = count;
 }
 
 /// @brief One thread per processed tile: 1 if the tile holds at least one lower node
@@ -601,7 +602,7 @@ struct TileHasRowsFunctor
 {
     __device__ void operator()(size_t t, const uint32_t *wordPrefix, uint32_t *counts)
     {
-        counts[t] = wordPrefix[(t + 1) * lm::UpperMaskWords] > wordPrefix[t * lm::UpperMaskWords] ? 1 : 0;
+        counts[t] = wordPrefix[(t + 1) * util::morphology::cuda::UpperMaskWords] > wordPrefix[t * util::morphology::cuda::UpperMaskWords] ? 1 : 0;
     }
 };
 
@@ -620,7 +621,7 @@ struct GatherSparseNodeCountsFunctor
     void operator()(size_t g, const uint32_t *tileBases, uint32_t *counts, const uint32_t *upperOffsets,
                     const uint32_t *wordPrefix, const uint32_t *leafOffsets, uint32_t capacity) {
         const uint32_t t0 = tileBases[g], t1 = tileBases[g + 1];
-        const uint32_t lower0 = wordPrefix[uint64_t(t0) * lm::UpperMaskWords], lower1 = wordPrefix[uint64_t(t1) * lm::UpperMaskWords];
+        const uint32_t lower0 = wordPrefix[uint64_t(t0) * util::morphology::cuda::UpperMaskWords], lower1 = wordPrefix[uint64_t(t1) * util::morphology::cuda::UpperMaskWords];
         const uint32_t leaf0 = leafOffsets[min(lower0, capacity)], leaf1 = leafOffsets[min(lower1, capacity)];
         uint32_t *c = counts + g * TopologyBuilderData<BuildT>::CountFieldCount;
         c[0] = leaf1 - leaf0;
@@ -723,11 +724,10 @@ void TopologyBuilder<BuildT, ResourceT>::rankLowerNodes(cudaStream_t stream)
 template<typename BuildT, typename ResourceT>
 void TopologyBuilder<BuildT, ResourceT>::countNodesSparse(cudaStream_t stream)
 {
-    namespace lm = util::morphology::cuda;
     const uint32_t tileCount = mTileTotal;
     const uint32_t capacity = mRowCapacity;
     rankLowerNodes(stream);
-    const std::size_t words = std::size_t(tileCount) * lm::UpperMaskWords;
+    const std::size_t words = std::size_t(tileCount) * util::morphology::cuda::UpperMaskWords;
     const uint32_t *lowerTotal = mWordPrefix.data() + words;// device-side, ahead of the readback
 
     // Lower-node keys and pool rows in output order
@@ -741,7 +741,9 @@ void TopologyBuilder<BuildT, ResourceT>::countNodesSparse(cudaStream_t stream)
     // Leaves per lower node, and their exclusive scan
     BufT<uint32_t> leafCounts(stream, this->ref(), capacity, nanovdb::cuda::noInit);
     if (capacity) {
-        topology::detail::countRowLeavesKernel<<<(capacity + 7) / 8, 256, 0, stream>>>(
+        cudaCheck(cudaMemsetAsync(leafCounts.data(), 0, leafCounts.size_bytes(), stream));
+        const unsigned int blocks = unsigned(std::min<uint64_t>((uint64_t(capacity) + 7) / 8, 1u << 16));
+        topology::detail::countRowLeavesKernel<BuildT><<<blocks, 256, 0, stream>>>(
             mLowerMasks.data(), mRowOf.data(), capacity, lowerTotal, leafCounts.data());
         cudaCheckError();
     }
@@ -782,7 +784,7 @@ void TopologyBuilder<BuildT, ResourceT>::processLowerRows(cudaStream_t stream)
     mLowerParents = BufT<uint32_t>(stream, this->ref(), lowerTotal, nanovdb::cuda::noInit);
     mLeafParents = BufT<uint32_t>(stream, this->ref(), totalNodeCount(0), nanovdb::cuda::noInit);
     if (lowerTotal) {
-        topology::detail::processLowerRowsKernel<BuildT><<<(lowerTotal + 7) / 8, 256, 0, stream>>>(
+        topology::detail::processLowerRowsKernel<BuildT><<<unsigned((uint64_t(lowerTotal) + 7) / 8), 256, 0, stream>>>(
             mRowKeys.data(), mLowerMasks.data(), mRowOf.data(), mRowCapacity,
             lowerTotal, mUpperOffsets.data(), mLeafOffsets.data(), deviceData(), gridCount(),
             mLowerParents.data(), mLeafParents.data());

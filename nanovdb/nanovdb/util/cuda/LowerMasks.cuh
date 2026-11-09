@@ -21,8 +21,9 @@
     A view passed for one grid of a batch is shifted to that grid's first tile with
     offsetTiles(tileBase).
 
-    Claiming rows needs __match_any_sync, __nanosleep and independent thread scheduling, so
-    the views require compute capability 7.0 or newer.
+    Claiming rows needs labeled coalesced groups, __nanosleep and independent thread scheduling, so a
+    kernel that writes through SparseLowerMasks requires compute capability 7.0 or newer.
+    DenseLowerMasks, and so the deprecated dense path, has no such requirement.
 
     \warning The header file contains cuda device code so be sure
              to only include it in .cu files (or other .cuh files)
@@ -33,8 +34,11 @@
 
 #include <nanovdb/NanoVDB.h>
 
-#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 700
-#error "nanovdb/util/cuda/LowerMasks.cuh, and the CUDA topology tools that use it, require compute capability 7.0 or newer"
+#if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 700
+#define NANOVDB_LOWERMASKS_CAN_CLAIM 1
+#include <cooperative_groups.h>
+#else
+#define NANOVDB_LOWERMASKS_CAN_CLAIM 0
 #endif
 
 namespace nanovdb::util::morphology::cuda {
@@ -102,29 +106,31 @@ struct SparseLowerMasks : LowerMasksWrites<SparseLowerMasks>
         return v;
     }
 
+    /// @note A template only so that the compute capability check below fires in kernels
+    ///       that write through this view, not in every file that includes the header
+    template <int Unused = 0>
     __device__ Mask<4>* row(uint64_t tile, uint32_t uc) const
     {
+#if NANOVDB_LOWERMASKS_CAN_CLAIM
         uint32_t *slot = index + tile * Mask<5>::SIZE + uc;
         uint32_t r = *reinterpret_cast<volatile uint32_t*>(slot);
         if (r == UnclaimedRow || r == ClaimingRow) {
-            // The lanes that reach here for the same slot elect one leader to claim it, so a
-            // row costs one claim per warp. __match_any_sync waits for every lane in the mask.
-            const uint32_t peers = __match_any_sync(__activemask(), reinterpret_cast<unsigned long long>(slot));
-            const uint32_t leader = __ffs(peers) - 1;
-            if (laneId() == leader) r = claim(slot);
-            r = __shfl_sync(peers, r, leader);
+            // The lanes that reach here together for the same slot elect one leader to claim
+            // it, so a row costs one claim per warp: the documented coalesced-group pattern
+            namespace cg = cooperative_groups;
+            const cg::coalesced_group peers = cg::labeled_partition(cg::coalesced_threads(), slot);
+            if (peers.thread_rank() == 0) r = claim(slot);
+            r = peers.shfl(r, 0);
         }
         return r < capacity ? pool + r : nullptr;
+#else
+        static_assert(Unused != 0, "SparseLowerMasks, and the CUDA topology tools that write through it, require compute capability 7.0 or newer");
+        return nullptr;
+#endif
     }
 
+#if NANOVDB_LOWERMASKS_CAN_CLAIM
 private:
-    __device__ static uint32_t laneId()
-    {
-        uint32_t lane;
-        asm("mov.u32 %0, %%laneid;" : "=r"(lane));
-        return lane;
-    }
-
     /// @brief Pool row of @a slot, claiming one if the slot is unclaimed. The claimant never
     ///        waits between its CAS and its store, so a lane waiting on another warp's claim
     ///        is released once independent thread scheduling runs that claimant.
@@ -151,8 +157,11 @@ private:
         __threadfence();
         return r;
     }
+#endif
 };
 
 } // namespace nanovdb::util::morphology::cuda
+
+#undef NANOVDB_LOWERMASKS_CAN_CLAIM
 
 #endif // NANOVDB_UTIL_CUDA_LOWERMASKS_CUH_HAS_BEEN_INCLUDED

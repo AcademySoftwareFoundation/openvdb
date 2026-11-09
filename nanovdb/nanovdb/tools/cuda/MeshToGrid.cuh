@@ -194,6 +194,8 @@ private:
 
     void rasterizeInternalNodes();
 
+    uint64_t countTouchedUpperChildren();
+
     void processGridTreeRoot();
 
     void rasterizeLeafNodes();
@@ -883,11 +885,68 @@ void MeshToGrid<BuildT, ResourceT>::buildRasterizedRoot()
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+namespace topology::detail {
+
+/// @brief Sets the upper-mask bit of the (processed tile, upper child) a leaf/triangle pair marks
+template <typename BuildT>
+struct MarkUpperChildFunctor
+{
+    const MeshToGridBoxTrianglePair *dPairs;
+    const NanoRoot<BuildT>          *dRoot;
+    Mask<5>                         *dUpperMasks;
+
+    __device__ void operator()(size_t i) const
+    {
+        const nanovdb::Coord &origin = dPairs[i].origin;
+        const uint64_t tile = util::PtrDiff(dRoot->probeTile(origin), dRoot->tile(0)) / sizeof(typename NanoRoot<BuildT>::Tile);
+        const uint32_t uc = NanoUpper<BuildT>::CoordToOffset(origin);
+        if (!dUpperMasks[tile].isOn(uc)) dUpperMasks[tile].setOnAtomic(uc);// most pairs find their bit already set
+    }
+};
+
+/// @brief Adds the popcount of upper-mask word @a i to @a *count
+struct CountUpperBitsFunctor
+{
+    __device__ void operator()(size_t i, const uint64_t *words, unsigned long long *count) const
+    {
+        if (const uint64_t word = words[i]) atomicAdd(count, (unsigned long long)__popcll(word));
+    }
+};
+
+} // namespace topology::detail
+
+template<typename BuildT, typename ResourceT>
+uint64_t MeshToGrid<BuildT, ResourceT>::countTouchedUpperChildren()
+{
+    // The rasterizer marks one (tile, upper child) per leaf/triangle pair, but many pairs share
+    // one. Marking them in a 4 KiB upper mask per tile and counting the set bits gives the exact
+    // number of lower-mask rows the builder needs, with no per-pair scratch.
+    if (mBoxTrianglePairCount == 0) return 0;
+    const uint64_t tileCount = mUniqueRootTileCount;
+    BufT<Mask<5>> upperMasks(mStream, this->ref(), tileCount, nanovdb::cuda::noInit);
+    BufT<unsigned long long> count(mStream, this->ref(), 1, nanovdb::cuda::noInit);
+    cudaCheck(cudaMemsetAsync(upperMasks.data(), 0, upperMasks.size_bytes(), mStream));
+    cudaCheck(cudaMemsetAsync(count.data(), 0, count.size_bytes(), mStream));
+    util::cuda::lambdaKernel<<<numBlocks(mBoxTrianglePairCount), mNumThreads, 0, mStream>>>(
+        mBoxTrianglePairCount,
+        topology::detail::MarkUpperChildFunctor<BuildT>{ deviceBoxTrianglePairs(), mBuilder.deviceProcessedRoot(), upperMasks.data() });
+    const uint64_t words = tileCount * Mask<5>::WORD_COUNT;
+    util::cuda::lambdaKernel<<<numBlocks(words), mNumThreads, 0, mStream>>>(
+        words, topology::detail::CountUpperBitsFunctor(), reinterpret_cast<const uint64_t*>(upperMasks.data()), count.data());
+    cudaCheckError();
+
+    unsigned long long rows = 0;
+    cudaCheck(cudaMemcpyAsync(&rows, count.data(), sizeof(rows), cudaMemcpyDeviceToHost, mStream));
+    cudaCheck(cudaStreamSynchronize(mStream));
+    return uint64_t(rows);
+} // MeshToGrid<BuildT, ResourceT>::countTouchedUpperChildren
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 template<typename BuildT, typename ResourceT>
 void MeshToGrid<BuildT, ResourceT>::rasterizeInternalNodes()
 {
-    // Each leaf/triangle pair marks one (tile, upper child), which bounds the lower-mask rows
-    mBuilder.buildInternalMasks(mStream, mBoxTrianglePairCount, [&](Mask<5> *upperMasks, auto lowerMasks) {
+    mBuilder.buildInternalMasks(mStream, countTouchedUpperChildren(), [&](Mask<5> *upperMasks, auto lowerMasks) {
         if (mBoxTrianglePairCount == 0) return;
         using RasterizerT = util::rasterization::cuda::RasterizeInternalNodesFunctor<BuildT, BoxTrianglePair, decltype(lowerMasks)>;
         util::cuda::lambdaKernel<<<numBlocks(mBoxTrianglePairCount), mNumThreads, 0, mStream>>>(
