@@ -18,7 +18,8 @@ mkdir -p "$work"
 # Writes a CCCL package of the given version that, like any package config
 # using @PACKAGE_INIT@, overwrites PACKAGE_PREFIX_DIR. CMake 3.30 and newer
 # restore PACKAGE_PREFIX_DIR after find_package, so the include_dir case only
-# catches that problem on older CMake.
+# catches that problem on older CMake. Its version file follows CCCL's, which
+# accepts a requested version only from the same major release.
 fake_cccl() {
   local dir="$work/fake_cccl_$1"
   mkdir -p "$dir"
@@ -32,12 +33,18 @@ set_property(GLOBAL PROPERTY FAKE_CCCL_USED TRUE)
 EOF
   cat > "$dir/cccl-config-version.cmake" <<EOF
 set(PACKAGE_VERSION $1)
-set(PACKAGE_VERSION_COMPATIBLE TRUE)
+set(PACKAGE_VERSION_COMPATIBLE FALSE)
+string(REGEX MATCH "^[0-9]+" _major \${PACKAGE_VERSION})
+if(PACKAGE_VERSION VERSION_GREATER_EQUAL PACKAGE_FIND_VERSION
+   AND (NOT PACKAGE_FIND_VERSION OR _major EQUAL PACKAGE_FIND_VERSION_MAJOR))
+  set(PACKAGE_VERSION_COMPATIBLE TRUE)
+endif()
 EOF
   echo "$dir"
 }
-cccl_old=$(fake_cccl 2.7.0)
-cccl_new=$(fake_cccl 2.9.0)
+cccl_old=$(fake_cccl 3.1.0)
+cccl_new=$(fake_cccl 3.3.0)
+cccl_next_major=$(fake_cccl 4.0.0)
 
 failures=0
 
@@ -89,6 +96,31 @@ find_package(NanoVDB CONFIG REQUIRED)" -DCCCL_DIR="$cccl_old"
 run_case intree_preloaded_too_old fail "
 find_package(CCCL CONFIG REQUIRED PATHS \"$cccl_old\" NO_DEFAULT_PATH)
 $intree"
+
+run_case installed_next_major pass "
+find_package(NanoVDB CONFIG REQUIRED)" -DCCCL_DIR="$cccl_next_major"
+
+run_case intree_found pass "
+$intree
+get_property(used GLOBAL PROPERTY FAKE_CCCL_USED)
+if(NOT used)
+  message(FATAL_ERROR \"NanoVDB did not use the CCCL it found\")
+endif()" -DCCCL_DIR="$cccl_new"
+
+run_case intree_found_next_major pass "
+$intree
+get_property(used GLOBAL PROPERTY FAKE_CCCL_USED)
+if(NOT used)
+  message(FATAL_ERROR \"NanoVDB did not use the CCCL it found\")
+endif()" -DCCCL_DIR="$cccl_next_major"
+
+# Skips the old CCCL for the toolkit's, or clones one if that is old too
+run_case intree_too_old_skipped pass "
+$intree
+get_property(used GLOBAL PROPERTY FAKE_CCCL_USED)
+if(used OR NOT TARGET CCCL::CCCL)
+  message(FATAL_ERROR \"NanoVDB used a CCCL older than its minimum\")
+endif()" -DCCCL_DIR="$cccl_old"
 
 run_case intree_forced_fetch pass "
 $intree

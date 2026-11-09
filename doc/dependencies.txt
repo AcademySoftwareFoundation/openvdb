@@ -88,6 +88,7 @@ GLFW            | 3.3     | Latest      | Simple API for OpenGL development     
 OpenGL          | 3.2     | Latest      | Environment for developing portable graphics applications         | Y       | Y        | https://www.opengl.org
 GLEW            | 1.0.0   | Latest      | A cross-platform OpenGL extension loading library.                | Y       | Y        | http://glew.sourceforge.net
 CUDA            | -       | Latest      | Parallel computing platform for graphical processing units.       | Y       | N        | https://developer.nvidia.com/cuda-downloads
+CCCL            | 3.2     | Latest      | CUDA C++ Core Libraries (libcu++, CUB, Thrust) for NanoVDB        | N       | N        | https://github.com/NVIDIA/cccl
 Doxygen         | 1.8.8   | <= 1.14.0   | Documentation generation from C++                                 | Y       | Y        | http://www.doxygen.nl
 Doxygen Awesome | 2.0.0   | >= 2.0.0    | Documentation generation from C++                                 | Y       | Y        | https://github.com/jothepro/doxygen-awesome-css
 
