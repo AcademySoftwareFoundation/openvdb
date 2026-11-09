@@ -5353,7 +5353,8 @@ TEST(TestNanoVDBCUDA, PropagateSign_RootFill)
     auto origin = [](int i, int j, int k) { return nanovdb::Coord(i * Dim, j * Dim, k * Dim); };
     auto inCavity = [](int i, int j, int k) { return i >= 1 && i < 3 && j >= 1 && j < 3 && k >= 1 && k < 3; };
 
-    // The grid of one voxel per tile of the block, but the cavity's and the tile at index @a gap, if any.
+    // The grid of one voxel per tile of the block, but the cavity's and the tile at index @a gap, if any, on the
+    // device, and its host copy, which gives the root table's order, which the seeds follow.
     auto buildGrid = [&](nanovdb::Coord gap) {
         std::vector<nanovdb::Coord> voxels;
         for (int i = 0; i < 4; ++i)
@@ -5364,16 +5365,17 @@ TEST(TestNanoVDBCUDA, PropagateSign_RootFill)
         nanovdb::Coord* d_voxels = nullptr;
         cudaCheck(cudaMalloc(&d_voxels, voxels.size() * sizeof(nanovdb::Coord)));
         cudaCheck(cudaMemcpy(d_voxels, voxels.data(), voxels.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
-        auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_voxels, voxels.size());
+        auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_voxels, voxels.size(), 1.0, cudaStream_t(0));
         cudaCheck(cudaFree(d_voxels));
-        handle.deviceDownload(); // the host copy gives the root table's order, which the seeds follow
-        EXPECT_EQ(voxels.size(), size_t(handle.grid<BuildT>()->tree().root().tileCount()));
-        return handle;
+        auto hostHandle = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(handle, cudaStream_t(0));
+        EXPECT_EQ(voxels.size(), size_t(hostHandle.grid<BuildT>()->tree().root().tileCount()));
+        return std::make_pair(std::move(handle), std::move(hostHandle));
     };
 
     // Runs stage 4 with the seeds { (tile index, face) }, each on the entry of that tile, and returns the origins.
-    auto run = [&](auto& handle, std::vector<std::pair<nanovdb::Coord, Face>> flags) {
-        const auto&           root = handle.template grid<BuildT>()->tree().root();
+    auto run = [&](auto& grid, std::vector<std::pair<nanovdb::Coord, Face>> flags) {
+        auto& [handle, hostHandle] = grid;
+        const auto&           root = hostHandle.template grid<BuildT>()->tree().root();
         const uint32_t        entryCount = root.tileCount();
         std::vector<uint32_t> seeds(entryCount, 0u);
         for (const auto& [tile, face] : flags) {
