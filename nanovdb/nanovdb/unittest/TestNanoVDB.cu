@@ -16,6 +16,7 @@
 #include <nanovdb/tools/cuda/PointsToGrid.cuh>
 #include <nanovdb/tools/cuda/IndexToGrid.cuh>
 #include <nanovdb/tools/cuda/ConnectedComponents.cuh>
+#include <nanovdb/tools/cuda/PropagateSign.cuh>
 #include <nanovdb/tools/cuda/AddBlindData.cuh>
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
 #include <nanovdb/tools/cuda/GridValidator.cuh>
@@ -4180,6 +4181,8 @@ TEST(TestNanoVDBCUDA, NonBlockingStreamDeviceGridTraits)
     queueUpload();
     EXPECT_EQ(hostGrid->gridSize(), TraitsT::getGridSize(d_grid, nb));
     queueUpload();
+    EXPECT_EQ(hostGrid->data()->mFlags.data(), TraitsT::getFlags(d_grid, nb).data());
+    queueUpload();
     EXPECT_EQ(hostGrid->tree().root().bbox(), TraitsT::getIndexBBox(d_grid, hostTreeData, nb));
     queueUpload();
     EXPECT_EQ(hostGrid->tree().root().tileCount(), TraitsT::getRootTableSize(d_grid, hostTreeData, nb));
@@ -5261,3 +5264,172 @@ TEST(TestNanoVDBCUDA, ConnectedComponents_InFlightGrid)
     cudaCheck(cudaFree(d_bytes));
     cudaCheck(cudaFreeHost(pinned));
 }// ConnectedComponents_InFlightGrid
+
+// PropagateSign on the narrow band of a sphere: the level set from createLevelSetSphere, active where the signed
+// distance d satisfies |d| < 3, converted to a ValueOnIndex grid whose blind data channel 0, the SDF sidecar, holds
+// d at the active voxels' value indices and the background 3 at index 0; the level set's inactive values are
+// dropped. The sphere straddles the origin, so the root has eight entries and coordinates are negative too. Every
+// invert mask bit is checked against the analytic answer: on for an inactive voxel, or a childless lower or upper
+// slot, inside the sphere. A childless slot holds no active voxel, so its voxels all have the sign of its origin.
+// The center lies in the middle of the 128^3 block [0,128)^3, which is inside the sphere clear of the band, so
+// upper bits are on as well; no upper-node-sized region without a root-table entry is interior. createLevelSetSphere
+// fills an inside gap between root entries with a root value tile, which PropagateSign rejects (precondition 4), but
+// only once a whole 4096^3 root tile lies inside the sphere, i.e. above a radius of about 3547; so this radius is
+// safe, and interior regions without a root-table entry (stage 4) are left to a test of their own.
+TEST(TestNanoVDBCUDA, PropagateSign_Sphere)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    const nanovdb::Vec3d center(64.3, 63.7, 64.2);
+    const double radius = 120.0, halfWidth = 3.0;
+    auto sphereSdf = [&](const nanovdb::Coord& ijk) {// signed distance from the center of voxel ijk
+        return (nanovdb::Vec3d(ijk[0], ijk[1], ijk[2]) - center).length() - radius;
+    };
+
+    auto sphere = nanovdb::tools::createLevelSetSphere<float>(radius, center, 1.0, halfWidth);
+    auto handle = nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, BuildT>(*sphere.grid<float>(), 1u, false, false);// one channel, no stats or tiles
+    const auto* grid = handle.grid<BuildT>();
+    ASSERT_TRUE(grid);
+    const auto& tree = grid->tree();
+    EXPECT_EQ(8u, tree.nodeCount(2));
+    const float* sdf = grid->getBlindData<float>(0);
+    ASSERT_TRUE(sdf);
+
+    // The sidecar is blind data, so it lies at the same offset from the grid on the device as on the host
+    auto deviceHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(handle);
+    const auto* deviceGrid = deviceHandle.deviceGrid<BuildT>();
+    ASSERT_TRUE(deviceGrid);
+    const float* deviceSdf = nanovdb::util::PtrAdd<float>(deviceGrid, nanovdb::util::PtrDiff(sdf, grid));
+
+    nanovdb::cuda::Buffer<nanovdb::Mask<3>> deviceLeafMasks(cudaStream_t(0), tree.nodeCount(0), nanovdb::cuda::noInit);
+    nanovdb::cuda::Buffer<nanovdb::Mask<4>> deviceLowerMasks(cudaStream_t(0), tree.nodeCount(1), nanovdb::cuda::noInit);
+    nanovdb::cuda::Buffer<nanovdb::Mask<5>> deviceUpperMasks(cudaStream_t(0), tree.nodeCount(2), nanovdb::cuda::noInit);
+    nanovdb::tools::cuda::PropagateSign<BuildT> op(deviceGrid, deviceSdf);
+    auto [rootOrigins, hasInvertRootTiles] =
+        op.propagate(deviceLeafMasks.data(), deviceLowerMasks.data(), deviceUpperMasks.data());
+    EXPECT_FALSE(hasInvertRootTiles);
+    EXPECT_EQ(0u, rootOrigins.size());
+
+    std::vector<nanovdb::Mask<3>> leafMasks(tree.nodeCount(0));
+    std::vector<nanovdb::Mask<4>> lowerMasks(tree.nodeCount(1));
+    std::vector<nanovdb::Mask<5>> upperMasks(tree.nodeCount(2));
+    cudaCheck(cudaMemcpy(leafMasks.data(), deviceLeafMasks.data(), deviceLeafMasks.size_bytes(), cudaMemcpyDeviceToHost));
+    cudaCheck(cudaMemcpy(lowerMasks.data(), deviceLowerMasks.data(), deviceLowerMasks.size_bytes(), cudaMemcpyDeviceToHost));
+    cudaCheck(cudaMemcpy(upperMasks.data(), deviceUpperMasks.data(), deviceUpperMasks.size_bytes(), cudaMemcpyDeviceToHost));
+
+    // Compares the masks of one level with the analytic answer; the bits on are counted so that every level is
+    // seen to be exercised
+    auto check = [&](const auto* nodes, const auto& masks, auto isOccupied) {
+        uint64_t errors = 0, on = 0;
+        for (size_t i = 0; i < masks.size(); ++i)
+            for (uint32_t n = 0; n < nodes[i].SIZE; ++n) {
+                const bool inside = !isOccupied(nodes[i], n) && sphereSdf(nodes[i].offsetToGlobalCoord(n)) < 0;
+                errors += masks[i].isOn(n) != inside;
+                on += masks[i].isOn(n);
+            }
+        EXPECT_EQ(0u, errors);
+        EXPECT_GT(on, 0u);
+    };
+    check(tree.getFirstLeaf(), leafMasks, [](const auto& leaf, uint32_t n) { return leaf.isActive(n); });
+    check(tree.getFirstLower(), lowerMasks, [](const auto& node, uint32_t n) { return node.isChild(n); });
+    check(tree.getFirstUpper(), upperMasks, [](const auto& node, uint32_t n) { return node.isChild(n); });
+}// PropagateSign_Sphere
+
+// Stage 4 of PropagateSign on its own: floodfill::detail::fillRootInvertTiles, given hand-set root face seeds. A valid
+// input whose stages 1-3 set a seed into a tile without a root-table entry needs a narrow band enclosing a whole
+// 4096^3 region, some 200M active voxels; stage 4 reads only the root table, the root's bounding box and the seeds, so
+// here the grid is just a root table and the seeds are set by hand. The grid has one active voxel in each tile of the
+// 4^3 block of tiles [0,4)^3 but the 2^3 cavity [1,3)^3: 56 entries around 8 tiles without one. Each voxel lies at
+// (5,6,7) from its tile's origin, so the root's bounding box does not start at a tile origin: without the hull's
+// rounding, the cavity's neighbors in the lowest column of entries would fall outside the hull and throw.
+TEST(TestNanoVDBCUDA, PropagateSign_RootFill)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    using nanovdb::tools::cuda::floodfill::detail::Face;
+    using nanovdb::tools::cuda::floodfill::detail::fillRootInvertTiles;
+    static constexpr int Dim = nanovdb::NanoUpper<BuildT>::DIM; // static: MSVC will not read it uncaptured otherwise
+    auto& resource = nanovdb::cuda::default_resource<nanovdb::cuda::DeviceResource>();
+    nanovdb::cuda::TempPool<nanovdb::cuda::DeviceResource> tempPool(resource);
+
+    auto origin = [](int i, int j, int k) { return nanovdb::Coord(i * Dim, j * Dim, k * Dim); };
+    auto inCavity = [](int i, int j, int k) { return i >= 1 && i < 3 && j >= 1 && j < 3 && k >= 1 && k < 3; };
+
+    // The grid of one voxel per tile of the block, but the cavity's and the tile at index @a gap, if any, on the
+    // device, and its host copy, which gives the root table's order, which the seeds follow.
+    auto buildGrid = [&](nanovdb::Coord gap) {
+        std::vector<nanovdb::Coord> voxels;
+        for (int i = 0; i < 4; ++i)
+            for (int j = 0; j < 4; ++j)
+                for (int k = 0; k < 4; ++k)
+                    if (!inCavity(i, j, k) && nanovdb::Coord(i, j, k) != gap)
+                        voxels.push_back(origin(i, j, k).offsetBy(5, 6, 7));
+        nanovdb::Coord* d_voxels = nullptr;
+        cudaCheck(cudaMalloc(&d_voxels, voxels.size() * sizeof(nanovdb::Coord)));
+        cudaCheck(cudaMemcpy(d_voxels, voxels.data(), voxels.size() * sizeof(nanovdb::Coord), cudaMemcpyHostToDevice));
+        auto handle = nanovdb::tools::cuda::voxelsToGrid<BuildT>(d_voxels, voxels.size(), 1.0, cudaStream_t(0));
+        cudaCheck(cudaFree(d_voxels));
+        auto hostHandle = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(handle, cudaStream_t(0));
+        EXPECT_EQ(voxels.size(), size_t(hostHandle.grid<BuildT>()->tree().root().tileCount()));
+        return std::make_pair(std::move(handle), std::move(hostHandle));
+    };
+
+    // Runs stage 4 with the seeds { (tile index, face) }, each on the entry of that tile, and returns the origins.
+    // Not a generic lambda: MSVC does not capture what only its dependent calls use.
+    using GridsT = decltype(buildGrid(nanovdb::Coord()));
+    auto run = [&](GridsT& grid, std::vector<std::pair<nanovdb::Coord, Face>> flags) {
+        auto& [handle, hostHandle] = grid;
+        const auto&           root = hostHandle.grid<BuildT>()->tree().root();
+        const uint32_t        entryCount = root.tileCount();
+        std::vector<uint32_t> seeds(entryCount, 0u);
+        for (const auto& [tile, face] : flags) {
+            uint32_t n = 0;
+            while (n < entryCount && root.tile(n)->origin() != origin(tile[0], tile[1], tile[2])) ++n;
+            EXPECT_LT(n, entryCount); // the seeding tile has an entry
+            if (n < entryCount) seeds[n] |= 1u << face;
+        }
+        uint32_t* d_seeds = nullptr;
+        cudaCheck(cudaMalloc(&d_seeds, entryCount * sizeof(uint32_t)));
+        cudaCheck(cudaMemcpy(d_seeds, seeds.data(), entryCount * sizeof(uint32_t), cudaMemcpyHostToDevice));
+        std::vector<nanovdb::Coord> origins;
+        try {
+            auto d_origins =
+                fillRootInvertTiles(handle.deviceGrid<BuildT>(), d_seeds, entryCount, 0, resource, tempPool);
+            origins.resize(d_origins.size());
+            cudaCheck(cudaMemcpy(origins.data(), d_origins.data(), d_origins.size_bytes(), cudaMemcpyDeviceToHost));
+        } catch (...) {
+            cudaCheck(cudaFree(d_seeds));
+            throw;
+        }
+        cudaCheck(cudaFree(d_seeds));
+        return origins;
+    };
+
+    std::vector<nanovdb::Coord> cavity; // in increasing (x, y, z) order
+    for (int i = 1; i < 3; ++i)
+        for (int j = 1; j < 3; ++j)
+            for (int k = 1; k < 3; ++k) cavity.push_back(origin(i, j, k));
+
+    const nanovdb::Coord noGap(-1);
+    auto closed = buildGrid(noGap);
+
+    // No root-table entry: nothing to read, no origin.
+    EXPECT_EQ(0u, fillRootInvertTiles<BuildT>(nullptr, nullptr, 0, 0, resource, tempPool).size());
+
+    // No seed: the early exit, no origin.
+    EXPECT_TRUE(run(closed, {}).empty());
+
+    // One seed into the cavity fills it over four rounds that add tiles (1, 3, 3 and 1), and a fifth that adds none.
+    EXPECT_EQ(cavity, run(closed, {{nanovdb::Coord(0, 1, 1), Face::plusX}}));
+
+    // Seeds from several entries, into different tiles of the cavity, give the same result.
+    EXPECT_EQ(cavity, run(closed, {{nanovdb::Coord(0, 1, 1), Face::plusX},
+                                   {nanovdb::Coord(2, 3, 2), Face::minusY},
+                                   {nanovdb::Coord(1, 1, 3), Face::minusZ}}));
+
+    // A seed out of the block: its tile lies outside the hull, so the first round throws.
+    EXPECT_THROW(run(closed, {{nanovdb::Coord(0, 0, 0), Face::minusX}}), std::runtime_error);
+
+    // With the entry of tile (0,1,1) missing, the cavity opens onto the hull's side: the fill reaches that tile in
+    // round 3, and its neighbor (-1,1,1), outside the hull, makes round 4 throw.
+    auto open = buildGrid(nanovdb::Coord(0, 1, 1));
+    EXPECT_THROW(run(open, {{nanovdb::Coord(3, 1, 1), Face::minusX}}), std::runtime_error);
+}// PropagateSign_RootFill
