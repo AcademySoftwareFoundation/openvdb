@@ -232,9 +232,10 @@ void MeshToSDF<BuildT, ResourceT>::partitionSurfaces()
     const auto* dGrid = mGridHandle.template deviceGrid<BuildT>();
     ConnectedComponents<BuildT, ResourceT> components(dGrid, mStream, *mResource);
     auto result = components.getVoxelLabelsAndCount();
-    mSurfaceLabels = std::move(result.first);
     mSurfaceCount = result.second;
+    // The labels are read only when there are several surfaces; otherwise they are freed here, with result.
     if (mSurfaceCount <= 1) return;
+    mSurfaceLabels = std::move(result.first);
 
     mSurfaceGrids = PartitionGrid<BuildT, ResourceT>(dGrid, mSurfaceLabels.data(), mSurfaceCount, mStream, *mResource)
                         .getHandles(mGridHandle.buffer());
@@ -670,9 +671,11 @@ void MeshToSDF<BuildT, ResourceT>::processSurface(uint32_t surfaceID)
     const auto* dDerivedGrid = derived.template deviceGrid<BuildT>();
 
     ConnectedComponents<BuildT, ResourceT> components(dDerivedGrid, mStream, *mResource);
-    const auto componentLabels = components.getVoxelLabelsAndCount();
+    auto componentLabels = components.getVoxelLabelsAndCount();
 
     signNonBarrierComponents(dGrid, dDerivedGrid, componentLabels.first.data(), dSDF);
+    componentLabels.first.destroy();
+    derived.reset();
 
     signBarrier(dGrid, dSDF, dTriangleIndex);
 
