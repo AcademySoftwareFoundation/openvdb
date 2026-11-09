@@ -132,13 +132,14 @@ void MaskShift( const nanovdb::Mask<4>& inMaskQ, nanovdb::Mask<4>& outMaskQ )
 template<int di, int dj, int dk, bool combine = true, int LOG2DIM>
 __device__ void MaskShift(const Mask2D<LOG2DIM>& in, Mask2D<LOG2DIM>& out)
 {
-    constexpr int DIM = Mask2D<LOG2DIM>::DIM, WORD_COUNT = Mask2D<LOG2DIM>::WORD_COUNT;
+    constexpr int DIM = Mask2D<LOG2DIM>::DIM;
     static_assert(di > -DIM && di < DIM, "the shift must stay within the mask");
 
     // x: slice x + di, held by lane x + di. Lanes whose source is outside the mask take zeros, and so do
     // lanes x >= DIM, whose slices stay empty.
     Mask2D<LOG2DIM> t = in;
     if constexpr (di != 0) {
+        constexpr int WORD_COUNT = Mask2D<LOG2DIM>::WORD_COUNT;
         const int  x         = threadIdx.x & 31;
         const bool hasSource = x < DIM && unsigned(x + di) < unsigned(DIM);
         for (int j = 0; j < WORD_COUNT; ++j) {
