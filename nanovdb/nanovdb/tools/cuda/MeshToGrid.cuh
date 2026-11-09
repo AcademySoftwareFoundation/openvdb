@@ -182,8 +182,9 @@ public:
                                      BufferT(mStream, this->ref(), 0, nanovdb::cuda::noInit));
     }
 
-    /// @brief Like getHandleAndUDF, and also returns the triangle nearest to each active voxel. The distance and
-    ///        its triangle come from one packed atomic minimum, so they always agree. The index sidecar stores
+    /// @brief Like getHandleAndUDF, and also returns the triangle nearest to each active voxel. The distance and its
+    ///        triangle come from one minimum per voxel over the candidate triangles of its leaf, so they always
+    ///        agree; ties go to the smaller triangle index. The index sidecar stores
     ///        (activeVoxelCount+1) uint32_t values, indexed like the UDF sidecar:
     ///          - index[0]   = 0xFFFFFFFF (background slot)
     ///          - index[k>0] = nearest triangle of the k-th active voxel, or 0xFFFFFFFF if no triangle is
@@ -200,6 +201,10 @@ private:
     ///        the leaves that keep no active voxel pruned.
     template<typename GridBufferT>
     GridHandle<GridBufferT> buildPrunedGrid(const GridBufferT& buffer);
+
+    /// @brief The triangles of the leaf/triangle pairs grouped by leaf of @a dGrid: those of leaf l are at
+    ///        [dOffsets[l], dOffsets[l + 1]) of the result. Releases the pairs.
+    BufT<uint32_t> groupTrianglesByLeaf(const GridT* dGrid, uint32_t leafCount, uint64_t* dOffsets);
 
     void transformTriangles();
 
@@ -1084,26 +1089,40 @@ struct FinalizeSidecarFunctor
     }
 };
 
-/// @brief Fills each slot of the packed distance and triangle sidecar with the InitSidecarFunctor sentinel in
-///        its distance bits and no triangle (0xFFFFFFFF) in its triangle bits.
-struct InitPackedSidecarFunctor
+/// @brief Splits each leaf/triangle pair into a sort key, the index of its leaf in @a dGrid (@a leafCount for a
+///        leaf that was pruned), and its triangle.
+template <typename BuildT>
+struct LeafKeyFunctor
 {
-    uint64_t *dPacked;
-    __device__ void operator()(size_t i) const { dPacked[i] = (uint64_t(0x7F7FFFFFu) << 32) | 0xFFFFFFFFu; }
-};
-
-/// @brief Splits the packed distance and triangle sidecar into a UDF sidecar, still holding squared distance bits
-///        for FinalizeSidecarFunctor, and a nearest-triangle sidecar.
-struct SplitPackedSidecarFunctor
-{
-    const uint64_t *dPacked;
-    float          *dUDF;
-    uint32_t       *dIndex;
+    const MeshToGridBoxTrianglePair *dPairs;
+    const NanoGrid<BuildT>          *dGrid;
+    uint32_t                         leafCount;
+    uint32_t                        *dKeys;
+    uint32_t                        *dTriangleIDs;
     __device__ void operator()(size_t i) const
     {
-        const uint64_t p = dPacked[i];
-        dUDF[i]   = __uint_as_float(uint32_t(p >> 32));
-        dIndex[i] = uint32_t(p);
+        const auto &pair = dPairs[i];
+        const auto *leaf = dGrid->tree().root().probeLeaf(pair.origin);
+        dKeys[i]        = leaf ? uint32_t(leaf - dGrid->tree().getFirstLeaf()) : leafCount;
+        dTriangleIDs[i] = pair.triangleID;
+    }
+};
+
+/// @brief Writes to @a dOffsets[leafID] the position of the first of the @a count sorted keys that is not below
+///        @a leafID, so the triangles of leaf l are at [dOffsets[l], dOffsets[l + 1]).
+struct LeafOffsetFunctor
+{
+    const uint32_t *dSortedKeys;
+    uint64_t        count;
+    uint64_t       *dOffsets;
+    __device__ void operator()(size_t leafID) const
+    {
+        uint64_t lo = 0, hi = count;
+        while (lo < hi) {
+            const uint64_t mid = (lo + hi) / 2;
+            if (dSortedKeys[mid] < leafID) lo = mid + 1; else hi = mid;
+        }
+        dOffsets[leafID] = lo;
     }
 };
 
@@ -1205,6 +1224,38 @@ GridHandle<GridBufferT> MeshToGrid<BuildT, ResourceT>::buildPrunedGrid(const Gri
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT, typename ResourceT>
+typename MeshToGrid<BuildT, ResourceT>::template BufT<uint32_t>
+MeshToGrid<BuildT, ResourceT>::groupTrianglesByLeaf(const GridT* dGrid, uint32_t leafCount, uint64_t* dOffsets)
+{
+    const uint64_t pairCount = mBoxTrianglePairCount;
+    BufT<uint32_t> keys(mStream, this->ref(), pairCount, nanovdb::cuda::noInit);
+    BufT<uint32_t> triangles(mStream, this->ref(), pairCount, nanovdb::cuda::noInit);
+    if (pairCount)
+        util::cuda::lambdaKernel<<<numBlocks(pairCount), mNumThreads, 0, mStream>>>(
+            pairCount, topology::detail::LeafKeyFunctor<BuildT>{ deviceBoxTrianglePairs(), dGrid, leafCount,
+                                                                   keys.data(), triangles.data() });
+    cudaCheckError();
+    mBoxTrianglePairsBuffer.destroy(mStream);
+
+    // Sort by leaf (the triangles of a pruned leaf, key leafCount, go last), then find where each leaf starts.
+    BufT<uint32_t> keysAlt(mStream, this->ref(), pairCount, nanovdb::cuda::noInit);
+    BufT<uint32_t> trianglesAlt(mStream, this->ref(), pairCount, nanovdb::cuda::noInit);
+    if (pairCount) {
+        cub::DoubleBuffer<uint32_t> dKeys(keys.data(), keysAlt.data()), dTriangles(triangles.data(), trianglesAlt.data());
+        const int endBit = int(util::findHighestOn(leafCount | 1u)) + 1;  // bits of the largest key, leafCount
+        CALL_CUBS(DeviceRadixSort::SortPairs, dKeys, dTriangles, (int)pairCount, 0, endBit);
+        if (dTriangles.Current() != triangles.data()) std::swap(triangles, trianglesAlt);
+        if (dKeys.Current() != keys.data()) std::swap(keys, keysAlt);
+    }
+    util::cuda::lambdaKernel<<<numBlocks(uint64_t(leafCount) + 1), mNumThreads, 0, mStream>>>(
+        uint64_t(leafCount) + 1, topology::detail::LeafOffsetFunctor{ keys.data(), pairCount, dOffsets });
+    cudaCheckError();
+    return triangles;
+} // MeshToGrid<BuildT, ResourceT>::groupTrianglesByLeaf
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename BuildT, typename ResourceT>
 template<typename GridBufferT, typename SidecarBufferT>
 std::pair<GridHandle<GridBufferT>, SidecarBufferT>
 MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const SidecarBufferT& sidecarProto)
@@ -1266,50 +1317,38 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDFAndIndex(const GridBufferT& buffer
     auto handle = buildPrunedGrid(buffer);
     int device = 0; cudaGetDevice(&device);
 
-    // ---- UDF and nearest-triangle sidecars, from one packed sidecar ----
+    // ---- UDF and nearest-triangle sidecars, from the candidate triangles of each leaf ----
 
     const float voxelSize = (float)mMap.getVoxelSize()[0];
+    const auto  treeData  = util::cuda::DeviceGridTraits<BuildT>::getTreeData(handle.template deviceGrid<BuildT>(), mStream);
+    const uint64_t activeVoxelCount = treeData.mVoxelCount;
+    const uint32_t leafCount        = treeData.mNodeCount[0];
 
-    const uint64_t activeVoxelCount = util::cuda::DeviceGridTraits<BuildT>::getActiveVoxelCount(
-        handle.template deviceGrid<BuildT>(), mStream);
-
-    BufT<uint64_t> packedBuffer(mStream, this->ref(), activeVoxelCount + 1, nanovdb::cuda::noInit);
-    uint64_t *dPacked = packedBuffer.data();
-
-    if (mVerbose==1) mTimer.start("Initializing UDF and triangle sidecar");
-    util::cuda::lambdaKernel<<<numBlocks(activeVoxelCount + 1), mNumThreads, 0, mStream>>>(
-        activeVoxelCount + 1,
-        topology::detail::InitPackedSidecarFunctor{ dPacked });
-    cudaCheckError();
-    if (mVerbose==1) mTimer.stop();
-
-    if (mVerbose==1) mTimer.start("Computing UDF and nearest triangles via leaf/triangle pairs");
-    if (mBoxTrianglePairCount) {
-        using UDFFunctorT = util::rasterization::cuda::ComputeUDFAndIndexFunctor<BuildT, BoxTrianglePair, Triangle>;
-        util::cuda::operatorKernelInstance<UDFFunctorT>
-            <<<mBoxTrianglePairCount, UDFFunctorT::MaxThreadsPerBlock, 0, mStream>>>(
-                UDFFunctorT{ deviceBoxTrianglePairs(), deviceXformedTriangles(),
-                             handle.template deviceGrid<BuildT>(), dPacked,
-                             mBandWidth * mBandWidth });
-        cudaCheckError();
-        mXformedTriangles.destroy(mStream);
-        mBoxTrianglePairsBuffer.destroy(mStream);
-    }
+    if (mVerbose==1) mTimer.start("Grouping candidate triangles by leaf");
+    BufT<uint64_t> leafOffsets(mStream, this->ref(), uint64_t(leafCount) + 1, nanovdb::cuda::noInit);
+    auto leafTriangles = groupTrianglesByLeaf(handle.template deviceGrid<BuildT>(), leafCount, leafOffsets.data());
     if (mVerbose==1) mTimer.stop();
 
     auto udfBuffer = nanovdb::cuda::detail::createDeviceStorage<SidecarBufferT>(
         (activeVoxelCount + 1) * sizeof(float), &sidecarProto, device, mStream);
+    auto *dUDF = static_cast<float*>(nanovdb::cuda::detail::deviceStorageData(udfBuffer));
     auto indexBuffer = nanovdb::cuda::detail::createDeviceStorage<SidecarBufferT>(
         (activeVoxelCount + 1) * sizeof(uint32_t), &sidecarProto, device, mStream);
-    auto *dUDF   = static_cast<float*>(nanovdb::cuda::detail::deviceStorageData(udfBuffer));
     auto *dIndex = static_cast<uint32_t*>(nanovdb::cuda::detail::deviceStorageData(indexBuffer));
 
-    if (mVerbose==1) mTimer.start("Splitting the packed sidecar");
-    util::cuda::lambdaKernel<<<numBlocks(activeVoxelCount + 1), mNumThreads, 0, mStream>>>(
-        activeVoxelCount + 1,
-        topology::detail::SplitPackedSidecarFunctor{ dPacked, dUDF, dIndex });
-    cudaCheckError();
-    packedBuffer.destroy(mStream);
+    if (mVerbose==1) mTimer.start("Computing UDF and nearest triangles per leaf");
+    cudaCheck(cudaMemsetAsync(dIndex, 0xFF, sizeof(uint32_t), mStream));  // background slot: no triangle
+    if (leafCount) {
+        using UDFFunctorT = util::rasterization::cuda::ComputeUDFAndIndexByLeafFunctor<BuildT, Triangle>;
+        util::cuda::operatorKernelInstance<UDFFunctorT>
+            <<<leafCount, UDFFunctorT::MaxThreadsPerBlock, 0, mStream>>>(
+                UDFFunctorT{ leafTriangles.data(), leafOffsets.data(), deviceXformedTriangles(),
+                             handle.template deviceGrid<BuildT>(), dUDF, dIndex, mBandWidth * mBandWidth });
+        cudaCheckError();
+    }
+    leafTriangles.destroy(mStream);
+    leafOffsets.destroy(mStream);
+    mXformedTriangles.destroy(mStream);
     if (mVerbose==1) mTimer.stop();
 
     if (mVerbose==1) mTimer.start("Finalizing UDF sidecar (sqrt + clamp)");
