@@ -25,7 +25,8 @@
 #include <nanovdb/util/cuda/Util.h>
 
 #include <cub/cub.cuh>
-#include <cuda/std/algorithm> // cuda::std::binary_search
+#include <thrust/binary_search.h>    // thrust::binary_search (cuda/std/algorithm needs CCCL 3.2)
+#include <thrust/execution_policy.h> // thrust::seq
 
 #include <algorithm> // std::none_of
 #include <cstddef>   // std::size_t
@@ -609,7 +610,7 @@ struct NewRootTileFunctor
                                uint32_t knownCount, uint8_t* isNew) const
     {
         isNew[i] = int(i) < *uniqueCount && candidates[i] != NoRootTile &&
-                   !::cuda::std::binary_search(known, known + knownCount, candidates[i]);
+                   !thrust::binary_search(thrust::seq, known, known + knownCount, candidates[i]);
     }
 }; // NewRootTileFunctor
 
