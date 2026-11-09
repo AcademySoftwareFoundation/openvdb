@@ -248,20 +248,24 @@ __hostdev__ inline char* strcpy(char* dst, int num, int bas = 10)
     const bool neg = num < 0 && bas == 10;
     unsigned int abs = neg ? 0u - static_cast<unsigned int>(num) : static_cast<unsigned int>(num);
 
-    // Collect digits in reverse order, then copy them out forward.
-    // An in-place reversal of dst crashes cicc in nvcc 13.4 for sm_100 and sm_120.
-    char tmp[32];// 32 digits covers any 32-bit value in base 2
-    int n = 0;
-    do {
-        const unsigned int rem = abs % static_cast<unsigned int>(bas);
-        tmp[n++] = static_cast<char>(rem > 9 ? rem - 10 + 'a' : rem + '0');
-        abs /= static_cast<unsigned int>(bas);
-    } while (abs);
+    const unsigned int base = static_cast<unsigned int>(bas);
 
-    int len = 0;
-    if (neg) dst[len++] = '-';
-    while (n > 0) dst[len++] = tmp[--n];
+    // Count the digits first, then write them from the last one back, so no reversal is needed.
+    // An in-place reversal of dst crashes cicc in nvcc 13.4 for sm_100 and sm_120, and copying
+    // from a local digit buffer lets GCC 14 vectorize the copy and report -Wstringop-overflow.
+    int len = neg ? 1 : 0;
+    for (unsigned int t = abs; ; t /= base) {
+        ++len;
+        if (t < base) break;
+    }
     dst[len] = '\0';
+    char *p = dst + len;
+    do {
+        const unsigned int rem = abs % base;
+        *--p = static_cast<char>(rem > 9 ? rem - 10 + 'a' : rem + '0');
+        abs /= base;
+    } while (abs);
+    if (neg) *--p = '-';
     return dst;
 }// util::strcpy(char*, int, int)
 
