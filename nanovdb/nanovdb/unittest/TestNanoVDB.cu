@@ -5346,7 +5346,7 @@ TEST(TestNanoVDBCUDA, PropagateSign_RootFill)
     using BuildT = nanovdb::ValueOnIndex;
     using nanovdb::tools::cuda::floodfill::detail::Face;
     using nanovdb::tools::cuda::floodfill::detail::fillRootInvertTiles;
-    constexpr int Dim = nanovdb::NanoUpper<BuildT>::DIM;
+    static constexpr int Dim = nanovdb::NanoUpper<BuildT>::DIM; // static: MSVC will not read it uncaptured otherwise
     auto& resource = nanovdb::cuda::default_resource<nanovdb::cuda::DeviceResource>();
     nanovdb::cuda::TempPool<nanovdb::cuda::DeviceResource> tempPool(resource);
 
@@ -5373,9 +5373,11 @@ TEST(TestNanoVDBCUDA, PropagateSign_RootFill)
     };
 
     // Runs stage 4 with the seeds { (tile index, face) }, each on the entry of that tile, and returns the origins.
-    auto run = [&](auto& grid, std::vector<std::pair<nanovdb::Coord, Face>> flags) {
+    // Not a generic lambda: MSVC does not capture what only its dependent calls use.
+    using GridsT = decltype(buildGrid(nanovdb::Coord()));
+    auto run = [&](GridsT& grid, std::vector<std::pair<nanovdb::Coord, Face>> flags) {
         auto& [handle, hostHandle] = grid;
-        const auto&           root = hostHandle.template grid<BuildT>()->tree().root();
+        const auto&           root = hostHandle.grid<BuildT>()->tree().root();
         const uint32_t        entryCount = root.tileCount();
         std::vector<uint32_t> seeds(entryCount, 0u);
         for (const auto& [tile, face] : flags) {
@@ -5389,8 +5391,8 @@ TEST(TestNanoVDBCUDA, PropagateSign_RootFill)
         cudaCheck(cudaMemcpy(d_seeds, seeds.data(), entryCount * sizeof(uint32_t), cudaMemcpyHostToDevice));
         std::vector<nanovdb::Coord> origins;
         try {
-            auto d_origins = fillRootInvertTiles(handle.template deviceGrid<BuildT>(), d_seeds, entryCount, 0, resource,
-                                                 tempPool);
+            auto d_origins =
+                fillRootInvertTiles(handle.deviceGrid<BuildT>(), d_seeds, entryCount, 0, resource, tempPool);
             origins.resize(d_origins.size());
             cudaCheck(cudaMemcpy(origins.data(), d_origins.data(), d_origins.size_bytes(), cudaMemcpyDeviceToHost));
         } catch (...) {
