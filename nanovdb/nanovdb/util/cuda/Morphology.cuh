@@ -59,7 +59,7 @@ struct DilateInternalNodesFunctor
         Mask<5> *upperMasks,
         Mask<4> (*lowerMasks)[Mask<5>::SIZE])
     {
-        (*this)(srcGrid, dilatedRoot, upperMasks, DenseLowerMasks{{}, lowerMasks[0]});
+        (*this)(srcGrid, dilatedRoot, upperMasks, DenseLowerMasks(lowerMasks));
     }
 
     template <typename LowerMasksT>
@@ -356,7 +356,7 @@ struct MergeInternalNodesFunctor
         Mask<5> *upperMasks,
         Mask<4> (*lowerMasks)[Mask<5>::SIZE])
     {
-        (*this)(srcGrid, mergedRoot, upperMasks, DenseLowerMasks{{}, lowerMasks[0]});
+        (*this)(srcGrid, mergedRoot, upperMasks, DenseLowerMasks(lowerMasks));
     }
 
     template <typename LowerMasksT>
@@ -404,7 +404,7 @@ struct PruneInternalNodesFunctor
         Mask<5> *upperMasks,
         Mask<4> (*lowerMasks)[Mask<5>::SIZE])
     {
-        (*this)(srcLeafID, srcGrid, prunedRoot, srcLeafMask, upperMasks, DenseLowerMasks{{}, lowerMasks[0]});
+        (*this)(srcLeafID, srcGrid, prunedRoot, srcLeafMask, upperMasks, DenseLowerMasks(lowerMasks));
     }
 
     template <typename LowerMasksT>
@@ -449,7 +449,7 @@ struct RefineInternalNodesFunctor
         Mask<5> *upperMasks,
         Mask<4> (*lowerMasks)[Mask<5>::SIZE])
     {
-        (*this)(srcLeafID, srcGrid, prunedRoot, upperMasks, DenseLowerMasks{{}, lowerMasks[0]});
+        (*this)(srcLeafID, srcGrid, prunedRoot, upperMasks, DenseLowerMasks(lowerMasks));
     }
 
     template <typename LowerMasksT>
@@ -502,7 +502,7 @@ struct CoarsenInternalNodesFunctor
         Mask<5> *upperMasks,
         Mask<4> (*lowerMasks)[Mask<5>::SIZE])
     {
-        (*this)(srcLeafID, srcGrid, prunedRoot, upperMasks, DenseLowerMasks{{}, lowerMasks[0]});
+        (*this)(srcLeafID, srcGrid, prunedRoot, upperMasks, DenseLowerMasks(lowerMasks));
     }
 
     template <typename LowerMasksT>

@@ -21,6 +21,9 @@
     A view passed for one grid of a batch is shifted to that grid's first tile with
     offsetTiles(tileBase).
 
+    Claiming rows needs __match_any_sync, __nanosleep and independent thread scheduling, so
+    the views require compute capability 7.0 or newer.
+
     \warning The header file contains cuda device code so be sure
              to only include it in .cu files (or other .cuh files)
 */
@@ -29,6 +32,10 @@
 #define NANOVDB_UTIL_CUDA_LOWERMASKS_CUH_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h>
+
+#if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 700
+#error "nanovdb/util/cuda/LowerMasks.cuh, and the CUDA topology tools that use it, require compute capability 7.0 or newer"
+#endif
 
 namespace nanovdb::util::morphology::cuda {
 
@@ -41,6 +48,8 @@ static constexpr uint32_t UnclaimedRow = 0xFFFFFFFFu;
 static constexpr uint32_t ClaimingRow  = 0xFFFFFFFEu;
 /// @brief SparseLowerMasks row index of a (tile, uc) whose claim overflowed the pool
 static constexpr uint32_t OverflowRow  = 0xFFFFFFFDu;
+/// @brief Largest SparseLowerMasks pool, so that every row index stays below the sentinels
+static constexpr uint32_t MaxLowerRows = OverflowRow;
 
 /// @brief Write calls shared by the views; Derived supplies row(tile, uc), which returns
 ///        nullptr when the write must be dropped
@@ -62,12 +71,16 @@ struct LowerMasksWrites
     }
 };
 
-/// @brief Mask<5>::SIZE Mask<4> per tile, indexed [tile][uc]
+/// @brief Mask<5>::SIZE Mask<4> per tile, indexed [tile][uc]. Converts implicitly from the
+///        Mask<4>(*)[Mask<5>::SIZE] array of TopologyBuilder's deprecated dense path.
 struct DenseLowerMasks : LowerMasksWrites<DenseLowerMasks>
 {
     Mask<4> *rows;
 
-    __hostdev__ DenseLowerMasks offsetTiles(uint64_t tileBase) const { return {{}, rows + tileBase * Mask<5>::SIZE}; }
+    __hostdev__ DenseLowerMasks(Mask<4> *rows) : rows(rows) {}
+    __hostdev__ DenseLowerMasks(Mask<4> (*rows)[Mask<5>::SIZE]) : rows(rows ? rows[0] : nullptr) {}
+
+    __hostdev__ DenseLowerMasks offsetTiles(uint64_t tileBase) const { return DenseLowerMasks(rows + tileBase * Mask<5>::SIZE); }
     __device__ Mask<4>* row(uint64_t tile, uint32_t uc) const { return rows + tile * Mask<5>::SIZE + uc; }
 };
 
@@ -91,20 +104,30 @@ struct SparseLowerMasks : LowerMasksWrites<SparseLowerMasks>
 
     __device__ Mask<4>* row(uint64_t tile, uint32_t uc) const
     {
-        // Lanes after the same row elect one leader to claim it, so a row costs one claim
-        // per warp rather than one per lane
         uint32_t *slot = index + tile * Mask<5>::SIZE + uc;
-        const uint32_t peers = __match_any_sync(__activemask(), reinterpret_cast<unsigned long long>(slot));
-        const int leader = __ffs(peers) - 1;
-        uint32_t r = 0;
-        if ((threadIdx.x & 31) == uint32_t(leader)) r = claim(slot);
-        r = __shfl_sync(peers, r, leader);
-        return r == OverflowRow ? nullptr : pool + r;
+        uint32_t r = *reinterpret_cast<volatile uint32_t*>(slot);
+        if (r == UnclaimedRow || r == ClaimingRow) {
+            // The lanes that reach here for the same slot elect one leader to claim it, so a
+            // row costs one claim per warp. __match_any_sync waits for every lane in the mask.
+            const uint32_t peers = __match_any_sync(__activemask(), reinterpret_cast<unsigned long long>(slot));
+            const uint32_t leader = __ffs(peers) - 1;
+            if (laneId() == leader) r = claim(slot);
+            r = __shfl_sync(peers, r, leader);
+        }
+        return r < capacity ? pool + r : nullptr;
     }
 
 private:
-    /// @brief Pool row of @a slot, claiming one if the slot is unclaimed and waiting while
-    ///        another warp claims it
+    __device__ static uint32_t laneId()
+    {
+        uint32_t lane;
+        asm("mov.u32 %0, %%laneid;" : "=r"(lane));
+        return lane;
+    }
+
+    /// @brief Pool row of @a slot, claiming one if the slot is unclaimed. The claimant never
+    ///        waits between its CAS and its store, so a lane waiting on another warp's claim
+    ///        is released once independent thread scheduling runs that claimant.
     __device__ uint32_t claim(uint32_t *slot) const
     {
         uint32_t r = *reinterpret_cast<volatile uint32_t*>(slot);

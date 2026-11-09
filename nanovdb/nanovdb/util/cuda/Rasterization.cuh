@@ -18,8 +18,6 @@
 #include <nanovdb/math/Proximity.h>
 #include <nanovdb/util/cuda/LowerMasks.cuh>
 
-#include <type_traits>
-
 namespace nanovdb::util {
 
 namespace rasterization {
@@ -38,9 +36,10 @@ namespace cuda {
 ///        Both setOnAtomic() calls are required since multiple pairs can share
 ///        the same upper node (competing for the upper mask) or the same lower
 ///        node (competing for the lower mask).
-///        @a LowerMasksT is a view from nanovdb/util/cuda/LowerMasks.cuh, or the raw
-///        Mask<4>(*)[Mask<5>::SIZE] array of TopologyBuilder's dense path.
-template<typename BuildT, typename PairT, typename LowerMasksT = Mask<4> (*)[Mask<5>::SIZE]>
+///        @a LowerMasksT is a view from nanovdb/util/cuda/LowerMasks.cuh. The default,
+///        DenseLowerMasks, also accepts the raw Mask<4>(*)[Mask<5>::SIZE] array of
+///        TopologyBuilder's dense path.
+template<typename BuildT, typename PairT, typename LowerMasksT = util::morphology::cuda::DenseLowerMasks>
 struct RasterizeInternalNodesFunctor
 {
     using RootT  = NanoRoot<BuildT>;
@@ -65,10 +64,7 @@ struct RasterizeInternalNodesFunctor
         const uint32_t lowerBit = LowerT::CoordToOffset(pair.origin);
 
         dUpperMasks[tileIdx].setOnAtomic(upperBit);
-        if constexpr (std::is_pointer_v<LowerMasksT>)
-            dLowerMasks[tileIdx][upperBit].setOnAtomic(lowerBit);
-        else
-            dLowerMasks.setOnAtomic(tileIdx, upperBit, lowerBit);
+        dLowerMasks.setOnAtomic(tileIdx, upperBit, lowerBit);
     }
 };
 

@@ -14,11 +14,15 @@ NanoVDB:
     launch(upperMasks, lowerMasks) once with a util::morphology::cuda::SparseLowerMasks
     view, plus allocateLowerMasks and lowerMasks() for callers that launch the
     functors themselves. maxRows bounds the (tile, upper child) pairs the functors
-    touch; exceeding it makes getBuffer and waitForNodeCounts throw.
+    touch, and TopologyBuilder::UnknownMaxRows reserves a row for every pair;
+    exceeding the bound makes getBuffer and waitForNodeCounts throw. The views, and
+    so the CUDA topology tools, require compute capability 7.0 or newer.
   - The internal-node functors in nanovdb/util/cuda/Morphology.cuh (refine, coarsen,
     dilate, prune and merge) take any lower-mask view from the new header
     nanovdb/util/cuda/LowerMasks.cuh. RasterizeInternalNodesFunctor takes the view
-    type as a third template parameter.
+    type as a third template parameter, defaulting to DenseLowerMasks, which converts
+    from the raw array.
   - Deprecated TopologyBuilder::allocateInternalMaskBuffers, deviceLowerMasks,
     lowerOffsetRows and leafOffsetRows, and the functor overloads that take a raw
-    Mask<4>(*)[Mask<5>::SIZE] array. They keep working until the next major release.
+    Mask<4>(*)[Mask<5>::SIZE] array. They keep working until the next major release;
+    the dense accessors throw std::logic_error after buildInternalMasks.

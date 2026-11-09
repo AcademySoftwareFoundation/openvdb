@@ -34,7 +34,9 @@
 #include <cstddef> // for std::byte, std::size_t
 #include <cstring> // for std::memset
 #include <map> // for the processed tile maps
-#include <stdexcept> // for std::runtime_error
+#include <algorithm> // for std::min
+#include <stdexcept> // for std::runtime_error, std::logic_error
+#include <string> // for the dense-accessor error message
 #include <utility> // for std::exchange, std::swap
 #include <vector> // for the tile counts handed to allocateProcessedRoots and the per-grid byte offsets
 
@@ -166,8 +168,9 @@ public:
 /// Synchronization: every method is stream-ordered on the stream it is given. getBuffer is the
 /// one method that blocks the host, because it sizes the output from data(g)->nodeCount; it
 /// waits on an event countNodes records, so no work queued on the stream after countNodes is
-/// waited for. It throws if the functors touched more (tile, upper child) pairs than maxRows. A caller that reads data(g)->nodeCount or nodeCount(level) before getBuffer
-/// must call waitForNodeCounts() (or synchronize the stream) first. countNodes writes only
+/// waited for. A caller that reads data(g)->nodeCount or nodeCount(level) before getBuffer
+/// must call waitForNodeCounts() (or synchronize the stream) first. waitForNodeCounts, and so
+/// getBuffer, throws if the functors touched more (tile, upper child) pairs than maxRows. countNodes writes only
 /// the node counts and node bases of data(g); every other field is the caller's to set until
 /// getBuffer uploads data(g). The processed roots and mask buffers are released by
 /// processLowerNodes; deviceProcessedRoot() and the mask pointers are invalid after it.
@@ -240,13 +243,16 @@ public:
     [[deprecated("Use buildInternalMasks, which stores lower masks only for the upper-node children the functors touch")]]
     void allocateInternalMaskBuffers(cudaStream_t stream) { allocateDenseMasks(stream); }
 
+    /// @brief maxRows for buildInternalMasks and allocateLowerMasks when no bound is known
+    static constexpr uint64_t UnknownMaxRows = ~uint64_t(0);
+
     /// @brief Fills the upper and lower child masks through @a launch, which the builder calls
     ///        once as launch(Mask<5>* upperMasks, util::morphology::cuda::SparseLowerMasks lowerMasks)
     ///        to launch the consumer's internal-node functors. A lower mask is stored only for
     ///        each (tile, upper child) the functors touch.
     /// @param maxRows upper bound on the (tile, upper child) pairs the functors touch over the
-    ///        whole batch; 0 means unknown, which reserves a row for every pair. A bound the
-    ///        functors exceed makes waitForNodeCounts (and so getBuffer) throw.
+    ///        whole batch. UnknownMaxRows reserves a row for every pair of every tile. A bound
+    ///        the functors exceed makes waitForNodeCounts (and so getBuffer) throw.
     template <typename LaunchT>
     void buildInternalMasks(cudaStream_t stream, uint64_t maxRows, LaunchT &&launch)
     {
@@ -407,15 +413,15 @@ public:
     ///        indexed [upper node][lower node offset]. The row shape is fixed here, beside the
     ///        allocation that defines it, so consumers never re-derive the stride.
     [[deprecated("Use buildInternalMasks, which stores lower masks only for the upper-node children the functors touch")]]
-    Mask<4> (*deviceLowerMasks())[Mask<5>::SIZE] { return denseLowerMasks(); }
+    Mask<4> (*deviceLowerMasks())[Mask<5>::SIZE] { requireDense("deviceLowerMasks"); return denseLowerMasks(); }
     //@{
     /// @brief The lower and leaf node offsets viewed one row of Mask<5>::SIZE per upper node,
     ///        indexed [upper node][lower node offset]; the row shape is fixed here, beside the
     ///        allocation that defines it, so consumers never re-derive the stride
     [[deprecated("Use buildInternalMasks, which stores lower masks only for the upper-node children the functors touch")]]
-    uint32_t (*lowerOffsetRows())[Mask<5>::SIZE] { return denseLowerOffsets(); }
+    uint32_t (*lowerOffsetRows())[Mask<5>::SIZE] { requireDense("lowerOffsetRows"); return denseLowerOffsets(); }
     [[deprecated("Use buildInternalMasks, which stores lower masks only for the upper-node children the functors touch")]]
-    uint32_t (*leafOffsetRows())[Mask<5>::SIZE] { return denseLeafOffsets(); }
+    uint32_t (*leafOffsetRows())[Mask<5>::SIZE] { requireDense("leafOffsetRows"); return denseLeafOffsets(); }
     //@}
     /// @brief A borrowing reference to the builder's resource, for consumers
     ///        allocating sibling scratch from the same instance.
@@ -466,6 +472,13 @@ private:
     uint32_t* hostRowOverflow() { return hostTileBases() + gridCount() + 1; }
 
     void allocateDenseMasks(cudaStream_t stream);
+    /// @brief The dense accessors index T × Mask<5>::SIZE rows, which buildInternalMasks does not allocate
+    void requireDense(const char *accessor) const
+    {
+        if (mMode == LowerMaskMode::Sparse)
+            throw std::logic_error(std::string("TopologyBuilder::") + accessor + " is only valid after allocateInternalMaskBuffers");
+    }
+
     Mask<4> (*denseLowerMasks())[Mask<5>::SIZE] { return reinterpret_cast<Mask<4>(*)[Mask<5>::SIZE]>(mLowerMasks.data()); }
     uint32_t (*denseLowerOffsets())[Mask<5>::SIZE] { return reinterpret_cast<uint32_t(*)[Mask<5>::SIZE]>(mLowerOffsets.data()); }
     uint32_t (*denseLeafOffsets())[Mask<5>::SIZE] { return reinterpret_cast<uint32_t(*)[Mask<5>::SIZE]>(mLeafOffsets.data()); }
@@ -678,7 +691,7 @@ void TopologyBuilder<BuildT, ResourceT>::allocateLowerMasks(cudaStream_t stream,
 {
     mMode = LowerMaskMode::Sparse;
     const uint64_t slots = uint64_t(mTileTotal) * Mask<5>::SIZE;
-    mRowCapacity = uint32_t(maxRows == 0 ? slots : std::min(maxRows, slots));
+    mRowCapacity = uint32_t(std::min<uint64_t>({maxRows, slots, util::morphology::cuda::MaxLowerRows}));
     mRowState = BufT<uint32_t>(stream, this->ref(), 2, nanovdb::cuda::noInit);
     cudaCheck(cudaMemsetAsync(mRowState.data(), 0, mRowState.size_bytes(), stream));
     if (mTileTotal == 0) return; // Processing empty grid(s); nothing else to allocate
