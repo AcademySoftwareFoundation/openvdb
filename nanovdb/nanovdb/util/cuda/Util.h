@@ -303,7 +303,7 @@ inline cudaError_t memPrefetchAsync(const void* devPtr, size_t count, int dstDev
 template<typename Func, typename... Args>
 __global__ void lambdaKernel(const size_t numItems, Func func, Args... args)
 {
-    const int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t tid = size_t(blockIdx.x) * blockDim.x + threadIdx.x;
     if (tid >= numItems) return;
     func(tid, args...);
 }// util::cuda::lambdaKernel
