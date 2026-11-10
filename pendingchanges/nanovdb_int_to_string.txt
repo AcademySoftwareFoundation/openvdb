@@ -1,0 +1,5 @@
+NanoVDB:
+  Bug Fixes:
+  - util::strcpy(char*, int, int) and util::strcat(char*, int, int) no longer crash cicc in nvcc 13.4 when compiled for sm_100 or sm_120. The digits are now written from the end of the string back, so it is no longer reversed in place.
+  - util::strcpy(char*, int, int) now formats INT_MIN as "-2147483648". It used to negate INT_MIN, which is undefined behavior, and print "-./,),(-*,(".
+  - util::strcpy(char*, int, int) now prints negative numbers in bases other than 10 as unsigned two's complement, like itoa. It used to print a '-' followed by invalid characters, for example "-/" for -1 in base 16.

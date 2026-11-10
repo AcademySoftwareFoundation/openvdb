@@ -9749,6 +9749,16 @@ TEST_F(TestNanoVDB, strcpy)
     //std::cerr << "mStr = \"" << mStr << "\"" << std::endl;
     EXPECT_TRUE(nanovdb::util::streq(mStr, "100101101011010000111"));
     EXPECT_EQ(nanovdb::util::strlen(mStr), std::strlen("100101101011010000111"));
+
+    EXPECT_TRUE(nanovdb::util::streq(nanovdb::util::strcpy(mStr, std::numeric_limits<int>::max()), "2147483647"));
+    EXPECT_TRUE(nanovdb::util::streq(nanovdb::util::strcpy(mStr, std::numeric_limits<int>::min()), "-2147483648"));
+    EXPECT_TRUE(nanovdb::util::streq(nanovdb::util::strcpy(mStr, 255, 16), "ff"));
+    EXPECT_TRUE(nanovdb::util::streq(nanovdb::util::strcpy(mStr, 35, 36), "z"));
+    EXPECT_TRUE(nanovdb::util::streq(nanovdb::util::strcpy(mStr, 0, 2), "0"));
+
+    // Negative numbers outside base 10 print as unsigned two's complement, like itoa
+    EXPECT_TRUE(nanovdb::util::streq(nanovdb::util::strcpy(mStr, -1, 16), "ffffffff"));
+    EXPECT_TRUE(nanovdb::util::streq(nanovdb::util::strcpy(mStr, -1, 2), "11111111111111111111111111111111"));
 }// strcpy
 
 // make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*strcat"
