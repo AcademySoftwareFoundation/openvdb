@@ -64,6 +64,13 @@ closestPointOnTriangleToPoint(
 {
     using RealT = typename Vec3T::ValueType;
 
+    // a*b - c*d without the cancellation of rounding each product first (Kahan's algorithm): the rounding
+    // error of c*d is recovered exactly with an fma and added back. The result is within about 1.5 ulp.
+    auto diffOfProducts = [](RealT a, RealT b, RealT c, RealT d) {
+        const RealT w = c * d;
+        return fma(a, b, -w) + fma(-c, d, w);
+    };
+
     const Vec3T ab = v1 - v0;
     const Vec3T ac = v2 - v0;
     const Vec3T ap = p  - v0;
@@ -88,7 +95,7 @@ closestPointOnTriangleToPoint(
     }
 
     // --- Region AB (edge v0-v1) ---
-    const RealT vc = d1 * d4 - d3 * d2;
+    const RealT vc = diffOfProducts(d1, d4, d3, d2);
     if (vc <= RealT(0) && d1 >= RealT(0) && d3 <= RealT(0)) {
         t0 = d1 / (d1 - d3);
         t1 = RealT(0);
@@ -106,7 +113,7 @@ closestPointOnTriangleToPoint(
     }
 
     // --- Region AC (edge v0-v2) ---
-    const RealT vb = d5 * d2 - d1 * d6;
+    const RealT vb = diffOfProducts(d5, d2, d1, d6);
     if (vb <= RealT(0) && d2 >= RealT(0) && d6 <= RealT(0)) {
         t1 = d2 / (d2 - d6);
         t0 = RealT(0);
@@ -114,7 +121,7 @@ closestPointOnTriangleToPoint(
     }
 
     // --- Region BC (edge v1-v2) ---
-    const RealT va = d3 * d6 - d5 * d4;
+    const RealT va = diffOfProducts(d3, d6, d5, d4);
     if (va <= RealT(0) && (d4 - d3) >= RealT(0) && (d5 - d6) >= RealT(0)) {
         t1 = (d4 - d3) / ((d4 - d3) + (d5 - d6));
         t0 = RealT(1) - t1;
