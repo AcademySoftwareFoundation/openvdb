@@ -6,7 +6,7 @@
 
     \authors JaeHyun Lee and Efty Sifakis
 
-    \brief Partitions a NanoVDB index grid in two by a leaf-indexed retain mask, or into one grid per label
+    \brief Partitions a NanoVDB index grid in two by a leaf-indexed selection mask, or into one grid per label
 
     \warning The header file contains cuda device code so be sure
              to only include it in .cu files (or other .cuh files)
@@ -42,13 +42,13 @@ namespace nanovdb {
 
 namespace tools::cuda {
 
-/// @brief Splits the active voxels of an index grid in two, by a retain mask with one Mask<3> per source leaf.
-/// @details Output 0 holds the active voxels whose retain bit is on, and output 1 the other active voxels.
-///          Together they hold every active voxel exactly once. Retain bits of inactive voxels are ignored
+/// @brief Splits the active voxels of an index grid in two, by a selection mask with one Mask<3> per source leaf.
+/// @details Output 0 holds the active voxels whose selection bit is on, and output 1 the other active voxels.
+///          Together they hold every active voxel exactly once. Selection bits of inactive voxels are ignored
 ///          on both sides. An output that keeps no voxel is a valid empty grid.
 ///
 ///          Both outputs are built in one pass: the root table is computed once, and each kernel that reads the
-///          retain mask writes both outputs.
+///          selection mask writes both outputs.
 /// @note Scratch memory is about twice that of PruneGrid, since each output has its own TopologyBuilder, whose
 ///       dense lower-node masks take Mask<5>::SIZE Mask<4>s (16 MB) per root tile of the source grid.
 /// @tparam BuildT NanoVDB build type; only ValueOnIndex is supported.
@@ -68,7 +68,7 @@ class PartitionGridBinary
 public:
     /// @brief Constructor
     /// @param d_srcGrid source device grid to be partitioned
-    /// @param d_srcLeafMask retain mask: one Mask<3> per source leaf, in leaf order
+    /// @param d_srcLeafMask selection mask: one Mask<3> per source leaf, in leaf order
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
     /// @param resource resource instance all device scratch is allocated from;
     ///        must outlive this operator (defaults to the per-type default resource)
@@ -88,7 +88,7 @@ public:
         for (auto& builder : mBuilders) builder.mChecksum = mode;
     }
 
-    /// @brief The two outputs: [0] the voxels whose retain bit is on, [1] the rest.
+    /// @brief The two outputs: [0] the voxels whose selection bit is on, [1] the rest.
     /// @tparam BufferT Buffer type of the returned grid handles.
     /// @param pool Prototype buffer the outputs take their resource from.
     /// @note The stream is synchronized before this method returns.
@@ -111,7 +111,7 @@ private:
 
     void partitionInternalNodes();
 
-    void processGridTreeRoot(BuilderT& builder);
+    void processGridTreeRoot();
 
     void partitionLeafNodes();
 
@@ -153,7 +153,7 @@ std::array<GridHandle<BufferT>, 2> PartitionGridBinary<BuildT, ResourceT>::getHa
     auto buffer1 = mBuilders[1].getBuffer(pool, mStream);
 
     if (mVerbose==1) mTimer.restart("Processing grid/tree/root");
-    for (auto& builder : mBuilders) processGridTreeRoot(builder);
+    processGridTreeRoot();
 
     if (mVerbose==1) mTimer.restart("Processing upper nodes");
     for (auto& builder : mBuilders) builder.processUpperNodes(mStream);
@@ -220,12 +220,14 @@ void PartitionGridBinary<BuildT, ResourceT>::partitionInternalNodes()
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT, typename ResourceT>
-void PartitionGridBinary<BuildT, ResourceT>::processGridTreeRoot(BuilderT& builder)
+void PartitionGridBinary<BuildT, ResourceT>::processGridTreeRoot()
 {
-    // Copies the source GridData (name, map, ...), then resets what the builder owns
-    cudaCheck(cudaMemcpyAsync(&builder.data()->getGrid(), mDeviceSrcGrid->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
-    util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), builder.deviceData());
-    cudaCheckError();
+    // Copies the source GridData (name, map, ...) into each output, then resets what its builder owns
+    for (auto& builder : mBuilders) {
+        cudaCheck(cudaMemcpyAsync(&builder.data()->getGrid(), mDeviceSrcGrid->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
+        util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), builder.deviceData());
+        cudaCheckError();
+    }
 }// PartitionGridBinary<BuildT, ResourceT>::processGridTreeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -422,11 +424,11 @@ namespace partition::detail {
 
 // Stage 2: recursive bisection of the labels.
 //
-// Each split builds a retain mask of the voxels with a label below the pivot and runs PartitionGridBinary with it.
+// Each split builds a selection mask of the voxels with a label below the pivot and runs PartitionGridBinary with it.
 // Depth first, and a grid is released once it is split, so only the grids on the path from the source and their
 // siblings are alive at once.
 
-/// @brief Retain mask of one leaf of a grid that was split off from a source grid: a voxel is retained when it is
+/// @brief Selection mask of one leaf of a grid that was split off from a source grid: a voxel is selected when it is
 ///        active and its label is below the pivot. The labels are indexed by the source grid's value indices, so a
 ///        voxel's label is read through the source leaf with the same origin, which holds that voxel at the same n.
 ///        One warp per leaf, lane i testing voxels i, i + 32, ..., so that a warp reads the labels of 32 consecutive
@@ -452,11 +454,11 @@ struct LabelBelowPivotFunctor
         // So the label of voxel n is found through the source leaf with the same origin.
         const auto* srcLeaf = srcGrid->tree().root().probeLeaf(leaf.origin());
         NANOVDB_ASSERT(srcLeaf);
-        auto retained = [&](uint32_t n) { return leaf.isActive(n) && srcLabels[srcLeaf->getValue(n)] < pivot; };
+        auto selected = [&](uint32_t n) { return leaf.isActive(n) && srcLabels[srcLeaf->getValue(n)] < pivot; };
         // The Mask<3> words recast as 32-bit words: one ballot fills one, bit i from lane i (voxel h * 32 + i)
         uint32_t* maskWords_u32 = reinterpret_cast<uint32_t*>(leafMasks[leafID].words());
         for (uint32_t h = 0; h < 2 * Mask<3>::WORD_COUNT; h++) {
-            const uint32_t ballot = __ballot_sync(0xFFFFFFFF, retained(h * 32 + lane));
+            const uint32_t ballot = __ballot_sync(0xFFFFFFFF, selected(h * 32 + lane));
             if (lane == 0) maskWords_u32[h] = ballot;
         }
     }
