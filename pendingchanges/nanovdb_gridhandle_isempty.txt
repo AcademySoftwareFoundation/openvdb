@@ -1,0 +1,5 @@
+NanoVDB:
+
+  API Changes:
+  - Deprecated GridHandle::isEmpty in favor of GridHandle::empty, which it duplicated. The Python
+    GridHandle.isEmpty remains available and is not deprecated.
