@@ -1,0 +1,31 @@
+NanoVDB:
+  Improvements:
+  - tools::cuda::TopologyBuilder stores a lower-node mask only for each upper-node
+    child the consumer's internal-node functors touch, instead of a full row of
+    32,768 lower masks (16 MiB) per speculative root tile. Scratch now scales with
+    the output topology rather than the tile count; outputs are byte-identical.
+    A batch of 64 small grids that touch ijk = 0 dilates with 80 MiB of device
+    memory instead of 8.4 GiB and 3.8x faster; large grids build at the same speed
+    with 1.2-19x lower peak device memory. RefineGrid, CoarsenGrid, DilateGrid,
+    PruneGrid, MergeGrids and MeshToGrid use the new path; MeshToGrid first marks
+    the upper-node children its triangles touch, so its pool is sized exactly.
+    Fixes #2392.
+
+  API Changes:
+  - Added TopologyBuilder::buildInternalMasks(stream, maxRows, launch), which calls
+    launch(upperMasks, lowerMasks) once with a util::morphology::cuda::SparseLowerMasks
+    view, plus allocateLowerMasks and lowerMasks() for callers that launch the
+    functors themselves. maxRows bounds the (tile, upper child) pairs the functors
+    touch, and TopologyBuilder::UnknownMaxRows reserves a row for every pair;
+    exceeding the bound makes getBuffer and waitForNodeCounts throw. Kernels that
+    write through SparseLowerMasks, and so the CUDA topology tools, require compute
+    capability 7.0 or newer; the deprecated dense path does not.
+  - The internal-node functors in nanovdb/util/cuda/Morphology.cuh (refine, coarsen,
+    dilate, prune and merge) take any lower-mask view from the new header
+    nanovdb/util/cuda/LowerMasks.cuh. RasterizeInternalNodesFunctor takes the view
+    type as a third template parameter, defaulting to DenseLowerMasks, which converts
+    from the raw array.
+  - Deprecated TopologyBuilder::allocateInternalMaskBuffers, deviceLowerMasks,
+    lowerOffsetRows and leafOffsetRows, and the functor overloads that take a raw
+    Mask<4>(*)[Mask<5>::SIZE] array. They keep working until the next major release;
+    the dense accessors throw std::logic_error after buildInternalMasks.

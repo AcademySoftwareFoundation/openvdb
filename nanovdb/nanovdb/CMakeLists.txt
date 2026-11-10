@@ -423,6 +423,7 @@ set(NANOVDB_INCLUDE_UTIL_CUDA_FILES
   util/cuda/MorphologyHelpers.cuh
   util/cuda/DeviceGridTraits.cuh
   util/cuda/Injection.cuh
+  util/cuda/LowerMasks.cuh
   util/cuda/Rasterization.cuh
 )
 

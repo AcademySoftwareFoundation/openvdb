@@ -139,10 +139,6 @@ MergeGrids<BuildT, ResourceT>::getHandle(const BufferT &pool)
     if (mVerbose==1) mTimer.start("\nMerging root nodes");
     mergeRoot();
 
-    // Allocate memory for merged upper/lower masks
-    if (mVerbose==1) mTimer.restart("Allocating internal node mask buffers");
-    mBuilder.allocateInternalMaskBuffers(mStream);
-
     // Merge masks of upper/lower nodes
     if (mVerbose==1) mTimer.restart("Merge internal nodes");
     mergeInternalNodes();
@@ -223,17 +219,19 @@ void MergeGrids<BuildT, ResourceT>::mergeRoot()
 template<typename BuildT, typename ResourceT>
 void MergeGrids<BuildT, ResourceT>::mergeInternalNodes()
 {
-    // Merges the masks of upper and lower nodes from both input topologies into the
-    // densified, pre-allocated mask arrays of the merged result
+    // Each input scatter-ORs its internal-node masks into the merged result's masks; the merged
+    // root (built from all inputs) provides the tiles. The inputs' lower nodes bound the rows.
     using Op = util::morphology::cuda::MergeInternalNodesFunctor<BuildT>;
-    // Each input scatter-ORs its internal-node masks into the shared, union-sized
-    // accumulator; the merged root (built from all inputs) provides the slots.
-    for (size_t i = 0; i < mDeviceSrcGrids.size(); ++i) {
-        if (!mSrcTreeData[i].mNodeCount[1]) continue; // skip empty grids
-        util::cuda::operatorKernel<Op>
-            <<<mSrcTreeData[i].mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
-            (mDeviceSrcGrids[i], mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks());
-    }
+    uint64_t maxRows = 0;
+    for (const auto &td : mSrcTreeData) maxRows += td.mNodeCount[1];
+    mBuilder.buildInternalMasks(mStream, maxRows, [&](Mask<5> *upperMasks, auto lowerMasks) {
+        for (size_t i = 0; i < mDeviceSrcGrids.size(); ++i) {
+            if (!mSrcTreeData[i].mNodeCount[1]) continue; // skip empty grids
+            util::cuda::operatorKernel<Op>
+                <<<mSrcTreeData[i].mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
+                (mDeviceSrcGrids[i], mBuilder.deviceProcessedRoot(), upperMasks, lowerMasks);
+        }
+    });
 }// MergeGrids<BuildT, ResourceT>::mergeInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

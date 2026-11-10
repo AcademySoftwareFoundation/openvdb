@@ -124,10 +124,6 @@ PruneGrid<BuildT, ResourceT>::getHandle(const BufferT &pool)
     if (mVerbose==1) mTimer.start("\nPrune root node");
     pruneRoot();
 
-    // Allocate memory for pruned upper/lower masks
-    if (mVerbose==1) mTimer.restart("Allocating internal node mask buffers");
-    mBuilder.allocateInternalMaskBuffers(mStream);
-
     // Prune masks of upper/lower nodes
     if (mVerbose==1) mTimer.restart("Prune internal nodes");
     pruneInternalNodes();
@@ -205,14 +201,15 @@ void PruneGrid<BuildT, ResourceT>::pruneRoot()
 template<typename BuildT, typename ResourceT>
 void PruneGrid<BuildT, ResourceT>::pruneInternalNodes()
 {
-    // Computes the masks of upper and (densified) lower internal nodes, as a result of the pruning operation
-    // Masks of lower internal nodes are densified in the sense that a serialized array of them is allocated,
-    // as if every upper node had a full set of 32^3 lower children
-    if (auto srcLeafCount = mSrcTreeData.mNodeCount[0]) { // Unless it's an empty grid
+    // Computes the upper and lower internal-node masks of the pruned topology. Pruning keeps a
+    // subset of the source lower nodes, which bounds the lower-mask rows.
+    const auto srcLeafCount = mSrcTreeData.mNodeCount[0];
+    mBuilder.buildInternalMasks(mStream, mSrcTreeData.mNodeCount[1], [&](Mask<5> *upperMasks, auto lowerMasks) {
+        if (srcLeafCount == 0) return; // Empty grid
         util::cuda::lambdaKernel<<<numBlocks(srcLeafCount), mNumThreads, 0, mStream>>>(
             srcLeafCount, util::morphology::cuda::PruneInternalNodesFunctor<BuildT>(),
-            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mDeviceSrcLeafMask, mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks() );
-    }
+            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mDeviceSrcLeafMask, upperMasks, lowerMasks);
+    });
 }// PruneGrid<BuildT, ResourceT>::pruneInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

@@ -28,6 +28,7 @@
 #include <cstddef> // for std::byte
 #include <map>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 
@@ -126,10 +127,6 @@ DilateGrid<BuildT, ResourceT>::getHandle(const BufferT &pool)
     if (mVerbose==1) mTimer.start("\nDilating root node");
     dilateRoot();
 
-    // Allocate memory for dilated upper/lower masks
-    if (mVerbose==1) mTimer.restart("Allocating internal node mask buffers");
-    mBuilder.allocateInternalMaskBuffers(mStream);
-
     // Dilate masks of upper/lower nodes
     if (mVerbose==1) mTimer.restart("Dilate internal nodes");
     dilateInternalNodes();
@@ -215,26 +212,24 @@ void DilateGrid<BuildT, ResourceT>::dilateRoot()
 template<typename BuildT, typename ResourceT>
 void DilateGrid<BuildT, ResourceT>::dilateInternalNodes()
 {
-    // Computes the masks of upper and (densified) lower internal nodes, as a result of the dilation operation
-    // Masks of lower internal nodes are densified in the sense that a serialized array of them is allocated,
-    // as if every upper node had a full set of 32^3 lower children
-    if (mSrcTreeData.mNodeCount[1]) { // Unless it's an empty grid
-        if (mOp == morphology::NN_FACE) {
-            using Op = util::morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE>;
+    // Computes the upper and lower internal-node masks of the dilated topology. A one-voxel
+    // dilation of a source lower node reaches at most its 27 neighbors, which bounds the rows.
+    const auto srcLowerCount = mSrcTreeData.mNodeCount[1];
+    mBuilder.buildInternalMasks(mStream, 27ull * srcLowerCount, [&](Mask<5> *upperMasks, auto lowerMasks) {
+        if (srcLowerCount == 0) return; // Empty grid
+        auto launch = [&](auto nn) {
+            using Op = util::morphology::cuda::DilateInternalNodesFunctor<BuildT, decltype(nn)::value>;
             util::cuda::operatorKernel<Op>
-                <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-                (mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
-        else if (mOp == morphology::NN_FACE_EDGE) {
-            using Op = util::morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE_EDGE>;
-            util::cuda::operatorKernel<Op>
-                <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-                (mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
-        else if (mOp == morphology::NN_FACE_EDGE_VERTEX) {
-            using Op = util::morphology::cuda::DilateInternalNodesFunctor<BuildT, morphology::NN_FACE_EDGE_VERTEX>;
-            util::cuda::operatorKernel<Op>
-                <<<dim3(mSrcTreeData.mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
-                (mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks()); }
-    }
+                <<<dim3(srcLowerCount, Op::SlicesPerLowerNode, 1), Op::MaxThreadsPerBlock, 0, mStream>>>
+                (mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), upperMasks, lowerMasks);
+        };
+        if (mOp == morphology::NN_FACE)
+            launch(std::integral_constant<morphology::NearestNeighbors, morphology::NN_FACE>());
+        else if (mOp == morphology::NN_FACE_EDGE)
+            launch(std::integral_constant<morphology::NearestNeighbors, morphology::NN_FACE_EDGE>());
+        else if (mOp == morphology::NN_FACE_EDGE_VERTEX)
+            launch(std::integral_constant<morphology::NearestNeighbors, morphology::NN_FACE_EDGE_VERTEX>());
+    });
 }// DilateGrid<BuildT, ResourceT>::dilateInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
