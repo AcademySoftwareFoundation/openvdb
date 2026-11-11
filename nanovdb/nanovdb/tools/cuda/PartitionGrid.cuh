@@ -6,7 +6,7 @@
 
     \authors JaeHyun Lee and Efty Sifakis
 
-    \brief Partitions a NanoVDB index grid in two by a leaf-indexed selection mask, or into one grid per label
+    \brief Partitions a NanoVDB ValueOnIndex grid in two by a leaf-indexed selection mask, or into one grid per label
 
     \warning The header file contains cuda device code so be sure
              to only include it in .cu files (or other .cuh files)
@@ -42,7 +42,7 @@ namespace nanovdb {
 
 namespace tools::cuda {
 
-/// @brief Splits the active voxels of an index grid in two, by a selection mask with one Mask<3> per source leaf.
+/// @brief Splits the active voxels of a ValueOnIndex grid in two, by a selection mask with one Mask<3> per source leaf.
 /// @details Output 0 holds the active voxels whose selection bit is on, and output 1 the other active voxels.
 ///          Together they hold every active voxel exactly once. Selection bits of inactive voxels are ignored
 ///          on both sides. An output that keeps no voxel is a valid empty grid.
@@ -248,7 +248,7 @@ void PartitionGridBinary<BuildT, ResourceT>::partitionLeafNodes()
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-/// @brief Splits the active voxels of an index grid into one grid per label.
+/// @brief Splits the active voxels of a ValueOnIndex grid into one grid per label.
 /// @details Output l holds the active voxels whose label is l, and is a valid empty grid if no voxel has label l.
 ///          The labels are split in two at the label that halves the voxel count, by one PartitionGridBinary, and
 ///          each side is split again until it holds a single label: labelCount - 1 splits in all, each over the
@@ -272,13 +272,14 @@ class PartitionGrid
 
 public:
     /// @brief Maximum number of labels: the label histogram takes its level count, labelCount + 1, as an int.
+    /// @note This is below ConnectedComponentsBase::MaxComponentCount, so getHandles rejects a component count above it.
     static constexpr uint32_t MaxLabelCount = uint32_t(std::numeric_limits<int>::max()) - 1;
 
     /// @brief Constructor
     /// @param d_srcGrid source device grid to be partitioned
-    /// @param d_srcLabels label of each active voxel, indexed by the source grid's value index (leaf.getValue(n)),
+    /// @param d_srcLabels device array of labels, one entry per value index, i.e. the grid's value count,
     ///        e.g. the labels of ConnectedComponents. Every active voxel's label must be in [0, labelCount); the
-    ///        other entries do not affect the outputs
+    ///        other entries (slot 0 included) do not affect the outputs
     /// @param labelCount number of labels, and of outputs; at most MaxLabelCount
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
     /// @param resource resource instance all device scratch is allocated from;
