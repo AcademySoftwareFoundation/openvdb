@@ -457,6 +457,8 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/LevelSetFracture.h
   tools/LevelSetMeasure.h
   tools/LevelSetMorph.h
+  tools/LevelSetMultiObject.h
+  tools/LevelSetMultiObjectMesh.h
   tools/LevelSetPlatonic.h
   tools/LevelSetRebuild.h
   tools/LevelSetSphere.h

@@ -1,0 +1,47 @@
+OpenVDB:
+  New Features:
+  - Added tools::LevelSetMultiObject, multi-object geodesic active contours
+    (MOGAC) on a paired unsigned-distance/label grid (tools::MultiLevelSet,
+    with the factories fromLabelGrid() and fromSignedGrids()), with
+    second-order per-label signed distance extraction
+    (MultiLevelSet::extractSignedDistance(), tools::ExtractSettings) and
+    redistancing (tools::MultiLevelSetRedistance). Implements B. C. Lucas,
+    M. Kazhdan and R. H. Taylor, "Multi-Object Geodesic Active Contours
+    (MOGAC): How to Represent and Manipulate Multiple Level Sets with only a
+    Label Mask and Distance Field", MICCAI 2012.
+  - Labels are 16-bit by default (tools::Int16LabelTree and Int16LabelGrid,
+    range [-32768, 32767]); call tools::registerMultiLevelSetGridTypes()
+    before writing label grids to a file.
+  - The evolver defaults to the HJWENO5 spatial scheme and TVD-RK2 time
+    integration (setSpatialScheme(), setTemporalScheme()). HJWENO5 needs a
+    halfWidth of at least 3 for the default constructor; use the
+    constructor overload that takes the scheme with math::FIRST_BIAS for a
+    halfWidth of 2.
+  - Incremental redistancing by default: each step re-solves only the band
+    near its own changes. It matches the full solve to within 1e-4*dx for
+    halfWidth <= 3 in the tested scenes and can differ by up to about
+    1e-2*dx for halfWidth >= 4; setFullRedistance(true) is exact. Call
+    markExternallyModified() after editing the pair between steps.
+  - Speed functors and forces: tools::MultiObjectForces (curvature,
+    advection, pressure) with per-label advection (setAdvection(label, ...),
+    clearLabelAdvection()), tools::LabelAwareStencil, and a speed extension
+    that samples advection and pressure at the closest interface point
+    (setSpeedExtension()).
+  - Kinematic labels: rigid obstacles with prescribed motion
+    (setKinematicLabel(), clearKinematicLabel()).
+  - Opt-in topology preservation (setTopologyPreservingLabels(),
+    setConnectivity()) with a phi floor on protected interfaces
+    (setMinimumPhi(), phiFloor(), validateTopologyFloor()).
+  - Per-label volume constraints (setVolumeConstraint(),
+    preserveInitialVolume(), clearVolumeConstraints(),
+    setVolumeRelaxation(), labelVolume()).
+  - Strang operator splitting of split speed functors with an adaptive
+    decision and interruptible sub-updates (setSplitting()), and optional
+    full-voxel interface motion per step (setMaxInterfaceMotion(1.0); the
+    default is 0.5).
+  - Pooled per-leaf scratch memory (scratchMemUsage()).
+  - Added tools::multiObjectToMesh, topology-constrained multi-label
+    contouring (tools::MultiObjectMeshSettings, with minimumPhi and
+    closestPointJunctions). Closest-point reconstruction at triple junctions
+    (ExtractSettings::closestPointJunctions and
+    MultiObjectMeshSettings::closestPointJunctions) is on by default.
