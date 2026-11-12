@@ -2,5 +2,5 @@ NanoVDB:
   Fixes:
   - Fixed util::cuda::lambdaKernel skipping every item past 2^31 without an error: its thread index was a 32-bit
     int, which wraps. It is now 64-bit, so e.g. tools::cuda::MeshToGrid::getHandleAndUDF now finishes the distances
-    of every voxel on grids with more than 2^31 active voxels. MeshToGrid also computed the block count of its launches
-    in 32 bits, which would launch too few blocks past 2^32 items; it is now 64-bit.
+    of every voxel on grids with more than 2^31 active voxels. util::cuda::offsetLambdaKernel had the same issue past
+    2^32, in both its thread index and its offset; both are now 64-bit.

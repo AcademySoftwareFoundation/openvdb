@@ -200,7 +200,7 @@ private:
 
 
     static constexpr unsigned int mNumThreads = 128;// for kernels spawned via lambdaKernel (others may specialize)
-    static uint64_t numBlocks(uint64_t n) {return (n + mNumThreads - 1) / mNumThreads;}
+    static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
     TopologyBuilder<BuildT, ResourceT> mBuilder;
     cudaStream_t                 mStream{0};

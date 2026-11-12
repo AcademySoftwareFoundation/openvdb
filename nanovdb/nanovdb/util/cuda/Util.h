@@ -312,9 +312,9 @@ __global__ void lambdaKernel(const size_t numItems, Func func, Args... args)
 /// @param numItems Problem size
 /// @param offset Offset for thread id
 template<typename Func, typename... Args>
-__global__ void offsetLambdaKernel(size_t numItems, unsigned int offset, Func func, Args... args)
+__global__ void offsetLambdaKernel(size_t numItems, size_t offset, Func func, Args... args)
 {
-    const unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t tid = size_t(blockIdx.x) * blockDim.x + threadIdx.x;
     if (tid >= numItems) return;
     func(tid + offset, args...);
 }// util::cuda::offsetLambdaKernel
