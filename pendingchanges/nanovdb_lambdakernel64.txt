@@ -1,0 +1,5 @@
+NanoVDB:
+  Fixes:
+  - Fixed util::cuda::lambdaKernel skipping every item past 2^31 without an error: its thread index was a 32-bit
+    int, which wraps. util::cuda::offsetLambdaKernel had the same issue past 2^32, in both its thread index and its
+    offset. Both are now 64-bit.
