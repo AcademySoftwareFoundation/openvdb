@@ -1,0 +1,4 @@
+NanoVDB:
+
+  API Changes:
+  - Removed the headers nanovdb/cuda/DeviceBuffer.h, nanovdb/cuda/UnifiedBuffer.h and nanovdb/util/cuda/CudaDeviceBuffer.h, which since 14.0 held only an #error naming the replacement: use GridHandle<cuda::Buffer<std::byte>> (nanovdb/cuda/Buffer.h), with cuda::ManagedResource for managed memory, and cuda::copyTo (nanovdb/cuda/HandleStorage.h) for host-device transfers.
