@@ -718,21 +718,21 @@ TEST_F(TestPointConversion, testComputeVoxelSize)
             positionHandle.set(i, 0, Vec3f(0.0f));
 
         float voxelSize = computeVoxelSize(position, /*points per voxel*/8);
-        EXPECT_NEAR(18.5528f, voxelSize, /*tolerance=*/1e-4);
+        EXPECT_NEAR(2.0f * 23.8f, voxelSize, /*tolerance=*/1e-4);
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1);
-        EXPECT_NEAR(5.51306f, voxelSize, /*tolerance=*/1e-4);
+        EXPECT_NEAR(7.17580f, voxelSize, /*tolerance=*/1e-4);
 
         // test decimal place accuracy
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1, math::Mat4d::identity(), 10);
-        EXPECT_NEAR(5.5130610466f, voxelSize, /*tolerance=*/1e-9);
+        EXPECT_NEAR(7.1758069992f, voxelSize, /*tolerance=*/1e-9);
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1, math::Mat4d::identity(), 1);
-        EXPECT_EQ(5.5f, voxelSize);
+        EXPECT_EQ(7.2f, voxelSize);
 
         voxelSize = computeVoxelSize(position, /*points per voxel*/1, math::Mat4d::identity(), 0);
-        EXPECT_EQ(6.0f, voxelSize);
+        EXPECT_EQ(7.0f, voxelSize);
     }
 
     // test coplanar points (Y=0)
@@ -753,6 +753,26 @@ TEST_F(TestPointConversion, testComputeVoxelSize)
         EXPECT_NEAR(11.696f, voxelSize, /*tolerance=*/1e-4);
     }
 
+    // test nearly coplanar points (Y is tiny but not exactly zero)
+
+    {
+        const size_t n = 32;
+        position.resize(n * n);
+        AttributeWrapper<Vec3f>::Handle positionHandle(position);
+
+        for (size_t i = 0; i < n; ++i)
+            for (size_t j = 0; j < n; ++j)
+                positionHandle.set(i * n + j, 0, Vec3f(float(i), 0.0f, float(j)));
+
+        const float planarSize = computeVoxelSize(position, /*points per voxel*/8);
+
+        for (size_t i = 0; i < n; ++i)
+            for (size_t j = 0; j < n; ++j)
+                positionHandle.set(i * n + j, 0, Vec3f(float(i), 1e-6f * float(i % 2), float(j)));
+
+        EXPECT_NEAR(planarSize, computeVoxelSize(position, /*points per voxel*/8), /*tolerance=*/1e-4);
+    }
+
     // test collinear points (X=0, Y=0)
 
     {
@@ -763,6 +783,24 @@ TEST_F(TestPointConversion, testComputeVoxelSize)
         positionHandle.set(2, 0, Vec3f(0.0f, 0.0f, -10.0f));
         positionHandle.set(3, 0, Vec3f(0.0f, 0.0f, 10.0f));
         positionHandle.set(4, 0, Vec3f(0.0f, 0.0f, 0.0f));
+
+        float voxelSize = computeVoxelSize(position, /*points per voxel*/5);
+        EXPECT_NEAR(20.0f, voxelSize, /*tolerance=*/1e-4);
+
+        voxelSize = computeVoxelSize(position, /*points per voxel*/1);
+        EXPECT_NEAR(8.32034f, voxelSize, /*tolerance=*/1e-4);
+    }
+
+    // test nearly collinear points (X=~0, Y=~0)
+
+    {
+        position.resize(5);
+        AttributeWrapper<Vec3f>::Handle positionHandle(position);
+        positionHandle.set(0, 0, Vec3f(0.0f, 0.0f, 10.0f));
+        positionHandle.set(1, 0, Vec3f(1.0e-6f, 0.0f, -10.0f));
+        positionHandle.set(2, 0, Vec3f(0.0f, 1.0e-6f, -10.0f));
+        positionHandle.set(3, 0, Vec3f(1.0e-6f, 0.0f, 10.0f));
+        positionHandle.set(4, 0, Vec3f(0.0f, 1.0e-6f, 0.0f));
 
         float voxelSize = computeVoxelSize(position, /*points per voxel*/5);
         EXPECT_NEAR(20.0f, voxelSize, /*tolerance=*/1e-4);
@@ -1333,10 +1371,10 @@ TEST_F(TestPointConversion, testExample)
         // remap the position order
 
         std::vector<size_t> remap;
-        remap.push_back(1);
-        remap.push_back(3);
         remap.push_back(0);
         remap.push_back(2);
+        remap.push_back(3);
+        remap.push_back(1);
 
         for (int i = 0; i < 4; i++) {
             EXPECT_NEAR(positions[i].x(), resultingPositions[remap[i]].x(), /*tolerance=*/1e-6);
@@ -1436,10 +1474,10 @@ TEST_F(TestPointConversion, testExample)
         // remap the position order
 
         std::vector<size_t> remap;
-        remap.push_back(1);
-        remap.push_back(3);
         remap.push_back(0);
         remap.push_back(2);
+        remap.push_back(3);
+        remap.push_back(1);
 
         for (int i = 0; i < 4; i++) {
             EXPECT_NEAR(positions[i].x(), resultingPositions[remap[i]].x(), /*tolerance=*/1e-6f);

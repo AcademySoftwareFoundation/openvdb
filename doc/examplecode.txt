@@ -1355,14 +1355,13 @@ int main()
 @endcode
 Output:
 @code
-VoxelSize=3.34716
+VoxelSize=5
 PointCount=4
-Leaf[0, 0, -8]
-* PointIndex=[0] WorldPosition=[-1, 6, -2]
 Leaf[0, 0, 0]
 * PointIndex=[0] WorldPosition=[0, 1, 0]
 * PointIndex=[1] WorldPosition=[1.1, 1.25, 0.06]
 * PointIndex=[2] WorldPosition=[1.5, 3.5, 1]
+* PointIndex=[3] WorldPosition=[-1, 6, -2]
 @endcode
 
 @section sPointsConversion Converting Point Attributes
@@ -1498,12 +1497,11 @@ int main()
 @endcode
 Output:
 @code
-Leaf[0, 0, -8]
-* PointIndex=[0] WorldPosition=[-1, 6, -2] Radius=0.2
 Leaf[0, 0, 0]
 * PointIndex=[0] WorldPosition=[0, 1, 0] Radius=0.0999924
 * PointIndex=[1] WorldPosition=[1.1, 1.25, 0.06] Radius=0.499992
 * PointIndex=[2] WorldPosition=[1.5, 3.5, 1] Radius=0.149996
+* PointIndex=[3] WorldPosition=[-1, 6, -2] Radius=0.2
 @endcode
 
 @section sPointsGeneration Random Point Generation
