@@ -478,11 +478,11 @@ struct SignBarrierFunctor
         const float*            dSDF,        // signed outside the barrier, unsigned in it
         float                   isoValue,    // world
         float                   voxelSize,   // world
-        const uint32_t*         dTriangleIndex,      // nearest-triangle index sidecar (original grid)
+        const uint32_t*         dTriangleIndex,      // nearest triangle of each voxel slot of dGrid
         const nanovdb::Vec3f*   dPoints,     // mesh vertices, WORLD space
         const nanovdb::Vec3i*   dTriangles,  // triangle vertex indices
         nanovdb::Map            map,          // world<->index transform (by value)
-        float                   isoValueIndex,// surface signed = { udf == isoValue }, INDEX units
+        float                   isoValueIndex,// isoValue in voxels
         uint8_t*                dNegate)      // set to 1 for each interior barrier voxel
     {
         const int leafID = blockIdx.x, n = threadIdx.x;
@@ -645,8 +645,8 @@ void MeshToSDF<BuildT, ResourceT>::processSurface(uint32_t surfaceID)
 {
     const auto* dOriginalGrid = mGridHandle.template deviceGrid<BuildT>();
 
-    // The distances of this surface's voxels, unsigned until the barrier signing below: the grid's own when
-    // there is one surface, else a copy indexed by the surface's grid
+    // The distances of this surface's voxels, unsigned until the signing below: the grid's own when there is
+    // one surface, else a copy indexed by the surface's grid. Likewise the triangle indices.
     BufferT<float>    surfaceSDF(mStream, this->ref(), 0, nanovdb::cuda::noInit);
     BufferT<uint32_t> surfaceTriangleIndex(mStream, this->ref(), 0, nanovdb::cuda::noInit);
     const GridT*    dGrid          = dOriginalGrid;
@@ -720,13 +720,11 @@ namespace sdf::detail {
 /// @note The enclosing count is the surface depth plus its local inside state.
 struct ResolveNestingFunctor
 {
-    __device__ void operator()(size_t v, const uint32_t* dSurfaceLabel, const uint32_t* dDepth,
-                               uint32_t surfaceCount, bool evenOdd, float* dSDF) const
+    __device__ void operator()(size_t v, const uint32_t* dSurfaceLabel, const uint32_t* dDepth, bool evenOdd,
+                               float* dSDF) const
     {
         if (v == 0) return;                                  // slot 0 is the background
-        const uint32_t s = dSurfaceLabel[v];
-        if (s >= surfaceCount) return;
-        const uint32_t enclosing = dDepth[s] + (signbit(dSDF[v]) ? 1u : 0u);
+        const uint32_t enclosing = dDepth[dSurfaceLabel[v]] + (signbit(dSDF[v]) ? 1u : 0u);
         const bool interior = evenOdd ? ((enclosing & 1u) != 0u) : (enclosing != 0u);
         const float m = fabsf(dSDF[v]);
         dSDF[v] = interior ? -m : m;
@@ -744,7 +742,7 @@ void MeshToSDF<BuildT, ResourceT>::resolveSigns()
     static constexpr unsigned int threadsPerBlock = 256;
     util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(activeCount + 1, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
         activeCount + 1, sdf::detail::ResolveNestingFunctor{}, mSurfaceLabels.data(),
-        mNestingDepth.data(), mSurfaceCount, mNestingRule == NestingRule::EvenOdd, reinterpret_cast<float*>(mSDF.data()));
+        mNestingDepth.data(), mNestingRule == NestingRule::EvenOdd, reinterpret_cast<float*>(mSDF.data()));
     cudaCheckError();
 }
 
