@@ -172,6 +172,7 @@ private:
 
     // Steps of processSurface().
     HandleT pruneBarrier(const GridT* dGrid, const float* dUDF);
+    BufferT<unsigned long long> findExteriorLabel(const GridT* dDerivedGrid, const uint32_t* dVoxelLabel);
     void signNonBarrierComponents(const GridT* dGrid, const GridT* dDerivedGrid, const uint32_t* dVoxelLabel,
                                   float* dSDF);
     void signBarrier(const GridT* dGrid, float* dSDF, const uint32_t* dTriangleIndex);
@@ -377,6 +378,22 @@ struct SignNonBarrierFunctor
 
 } // namespace sdf::detail
 
+/// @brief Find the exterior component of the barrier-free grid @a dDerivedGrid, which must have a leaf. Returns
+///        the key of FindExteriorLabelFunctor on the device; its low 32 bits are the component label.
+template <typename BuildT, typename ResourceT>
+typename MeshToSDF<BuildT, ResourceT>::template BufferT<unsigned long long>
+MeshToSDF<BuildT, ResourceT>::findExteriorLabel(const GridT* dDerivedGrid, const uint32_t* dVoxelLabel)
+{
+    const uint32_t leaves = TraitsT::getTreeData(dDerivedGrid, mStream).mNodeCount[0];
+    BufferT<unsigned long long> minKey(mStream, this->ref(), 1, nanovdb::cuda::noInit);
+    cudaCheck(cudaMemsetAsync(minKey.data(), 0xFF, sizeof(unsigned long long), mStream));
+    using FunctorT = sdf::detail::FindExteriorLabelFunctor<BuildT>;
+    util::cuda::operatorKernel<FunctorT><<<leaves, FunctorT::MaxThreadsPerBlock, 0, mStream>>>(
+        dDerivedGrid, dVoxelLabel, minKey.data());
+    cudaCheckError();
+    return minKey;
+} // MeshToSDF<BuildT, ResourceT>::findExteriorLabel
+
 template <typename BuildT, typename ResourceT>
 void MeshToSDF<BuildT, ResourceT>::signNonBarrierComponents(const GridT* dGrid, const GridT* dDerivedGrid,
                                                             const uint32_t* dVoxelLabel, float* dSDF)
@@ -384,17 +401,10 @@ void MeshToSDF<BuildT, ResourceT>::signNonBarrierComponents(const GridT* dGrid, 
     const uint32_t leaves = TraitsT::getTreeData(dDerivedGrid, mStream).mNodeCount[0];
     if (leaves == 0) return;
 
-    BufferT<unsigned long long> minKeyBuffer(mStream, this->ref(), 1, nanovdb::cuda::noInit);
-    auto* dMinKey = minKeyBuffer.data();
-    cudaCheck(cudaMemsetAsync(dMinKey, 0xFF, sizeof(unsigned long long), mStream));
-    using FindExteriorFunctorT = sdf::detail::FindExteriorLabelFunctor<BuildT>;
-    util::cuda::operatorKernel<FindExteriorFunctorT><<<leaves, FindExteriorFunctorT::MaxThreadsPerBlock, 0, mStream>>>(
-        dDerivedGrid, dVoxelLabel, dMinKey);
-    cudaCheckError();
-
+    const auto minKey = findExteriorLabel(dDerivedGrid, dVoxelLabel);
     using SignFunctorT = sdf::detail::SignNonBarrierFunctor<BuildT>;
     util::cuda::operatorKernel<SignFunctorT><<<leaves, SignFunctorT::MaxThreadsPerBlock, 0, mStream>>>(
-        dDerivedGrid, dVoxelLabel, dMinKey, dGrid, dSDF);
+        dDerivedGrid, dVoxelLabel, minKey.data(), dGrid, dSDF);
     cudaCheckError();
 } // MeshToSDF<BuildT, ResourceT>::signNonBarrierComponents
 
