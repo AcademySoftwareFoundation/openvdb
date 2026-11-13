@@ -5346,9 +5346,18 @@ TEST(TestNanoVDBCUDA, PartitionGrid_ValueOnIndex)
     nanovdb::cuda::Buffer<uint32_t> labels(cudaStream_t(0), hostLabels.size(), nanovdb::cuda::noInit);
     cudaCheck(cudaMemcpy(labels.data(), hostLabels.data(), labels.size_bytes(), cudaMemcpyHostToDevice));
 
-    nanovdb::tools::cuda::PartitionGrid<BuildT> partitioner(inputGrid, labels.data(), labelCount);
-    auto outputs = partitioner.getHandles<BufferT>();
+    // The same labels narrowed to uint16_t: the background slot becomes 0xFFFF, still outside [0, labelCount)
+    const std::vector<uint16_t> hostLabels16(hostLabels.begin(), hostLabels.end());
+    nanovdb::cuda::Buffer<uint16_t> labels16(cudaStream_t(0), hostLabels16.size(), nanovdb::cuda::noInit);
+    cudaCheck(cudaMemcpy(labels16.data(), hostLabels16.data(), labels16.size_bytes(), cudaMemcpyHostToDevice));
+
+    nanovdb::tools::cuda::PartitionGrid<BuildT> partitioner(inputGrid);
+    auto outputs = partitioner.getHandles<BufferT>(labels.data(), labelCount);
+    auto outputs16 = partitioner.getHandles<BufferT>(labels16.data(), labelCount);
     ASSERT_EQ(labelCount, outputs.size());
+    ASSERT_EQ(labelCount, outputs16.size());
+    // A corrupt count, here an underflowed ~0u, is rejected before the histogram's int level count wraps
+    EXPECT_THROW(partitioner.getHandles<BufferT>(labels.data(), ~0u), std::runtime_error);
     for (uint32_t l = 0; l < labelCount; ++l) {
         SCOPED_TRACE(l);
         auto hostOutput = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(outputs[l], cudaStream_t(0));
@@ -5362,5 +5371,9 @@ TEST(TestNanoVDBCUDA, PartitionGrid_ValueOnIndex)
                 EXPECT_TRUE(acc.isActive(points[i]));
             }
         EXPECT_EQ(count, grid->activeVoxelCount());
+        // The label type must not change the outputs
+        auto hostOutput16 = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(outputs16[l], cudaStream_t(0));
+        ASSERT_EQ(hostOutput.bufferSize(), hostOutput16.bufferSize());
+        EXPECT_EQ(0, std::memcmp(hostOutput.data(), hostOutput16.data(), hostOutput.bufferSize()));
     }
 }// PartitionGrid_ValueOnIndex
