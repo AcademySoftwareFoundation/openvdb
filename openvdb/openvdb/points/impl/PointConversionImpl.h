@@ -738,15 +738,18 @@ computeVoxelSize(  const PositionWrapper& positions,
 
     double volume = bbox.volume();
 
-    // handle points that are collinear or coplanar by expanding the volume
+    // handle points that are (nearly) collinear or (nearly) coplanar by expanding the volume
+    {
+        const Vec3d extents = bbox.extents().sorted().reversed();
 
-    if (math::isApproxZero(volume)) {
-        Vec3d extents = bbox.extents().sorted().reversed();
-        if (math::isApproxZero(extents[1])) {
-            // colinear (maxExtent^3)
+        const double collinearVoxelSize = extents[0] / targetVoxelCount;
+        const double coplanarVoxelSizeSqr = extents[0]*extents[1] / targetVoxelCount;
+
+        if (extents[1] < collinearVoxelSize) {
+            // collinear (maxExtent^3)
             volume = extents[0]*extents[0]*extents[0];
         }
-        else {
+        else if (extents[2]*extents[2] < coplanarVoxelSizeSqr) {
             // coplanar (maxExtent*nextMaxExtent^2)
             volume = extents[0]*extents[1]*extents[1];
         }
