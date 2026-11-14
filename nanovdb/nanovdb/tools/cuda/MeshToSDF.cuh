@@ -790,6 +790,13 @@ namespace sdf::detail {
 
 /// @brief Mark in @a dFloor the interior voxels whose distance from the requested isosurface is below
 ///        @a interiorFloor and that have no exterior face neighbour: IsoMagnitudeFunctor floors them.
+/// @details With isoValue > 0, {udf == isoValue} also passes through the interior, e.g. at depth isoValue inside a
+///          closed mesh. Both sides of such a sheet are interior, so no surface lies there, yet the distance
+///          |udf - isoValue| falls to zero across it and would let a contouring or redistancing pass put a surface
+///          back. Flooring the interior voxels near it removes these near-zero values. A voxel with an exterior face
+///          neighbour is left as is: marching cubes places a crossing between face neighbours of opposite sign, so
+///          its small distance is that of the signed surface. The floor removes only the near-zero values; the other
+///          interior distances inside the mesh remain distances to the interior sheet, not to the signed surface.
 /// @note The distances are only read here, so no thread reads a distance that another thread writes.
 template <typename BuildT>
 struct IsoFloorFunctor
