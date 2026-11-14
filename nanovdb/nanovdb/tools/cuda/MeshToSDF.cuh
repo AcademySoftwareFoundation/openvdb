@@ -99,7 +99,7 @@ public:
     void setVerbose(int level = 1) { mVerbose = level; }
 
     /// @brief Set desired width of the narrow band
-    /// @param bandWidth Narrow band width in cell units
+    /// @param bandWidth Narrow band width in voxels
     void setNarrowBandWidth(float bandWidth = 3.f) { mBandWidth = bandWidth; }
 
     /// @brief Policy for signing voxels in the surface barrier.
@@ -156,8 +156,8 @@ public:
         mDeviceSurfaceGrids.destroy();
         mNearestTriangle.destroy();
 
-        if (mVerbose==1) mTimer.start("Resolving signs on the original grid");
-        resolveSigns();
+        if (mVerbose==1) mTimer.start("Applying the nesting rule");
+        applyNestingRule();
         if (mVerbose==1) mTimer.stop();
 
         mSurfaceLabels.destroy();
@@ -200,7 +200,7 @@ private:
     void accumulateNesting(const GridT* dGrid, const float* dSDF, SurfaceLabelT surfaceID);
 
     // Stage 4: with several surfaces, compose their signs by the nesting rule.
-    void resolveSigns();
+    void applyNestingRule();
 
     // Stage 5: with a nonzero iso value, convert the distances from the mesh to distances from the signed surface.
     void finalizeDistances();
@@ -226,7 +226,7 @@ private:
     // "Per voxel slot" below: one entry per active voxel, indexed like the grid's values, plus slot 0 for the
     // background.
     HandleT                     mGridHandle;
-    typename TreeT::DataType    mTreeData{};    // host copy of the rasterized grid's tree header, read by rasterize()
+    typename TreeT::DataType    mTreeData{};    // host copy of the rasterized grid's tree header, set by rasterize()
     BufferT<std::byte>          mSDF;           // float per voxel slot: the UDF from MeshToGrid, signed in place
     BufferT<std::byte>          mNearestTriangle; // uint32_t per voxel slot, as returned by MeshToGrid
     BufferT<SurfaceLabelT>      mSurfaceLabels; // surface of each voxel slot, when there are several surfaces
@@ -306,7 +306,7 @@ __hostdev__ inline bool isBarrier(float udf, float isoValue, float voxelSize)
 
 /// @brief Retain the voxels outside the barrier.
 template <typename BuildT>
-struct UDFBarrierPruneMaskFunctor
+struct BarrierPruneMaskFunctor
 {
     static constexpr int MaxThreadsPerBlock         = NanoLeaf<BuildT>::SIZE / 2;
     static constexpr int MinBlocksPerMultiprocessor = 1;
@@ -339,7 +339,7 @@ template <typename BuildT, typename ResourceT>
 typename MeshToSDF<BuildT, ResourceT>::HandleT
 MeshToSDF<BuildT, ResourceT>::pruneBarrier(const GridT* dGrid, const float* dUDF)
 {
-    using FunctorT = sdf::detail::UDFBarrierPruneMaskFunctor<BuildT>;
+    using FunctorT = sdf::detail::BarrierPruneMaskFunctor<BuildT>;
 
     const uint32_t leaves = TraitsT::getTreeData(dGrid, mStream).mNodeCount[0];
 
@@ -359,7 +359,15 @@ namespace sdf::detail {
 
 // Stage 3b: non-barrier signing.
 
-/// @brief Find the component containing the minimum-x voxel, which is exterior.
+/// @brief Find the component containing the minimum-x voxel, which is exterior: the band reaches bandWidth voxels
+///        beyond the signed surface and the barrier only BarrierHalfWidth, so the voxel of least x lies at a smaller x
+///        than any point of the signed surface, where that closed surface cannot enclose it.
+/// @details Each active voxel packs its x and its component label into one 64-bit key, x in the high 32 bits and
+///          the label in the low 32 bits, and @a dMinKey becomes the minimum of all the keys. With x in the high
+///          bits, the minimum key belongs to a voxel of least x, so its low 32 bits are the exterior label: one
+///          atomicMin keeps the x and the label of the same voxel together. Voxels tied on the least x are all
+///          exterior, so the smaller label the tie leaves is the exterior label too. x is shifted by 2^31 so that
+///          the unsigned order of the keys is the signed order of x.
 /// @note Each warp reduces its keys first, so only one thread per warp updates @a dMinKey.
 template <typename BuildT>
 struct FindExteriorLabelFunctor
@@ -375,10 +383,10 @@ struct FindExteriorLabelFunctor
         unsigned long long key = ~0ull;  // inactive voxels take part in the reduction with the largest key
         if (leaf.isActive(uint32_t(n))) {
             const uint64_t v = leaf.getValue(uint32_t(n));
-            const nanovdb::Coord ijk = leaf.origin() + NanoLeaf<BuildT>::OffsetToLocalCoord(uint32_t(n));
-            const uint32_t label = dVoxelLabel[v];                            // component label
-            const uint32_t ux  = uint32_t(int64_t(ijk[0]) + (int64_t(1) << 31));  // x, shifted to unsigned-comparable
-            key = (static_cast<unsigned long long>(ux) << 32) | label;
+            const nanovdb::Coord ijk = leaf.offsetToGlobalCoord(uint32_t(n));
+            const uint32_t label = dVoxelLabel[v];
+            const uint32_t ux    = uint32_t(int64_t(ijk[0]) + (int64_t(1) << 31));  // x + 2^31
+            key = (static_cast<unsigned long long>(ux) << 32) | label;           // (x, label) packed
         }
         for (int offset = 16; offset > 0; offset >>= 1)
             key = min(key, __shfl_down_sync(0xFFFFFFFFu, key, offset));
@@ -533,14 +541,15 @@ struct SignBarrierFunctor
         __syncthreads();
 
         // The anchor geometry of the leaf and a one-voxel halo around it: local coordinates x, y, z in [-1, 8] at
-        // cell (x+1)*HaloDim^2 + (y+1)*HaloDim + (z+1).
+        // index (x+1)*HaloDim^2 + (y+1)*HaloDim + (z+1).
         static constexpr int HaloDim = LeafT::DIM + 2, HaloSize = HaloDim * HaloDim * HaloDim;
         __shared__ nanovdb::Vec3f sBase[HaloSize], sDir[HaloSize];
         __shared__ bool           sAnchor[HaloSize];
         for (int c = n; c < HaloSize; c += MaxThreadsPerBlock) {
             const int x = c / (HaloDim * HaloDim) - 1, y = c / HaloDim % HaloDim - 1, z = c % HaloDim - 1;
+            // x >> 3 = floor(x / 8): -1 in the leaf below, 0 in this leaf, 1 in the leaf above; likewise y and z.
             const LeafT*   haloLeaf   = sLeaves[((x >> 3) + 1) * 9 + ((y >> 3) + 1) * 3 + ((z >> 3) + 1)];
-            const uint32_t haloOffset = (uint32_t(x & 7) << 6) | (uint32_t(y & 7) << 3) | uint32_t(z & 7);
+            const uint32_t haloOffset = LeafT::CoordToOffset(nanovdb::Coord(x, y, z));
             sAnchor[c] = haloLeaf && haloLeaf->isActive(haloOffset) &&
                          anchorGeometry(haloLeaf->getValue(haloOffset), origin.offsetBy(x, y, z), dSDF, isoValue,
                                         voxelSize, dNearestTriangle, dPoints, dTriangles, map, isoValueIndex,
@@ -550,9 +559,10 @@ struct SignBarrierFunctor
         if (!barrier) return;  // non-barrier: signed already
 
         const nanovdb::Coord local = LeafT::OffsetToLocalCoord(uint32_t(n));
-        const nanovdb::Vec3f q(float(origin[0] + local[0]), float(origin[1] + local[1]), float(origin[2] + local[2]));
+        const nanovdb::Vec3f q     = leaf.offsetToGlobalCoord(uint32_t(n)).asVec3s();
 
-        // This voxel, at q, is a barrier voxel, never an anchor, so all 27 cells around it can be tested.
+        // This voxel, at q, is a barrier voxel, never an anchor, so all 27 voxels around it can be tested. The
+        // halo index of local + (dx-1, dy-1, dz-1) is that of local + (dx, dy, dz) minus one per axis.
         bool exterior = false;
         for (int dx = 0; dx < 3 && !exterior; ++dx)
             for (int dy = 0; dy < 3 && !exterior; ++dy)
@@ -703,7 +713,9 @@ void MeshToSDF<BuildT, ResourceT>::processSurface(SurfaceLabelT surfaceID)
     const auto* dOriginalGrid = mGridHandle.template deviceGrid<BuildT>();
 
     // The distances of this surface's voxels, unsigned until the signing below: the grid's own when there is
-    // one surface, else a copy indexed by the surface's grid. Likewise the triangle indices.
+    // one surface, else a copy indexed by the surface's grid. Likewise the triangle indices. The voxels of a
+    // surface's grid are all in the original grid, so the injection writes every slot of the copies but slot 0, the
+    // background; the memsets only give slot 0 a defined value.
     BufferT<float>    surfaceSDF(mStream, this->ref(), 0, nanovdb::cuda::noInit);
     BufferT<uint32_t> surfaceNearestTriangle(mStream, this->ref(), 0, nanovdb::cuda::noInit);
     const GridT*    dGrid            = dOriginalGrid;
@@ -748,6 +760,7 @@ void MeshToSDF<BuildT, ResourceT>::processSurface(SurfaceLabelT surfaceID)
 
     signBarrier(dGrid, dSDF, dNearestTriangle);
 
+    // With one surface, the distances signed above are the grid's own, and no other surface can nest with it.
     if (mSurfaceCount == 1) return;
 
     accumulateNesting(dGrid, dSDF, surfaceID);
@@ -766,9 +779,10 @@ namespace sdf::detail {
 
 // Stage 4: nesting rule.
 
-/// @brief Compose per-surface signs under the selected nesting rule.
-/// @note The enclosing count is the surface depth plus its local inside state.
-struct ResolveNestingFunctor
+/// @brief Sign each voxel by the chosen nesting rule, from the sign it has for its own surface.
+/// @note A voxel is enclosed by the other surfaces that enclose its own surface, dDepth[s], plus its own surface if it
+///       is inside it.
+struct ApplyNestingRuleFunctor
 {
     __device__ void operator()(size_t v, const uint32_t* dSurfaceLabel, const uint32_t* dDepth, bool evenOdd,
                                float* dSDF) const
@@ -783,7 +797,7 @@ struct ResolveNestingFunctor
 } // namespace sdf::detail
 
 template <typename BuildT, typename ResourceT>
-void MeshToSDF<BuildT, ResourceT>::resolveSigns()
+void MeshToSDF<BuildT, ResourceT>::applyNestingRule()
 {
     if (mSurfaceCount <= 1) return;
 
@@ -791,10 +805,10 @@ void MeshToSDF<BuildT, ResourceT>::resolveSigns()
     static constexpr unsigned int threadsPerBlock = 256;
     const auto blocks = util::cuda::blocksPerGrid(activeCount + 1, threadsPerBlock);
     util::cuda::lambdaKernel<<<blocks, threadsPerBlock, 0, mStream>>>(
-        activeCount + 1, sdf::detail::ResolveNestingFunctor{}, mSurfaceLabels.data(), mNestingDepth.data(),
+        activeCount + 1, sdf::detail::ApplyNestingRuleFunctor{}, mSurfaceLabels.data(), mNestingDepth.data(),
         mNestingRule == NestingRule::EvenOdd, reinterpret_cast<float*>(mSDF.data()));
     cudaCheckError();
-} // MeshToSDF<BuildT, ResourceT>::resolveSigns
+} // MeshToSDF<BuildT, ResourceT>::applyNestingRule
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -864,7 +878,7 @@ void MeshToSDF<BuildT, ResourceT>::finalizeDistances()
 {
     if (mIsoValue == 0.f) return;
 
-    // Match the barrier used during signing.
+    // The barrier half-width. TODO: state why the floor must be this value.
     const float interiorFloor = sdf::detail::BarrierHalfWidth * mVoxelSize;
 
     // The floor test reads the signs of the neighbours, so the floored voxels are marked first, and a second kernel
