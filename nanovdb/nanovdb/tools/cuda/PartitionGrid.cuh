@@ -6,7 +6,7 @@
 
     \authors JaeHyun Lee and Efty Sifakis
 
-    \brief Partitions a NanoVDB index grid in two by a leaf-indexed retain mask, or into one grid per label
+    \brief Partitions a NanoVDB ValueOnIndex grid in two by a leaf-indexed selection mask, or into one grid per label
 
     \warning The header file contains cuda device code so be sure
              to only include it in .cu files (or other .cuh files)
@@ -42,13 +42,13 @@ namespace nanovdb {
 
 namespace tools::cuda {
 
-/// @brief Splits the active voxels of an index grid in two, by a retain mask with one Mask<3> per source leaf.
-/// @details Output 0 holds the active voxels whose retain bit is on, and output 1 the other active voxels.
-///          Together they hold every active voxel exactly once. Retain bits of inactive voxels are ignored
+/// @brief Splits the active voxels of a ValueOnIndex grid in two, by a selection mask with one Mask<3> per source leaf.
+/// @details Output 0 holds the active voxels whose selection bit is on, and output 1 the other active voxels.
+///          Together they hold every active voxel exactly once. Selection bits of inactive voxels are ignored
 ///          on both sides. An output that keeps no voxel is a valid empty grid.
 ///
 ///          Both outputs are built in one pass: the root table is computed once, and each kernel that reads the
-///          retain mask writes both outputs.
+///          selection mask writes both outputs.
 /// @note Scratch memory is about twice that of PruneGrid, since each output has its own TopologyBuilder, whose
 ///       dense lower-node masks take Mask<5>::SIZE Mask<4>s (16 MB) per root tile of the source grid.
 /// @tparam BuildT NanoVDB build type; only ValueOnIndex is supported.
@@ -68,7 +68,7 @@ class PartitionGridBinary
 public:
     /// @brief Constructor
     /// @param d_srcGrid source device grid to be partitioned
-    /// @param d_srcLeafMask retain mask: one Mask<3> per source leaf, in leaf order
+    /// @param d_srcLeafMask selection mask: one Mask<3> per source leaf, in leaf order
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
     /// @param resource resource instance all device scratch is allocated from;
     ///        must outlive this operator (defaults to the per-type default resource)
@@ -88,12 +88,12 @@ public:
         for (auto& builder : mBuilders) builder.mChecksum = mode;
     }
 
-    /// @brief The two outputs: [0] the voxels whose retain bit is on, [1] the rest.
+    /// @brief The two outputs: [0] the voxels whose selection bit is on, [1] the rest.
     /// @tparam BufferT Buffer type of the returned grid handles.
     /// @param pool Prototype buffer the outputs take their resource from.
     /// @note The stream is synchronized before this method returns.
     /// @throw std::runtime_error if the grid has active tiles.
-    template<typename BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>>
+    template<typename BufferT = nanovdb::cuda::Buffer<std::byte>>
     std::array<GridHandle<BufferT>, 2> getHandles(const BufferT& pool = BufferT());
 
     /// @brief Resource form of getHandles: the outputs allocate through this
@@ -111,7 +111,7 @@ private:
 
     void partitionInternalNodes();
 
-    void processGridTreeRoot(BuilderT& builder);
+    void processGridTreeRoot();
 
     void partitionLeafNodes();
 
@@ -153,7 +153,7 @@ std::array<GridHandle<BufferT>, 2> PartitionGridBinary<BuildT, ResourceT>::getHa
     auto buffer1 = mBuilders[1].getBuffer(pool, mStream);
 
     if (mVerbose==1) mTimer.restart("Processing grid/tree/root");
-    for (auto& builder : mBuilders) processGridTreeRoot(builder);
+    processGridTreeRoot();
 
     if (mVerbose==1) mTimer.restart("Processing upper nodes");
     for (auto& builder : mBuilders) builder.processUpperNodes(mStream);
@@ -220,12 +220,14 @@ void PartitionGridBinary<BuildT, ResourceT>::partitionInternalNodes()
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT, typename ResourceT>
-void PartitionGridBinary<BuildT, ResourceT>::processGridTreeRoot(BuilderT& builder)
+void PartitionGridBinary<BuildT, ResourceT>::processGridTreeRoot()
 {
-    // Copies the source GridData (name, map, ...), then resets what the builder owns
-    cudaCheck(cudaMemcpyAsync(&builder.data()->getGrid(), mDeviceSrcGrid->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
-    util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), builder.deviceData());
-    cudaCheckError();
+    // Copies the source GridData (name, map, ...) into each output, then resets what its builder owns
+    for (auto& builder : mBuilders) {
+        cudaCheck(cudaMemcpyAsync(&builder.data()->getGrid(), mDeviceSrcGrid->data(), GridT::memUsage(), cudaMemcpyDeviceToDevice, mStream));
+        util::cuda::lambdaKernel<<<1, 1, 0, mStream>>>(1, topology::detail::BuildGridTreeRootFunctor<BuildT>(), builder.deviceData());
+        cudaCheckError();
+    }
 }// PartitionGridBinary<BuildT, ResourceT>::processGridTreeRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -246,12 +248,15 @@ void PartitionGridBinary<BuildT, ResourceT>::partitionLeafNodes()
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-/// @brief Splits the active voxels of an index grid into one grid per label.
-/// @details Output l holds the active voxels whose label is l, and is a valid empty grid if no voxel has label l.
-///          The labels are split in two at the label that halves the voxel count, by one PartitionGridBinary, and
-///          each side is split again until it holds a single label: labelCount - 1 splits in all, each over the
-///          voxels of its side only. A single label still takes one split, which keeps every voxel: the source
-///          itself is not returned.
+/// @brief Splits the active voxels of a ValueOnIndex grid into one grid per label.
+/// @details Output l holds the active voxels with label l, and is a valid empty grid if there are none. As with the
+///          other topology operators, grids with active tiles are rejected.
+///          The label range is split at the label that halves the voxel count, by one PartitionGridBinary, and each
+///          side again until it holds one label: labelCount - 1 splits, each over its own side's voxels. A single
+///          label still takes one split, since the source itself is never returned.
+///          The labels are given to getHandles, not to the constructor as PartitionGridBinary's mask is: their type
+///          is deduced there, so labels of any unsigned width need no copy, and one operator can apply several
+///          labelings.
 /// @tparam BuildT NanoVDB build type; only ValueOnIndex is supported.
 /// @tparam ResourceT Stream-ordered resource used for all scratch allocations.
 template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
@@ -269,22 +274,14 @@ class PartitionGrid
     using BufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ResourceRef<ResourceT>>;
 
 public:
-    /// @brief Maximum number of labels: the label histogram takes its level count, labelCount + 1, as an int.
-    static constexpr uint32_t MaxLabelCount = uint32_t(std::numeric_limits<int>::max()) - 1;
-
     /// @brief Constructor
-    /// @param d_srcGrid source device grid to be partitioned
-    /// @param d_srcLabels label of each active voxel, indexed by the source grid's value index (leaf.getValue(n)),
-    ///        e.g. the labels of ConnectedComponents. Every active voxel's label must be in [0, labelCount); the
-    ///        other entries do not affect the outputs
-    /// @param labelCount number of labels, and of outputs; at most MaxLabelCount
+    /// @param d_srcGrid source device ValueOnIndex grid, without active tiles
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
     /// @param resource resource instance all device scratch is allocated from;
     ///        must outlive this operator (defaults to the per-type default resource)
-    PartitionGrid(const GridT* d_srcGrid, const uint32_t* d_srcLabels, uint32_t labelCount, cudaStream_t stream = 0,
+    PartitionGrid(const GridT* d_srcGrid, cudaStream_t stream = 0,
                   ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
-        : mStream(stream), mTimer(stream), mResource(&resource), mDeviceSrcGrid(d_srcGrid)
-        , mDeviceSrcLabels(d_srcLabels), mLabelCount(labelCount) {}
+        : mStream(stream), mTimer(stream), mResource(&resource), mDeviceSrcGrid(d_srcGrid) {}
 
     /// @brief Toggle on and off verbose mode
     /// @param level Verbose level: 0=quiet, 1=timing, 2=benchmarking
@@ -294,22 +291,31 @@ public:
     /// @param mode Mode of checksum computation
     void setChecksum(CheckMode mode = CheckMode::Disable) { mChecksum = mode; }
 
-    /// @brief The outputs: [l] the voxels whose label is l.
+    /// @brief The outputs: [l] holds the voxels with label l.
     /// @tparam BufferT Buffer type of the returned grid handles.
-    /// @param pool Prototype buffer the outputs, and the grids split on the way, take their resource from.
+    /// @tparam LabelT Unsigned integer label type, deduced from d_srcLabels.
+    /// @param d_srcLabels device labels, one per value index (the grid's value count), e.g. from ConnectedComponents.
+    ///        Active voxels' labels must be in [0, labelCount), which is not checked. Slot 0 (the background) is
+    ///        never read
+    /// @param labelCount number of labels, and of outputs
+    /// @param pool prototype buffer whose resource allocates the outputs, and the grids split on the way
     /// @note The stream is synchronized before this method returns.
-    /// @throw std::runtime_error if labelCount exceeds MaxLabelCount, or if the grid has active tiles.
-    template<typename BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>>
-    std::vector<GridHandle<BufferT>> getHandles(const BufferT& pool = BufferT());
+    /// @throw std::runtime_error if labelCount + 1 does not fit in an int, or if the grid has active tiles.
+    template<typename BufferT = nanovdb::cuda::Buffer<std::byte>, typename LabelT>
+    std::vector<GridHandle<BufferT>> getHandles(const LabelT* d_srcLabels, uint32_t labelCount,
+                                                const BufferT& pool = BufferT());
 
     /// @brief Resource form of getHandles: the outputs, and the grids split on the way, allocate through this
     ///        builder's resource, the one its scratch uses, on its stream.
+    ///        d_srcLabels and labelCount are as for getHandles.
     /// @return handles over cuda::Buffer<std::byte, ResourceRef<ResourceT>>,
     ///         which borrow the resource: it must outlive the handles
-    std::vector<GridHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>>> build()
+    template<typename LabelT>
+    std::vector<GridHandle<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>>>
+    build(const LabelT* d_srcLabels, uint32_t labelCount)
     {
         using BufferT = nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::ResourceRef<ResourceT>>;
-        return this->getHandles(BufferT(mStream, this->ref(), 0, nanovdb::cuda::noInit));
+        return this->getHandles(d_srcLabels, labelCount, BufferT(mStream, this->ref(), 0, nanovdb::cuda::noInit));
     }
 
 private:
@@ -317,20 +323,22 @@ private:
     // --- Pipeline stages (run in order by getHandles). ---
 
     // Stage 1: the voxel count of each label -> mLabelOffsets.
-    void countLabels();
+    template<typename LabelT>
+    void countLabels(const LabelT* d_srcLabels, uint32_t labelCount, uint64_t activeVoxelCount);
 
-    // Stage 2: the labels [lo, hi), whose voxels the grid of handle holds, split recursively into outputs[lo, hi),
-    // which are appended in label order.
-    template<typename BufferT>
-    void split(GridHandle<BufferT> handle, uint32_t lo, uint32_t hi, const BufferT& pool,
-               std::vector<GridHandle<BufferT>>& outputs);
+    // Stage 2: splits the grid of handle, holding the voxels of labels [lo, hi), recursively into outputs[lo, hi),
+    // appended in label order.
+    template<typename LabelT, typename BufferT>
+    void split(const LabelT* d_srcLabels, GridHandle<BufferT> handle,
+               uint32_t lo, uint32_t hi, const BufferT& pool, std::vector<GridHandle<BufferT>>& outputs);
 
     // The label that splits [lo, hi) in two, by voxel count.
     uint32_t pivotLabel(uint32_t lo, uint32_t hi) const;
 
     // One split: [0] the voxels of d_grid with a label below pivot, [1] the rest.
-    template<typename BufferT>
-    std::array<GridHandle<BufferT>, 2> splitAt(const GridT* d_grid, uint32_t pivot, const BufferT& pool);
+    template<typename LabelT, typename BufferT>
+    std::array<GridHandle<BufferT>, 2> splitAt(const LabelT* d_srcLabels, const GridT* d_grid, uint32_t pivot,
+                                               const BufferT& pool);
 
     /// @brief Borrowed handle to the injected resource, for the scratch allocated after construction.
     nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource); }
@@ -341,40 +349,49 @@ private:
     CheckMode             mChecksum{CheckMode::Disable};
     ResourceT*            mResource;     // non-owning; all device scratch routes through this instance
     const GridT*          mDeviceSrcGrid;
-    const uint32_t*       mDeviceSrcLabels;
-    uint32_t              mLabelCount;
-    std::vector<uint64_t> mLabelOffsets; // [l], for l in [0, labelCount]: the number of label entries below l
+    // Exclusive prefix sum of the label counts, set by countLabels: mLabelOffsets[l], l = 0, ..., labelCount, is the
+    // number of active voxels with a label below l
+    std::vector<uint64_t> mLabelOffsets;
 };// tools::cuda::PartitionGrid<BuildT, ResourceT>
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT, typename ResourceT>
-template<typename BufferT>
-std::vector<GridHandle<BufferT>> PartitionGrid<BuildT, ResourceT>::getHandles(const BufferT& pool)
+template<typename BufferT, typename LabelT>
+std::vector<GridHandle<BufferT>>
+PartitionGrid<BuildT, ResourceT>::getHandles(const LabelT* d_srcLabels, uint32_t labelCount, const BufferT& pool)
 {
-    if (mLabelCount > MaxLabelCount)
-        throw std::runtime_error("nanovdb::tools::cuda::PartitionGrid: labelCount exceeds MaxLabelCount");
+    static_assert(std::is_unsigned<LabelT>::value, "PartitionGrid labels must be unsigned integers");
+    // CUB's histogram takes the level count, labelCount + 1, as an int. Memory runs out long before a valid
+    // labelCount gets there, so this only catches a corrupt one, such as an underflowed ~0u
+    if (labelCount >= uint32_t(std::numeric_limits<int>::max()))
+        throw std::runtime_error("nanovdb::tools::cuda::PartitionGrid: labelCount + 1 does not fit in an int");
+    // Active tiles are rejected here, whatever labelCount, as the other topology operators do. An active tile has
+    // a value index, so it could carry a label, but only leaf voxels are partitioned
+    const TreeData srcTreeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid, mStream);
+    if (srcTreeData.mTileCount[0] || srcTreeData.mTileCount[1] || srcTreeData.mTileCount[2])
+        throw std::runtime_error("Topological operations not supported on grids with value tiles");
     std::vector<GridHandle<BufferT>> outputs;
-    if (mLabelCount == 0) return outputs;
-    outputs.reserve(mLabelCount);
+    if (labelCount == 0) return outputs;
+    outputs.reserve(labelCount);
 
-    if (mLabelCount == 1) {
-        // Every voxel has label 0, but the source is not ours to return: rebuild it as the voxels with a label
-        // below labelCount, i.e. all of them
+    if (labelCount == 1) {
+        // The one output is the whole source, which is not ours to return: rebuild it as the lower side of a split
+        // at labelCount. No counts are needed, as there is no pivot to choose
         if (mVerbose==1) mTimer.start("\nSplitting");
-        outputs.push_back(std::move(splitAt(mDeviceSrcGrid, mLabelCount, pool)[0]));
+        outputs.push_back(std::move(splitAt(d_srcLabels, mDeviceSrcGrid, labelCount, pool)[0]));
     } else {
         if (mVerbose==1) mTimer.start("\nCounting labels");
-        countLabels();
+        countLabels(d_srcLabels, labelCount, srcTreeData.mVoxelCount);
         if (mVerbose==1) mTimer.restart("Splitting");
-        // The source is not ours to release, so it is split here, and split() only ever gets grids it owns
-        const uint32_t pivot = pivotLabel(0, mLabelCount);
-        auto halves = splitAt(mDeviceSrcGrid, pivot, pool);
-        split(std::move(halves[0]), 0, pivot, pool, outputs);
-        split(std::move(halves[1]), pivot, mLabelCount, pool, outputs);
+        // split() releases each grid it splits, and the source is not ours to release, so its split is done here
+        const uint32_t pivot = pivotLabel(0, labelCount);
+        auto halves = splitAt(d_srcLabels, mDeviceSrcGrid, pivot, pool);
+        split(d_srcLabels, std::move(halves[0]), 0, pivot, pool, outputs);
+        split(d_srcLabels, std::move(halves[1]), pivot, labelCount, pool, outputs);
     }
 
-    // Checksums of the outputs only: the splits leave them disabled, so the grids released on the way pay none
+    // Only the outputs get checksums: the splits leave them disabled, so the grids released on the way pay none
     if (mChecksum != CheckMode::Disable) {
         if (mVerbose==1) mTimer.restart("Updating checksums");
         for (auto& output : outputs) updateChecksum(output.template deviceGrid<BuildT>(), mChecksum, mStream);
@@ -390,30 +407,32 @@ std::vector<GridHandle<BufferT>> PartitionGrid<BuildT, ResourceT>::getHandles(co
 // Stage 1: the voxel count of each label.
 //
 // One histogram of the labels, computed once: a split never changes a voxel's label, only which grid holds it, so
-// the counts hold for the whole recursion. Entries outside [0, labelCount), such as the background slot of
-// ConnectedComponents labels, are not counted.
+// the counts hold for the whole recursion. Labels outside [0, labelCount) are not counted.
 template<typename BuildT, typename ResourceT>
-void PartitionGrid<BuildT, ResourceT>::countLabels()
+template<typename LabelT>
+void PartitionGrid<BuildT, ResourceT>::countLabels(const LabelT* d_srcLabels, uint32_t labelCount,
+                                                   uint64_t activeVoxelCount)
 {
-    // The labels hold activeVoxelCount + 1 entries: slot 0 (the background), then one per active voxel
-    const uint64_t activeVoxelCount = util::cuda::DeviceGridTraits<BuildT>::getActiveVoxelCount(
-        mDeviceSrcGrid, mStream);
-    BufT<uint32_t> d_counts(mStream, this->ref(), mLabelCount, nanovdb::cuda::noInit);
+    // One label per active voxel, from slot 1: slot 0 (the background) is never read. Without tiles or stats these
+    // are exactly the active voxels' slots, and the reads stay within a sidecar sized to the active voxels anyway
+    // 64-bit counters, since one label may hold more than 2^32 voxels (unsigned long long, which atomicAdd takes)
+    BufT<unsigned long long> d_counts(mStream, this->ref(), labelCount, nanovdb::cuda::noInit);
     nanovdb::cuda::TempPool<ResourceT> tempPool(*mResource);
-    // mLabelCount <= MaxLabelCount, so the level count mLabelCount + 1 fits in an int
-    cudaCheck(cub::DeviceHistogram::HistogramEven(nullptr, tempPool.requestedSize(), mDeviceSrcLabels,
-                                                  d_counts.data(), int(mLabelCount) + 1, 0u, mLabelCount,
-                                                  activeVoxelCount + 1, mStream));
+    // getHandles checked that the level count labelCount + 1 fits in an int. The levels are uint32_t
+    // whatever LabelT is, since labelCount may not fit in LabelT: CUB compares in their common type
+    cudaCheck(cub::DeviceHistogram::HistogramEven(nullptr, tempPool.requestedSize(), d_srcLabels + 1,
+                                                  d_counts.data(), int(labelCount) + 1, 0u, labelCount,
+                                                  activeVoxelCount, mStream));
     tempPool.reallocate(mStream);
-    cudaCheck(cub::DeviceHistogram::HistogramEven(tempPool.data(), tempPool.size(), mDeviceSrcLabels,
-                                                  d_counts.data(), int(mLabelCount) + 1, 0u, mLabelCount,
-                                                  activeVoxelCount + 1, mStream));
+    cudaCheck(cub::DeviceHistogram::HistogramEven(tempPool.data(), tempPool.size(), d_srcLabels + 1,
+                                                  d_counts.data(), int(labelCount) + 1, 0u, labelCount,
+                                                  activeVoxelCount, mStream));
 
-    std::vector<uint32_t> counts(mLabelCount);
+    std::vector<unsigned long long> counts(labelCount);
     cudaCheck(cudaMemcpyAsync(counts.data(), d_counts.data(), d_counts.size_bytes(), cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaStreamSynchronize(mStream));
-    mLabelOffsets.assign(mLabelCount + 1, 0);
-    for (uint32_t l = 0; l < mLabelCount; l++) mLabelOffsets[l + 1] = mLabelOffsets[l] + counts[l];
+    mLabelOffsets.assign(labelCount + 1, 0);
+    for (uint32_t l = 0; l < labelCount; l++) mLabelOffsets[l + 1] = mLabelOffsets[l] + counts[l];
 }// PartitionGrid<BuildT, ResourceT>::countLabels
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -422,16 +441,16 @@ namespace partition::detail {
 
 // Stage 2: recursive bisection of the labels.
 //
-// Each split builds a retain mask of the voxels with a label below the pivot and runs PartitionGridBinary with it.
+// Each split builds a selection mask of the voxels with a label below the pivot and runs PartitionGridBinary with it.
 // Depth first, and a grid is released once it is split, so only the grids on the path from the source and their
 // siblings are alive at once.
 
-/// @brief Retain mask of one leaf of a grid that was split off from a source grid: a voxel is retained when it is
+/// @brief Selection mask of one leaf of a grid that was split off from a source grid: a voxel is selected when it is
 ///        active and its label is below the pivot. The labels are indexed by the source grid's value indices, so a
 ///        voxel's label is read through the source leaf with the same origin, which holds that voxel at the same n.
 ///        One warp per leaf, lane i testing voxels i, i + 32, ..., so that a warp reads the labels of 32 consecutive
 ///        voxels at once.
-template <typename BuildT>
+template <typename BuildT, typename LabelT>
 struct LabelBelowPivotFunctor
 {
     // Intended to be called via nanovdb::util::cuda::lambdaKernel, with one warp (32 threads) per leaf
@@ -440,7 +459,7 @@ struct LabelBelowPivotFunctor
         size_t tID,
         const NanoGrid<BuildT>* grid,
         const NanoGrid<BuildT>* srcGrid,
-        const uint32_t* srcLabels,
+        const LabelT* srcLabels,
         uint32_t pivot,
         Mask<3>* leafMasks) const
     {
@@ -452,11 +471,13 @@ struct LabelBelowPivotFunctor
         // So the label of voxel n is found through the source leaf with the same origin.
         const auto* srcLeaf = srcGrid->tree().root().probeLeaf(leaf.origin());
         NANOVDB_ASSERT(srcLeaf);
-        auto retained = [&](uint32_t n) { return leaf.isActive(n) && srcLabels[srcLeaf->getValue(n)] < pivot; };
+        // Compared as uint64_t: pivot may not fit in a narrow LabelT, and a narrow label would otherwise promote to int
+        auto selected = [&](uint32_t n) {
+            return leaf.isActive(n) && uint64_t(srcLabels[srcLeaf->getValue(n)]) < pivot; };
         // The Mask<3> words recast as 32-bit words: one ballot fills one, bit i from lane i (voxel h * 32 + i)
         uint32_t* maskWords_u32 = reinterpret_cast<uint32_t*>(leafMasks[leafID].words());
         for (uint32_t h = 0; h < 2 * Mask<3>::WORD_COUNT; h++) {
-            const uint32_t ballot = __ballot_sync(0xFFFFFFFF, retained(h * 32 + lane));
+            const uint32_t ballot = __ballot_sync(0xFFFFFFFF, selected(h * 32 + lane));
             if (lane == 0) maskWords_u32[h] = ballot;
         }
     }
@@ -465,8 +486,9 @@ struct LabelBelowPivotFunctor
 }// namespace partition::detail
 
 template<typename BuildT, typename ResourceT>
-template<typename BufferT>
-void PartitionGrid<BuildT, ResourceT>::split(GridHandle<BufferT> handle, uint32_t lo, uint32_t hi, const BufferT& pool,
+template<typename LabelT, typename BufferT>
+void PartitionGrid<BuildT, ResourceT>::split(const LabelT* d_srcLabels, GridHandle<BufferT> handle,
+                                             uint32_t lo, uint32_t hi, const BufferT& pool,
                                              std::vector<GridHandle<BufferT>>& outputs)
 {
     if (hi - lo == 1) {
@@ -478,10 +500,10 @@ void PartitionGrid<BuildT, ResourceT>::split(GridHandle<BufferT> handle, uint32_
         return;
     }
     const uint32_t pivot = pivotLabel(lo, hi);
-    auto halves = splitAt(handle.template deviceGrid<BuildT>(), pivot, pool);
+    auto halves = splitAt(d_srcLabels, handle.template deviceGrid<BuildT>(), pivot, pool);
     handle.reset();
-    split(std::move(halves[0]), lo, pivot, pool, outputs);
-    split(std::move(halves[1]), pivot, hi, pool, outputs);
+    split(d_srcLabels, std::move(halves[0]), lo, pivot, pool, outputs);
+    split(d_srcLabels, std::move(halves[1]), pivot, hi, pool, outputs);
 }// PartitionGrid<BuildT, ResourceT>::split
 
 template<typename BuildT, typename ResourceT>
@@ -504,18 +526,19 @@ uint32_t PartitionGrid<BuildT, ResourceT>::pivotLabel(uint32_t lo, uint32_t hi) 
 }// PartitionGrid<BuildT, ResourceT>::pivotLabel
 
 template<typename BuildT, typename ResourceT>
-template<typename BufferT>
+template<typename LabelT, typename BufferT>
 std::array<GridHandle<BufferT>, 2>
-PartitionGrid<BuildT, ResourceT>::splitAt(const GridT* d_grid, uint32_t pivot, const BufferT& pool)
+PartitionGrid<BuildT, ResourceT>::splitAt(const LabelT* d_srcLabels, const GridT* d_grid, uint32_t pivot,
+                                          const BufferT& pool)
 {
     const uint32_t leafCount = util::cuda::DeviceGridTraits<BuildT>::getTreeData(d_grid, mStream).mNodeCount[0];
     BufT<Mask<3>> d_leafMasks(mStream, this->ref(), leafCount, nanovdb::cuda::noInit);
     if (leafCount) {
-        using MaskFunctorT = partition::detail::LabelBelowPivotFunctor<BuildT>;
+        using MaskFunctorT = partition::detail::LabelBelowPivotFunctor<BuildT, LabelT>;
         static constexpr unsigned int threadsPerBlock = 128;
         const size_t threadCount = size_t(leafCount) * 32; // one warp per leaf
         util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(threadCount, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
-            threadCount, MaskFunctorT(), d_grid, mDeviceSrcGrid, mDeviceSrcLabels, pivot, d_leafMasks.data());
+            threadCount, MaskFunctorT(), d_grid, mDeviceSrcGrid, d_srcLabels, pivot, d_leafMasks.data());
         cudaCheckError();
     }
     return PartitionGridBinary<BuildT, ResourceT>(d_grid, d_leafMasks.data(), mStream, *mResource).getHandles(pool);

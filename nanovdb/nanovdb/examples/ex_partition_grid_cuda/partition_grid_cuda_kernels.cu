@@ -33,10 +33,10 @@ void mainPartitionGrid(
     std::cout << "Connected components: " << componentCount << " (OpenVDB: " << segments.size() << ")" << std::endl;
 
     // Split the grid into one grid per component
-    nanovdb::tools::cuda::PartitionGrid<BuildT> partitioner(deviceGrid, labels.data(), componentCount);
+    nanovdb::tools::cuda::PartitionGrid<BuildT> partitioner(deviceGrid);
     partitioner.setChecksum(nanovdb::CheckMode::Default);
     partitioner.setVerbose(1);
-    auto outputs = partitioner.template getHandles<BufferT>();
+    auto outputs = partitioner.template getHandles<BufferT>(labels.data(), componentCount);
 
     // Check each output against PruneGrid with the mask of its component, and against the OpenVDB segment that
     // holds a voxel of that component

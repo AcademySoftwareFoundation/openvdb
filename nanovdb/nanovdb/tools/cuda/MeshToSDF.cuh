@@ -270,8 +270,8 @@ void MeshToSDF<BuildT, ResourceT>::partitionSurfaces()
     if (mSurfaceCount <= 1) return;
     mSurfaceLabels = std::move(labels);
 
-    mSurfaceGrids = PartitionGrid<BuildT, ResourceT>(dGrid, mSurfaceLabels.data(), mSurfaceCount, mStream, *mResource)
-                        .getHandles(mGridHandle.buffer());
+    mSurfaceGrids = PartitionGrid<BuildT, ResourceT>(dGrid, mStream, *mResource)
+                        .getHandles(mSurfaceLabels.data(), mSurfaceCount, mGridHandle.buffer());
     std::vector<const GridT*> grids;
     for (const auto& handle : mSurfaceGrids) grids.push_back(handle.template deviceGrid<BuildT>());
     mDeviceSurfaceGrids = BufferT<const GridT*>(mStream, this->ref(), mSurfaceCount, nanovdb::cuda::noInit);

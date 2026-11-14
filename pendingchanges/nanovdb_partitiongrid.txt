@@ -1,9 +1,10 @@
 NanoVDB:
   New Features:
-  - Added tools::cuda::PartitionGridBinary, which splits the active voxels of an index grid in two by a
-    leaf-indexed retain mask, the same input as tools::cuda::PruneGrid: output 0 holds the voxels whose retain
-    bit is on and output 1 the others, built in one pass.
-  - Added tools::cuda::PartitionGrid, which splits the active voxels of an index grid into one grid per label,
+  - Added tools::cuda::PartitionGridBinary, which splits the active voxels of a ValueOnIndex grid in two by a
+    leaf-indexed selection mask, the same input as tools::cuda::PruneGrid: output 0 holds the voxels whose
+    selection bit is on and output 1 the others. The outputs are those of PruneGrid with the mask and with its
+    complement, built together.
+  - Added tools::cuda::PartitionGrid, which splits the active voxels of a ValueOnIndex grid into one grid per label,
     given a label per value index (e.g. from tools::cuda::ConnectedComponents), by recursive PartitionGridBinary
     splits at the voxel-count median. Added a companion ex_partition_grid_cuda example, which checks the outputs
     against PruneGrid and OpenVDB's segmentActiveVoxels, and unit tests.

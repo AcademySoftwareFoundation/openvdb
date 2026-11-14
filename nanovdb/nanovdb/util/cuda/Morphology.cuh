@@ -404,8 +404,9 @@ struct PruneInternalNodesFunctor
 };
 
 /// @brief The two-output counterpart of PruneInternalNodesFunctor, for PartitionGridBinary: marks the upper and lower
-///        node masks that each source leaf needs in output 0 (its active voxels with the retain bit on) and in
+///        node masks that each source leaf needs in output 0 (its active voxels with the selection bit on) and in
 ///        output 1 (the rest). Both outputs share the processed root, so a leaf has the same tile in each.
+///        PartitionLeafMasksFunctor must split the voxels the same way, since it fills only the leaves marked here.
 template <typename BuildT>
 struct PartitionInternalNodesFunctor
 {
@@ -433,8 +434,7 @@ struct PartitionInternalNodesFunctor
 
         const auto upperChildIndex = NanoUpper<BuildT>::CoordToOffset(srcLeaf.origin());
         const auto lowerChildIndex = NanoLower<BuildT>::CoordToOffset(srcLeaf.origin());
-        const auto tileIndex = util::PtrDiff(processedRoot->probeTile(srcLeaf.origin()), processedRoot->tile(0))
-                               / sizeof(typename NanoRoot<BuildT>::Tile);
+        const auto tileIndex = processedRoot->probeTile(srcLeaf.origin()) - processedRoot->tile(0);
         if (retain0) {
             upperMasks0[tileIndex].setOnAtomic(upperChildIndex);
             lowerMasks0[tileIndex][upperChildIndex].setOnAtomic(lowerChildIndex); }
@@ -896,8 +896,9 @@ struct PruneLeafMasksFunctor
 };
 
 /// @brief The two-output counterpart of PruneLeafMasksFunctor, for PartitionGridBinary: sets the value mask of the
-///        source leaf's copy in output 0 to its active voxels with the retain bit on, and in output 1 to the rest.
+///        source leaf's copy in output 0 to its active voxels with the selection bit on, and in output 1 to the rest.
 ///        A copy is missing from an output that keeps none of the leaf's voxels.
+///        The split must match PartitionInternalNodesFunctor's, which decides which copies exist.
 template <typename BuildT>
 struct PartitionLeafMasksFunctor
 {
