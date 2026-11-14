@@ -196,6 +196,9 @@ private:
     // Stage 3c: sign the distances in the barrier by the chosen BarrierSigning.
     void signBarrier(const GridT* dGrid, float* dSDF, const uint32_t* dNearestTriangle);
 
+    // Stage 3d: add one to the nesting depth of every other surface this surface encloses.
+    void accumulateNesting(const GridT* dGrid, const float* dSDF, SurfaceLabelT surfaceID);
+
     // Stage 4: with several surfaces, compose their signs by the nesting rule.
     void resolveSigns();
 
@@ -668,6 +671,32 @@ struct AccumulateNestingFunctor
 
 } // namespace sdf::detail
 
+/// @brief Add one to the nesting depth of every other surface that the surface of @a dGrid, signed by @a dSDF,
+///        encloses. The test reads the invert masks PropagateSign computes for this surface.
+template <typename BuildT, typename ResourceT>
+void MeshToSDF<BuildT, ResourceT>::accumulateNesting(const GridT* dGrid, const float* dSDF, SurfaceLabelT surfaceID)
+{
+    const auto tree = TraitsT::getTreeData(dGrid, mStream);
+    BufferT<nanovdb::Mask<3>> leafMasks(mStream, this->ref(), tree.mNodeCount[0], nanovdb::cuda::noInit);
+    BufferT<nanovdb::Mask<4>> lowerMasks(mStream, this->ref(), tree.mNodeCount[1], nanovdb::cuda::noInit);
+    BufferT<nanovdb::Mask<5>> upperMasks(mStream, this->ref(), tree.mNodeCount[2], nanovdb::cuda::noInit);
+    const auto rootOrigins = PropagateSign<BuildT, float, ResourceT>(dGrid, dSDF, mStream, *mResource)
+                                 .propagate(leafMasks.data(), lowerMasks.data(), upperMasks.data()).first;
+
+    using FunctorT = sdf::detail::AccumulateNestingFunctor<BuildT>;
+    static constexpr unsigned int threadsPerBlock = 256;
+    const auto blocks = util::cuda::blocksPerGrid(mSurfaceCount, threadsPerBlock);
+    util::cuda::lambdaKernel<<<blocks, threadsPerBlock, 0, mStream>>>(
+        mSurfaceCount, FunctorT{}, dGrid, mDeviceSurfaceGrids.data(),
+        leafMasks.data(), lowerMasks.data(), upperMasks.data(),
+        rootOrigins.data(), uint64_t(rootOrigins.size()), surfaceID, mNestingDepth.data());
+    cudaCheckError();
+} // MeshToSDF<BuildT, ResourceT>::accumulateNesting
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+// Stage 3: one surface.
+
 template <typename BuildT, typename ResourceT>
 void MeshToSDF<BuildT, ResourceT>::processSurface(SurfaceLabelT surfaceID)
 {
@@ -677,9 +706,9 @@ void MeshToSDF<BuildT, ResourceT>::processSurface(SurfaceLabelT surfaceID)
     // one surface, else a copy indexed by the surface's grid. Likewise the triangle indices.
     BufferT<float>    surfaceSDF(mStream, this->ref(), 0, nanovdb::cuda::noInit);
     BufferT<uint32_t> surfaceNearestTriangle(mStream, this->ref(), 0, nanovdb::cuda::noInit);
-    const GridT*    dGrid          = dOriginalGrid;
-    auto            tree           = mTreeData;   // the tree header of dGrid
-    float*          dSDF           = reinterpret_cast<float*>(mSDF.data());
+    const GridT*    dGrid            = dOriginalGrid;
+    auto            tree             = mTreeData;   // the tree header of dGrid
+    float*          dSDF             = reinterpret_cast<float*>(mSDF.data());
     const uint32_t* dNearestTriangle = reinterpret_cast<const uint32_t*>(mNearestTriangle.data());
 
     if (mSurfaceCount > 1) {
@@ -721,22 +750,9 @@ void MeshToSDF<BuildT, ResourceT>::processSurface(SurfaceLabelT surfaceID)
 
     if (mSurfaceCount == 1) return;
 
-    // The invert masks of this surface, for the nesting test below.
-    BufferT<nanovdb::Mask<3>> leafMasks(mStream, this->ref(), tree.mNodeCount[0], nanovdb::cuda::noInit);
-    BufferT<nanovdb::Mask<4>> lowerMasks(mStream, this->ref(), tree.mNodeCount[1], nanovdb::cuda::noInit);
-    BufferT<nanovdb::Mask<5>> upperMasks(mStream, this->ref(), tree.mNodeCount[2], nanovdb::cuda::noInit);
-    const auto rootOrigins = PropagateSign<BuildT, float, ResourceT>(dGrid, dSDF, mStream, *mResource)
-                                     .propagate(leafMasks.data(), lowerMasks.data(), upperMasks.data()).first;
-    uint32_t* dNestingDepth = mNestingDepth.data();
-    using NestingFunctorT = sdf::detail::AccumulateNestingFunctor<BuildT>;
-    static constexpr unsigned int threadsPerBlock = 256;
-    const auto blocks = util::cuda::blocksPerGrid(mSurfaceCount, threadsPerBlock);
-    util::cuda::lambdaKernel<<<blocks, threadsPerBlock, 0, mStream>>>(
-        mSurfaceCount, NestingFunctorT{}, dGrid, mDeviceSurfaceGrids.data(),
-        leafMasks.data(), lowerMasks.data(), upperMasks.data(),
-        rootOrigins.data(), uint64_t(rootOrigins.size()), surfaceID, dNestingDepth);
-    cudaCheckError();
+    accumulateNesting(dGrid, dSDF, surfaceID);
 
+    // Write the signed distances of this surface's voxels back to the grid's own distances.
     using InjectSDFFunctorT = util::cuda::InjectGridDataFunctor<BuildT, float>;
     const uint32_t leaves = tree.mNodeCount[0];
     util::cuda::operatorKernel<InjectSDFFunctorT><<<leaves, InjectSDFFunctorT::MaxThreadsPerBlock, 0, mStream>>>(
@@ -814,29 +830,16 @@ struct IsoFloorFunctor
         const float    distance = fabsf(fabsf(dSDF[v]) - isoValue);  // from the signed surface
         if (!inside || distance >= interiorFloor) return;   // nothing to floor
 
-        // Preserve voxels that can carry a marching-cubes crossing.
-        const nanovdb::Coord local = NanoLeaf<BuildT>::OffsetToLocalCoord(uint32_t(n));
-        const int lx = local[0], ly = local[1], lz = local[2];
-        const int off[6][3] = {{-1,0,0},{1,0,0},{0,-1,0},{0,1,0},{0,0,-1},{0,0,1}};
-
-        bool touchesExterior = false, needsAccessor = false;
-        for (int k = 0; k < 6 && !touchesExterior; ++k) {
-            const int nx = lx + off[k][0], ny = ly + off[k][1], nz = lz + off[k][2];
-            if (nx < 0 || nx > 7 || ny < 0 || ny > 7 || nz < 0 || nz > 7) { needsAccessor = true; continue; }
-            const uint32_t nOff = (uint32_t(nx) << 6) | (uint32_t(ny) << 3) | uint32_t(nz);
-            if (leaf.isActive(nOff) && !signbit(dSDF[leaf.getValue(nOff)])) touchesExterior = true;
-        }
-        if (!touchesExterior && needsAccessor) {
-            const nanovdb::Coord origin = leaf.origin();
-            auto acc = dGrid->getAccessor();
-            for (int k = 0; k < 6 && !touchesExterior; ++k) {
-                const int nx = lx + off[k][0], ny = ly + off[k][1], nz = lz + off[k][2];
-                if (nx >= 0 && nx <= 7 && ny >= 0 && ny <= 7 && nz >= 0 && nz <= 7) continue;
-                const nanovdb::Coord nijk(origin[0] + nx, origin[1] + ny, origin[2] + nz);
-                if (acc.isActive(nijk) && !signbit(dSDF[acc.getValue(nijk)])) touchesExterior = true;
+        // Preserve voxels that can carry a marching-cubes crossing: those with an exterior face neighbour.
+        const nanovdb::Coord ijk = leaf.offsetToGlobalCoord(uint32_t(n));
+        auto acc = dGrid->getAccessor();
+        for (int axis = 0; axis < 3; ++axis)
+            for (const int step : {-1, 1}) {
+                nanovdb::Coord neighbour = ijk;
+                neighbour[axis] += step;
+                if (acc.isActive(neighbour) && !signbit(dSDF[acc.getValue(neighbour)])) return;
             }
-        }
-        if (!touchesExterior) dFloor[v] = 1;
+        dFloor[v] = 1;
     }
 };
 
