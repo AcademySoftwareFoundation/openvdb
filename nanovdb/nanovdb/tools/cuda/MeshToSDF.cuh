@@ -46,7 +46,8 @@ namespace nanovdb {
 namespace tools::cuda {
 
 /// @brief Convert closed triangle surfaces to a narrow-band signed distance field.
-/// @warning The map must scale uniformly: one voxel size is used for all three axes.
+/// @warning The map must scale uniformly and must not rotate: the voxel size is read from the x axis of the map
+///          and used for all three axes.
 /// @note A surface is a connected component of the rasterized narrow band, so meshes whose bands touch are signed
 ///       as one surface, and the nesting rule applies only between surfaces whose bands are apart.
 /// @tparam BuildT Build type of the index grid (e.g. nanovdb::ValueOnIndex).
@@ -85,7 +86,7 @@ public:
               ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
         : mDevicePoints(devicePoints), mPointCount(pointCount)
         , mDeviceTriangles(deviceTriangles), mTriangleCount(triangleCount)
-        , mMap(map), mStream(stream), mTimer(stream), mResource(&resource)
+        , mMap(map), mVoxelSize(float(map.getVoxelSize()[0])), mStream(stream), mTimer(stream), mResource(&resource)
         , mGridHandle(BufferT<std::byte>(stream, resource, 0, nanovdb::cuda::noInit))
         , mSDF(stream, resource, 0, nanovdb::cuda::noInit)
         , mNearestTriangle(stream, resource, 0, nanovdb::cuda::noInit)
@@ -209,6 +210,7 @@ private:
     const TriangleIndexT* mDeviceTriangles{nullptr};
     uint32_t              mTriangleCount{0};
     nanovdb::Map          mMap{};
+    float                 mVoxelSize{0.f}; // world units; see the class @warning
     cudaStream_t          mStream{0};
     util::cuda::Timer     mTimer;
     ResourceT*            mResource{nullptr};
@@ -239,10 +241,8 @@ private:
 template <typename BuildT, typename ResourceT>
 void MeshToSDF<BuildT, ResourceT>::rasterize()
 {
-    const float voxelSize = float(mMap.getVoxelSize()[0]);
-
     // Preserve the requested band width beyond the offset surface.
-    const float extra = mIsoValue / voxelSize;
+    const float extra = mIsoValue / mVoxelSize;
 
     MeshToGrid<BuildT, ResourceT> converter(mDevicePoints, mPointCount, mDeviceTriangles, mTriangleCount, mMap, mStream,
                                             *mResource);
@@ -338,13 +338,12 @@ MeshToSDF<BuildT, ResourceT>::pruneBarrier(const GridT* dGrid, const float* dUDF
 {
     using FunctorT = sdf::detail::UDFBarrierPruneMaskFunctor<BuildT>;
 
-    const float    voxelSize = float(mMap.getVoxelSize()[0]);
-    const uint32_t leaves    = TraitsT::getTreeData(dGrid, mStream).mNodeCount[0];
+    const uint32_t leaves = TraitsT::getTreeData(dGrid, mStream).mNodeCount[0];
 
     BufferT<nanovdb::Mask<3>> retainMask(mStream, this->ref(), leaves, nanovdb::cuda::noInit);
 
     util::cuda::operatorKernel<FunctorT><<<leaves, FunctorT::MaxThreadsPerBlock, 0, mStream>>>(
-        dGrid, dUDF, mIsoValue, voxelSize, retainMask.data());
+        dGrid, dUDF, mIsoValue, mVoxelSize, retainMask.data());
     cudaCheckError();
 
     PruneGrid<BuildT, ResourceT> pruner(dGrid, retainMask.data(), mStream, *mResource);
@@ -583,11 +582,10 @@ void MeshToSDF<BuildT, ResourceT>::signBarrier(const GridT* dGrid, float* dSDF, 
     if (tree.mNodeCount[0] == 0) return;
 
     static constexpr unsigned int threadsPerBlock = 256;
-    const uint64_t slots     = tree.mVoxelCount + 1;
-    const float    voxelSize = float(mMap.getVoxelSize()[0]);
+    const uint64_t slots = tree.mVoxelCount + 1;
     if (mBarrierSigning == BarrierSigning::Interior) {
         util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(slots, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
-            slots, sdf::detail::BarrierToInteriorFunctor{}, mIsoValue, voxelSize, dSDF);
+            slots, sdf::detail::BarrierToInteriorFunctor{}, mIsoValue, mVoxelSize, dSDF);
         cudaCheckError();
         return;
     }
@@ -598,8 +596,8 @@ void MeshToSDF<BuildT, ResourceT>::signBarrier(const GridT* dGrid, float* dSDF, 
     cudaCheck(cudaMemsetAsync(negate.data(), 0, negate.size_bytes(), mStream));
     using FunctorT = sdf::detail::SignBarrierFunctor<BuildT>;
     util::cuda::operatorKernel<FunctorT><<<tree.mNodeCount[0], FunctorT::MaxThreadsPerBlock, 0, mStream>>>(
-        dGrid, dSDF, mIsoValue, voxelSize,
-        dNearestTriangle, mDevicePoints, mDeviceTriangles, mMap, mIsoValue / voxelSize, negate.data());
+        dGrid, dSDF, mIsoValue, mVoxelSize,
+        dNearestTriangle, mDevicePoints, mDeviceTriangles, mMap, mIsoValue / mVoxelSize, negate.data());
     cudaCheckError();
     util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(slots, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
         slots, sdf::detail::NegateMarkedFunctor{}, negate.data(), dSDF);
@@ -863,10 +861,8 @@ void MeshToSDF<BuildT, ResourceT>::finalizeDistances()
 {
     if (mIsoValue == 0.f) return;
 
-    const float voxelSize = float(mMap.getVoxelSize()[0]);
-
     // Match the barrier used during signing.
-    const float interiorFloor = sdf::detail::BarrierHalfWidth * voxelSize;
+    const float interiorFloor = sdf::detail::BarrierHalfWidth * mVoxelSize;
 
     // The floor test reads the signs of the neighbours, so the floored voxels are marked first, and a second kernel
     // writes every distance.
@@ -885,7 +881,7 @@ void MeshToSDF<BuildT, ResourceT>::finalizeDistances()
     cudaCheckError();
 
     // The voxel kernels do not visit the background slot.
-    const float bg = mBandWidth * voxelSize;
+    const float bg = mBandWidth * mVoxelSize;
     cudaCheck(cudaMemcpyAsync(mSDF.data(), &bg, sizeof(float), cudaMemcpyHostToDevice, mStream));
     cudaCheck(cudaStreamSynchronize(mStream));
 } // MeshToSDF<BuildT, ResourceT>::finalizeDistances
