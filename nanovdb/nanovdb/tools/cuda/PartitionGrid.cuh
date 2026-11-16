@@ -70,8 +70,7 @@ public:
     /// @param d_srcGrid source device grid to be partitioned
     /// @param d_srcLeafMask selection mask: one Mask<3> per source leaf, in leaf order
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    /// @param resource resource instance all device scratch is allocated from;
-    ///        must outlive this operator (defaults to the per-type default resource)
+    /// @param resource resource all device scratch allocates from; must outlive this operator
     PartitionGridBinary(const GridT* d_srcGrid, const Mask<3>* d_srcLeafMask, cudaStream_t stream = 0,
                         ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
         : mBuilders{BuilderT(stream, resource), BuilderT(stream, resource)}
@@ -88,7 +87,8 @@ public:
         for (auto& builder : mBuilders) builder.mChecksum = mode;
     }
 
-    /// @brief The two outputs: [0] the voxels whose selection bit is on, [1] the rest.
+    /// @brief Splits the grid by the selection mask.
+    /// @return two handles: the first holds the voxels whose selection bit is on, the second the rest.
     /// @tparam BufferT Buffer type of the returned grid handles.
     /// @param pool Prototype buffer the outputs take their resource from.
     /// @note The stream is synchronized before this method returns.
@@ -275,10 +275,9 @@ class PartitionGrid
 
 public:
     /// @brief Constructor
-    /// @param d_srcGrid source device ValueOnIndex grid, without active tiles
+    /// @param d_srcGrid source device grid
     /// @param stream optional CUDA stream (defaults to CUDA stream 0)
-    /// @param resource resource instance all device scratch is allocated from;
-    ///        must outlive this operator (defaults to the per-type default resource)
+    /// @param resource resource all device scratch allocates from; must outlive this operator
     PartitionGrid(const GridT* d_srcGrid, cudaStream_t stream = 0,
                   ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
         : mStream(stream), mTimer(stream), mResource(&resource), mDeviceSrcGrid(d_srcGrid) {}
@@ -291,7 +290,8 @@ public:
     /// @param mode Mode of checksum computation
     void setChecksum(CheckMode mode = CheckMode::Disable) { mChecksum = mode; }
 
-    /// @brief The outputs: [l] holds the voxels with label l.
+    /// @brief Splits the grid by label.
+    /// @return one handle per label, in label order: handle l holds the active voxels with label l.
     /// @tparam BufferT Buffer type of the returned grid handles.
     /// @tparam LabelT Unsigned integer label type, deduced from d_srcLabels.
     /// @param d_srcLabels device labels, one per value index (the grid's value count), e.g. from ConnectedComponents.
@@ -322,12 +322,13 @@ private:
 
     // --- Pipeline stages (run in order by getHandles). ---
 
-    // Stage 1: the voxel count of each label -> mLabelOffsets.
+    // Stage 1: counts the active voxels of each label, and stores the exclusive prefix sum of these counts in
+    // mLabelOffsets.
     template<typename LabelT>
     void countLabels(const LabelT* d_srcLabels, uint32_t labelCount, uint64_t activeVoxelCount);
 
-    // Stage 2: splits the grid of handle, holding the voxels of labels [lo, hi), recursively into outputs[lo, hi),
-    // appended in label order.
+    // Stage 2: splits the given grid, which holds the voxels of labels lo, ..., hi - 1, into one grid per label,
+    // appended to outputs in label order.
     template<typename LabelT, typename BufferT>
     void split(const LabelT* d_srcLabels, GridHandle<BufferT> handle,
                uint32_t lo, uint32_t hi, const BufferT& pool, std::vector<GridHandle<BufferT>>& outputs);
@@ -335,7 +336,7 @@ private:
     // The label that splits [lo, hi) in two, by voxel count.
     uint32_t pivotLabel(uint32_t lo, uint32_t hi) const;
 
-    // One split: [0] the voxels of d_grid with a label below pivot, [1] the rest.
+    // One split of d_grid at pivot: the first handle holds the voxels with a label below pivot, the second the rest.
     template<typename LabelT, typename BufferT>
     std::array<GridHandle<BufferT>, 2> splitAt(const LabelT* d_srcLabels, const GridT* d_grid, uint32_t pivot,
                                                const BufferT& pool);
