@@ -139,6 +139,7 @@ else()
     TestMorphology.cc
     TestMultiResGrid.cc
     TestName.cc
+    TestNeighborAccessor.cc
     TestNodeIterator.cc
     TestNodeManager.cc
     TestNodeMask.cc

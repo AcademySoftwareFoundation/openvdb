@@ -506,6 +506,7 @@ set(OPENVDB_LIBRARY_TREE_INCLUDE_FILES
   tree/LeafNode.h
   tree/LeafNodeBool.h
   tree/LeafNodeMask.h
+  tree/NeighborAccessor.h
   tree/NodeManager.h
   tree/NodeUnion.h
   tree/RootNode.h

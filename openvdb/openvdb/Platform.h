@@ -113,6 +113,16 @@
 #define OPENVDB_FORCE_INLINE inline
 #endif
 
+/// Prevent inlining of a function, for rarely taken paths that would
+/// otherwise grow their callers.
+#if defined(__GNUC__)
+#define OPENVDB_NO_INLINE __attribute__((noinline))
+#elif defined(_MSC_VER)
+#define OPENVDB_NO_INLINE __declspec(noinline)
+#else
+#define OPENVDB_NO_INLINE
+#endif
+
 /// Bracket code with OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN/_END,
 /// as in the following example, to inhibit ICC remarks about unreachable code:
 /// @code
