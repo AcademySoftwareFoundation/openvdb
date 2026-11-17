@@ -36,7 +36,6 @@
 
 #include <cstddef>   // std::byte
 #include <cstdint>   // uint8_t, uint32_t, uint64_t
-#include <stdexcept> // std::runtime_error
 #include <tuple>     // std::tie
 #include <utility>   // std::move, std::pair
 #include <vector>    // std::vector
@@ -121,23 +120,14 @@ public:
     /// @brief Choose the nesting rule (default EvenOdd).
     void setNestingRule(NestingRule rule) { mNestingRule = rule; }
 
-    /// @brief Sign the isosurface where the mesh UDF equals @a isoValue.
-    /// @param isoValue Non-negative offset in world units; zero signs the input surface.
-    /// @note Rasterization includes the offset, so time and memory increase with @a isoValue.
-    void setIsoValue(float isoValue = 0.f) { mIsoValue = isoValue; }
-
     /// @brief Run the pipeline and return the grid and its signed distances.
     /// @return { grid, sdf }: the narrow-band ValueOnIndex grid, and a sidecar of (activeVoxelCount+1) floats indexed
     ///         like the grid's values: sdf[0] is the positive background, and sdf[k>0] is the signed distance of
-    ///         the k-th active voxel to the signed surface, negative in the interior. Pass both to PropagateSign for
-    ///         the sign of the inactive voxels and tiles.
-    /// @throw std::runtime_error if the iso value is negative.
+    ///         the k-th active voxel to the mesh, negative in the interior. Pass both to PropagateSign for the
+    ///         sign of the inactive voxels and tiles.
     /// @note Call once: the grid and the distances are moved out of this object.
     std::pair<HandleT, BufferT<std::byte>> getHandleAndSDF()
     {
-        if (mIsoValue < 0.f)
-            throw std::runtime_error("MeshToSDF: setIsoValue() must be >= 0");
-
         if (mVerbose==1) mTimer.start("\nRasterizing mesh");
         rasterize();
         if (mVerbose==1) mTimer.stop();
@@ -163,10 +153,6 @@ public:
         mComponentLabels.destroy();
         mNestingDepth.destroy();
 
-        if (mVerbose==1) mTimer.start("Finalizing distances");
-        finalizeDistances();
-        if (mVerbose==1) mTimer.stop();
-
         cudaCheck(cudaStreamSynchronize(mStream));
         return {std::move(mGridHandle), std::move(mSDF)};
     }
@@ -191,7 +177,7 @@ private:
     void signSingleComponent(const GridT* dComponentGrid, float* dComponentSDF,
                              const uint32_t* dComponentNearestTriangle);
 
-    // Stage 3a: the grid of the component without its barrier, the voxels nearest the signed surface.
+    // Stage 3a: the grid of the component without its barrier, the voxels nearest the mesh.
     HandleT pruneBarrier(const GridT* dComponentGrid, const float* dComponentUDF);
 
     // Stage 3b: negate the distances outside the barrier that are not in the exterior barrier-free component.
@@ -209,9 +195,6 @@ private:
     // Stage 4: with several components, compose their signs by the nesting rule.
     void applyNestingRule();
 
-    // Stage 5: with a nonzero iso value, convert the distances from the mesh to distances from the signed surface.
-    void finalizeDistances();
-
     /// @brief Borrowed handle to the injected resource, for the storage allocated after construction.
     nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::ResourceRef<ResourceT>(*mResource); }
 
@@ -228,7 +211,6 @@ private:
     float                 mBandWidth{3.f};
     BarrierSigning        mBarrierSigning{BarrierSigning::Heuristic};
     NestingRule           mNestingRule{NestingRule::EvenOdd};
-    float                 mIsoValue{0.f};  // world units, >= 0; see setIsoValue()
 
     // "Per voxel slot" below: one entry per active voxel, indexed like the grid's values, plus slot 0 for the
     // background.
@@ -251,12 +233,9 @@ private:
 template <typename BuildT, typename ResourceT>
 void MeshToSDF<BuildT, ResourceT>::rasterize()
 {
-    // Preserve the requested band width beyond the offset surface.
-    const float extra = mIsoValue / mVoxelSize;
-
     MeshToGrid<BuildT, ResourceT> converter(mDevicePoints, mPointCount, mDeviceTriangles, mTriangleCount, mMap, mStream,
                                             *mResource);
-    converter.setNarrowBandWidth(mBandWidth + extra);
+    converter.setNarrowBandWidth(mBandWidth);
     std::tie(mGridHandle, mSDF, mNearestTriangle) =
         converter.template getHandleAndUDFAndIndex<BufferT<std::byte>, BufferT<std::byte>>(mGridHandle.buffer(), mSDF);
     mTreeData = TraitsT::getTreeData(mGridHandle.template deviceGrid<BuildT>(), mStream);
@@ -364,19 +343,19 @@ namespace sdf::detail {
 
 // Stage 3a: barrier pruning.
 
-/// @brief Half-width, in voxels, of the barrier around the signed surface {udf == isoValue}. Two face neighbours on
-///        opposite sides of it are one voxel apart, so the distances of both from it sum to at most one voxel: at
-///        least one lies within half a voxel. A barrier slightly wider than half a voxel therefore leaves no face
-///        neighbours on opposite sides outside it; the 0.001 margin covers float error in the distances.
+/// @brief Half-width, in voxels, of the barrier around the mesh. Two face neighbours on opposite sides of the mesh
+///        are one voxel apart, so the distances of both from it sum to at most one voxel: at least one lies within
+///        half a voxel. A barrier slightly wider than half a voxel therefore leaves no face neighbours on opposite
+///        sides outside it; the 0.001 margin covers float error in the distances.
 static constexpr float BarrierThreshold = 0.501f;
 
 /// @brief Whether a voxel at unsigned distance @a udf from the mesh lies in the barrier: within BarrierThreshold
-///        voxels of the signed surface {udf == isoValue}. All values are in world units.
+///        voxels of the mesh. All values are in world units.
 /// @note Pruning and barrier signing must classify a voxel alike, so both use this test. Signing negates the
 ///       distance exactly, so the test gives the same answer on the magnitude of a signed distance.
-__hostdev__ inline bool isBarrier(float udf, float isoValue, float voxelSize)
+__hostdev__ inline bool isBarrier(float udf, float voxelSize)
 {
-    return fabsf(udf - isoValue) < BarrierThreshold * voxelSize;
+    return udf < BarrierThreshold * voxelSize;
 }
 
 /// @brief Retain the voxels outside the barrier.
@@ -390,7 +369,6 @@ struct BarrierPruneMaskFunctor
     __device__ void operator()(
         const NanoGrid<BuildT>* dComponentGrid,
         const float*            dComponentUDF,           // unsigned distance of each voxel slot, world
-        float                   isoValue,       // signed surface = { udf == isoValue }, world
         float                   voxelSize,      // world
         nanovdb::Mask<3>*       dDstLeafMasks)  // one per leaf: the voxels to retain
     {
@@ -398,7 +376,7 @@ struct BarrierPruneMaskFunctor
         const auto& leaf = dComponentGrid->tree().template getFirstNode<0>()[leafID];
         auto selectNonBarrier = [&](uint32_t offset) {
             return leaf.isActive(offset) &&
-                   !isBarrier(dComponentUDF[leaf.getValue(offset)], isoValue, voxelSize);
+                   !isBarrier(dComponentUDF[leaf.getValue(offset)], voxelSize);
         };
 
         // Lane i in warp w tests voxel offsets 64*w + i and 64*w + i + 32.
@@ -425,7 +403,7 @@ MeshToSDF<BuildT, ResourceT>::pruneBarrier(const GridT* dComponentGrid, const fl
     BufferT<nanovdb::Mask<3>> barrierMask(mStream, this->ref(), leaves, nanovdb::cuda::noInit);
 
     util::cuda::operatorKernel<FunctorT><<<leaves, FunctorT::MaxThreadsPerBlock, 0, mStream>>>(
-        dComponentGrid, dComponentUDF, mIsoValue, mVoxelSize, barrierMask.data());
+        dComponentGrid, dComponentUDF, mVoxelSize, barrierMask.data());
     cudaCheckError();
 
     PruneGrid<BuildT, ResourceT> barrierPruner(dComponentGrid, barrierMask.data(), mStream, *mResource);
@@ -439,8 +417,8 @@ namespace sdf::detail {
 // Stage 3b: signing of the non-barrier voxels.
 
 /// @brief Find the barrier-free component containing the minimum-x voxel, which is exterior: the band reaches
-///        bandWidth voxels beyond the signed surface and the barrier only BarrierThreshold, so the voxel of least x
-///        lies at a smaller x than any point of the signed surface, where that closed surface cannot enclose it.
+///        bandWidth voxels beyond the mesh and the barrier only BarrierThreshold, so the voxel of least x lies at a
+///        smaller x than any point of the mesh, where the closed mesh cannot enclose it.
 /// @details Each active voxel packs its x and its barrier-free component label into one 64-bit key, x in the high
 ///          32 bits and the label in the low 32 bits, and @a dMinKey becomes the minimum of all the keys. With x in
 ///          the high bits, the minimum key belongs to a voxel of least x, so its low 32 bits are the exterior label:
@@ -538,25 +516,25 @@ namespace sdf::detail {
 
 static constexpr uint32_t InvalidTriangle = 0xFFFFFFFFu;
 
-/// @brief Least distance, in voxels, of an anchor from the signed surface: half a voxel diagonal, as in OpenVDB's
+/// @brief Least distance, in voxels, of an anchor from the mesh: half a voxel diagonal, as in OpenVDB's
 ///        meshToLevelSet. A single anchor can place a barrier voxel in the exterior, and anchors nearer the surface,
 ///        down to BarrierThreshold, place interior voxels next to it in the exterior far more often.
 static constexpr float AnchorMinDistance = 0.8660254f; // sqrt(3) / 2
 
-/// @brief Whether a voxel is exterior, at least AnchorMinDistance voxels from the signed surface, and has a nearest
+/// @brief Whether a voxel is exterior, at least AnchorMinDistance voxels from the mesh, and has a nearest
 ///        triangle. Distances are in world units; signedDistance is the mesh UDF with its current sign.
 __hostdev__ inline bool
-isExteriorAnchor(float signedDistance, uint32_t triangleID, float isoValue, float voxelSize)
+isExteriorAnchor(float signedDistance, uint32_t triangleID, float voxelSize)
 {
-    if (signbit(signedDistance) || fabsf(fabsf(signedDistance) - isoValue) < AnchorMinDistance * voxelSize) return false;
+    if (signbit(signedDistance) || signedDistance < AnchorMinDistance * voxelSize) return false;
     return triangleID != InvalidTriangle;
 }
 
 /// @brief Compute the reference plane of a valid exterior anchor. The plane point and outward direction are in
-///        index space; mesh vertices are in world space and isoValueIndex is in voxels.
+///        index space; mesh vertices are in world space.
 __hostdev__ inline void
 computeAnchorPlane(const nanovdb::Coord& anchorCoord, const nanovdb::Vec3i& triangle, const nanovdb::Vec3f* dPoints,
-                   const nanovdb::Map& map, float isoValueIndex, nanovdb::Vec3f& planePoint, nanovdb::Vec3f& outwardDir)
+                   const nanovdb::Map& map, nanovdb::Vec3f& planePoint, nanovdb::Vec3f& outwardDir)
 {
     const nanovdb::Vec3f  v0 = map.applyInverseMapF(dPoints[triangle[0]]);  // world -> index
     const nanovdb::Vec3f  v1 = map.applyInverseMapF(dPoints[triangle[1]]);
@@ -564,10 +542,9 @@ computeAnchorPlane(const nanovdb::Coord& anchorCoord, const nanovdb::Vec3i& tria
     const nanovdb::Vec3f  xyz = anchorCoord.asVec3s();
 
     float t0, t1;
-    const nanovdb::Vec3f cp = nanovdb::math::closestPointOnTriangleToPoint(v0, v1, v2, xyz, t0, t1);
-    outwardDir = xyz - cp;
+    planePoint = nanovdb::math::closestPointOnTriangleToPoint(v0, v1, v2, xyz, t0, t1);
+    outwardDir = xyz - planePoint;
     outwardDir.normalize();
-    planePoint = cp + outwardDir * isoValueIndex;
 }
 
 /// @brief Whether @a q lies on the outward side of the anchor's reference plane. All coordinates are in index space.
@@ -580,9 +557,9 @@ __hostdev__ inline bool isOnExteriorSide(const nanovdb::Vec3f& planePoint, const
 /// @brief Negate the distance of every barrier voxel; slot 0, the background, is left as is.
 struct BarrierToInteriorFunctor
 {
-    __device__ void operator()(size_t v, float isoValue, float voxelSize, float* dComponentSDF) const
+    __device__ void operator()(size_t v, float voxelSize, float* dComponentSDF) const
     {
-        if (v != 0 && isBarrier(fabsf(dComponentSDF[v]), isoValue, voxelSize)) dComponentSDF[v] = -dComponentSDF[v];
+        if (v != 0 && isBarrier(fabsf(dComponentSDF[v]), voxelSize)) dComponentSDF[v] = -dComponentSDF[v];
     }
 };
 
@@ -601,20 +578,18 @@ struct SignBarrierFunctor
     __device__ void operator()(
         const NanoGrid<BuildT>* dComponentGrid,
         const float*            dComponentSDF,           // signed outside the barrier, unsigned in it
-        float                   isoValue,       // signed surface = { udf == isoValue }, world
         float                   voxelSize,      // world
         const uint32_t*         dComponentNearestTriangle, // nearest triangle of each voxel slot of dComponentGrid
         const nanovdb::Vec3f*   dPoints,        // mesh vertices, world
         const nanovdb::Vec3i*   dTriangles,     // triangle vertex indices
         nanovdb::Map            map,            // world <-> index transform
-        float                   isoValueIndex,  // isoValue in voxels
         uint8_t*                dNegate)        // set to 1 for each interior barrier voxel
     {
         const int leafID = blockIdx.x, n = threadIdx.x;
         const auto& leaf = dComponentGrid->tree().template getFirstNode<0>()[leafID];
         const bool     active  = leaf.isActive(uint32_t(n));
         const uint64_t v       = active ? leaf.getValue(uint32_t(n)) : 0;
-        const bool     barrier = active && isBarrier(fabsf(dComponentSDF[v]), isoValue, voxelSize);
+        const bool     barrier = active && isBarrier(fabsf(dComponentSDF[v]), voxelSize);
         if (!__syncthreads_or(barrier)) return;  // no barrier voxel in this leaf
 
         // The leaf and its 26 neighbours: sLeaves[i][j][k] is the leaf i-1, j-1, k-1 leaves away along x, y, z, so
@@ -644,9 +619,9 @@ struct SignBarrierFunctor
 
             const uint64_t anchorSlot = haloLeaf->getValue(haloOffset);
             const uint32_t triangleID = dComponentNearestTriangle[anchorSlot];
-            sAnchor[x + 1][y + 1][z + 1] = isExteriorAnchor(dComponentSDF[anchorSlot], triangleID, isoValue, voxelSize);
+            sAnchor[x + 1][y + 1][z + 1] = isExteriorAnchor(dComponentSDF[anchorSlot], triangleID, voxelSize);
             if (sAnchor[x + 1][y + 1][z + 1])
-                computeAnchorPlane(origin.offsetBy(x, y, z), dTriangles[triangleID], dPoints, map, isoValueIndex,
+                computeAnchorPlane(origin.offsetBy(x, y, z), dTriangles[triangleID], dPoints, map,
                                    sPlanePoint[x + 1][y + 1][z + 1], sOutwardDir[x + 1][y + 1][z + 1]);
         }
         __syncthreads();
@@ -693,7 +668,7 @@ void MeshToSDF<BuildT, ResourceT>::signBarrier(const GridT* dComponentGrid, floa
     const uint64_t slots = tree.mVoxelCount + 1;
     if (mBarrierSigning == BarrierSigning::Interior) {
         util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(slots, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
-            slots, sdf::detail::BarrierToInteriorFunctor{}, mIsoValue, mVoxelSize, dComponentSDF);
+            slots, sdf::detail::BarrierToInteriorFunctor{}, mVoxelSize, dComponentSDF);
         cudaCheckError();
         return;
     }
@@ -704,8 +679,8 @@ void MeshToSDF<BuildT, ResourceT>::signBarrier(const GridT* dComponentGrid, floa
     cudaCheck(cudaMemsetAsync(negate.data(), 0, negate.size_bytes(), mStream));
     using FunctorT = sdf::detail::SignBarrierFunctor<BuildT>;
     util::cuda::operatorKernel<FunctorT><<<tree.mNodeCount[0], FunctorT::MaxThreadsPerBlock, 0, mStream>>>(
-        dComponentGrid, dComponentSDF, mIsoValue, mVoxelSize,
-        dComponentNearestTriangle, mDevicePoints, mDeviceTriangles, mMap, mIsoValue / mVoxelSize, negate.data());
+        dComponentGrid, dComponentSDF, mVoxelSize,
+        dComponentNearestTriangle, mDevicePoints, mDeviceTriangles, mMap, negate.data());
     cudaCheckError();
     util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(slots, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
         slots, sdf::detail::NegateMarkedFunctor{}, negate.data(), dComponentSDF);
@@ -835,99 +810,6 @@ void MeshToSDF<BuildT, ResourceT>::applyNestingRule()
         mNestingRule == NestingRule::EvenOdd, reinterpret_cast<float*>(mSDF.data()));
     cudaCheckError();
 } // MeshToSDF<BuildT, ResourceT>::applyNestingRule
-
-//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-namespace sdf::detail {
-
-// Stage 5: iso-value offset.
-
-/// @brief Mark in @a dFloor the interior voxels whose distance from the requested isosurface is below
-///        @a interiorFloor and that have no exterior face neighbour: IsoMagnitudeFunctor floors them.
-/// @details With isoValue > 0, {udf == isoValue} also passes through the interior, e.g. at depth isoValue within a
-///          closed mesh. Both sides of such a sheet are interior, so no surface lies there, yet the distance
-///          |udf - isoValue| falls to zero across it and would let a contouring or redistancing pass put a surface
-///          back. Flooring the interior voxels near it removes these near-zero values. A voxel with an exterior face
-///          neighbour is left as is: marching cubes places a crossing between face neighbours of opposite sign, so
-///          its small distance is that of the signed surface. The floor removes only the near-zero values; the other
-///          interior distances within the mesh remain distances to the interior sheet, not to the signed surface.
-/// @note The distances are only read here, so no thread reads a distance that another thread writes.
-template <typename BuildT>
-struct IsoFloorFunctor
-{
-    static constexpr int MaxThreadsPerBlock         = NanoLeaf<BuildT>::SIZE;
-    static constexpr int MinBlocksPerMultiprocessor = 1;
-
-    __device__ void operator()(const NanoGrid<BuildT>* dFullGrid, const float* dFullSDF, float isoValue,
-                               float interiorFloor, uint8_t* dFloor)
-    {
-        const int leafID = blockIdx.x, n = threadIdx.x;
-        const auto& leaf = dFullGrid->tree().template getFirstNode<0>()[leafID];
-        if (!leaf.isActive(uint32_t(n))) return;
-
-        const uint64_t v        = leaf.getValue(uint32_t(n));
-        const bool     negative = signbit(dFullSDF[v]);
-        const float    distance = fabsf(fabsf(dFullSDF[v]) - isoValue);  // from the signed surface
-        if (!negative || distance >= interiorFloor) return;   // nothing to floor
-
-        // Preserve voxels that can carry a marching-cubes crossing: those with an exterior face neighbour.
-        const nanovdb::Coord ijk = leaf.offsetToGlobalCoord(uint32_t(n));
-        auto acc = dFullGrid->getAccessor();
-        for (int axis = 0; axis < 3; ++axis)
-            for (const int step : {-1, 1}) {
-                nanovdb::Coord neighbour = ijk;
-                neighbour[axis] += step;
-                if (acc.isActive(neighbour) && !signbit(dFullSDF[acc.getValue(neighbour)])) return;
-            }
-        dFloor[v] = 1;
-    }
-};
-
-/// @brief Convert the signed mesh UDF to signed distance from the requested isosurface, in place, and floor the
-///        voxels marked by IsoFloorFunctor at -interiorFloor. Slot 0, the background, is left as is.
-struct IsoMagnitudeFunctor
-{
-    __device__ void operator()(size_t v, float isoValue, float interiorFloor, const uint8_t* dFloor,
-                               float* dFullSDF) const
-    {
-        if (v == 0) return;
-        const bool  negative = signbit(dFullSDF[v]);
-        const float distance = fabsf(fabsf(dFullSDF[v]) - isoValue);  // from the signed surface
-        dFullSDF[v] = dFloor[v] ? -interiorFloor : (negative ? -distance : distance);
-    }
-};
-
-} // namespace sdf::detail
-
-template <typename BuildT, typename ResourceT>
-void MeshToSDF<BuildT, ResourceT>::finalizeDistances()
-{
-    if (mIsoValue == 0.f) return;
-
-    // The barrier half-width. TODO: state why the floor must be this value.
-    const float interiorFloor = sdf::detail::BarrierThreshold * mVoxelSize;
-
-    // The floor test reads the signs of the neighbours, so the floored voxels are marked first, and a second kernel
-    // writes every distance.
-    static constexpr unsigned int threadsPerBlock = 256;
-    const uint64_t slots = mTreeData.mVoxelCount + 1;
-    float*         dFullSDF = reinterpret_cast<float*>(mSDF.data());
-    BufferT<uint8_t> floored(mStream, this->ref(), slots, nanovdb::cuda::noInit);
-    cudaCheck(cudaMemsetAsync(floored.data(), 0, floored.size_bytes(), mStream));
-    using FunctorT = sdf::detail::IsoFloorFunctor<BuildT>;
-    if (const uint32_t leaves = mTreeData.mNodeCount[0])
-        util::cuda::operatorKernel<FunctorT><<<leaves, FunctorT::MaxThreadsPerBlock, 0, mStream>>>(
-            mGridHandle.template deviceGrid<BuildT>(), dFullSDF, mIsoValue, interiorFloor, floored.data());
-    cudaCheckError();
-    util::cuda::lambdaKernel<<<util::cuda::blocksPerGrid(slots, threadsPerBlock), threadsPerBlock, 0, mStream>>>(
-        slots, sdf::detail::IsoMagnitudeFunctor{}, mIsoValue, interiorFloor, floored.data(), dFullSDF);
-    cudaCheckError();
-
-    // The voxel kernels do not visit the background slot.
-    const float bg = mBandWidth * mVoxelSize;
-    cudaCheck(cudaMemcpyAsync(mSDF.data(), &bg, sizeof(float), cudaMemcpyHostToDevice, mStream));
-    cudaCheck(cudaStreamSynchronize(mStream));
-} // MeshToSDF<BuildT, ResourceT>::finalizeDistances
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
