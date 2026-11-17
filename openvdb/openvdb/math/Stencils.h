@@ -115,7 +115,7 @@ public:
     }
 
     /// @brief Return the size of the stencil buffer.
-    inline int size() { return mValues.size(); }
+    inline int size() { return int(mValues.size()); }
 
     /// @brief Return the median value of the current stencil.
     inline ValueType median() const
@@ -219,6 +219,88 @@ protected:
     Coord           mCenter;
 
 }; // BaseStencil class
+
+
+////////////////////////////////////////
+
+
+/// @brief A stencil with no fixed shape, which reads each value using a
+/// tree::NeighborAccessor without any local caching.
+/// @details Any operator in math/Operators.h can use it, with any scheme and
+/// map. A NeighborStencil is fast when an operator is used that only reads
+/// each neighbor once. A fixed shape stencil like SevenPointStencil is fast
+/// when an operator is used that reads each neighbor multiple times.
+/// The topology of the tree must not change while the stencil is in use.
+/// @code
+/// math::NeighborStencil stencil(grid.tree());
+/// for (auto iter = leaf.cbeginValueOn(); iter; ++iter) {
+///     stencil.moveTo(iter);
+///     gradient = math::Gradient<MapT, math::CD_2ND>::result(map, stencil);
+/// }
+/// @endcode
+template<typename TreeT>
+class NeighborStencil
+{
+public:
+    /// NeighborStencil<const FloatTree> behaves the same as NeighborStencil<FloatTree>
+    using TreeType = std::remove_const_t<TreeT>;
+    using ValueType = typename TreeType::ValueType;
+
+    explicit NeighborStencil(const TreeType& tree) : mNeighbors(tree) {}
+
+    /// Center the stencil at the voxel @a ijk
+    OPENVDB_FORCE_INLINE void moveTo(const Coord& ijk)
+    {
+        mCenter = ijk;
+        mNeighbors.moveTo(ijk);
+        mOffset = TreeType::LeafNodeType::coordToOffset(ijk);
+    }
+
+    /// @brief Center the stencil at the voxel of @a iter.
+    /// @details @a iter may belong to another tree, since the center value is
+    /// read from this tree and not from the iterator.
+    template<typename IterT>
+    OPENVDB_FORCE_INLINE void moveTo(const IterT& iter) { this->moveTo(iter.getCoord()); }
+
+    /// Return the value at (@a I, @a J, @a K) from the center
+    template<int I, int J, int K>
+    OPENVDB_FORCE_INLINE const ValueType& getValue() const
+    {
+        return mNeighbors.template getValue<I, J, K>(mOffset);
+    }
+
+    /// Return the value at (@a i, @a j, @a k) from the center
+    OPENVDB_FORCE_INLINE const ValueType& getValue(int i, int j, int k) const
+    {
+        return mNeighbors.getValue(mOffset, i, j, k);
+    }
+
+    /// Return the value at the center
+    OPENVDB_FORCE_INLINE const ValueType& getCenterValue() const { return mNeighbors.getValue(mOffset); }
+
+    /// Return the coordinates of the center, or Coord::max() before the first moveTo()
+    const Coord& getCenterCoord() const { return mCenter; }
+
+    const TreeType& tree() const { return mNeighbors.tree(); }
+
+    /// @brief Discard everything read from the tree. Call this after the tree
+    /// has changed, then call moveTo() before reading again.
+    void clear()
+    {
+        mNeighbors.clear();
+        mCenter = Coord::max();
+        mOffset = 0;
+    }
+
+private:
+    tree::NeighborAccessor<const TreeType> mNeighbors;
+    Coord mCenter = Coord::max();
+    Index mOffset = 0; // offset of mCenter in its leaf-sized region
+}; // class NeighborStencil
+
+// The tree type is deduced and always const
+template<typename TreeT>
+NeighborStencil(const TreeT&) -> NeighborStencil<const TreeT>;
 
 
 ////////////////////////////////////////

@@ -140,6 +140,7 @@ else()
     TestMultiResGrid.cc
     TestName.cc
     TestNeighborAccessor.cc
+    TestNeighborStencil.cc
     TestNodeIterator.cc
     TestNodeManager.cc
     TestNodeMask.cc
