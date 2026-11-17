@@ -15,6 +15,7 @@
 #ifndef OPENVDB_TOOLS_LEVELSETFILTER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVELSETFILTER_HAS_BEEN_INCLUDED
 
+#include <openvdb/tree/NeighborAccessor.h>
 #include "LevelSetTracker.h"
 #include "Interpolation.h"// for tools::AlphaMask
 #include <algorithm> // for std::max()
@@ -203,18 +204,21 @@ private:
             if (swap) mParent->leafs().swapLeafBuffer(1, n==0);
         }
 
+        // The mean along Axis, over the voxels at most width away. Call acc.moveTo() with
+        // the origin of each leaf before averaging around its voxels.
         template <size_t Axis>
         struct Avg {
             Avg(const GridT& grid, Int32 w) :
                 acc(grid.tree()), width(w), frac(1/ValueType(2*w+1)) {}
-            inline ValueType operator()(Coord xyz)
+            inline ValueType operator()(const VoxelCIterT& iter) const
             {
                 ValueType sum = zeroVal<ValueType>();
-                Int32& i = xyz[Axis], j = i + width;
-                for (i -= width; i <= j; ++i) sum += acc.getValue(xyz);
+                for (Int32 d = -width; d <= width; ++d) {
+                    sum += acc.getValue(iter, Axis == 0 ? d : 0, Axis == 1 ? d : 0, Axis == 2 ? d : 0);
+                }
                 return sum*frac;
             }
-            typename GridT::ConstAccessor acc;
+            tree::NeighborAccessor<const TreeType> acc;
             const Int32 width;
             const ValueType frac;
         };
@@ -223,8 +227,8 @@ private:
         void boxImpl(const LeafRange& r, Int32 w);
 
         void boxXImpl(const LeafRange& r, Int32 w) { this->boxImpl<Avg<0> >(r,w); }
-        void boxZImpl(const LeafRange& r, Int32 w) { this->boxImpl<Avg<1> >(r,w); }
-        void boxYImpl(const LeafRange& r, Int32 w) { this->boxImpl<Avg<2> >(r,w); }
+        void boxYImpl(const LeafRange& r, Int32 w) { this->boxImpl<Avg<1> >(r,w); }
+        void boxZImpl(const LeafRange& r, Int32 w) { this->boxImpl<Avg<2> >(r,w); }
 
         void medianImpl(const LeafRange&, int);
         void meanCurvatureImpl(const LeafRange&);
@@ -295,10 +299,11 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::box(int width)
     mTask = std::bind(&Filter::boxXImpl, std::placeholders::_1, std::placeholders::_2, width);
     this->cook(true);
 
-    mTask = std::bind(&Filter::boxYImpl, std::placeholders::_1, std::placeholders::_2, width);
+    // z before y, so that the results stay the same as in earlier versions
+    mTask = std::bind(&Filter::boxZImpl, std::placeholders::_1, std::placeholders::_2, width);
     this->cook(true);
 
-    mTask = std::bind(&Filter::boxZImpl, std::placeholders::_1, std::placeholders::_2, width);
+    mTask = std::bind(&Filter::boxYImpl, std::placeholders::_1, std::placeholders::_2, width);
     this->cook(true);
 
     mParent->track();
@@ -387,7 +392,7 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::meanCurvatureImpl(const LeafRa
     mParent->checkInterrupter();
     //const float CFL = 0.9f, dt = CFL * mDx * mDx / 6.0f;
     const ValueType dx = mParent->voxelSize(), dt = math::Pow2(dx) / ValueType(3.0);
-    math::CurvatureStencil<GridType> stencil(mParent->grid(), dx);
+    math::CurvatureStencil<GridType, false> stencil(mParent->grid(), dx);
     if (mMask) {
         typename AlphaMaskT::FloatType a, b;
         AlphaMaskT alpha(mParent->grid(), *mMask, mParent->minMask(),
@@ -424,7 +429,7 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::filletImpl(const LeafRange& ra
     mParent->checkInterrupter();
 
     const ValueType dx = mParent->voxelSize(), dt = math::Pow2(dx) / ValueType(3);
-    math::CurvatureStencil<GridType> stencil(mParent->grid(), dx);
+    math::CurvatureStencil<GridType, false> stencil(mParent->grid(), dx);
 
     if (mMask) {
         typename AlphaMaskT::FloatType a, b;
@@ -473,7 +478,7 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::laplacianImpl(const LeafRange&
     mParent->checkInterrupter();
     //const float CFL = 0.9f, half_dt = CFL * mDx * mDx / 12.0f;
     const ValueType dx = mParent->voxelSize(), dt = math::Pow2(dx) / ValueType(6.0);
-    math::GradStencil<GridType> stencil(mParent->grid(), dx);
+    math::GradStencil<GridType, false> stencil(mParent->grid(), dx);
     if (mMask) {
         typename AlphaMaskT::FloatType a, b;
         AlphaMaskT alpha(mParent->grid(), *mMask, mParent->minMask(),
@@ -530,7 +535,7 @@ inline void
 LevelSetFilter<GridT, MaskT, InterruptT>::Filter::medianImpl(const LeafRange& range, int width)
 {
     mParent->checkInterrupter();
-    typename math::DenseStencil<GridType> stencil(mParent->grid(), width);//creates local cache!
+    typename math::DenseStencil<GridType, false> stencil(mParent->grid(), width);//creates local cache!
     if (mMask) {
         typename AlphaMaskT::FloatType a, b;
         AlphaMaskT alpha(mParent->grid(), *mMask, mParent->minMask(),
@@ -569,16 +574,18 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::boxImpl(const LeafRange& range
                          mParent->maxMask(), mParent->isMaskInverted());
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             ValueType* buffer = leafIter.buffer(1).data();
+            avg.acc.moveTo(leafIter->origin());
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 const Coord xyz = iter.getCoord();
-                if (alpha(xyz, a, b)) buffer[iter.pos()] = b * (*iter)+ a * avg(xyz);
+                if (alpha(xyz, a, b)) buffer[iter.pos()] = b * (*iter)+ a * avg(iter);
             }
         }
     } else {
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             ValueType* buffer = leafIter.buffer(1).data();
+            avg.acc.moveTo(leafIter->origin());
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
-                buffer[iter.pos()] = avg(iter.getCoord());
+                buffer[iter.pos()] = avg(iter);
             }
         }
     }

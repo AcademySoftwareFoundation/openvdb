@@ -78,3 +78,97 @@ TEST_F(TestLevelSetFilter, testLevelSetFillet)
         EXPECT_TRUE(acc.getValue(ijk.offsetBy(0,-1,-1)) < 0.0f);
     }
 }
+
+
+namespace {
+
+// Copy the values, active states and tiles of @a source into a level set of another tree type
+template<typename GridT>
+typename GridT::Ptr
+copyLevelSet(const FloatGrid& source)
+{
+    typename GridT::Ptr grid = GridT::create(source.background());
+    grid->setTransform(source.transform().copy());
+    grid->setGridClass(GRID_LEVEL_SET);
+    for (auto iter = source.cbeginValueAll(); iter; ++iter) {
+        if (iter.isVoxelValue()) {
+            if (iter.isValueOn()) grid->tree().setValueOn(iter.getCoord(), *iter);
+            else grid->tree().setValueOff(iter.getCoord(), *iter);
+        } else {
+            grid->tree().fill(iter.getBoundingBox(), *iter, iter.isValueOn());
+        }
+    }
+    return grid;
+}
+
+// One pass of the box filter of tools::LevelSetFilter along @a axis, through a ValueAccessor
+template<typename GridT>
+typename GridT::Ptr
+referenceBoxPass(const GridT& input, int axis, int width)
+{
+    using ValueT = typename GridT::ValueType;
+    typename GridT::Ptr output = input.deepCopy();
+    tree::ValueAccessor<const typename GridT::TreeType> acc(input.tree());
+    const ValueT frac = 1 / ValueT(2 * width + 1);
+    for (auto leaf = output->tree().beginLeaf(); leaf; ++leaf) {
+        for (auto iter = leaf->beginValueOn(); iter; ++iter) {
+            const Coord xyz = iter.getCoord();
+            Coord ijk = xyz;
+            ValueT sum = zeroVal<ValueT>();
+            for (int d = -width; d <= width; ++d) {
+                ijk[axis] = xyz[axis] + d;
+                sum += acc.getValue(ijk);
+            }
+            iter.setValue(sum * frac);
+        }
+    }
+    return output;
+}
+
+template<typename GridT>
+void
+checkSameGrid(const GridT& expected, const GridT& grid)
+{
+    EXPECT_TRUE(expected.tree().hasSameTopology(grid.tree()));
+    tree::ValueAccessor<const typename GridT::TreeType> acc(grid.tree());
+    for (auto iter = expected.cbeginValueAll(); iter; ++iter) {
+        EXPECT_EQ(*iter, acc.getValue(iter.getCoord())) << " at " << iter.getCoord();
+    }
+}
+
+template<typename GridT>
+void
+checkMeanFilter(const FloatGrid& sphere)
+{
+    using FilterT = tools::LevelSetFilter<GridT>;
+    const typename GridT::Ptr input = copyLevelSet<GridT>(sphere);
+
+    for (int width : {1, 4, 8, 9}) {
+        typename GridT::Ptr grid = input->deepCopy();
+        FilterT filter(*grid);
+        filter.mean(width);
+
+        // The passes run x, then z, then y, and the filter then tracks the interface.
+        typename GridT::Ptr expected = input->deepCopy();
+        for (int axis : {0, 2, 1}) expected = referenceBoxPass(*expected, axis, width);
+        tools::LevelSetTracker<GridT> tracker(*expected);
+        tracker.setState(filter.getState());
+        tracker.setTrimming(filter.trimming());
+        tracker.track();
+
+        checkSameGrid(*expected, *grid);
+    }
+}
+
+} // unnamed namespace
+
+
+TEST_F(TestLevelSetFilter, testMeanNeighbors)
+{
+    const FloatGrid::Ptr sphere = tools::createLevelSetSphere<FloatGrid>(/*radius=*/8.0f,
+        /*center=*/Vec3f(0.3f, -0.7f, 1.1f), /*dx=*/0.5f, /*halfWidth=*/3.0f);
+    checkMeanFilter<FloatGrid>(*sphere);
+    // Smaller internal nodes, so that wide filters cross more of them. The leaves
+    // stay at the size that Morphology supports.
+    checkMeanFilter<Grid<tree::Tree4<float, 4, 3, 3>::Type>>(*sphere);
+}
