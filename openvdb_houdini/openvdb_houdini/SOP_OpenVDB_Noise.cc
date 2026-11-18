@@ -332,7 +332,7 @@ SOP_OpenVDB_Noise::Cache::applyNoise(
     // Use second order finite difference.
     using Gradient = cvdb::math::Gradient<cvdb::math::GenericMap, cvdb::math::CD_2ND>;
     using CPT = cvdb::math::CPT<cvdb::math::GenericMap, cvdb::math::CD_2ND>;
-    using StencilType = cvdb::math::SecondOrderDenseStencil<GridType>;
+    using StencilType = cvdb::math::SecondOrderDenseStencil<GridType, false>;
 
     using TreeType = typename GridType::TreeType;
     using Vec3Type = cvdb::math::Vec3<typename TreeType::ValueType>;
@@ -343,7 +343,7 @@ SOP_OpenVDB_Noise::Cache::applyNoise(
     const cvdb::math::Transform& xform = grid.transform();
 
     // Create a stencil.
-    StencilType stencil(outGrid); // uses its own grid accessor
+    StencilType stencil(outGrid);
 
     // scratch variables
     typename GridType::ValueType result; // result - use mask as frequency multiplier
