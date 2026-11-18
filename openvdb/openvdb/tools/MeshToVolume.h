@@ -20,6 +20,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/FiniteDifference.h> // for GodunovsNormSqrd
 #include <openvdb/math/Proximity.h> // for closestPointOnTriangleToPoint
+#include <openvdb/tree/NeighborAccessor.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
 #include <openvdb/util/Assert.h>
@@ -1393,8 +1394,10 @@ struct ComputeIntersectingVoxelSign
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
 
-        tree::ValueAccessor<const TreeType> distAcc(*mDistTree);
         tree::ValueAccessor<const Int32TreeType> idxAcc(*mIndexTree);
+        // Read the neighbors outside each leaf with no search of the trees
+        tree::NeighborAccessor<const TreeType> distNeighbors(*mDistTree);
+        tree::NeighborAccessor<const Int32TreeType> idxNeighbors(*mIndexTree);
 
         ValueType nval;
         CoordBBox bbox;
@@ -1420,6 +1423,9 @@ struct ComputeIntersectingVoxelSign
 
             const Int32LeafNodeType* idxNode = idxAcc.probeConstLeaf(node.origin());
             const Int32* idxData = idxNode->buffer().data();
+
+            distNeighbors.moveTo(node.origin());
+            idxNeighbors.moveTo(node.origin());
 
             nodeMin = node.origin();
             nodeMax = nodeMin.offsetBy(LeafNodeType::DIM - 1);
@@ -1491,14 +1497,19 @@ struct ComputeIntersectingVoxelSign
                     dist = -dist;
                 } else {
                     for (Int32 m = 0; m < 26; ++m) {
-                        nijk = ijk + util::COORD_OFFSETS[m];
+                        const Coord& offset = util::COORD_OFFSETS[m];
+                        nijk = ijk + offset;
 
-                        if (!bbox.isInside(nijk) && distAcc.probeValue(nijk, nval) && nval<-0.75) {
+                        if (!bbox.isInside(nijk) &&
+                            distNeighbors.probeValue(it, offset[0], offset[1], offset[2], nval) &&
+                            nval < -0.75)
+                        {
                             nxyz[0] = double(nijk[0]);
                             nxyz[1] = double(nijk[1]);
                             nxyz[2] = double(nijk[2]);
 
-                            cp = closestPoint(nxyz, idxAcc.getValue(nijk));
+                            cp = closestPoint(nxyz,
+                                idxNeighbors.getValue(it, offset[0], offset[1], offset[2]));
 
                             dir1 = xyz - cp;
                             dir1.normalize();
@@ -1703,6 +1714,23 @@ checkNeighbours(const Coord& ijk, AccessorType& acc, bool (&mask)[26])
 }
 
 
+// As above, for the voxel at @a pos in the region that @a acc is bound to
+template<typename Compare, typename TreeType>
+inline bool
+checkNeighboursInRegion(const tree::NeighborAccessor<TreeType>& acc, const Index pos,
+    bool (&mask)[26])
+{
+    for (Int32 m = 0; m < 26; ++m) {
+        const Coord& offset = util::COORD_OFFSETS[m];
+        if (!mask[m] && Compare::check(acc.getValue(pos, offset[0], offset[1], offset[2]))) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
 template<typename TreeType>
 struct ValidateIntersectingVoxels
 {
@@ -1719,13 +1747,15 @@ struct ValidateIntersectingVoxels
 
     void operator()(const tbb::blocked_range<size_t>& range) const
     {
-        tree::ValueAccessor<const TreeType> acc(*mTree);
+        // Reads the neighbors outside each leaf with no search of the tree
+        tree::NeighborAccessor<const TreeType> acc(*mTree);
         bool neighbourMask[26];
 
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
             LeafNodeType& node = *mNodes[n];
             ValueType* data = node.buffer().data();
+            acc.moveTo(node.origin());
 
             typename LeafNodeType::ValueOnCIter it;
             for (it = node.cbeginValueOn(); it; ++it) {
@@ -1740,7 +1770,7 @@ struct ValidateIntersectingVoxels
 
                 const bool hasNegativeNeighbour =
                     checkNeighbours<IsNegative, LeafNodeType>(pos, data, neighbourMask) ||
-                    checkNeighbours<IsNegative>(node.offsetToGlobalCoord(pos), acc, neighbourMask);
+                    checkNeighboursInRegion<IsNegative>(acc, pos, neighbourMask);
 
                 if (!hasNegativeNeighbour) {
                     // push over boundary voxel distance
@@ -1774,7 +1804,8 @@ struct RemoveSelfIntersectingSurface
 
     void operator()(const tbb::blocked_range<size_t>& range) const
     {
-        tree::ValueAccessor<const TreeType> distAcc(*mDistTree);
+        // Reads the neighbors outside each leaf with no search of the tree
+        tree::NeighborAccessor<const TreeType> distAcc(*mDistTree);
         tree::ValueAccessor<Int32TreeType> idxAcc(*mIndexTree);
         bool neighbourMask[26];
 
@@ -1782,6 +1813,7 @@ struct RemoveSelfIntersectingSurface
 
             LeafNodeType& distNode = *mNodes[n];
             ValueType* data = distNode.buffer().data();
+            distAcc.moveTo(distNode.origin());
 
             typename Int32TreeType::LeafNodeType* idxNode =
                 idxAcc.probeLeaf(distNode.origin());
@@ -1798,7 +1830,7 @@ struct RemoveSelfIntersectingSurface
 
                 const bool hasBoundaryNeighbour =
                     checkNeighbours<Comp, LeafNodeType>(pos, data, neighbourMask) ||
-                    checkNeighbours<Comp>(distNode.offsetToGlobalCoord(pos),distAcc,neighbourMask);
+                    checkNeighboursInRegion<Comp>(distAcc, pos, neighbourMask);
 
                 if (!hasBoundaryNeighbour) {
                     distNode.setValueOff(pos);
@@ -2313,7 +2345,8 @@ struct ConstructVoxelMask
     {
         using Iterator = typename LeafNodeType::ValueOnCIter;
 
-        tree::ValueAccessor<const TreeType> acc(*mTree);
+        // Reads the active states across the faces of each leaf with no search of the tree
+        tree::NeighborAccessor<const TreeType> acc(*mTree);
         tree::ValueAccessor<BoolTreeType> maskAcc(*mMaskTree);
 
         Coord ijk, nijk, localCorod;
@@ -2322,6 +2355,7 @@ struct ConstructVoxelMask
         for (size_t n = range.begin(); n != range.end(); ++n) {
 
             LeafNodeType& node = *mNodes[n];
+            acc.moveTo(node.origin());
 
             CoordBBox bbox = node.getNodeBoundingBox();
             bbox.expand(-1);
@@ -2339,7 +2373,7 @@ struct ConstructVoxelMask
                     if (!node.isValueOn(npos)) maskNode.setValueOn(npos);
                 } else {
                     nijk = ijk.offsetBy(0, 0, 1);
-                    if (!acc.isValueOn(nijk)) maskAcc.setValueOn(nijk);
+                    if (!acc.template isValueOn<0, 0, 1>(it)) maskAcc.setValueOn(nijk);
                 }
 
                 if (localCorod[2] > 0) {
@@ -2347,7 +2381,7 @@ struct ConstructVoxelMask
                     if (!node.isValueOn(npos)) maskNode.setValueOn(npos);
                 } else {
                     nijk = ijk.offsetBy(0, 0, -1);
-                    if (!acc.isValueOn(nijk)) maskAcc.setValueOn(nijk);
+                    if (!acc.template isValueOn<0, 0, -1>(it)) maskAcc.setValueOn(nijk);
                 }
 
                 if (localCorod[1] < int(LeafNodeType::DIM - 1)) {
@@ -2355,7 +2389,7 @@ struct ConstructVoxelMask
                     if (!node.isValueOn(npos)) maskNode.setValueOn(npos);
                 } else {
                     nijk = ijk.offsetBy(0, 1, 0);
-                    if (!acc.isValueOn(nijk)) maskAcc.setValueOn(nijk);
+                    if (!acc.template isValueOn<0, 1, 0>(it)) maskAcc.setValueOn(nijk);
                 }
 
                 if (localCorod[1] > 0) {
@@ -2363,7 +2397,7 @@ struct ConstructVoxelMask
                     if (!node.isValueOn(npos)) maskNode.setValueOn(npos);
                 } else {
                     nijk = ijk.offsetBy(0, -1, 0);
-                    if (!acc.isValueOn(nijk)) maskAcc.setValueOn(nijk);
+                    if (!acc.template isValueOn<0, -1, 0>(it)) maskAcc.setValueOn(nijk);
                 }
 
                 if (localCorod[0] < int(LeafNodeType::DIM - 1)) {
@@ -2371,7 +2405,7 @@ struct ConstructVoxelMask
                     if (!node.isValueOn(npos)) maskNode.setValueOn(npos);
                 } else {
                     nijk = ijk.offsetBy(1, 0, 0);
-                    if (!acc.isValueOn(nijk)) maskAcc.setValueOn(nijk);
+                    if (!acc.template isValueOn<1, 0, 0>(it)) maskAcc.setValueOn(nijk);
                 }
 
                 if (localCorod[0] > 0) {
@@ -2379,7 +2413,7 @@ struct ConstructVoxelMask
                     if (!node.isValueOn(npos)) maskNode.setValueOn(npos);
                 } else {
                     nijk = ijk.offsetBy(-1, 0, 0);
-                    if (!acc.isValueOn(nijk)) maskAcc.setValueOn(nijk);
+                    if (!acc.template isValueOn<-1, 0, 0>(it)) maskAcc.setValueOn(nijk);
                 }
             }
         }
@@ -2960,9 +2994,9 @@ struct Renormalize
     {
         using Vec3Type = math::Vec3<ValueType>;
 
-        tree::ValueAccessor<const TreeType> acc(*mTree);
+        // Reads the face neighbors with no search of the tree
+        tree::NeighborAccessor<const TreeType> acc(*mTree);
 
-        Coord ijk;
         Vec3Type up, down;
 
         const ValueType dx = mVoxelSize, invDx = ValueType(1.0) / mVoxelSize;
@@ -2971,20 +3005,19 @@ struct Renormalize
 
             ValueType* bufferData = &mBuffer[n * LeafNodeType::SIZE];
 
+            acc.moveTo(mNodes[n]->origin());
             typename LeafNodeType::ValueOnCIter iter = mNodes[n]->cbeginValueOn();
             for (; iter; ++iter) {
 
                 const ValueType phi0 = *iter;
 
-                ijk = iter.getCoord();
+                up[0] = acc.template getValue<1, 0, 0>(iter) - phi0;
+                up[1] = acc.template getValue<0, 1, 0>(iter) - phi0;
+                up[2] = acc.template getValue<0, 0, 1>(iter) - phi0;
 
-                up[0] = acc.getValue(ijk.offsetBy(1, 0, 0)) - phi0;
-                up[1] = acc.getValue(ijk.offsetBy(0, 1, 0)) - phi0;
-                up[2] = acc.getValue(ijk.offsetBy(0, 0, 1)) - phi0;
-
-                down[0] = phi0 - acc.getValue(ijk.offsetBy(-1, 0, 0));
-                down[1] = phi0 - acc.getValue(ijk.offsetBy(0, -1, 0));
-                down[2] = phi0 - acc.getValue(ijk.offsetBy(0, 0, -1));
+                down[0] = phi0 - acc.template getValue<-1, 0, 0>(iter);
+                down[1] = phi0 - acc.template getValue<0, -1, 0>(iter);
+                down[2] = phi0 - acc.template getValue<0, 0, -1>(iter);
 
                 const ValueType normSqGradPhi = math::GodunovsNormSqrd(phi0 > 0.0, down, up);
 

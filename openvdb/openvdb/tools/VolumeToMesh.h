@@ -12,6 +12,8 @@
 
 #include <openvdb/Platform.h>
 #include <openvdb/math/Operators.h> // for ISGradient
+#include <openvdb/math/Stencils.h> // for NeighborStencil
+#include <openvdb/tree/NeighborAccessor.h>
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/util/Util.h> // for INVALID_IDX
 #include <openvdb/util/Assert.h>
@@ -700,6 +702,25 @@ getCellVertexValues(const LeafT& leaf,
 }
 
 
+/// @brief Extracts the eight corner values for the cell at the voxel at @a offset in the
+/// region that @a accessor is bound to.
+template<typename TreeT, typename ValueT>
+inline void
+getCellVertexValues(const tree::NeighborAccessor<TreeT>& accessor,
+    const Index offset,
+    std::array<ValueT, 8>& values)
+{
+    values[0] = ValueT(accessor.getValue(offset));                   // i, j, k
+    values[1] = ValueT(accessor.template getValue<1, 0, 0>(offset)); // i+1, j, k
+    values[2] = ValueT(accessor.template getValue<1, 0, 1>(offset)); // i+1, j, k+1
+    values[3] = ValueT(accessor.template getValue<0, 0, 1>(offset)); // i, j, k+1
+    values[4] = ValueT(accessor.template getValue<0, 1, 0>(offset)); // i, j+1, k
+    values[5] = ValueT(accessor.template getValue<1, 1, 0>(offset)); // i+1, j+1, k
+    values[6] = ValueT(accessor.template getValue<1, 1, 1>(offset)); // i+1, j+1, k+1
+    values[7] = ValueT(accessor.template getValue<0, 1, 1>(offset)); // i, j+1, k+1
+}
+
+
 template<typename ValueType>
 inline uint8_t
 computeSignFlags(const std::array<ValueType, 8>& values, const ValueType iso)
@@ -765,6 +786,26 @@ evalCellSigns(const LeafT& leaf, const Index offset, typename LeafT::ValueType i
 }
 
 
+/// @brief  Computes the cell-sign configuration of the cell at (@a DX, @a DY, @a DZ)
+///         from the voxel at @a offset in the region that @a accessor is bound to.
+template<int DX, int DY, int DZ, typename TreeT>
+inline uint8_t
+evalCellSigns(const tree::NeighborAccessor<TreeT>& accessor, const Index offset,
+    typename tree::NeighborAccessor<TreeT>::ValueType iso)
+{
+    unsigned signs = 0;
+    if (isInsideValue(accessor.template getValue<DX,   DY,   DZ  >(offset), iso)) signs |= 1u;
+    if (isInsideValue(accessor.template getValue<DX+1, DY,   DZ  >(offset), iso)) signs |= 2u;
+    if (isInsideValue(accessor.template getValue<DX+1, DY,   DZ+1>(offset), iso)) signs |= 4u;
+    if (isInsideValue(accessor.template getValue<DX,   DY,   DZ+1>(offset), iso)) signs |= 8u;
+    if (isInsideValue(accessor.template getValue<DX,   DY+1, DZ  >(offset), iso)) signs |= 16u;
+    if (isInsideValue(accessor.template getValue<DX+1, DY+1, DZ  >(offset), iso)) signs |= 32u;
+    if (isInsideValue(accessor.template getValue<DX+1, DY+1, DZ+1>(offset), iso)) signs |= 64u;
+    if (isInsideValue(accessor.template getValue<DX,   DY+1, DZ+1>(offset), iso)) signs |= 128u;
+    return uint8_t(signs);
+}
+
+
 /// @brief  Used to correct topological ambiguities related to two adjacent cells
 ///         that share an ambiguous face.
 template<class AccessorT>
@@ -806,30 +847,58 @@ correctCellSigns(uint8_t& signs,
 }
 
 
-template<class AccessorT>
+/// @brief  As above, for the cell at the voxel at @a offset in the region that @a acc
+///         is bound to.
+template<typename TreeT>
+inline void
+correctCellSigns(uint8_t& signs,
+    const uint8_t face,
+    const tree::NeighborAccessor<TreeT>& acc,
+    const Index offset,
+    const typename tree::NeighborAccessor<TreeT>::ValueType iso)
+{
+    switch (int(face)) {
+        case 1:
+            if (sAmbiguousFace[evalCellSigns<0, 0, -1>(acc, offset, iso)] == 3) signs = uint8_t(~signs);
+            break;
+        case 2:
+            if (sAmbiguousFace[evalCellSigns<1, 0, 0>(acc, offset, iso)] == 4) signs = uint8_t(~signs);
+            break;
+        case 3:
+            if (sAmbiguousFace[evalCellSigns<0, 0, 1>(acc, offset, iso)] == 1) signs = uint8_t(~signs);
+            break;
+        case 4:
+            if (sAmbiguousFace[evalCellSigns<-1, 0, 0>(acc, offset, iso)] == 2) signs = uint8_t(~signs);
+            break;
+        case 5:
+            if (sAmbiguousFace[evalCellSigns<0, -1, 0>(acc, offset, iso)] == 6) signs = uint8_t(~signs);
+            break;
+        case 6:
+            if (sAmbiguousFace[evalCellSigns<0, 1, 0>(acc, offset, iso)] == 5) signs = uint8_t(~signs);
+            break;
+        default:
+            break;
+    }
+}
+
+
+// Return true if the cell of size @a dim at the voxel that @a read reads at (0, 0, 0) is
+// ambiguous or not manifold. @a read(dx, dy, dz) returns the value at that offset.
+template<typename ReadT, typename ValueT>
 inline bool
-isNonManifold(const AccessorT& accessor, const Coord& ijk,
-    typename AccessorT::ValueType isovalue, const int dim)
+isNonManifoldCell(const ReadT& read, const ValueT isovalue, const int dim)
 {
     const int hDim = dim >> 1;
     bool m, p[8]; // Corner signs
 
-    Coord coord = ijk; // i, j, k
-    p[0] = isInsideValue(accessor.getValue(coord), isovalue);
-    coord[0] += dim; // i+dim, j, k
-    p[1] = isInsideValue(accessor.getValue(coord), isovalue);
-    coord[2] += dim; // i+dim, j, k+dim
-    p[2] = isInsideValue(accessor.getValue(coord), isovalue);
-    coord[0] = ijk[0]; // i, j, k+dim
-    p[3] = isInsideValue(accessor.getValue(coord), isovalue);
-    coord[1] += dim; coord[2] = ijk[2]; // i, j+dim, k
-    p[4] = isInsideValue(accessor.getValue(coord), isovalue);
-    coord[0] += dim; // i+dim, j+dim, k
-    p[5] = isInsideValue(accessor.getValue(coord), isovalue);
-    coord[2] += dim; // i+dim, j+dim, k+dim
-    p[6] = isInsideValue(accessor.getValue(coord), isovalue);
-    coord[0] = ijk[0]; // i, j+dim, k+dim
-    p[7] = isInsideValue(accessor.getValue(coord), isovalue);
+    p[0] = isInsideValue(ValueT(read(0, 0, 0)), isovalue);       // i, j, k
+    p[1] = isInsideValue(ValueT(read(dim, 0, 0)), isovalue);     // i+dim, j, k
+    p[2] = isInsideValue(ValueT(read(dim, 0, dim)), isovalue);   // i+dim, j, k+dim
+    p[3] = isInsideValue(ValueT(read(0, 0, dim)), isovalue);     // i, j, k+dim
+    p[4] = isInsideValue(ValueT(read(0, dim, 0)), isovalue);     // i, j+dim, k
+    p[5] = isInsideValue(ValueT(read(dim, dim, 0)), isovalue);   // i+dim, j+dim, k
+    p[6] = isInsideValue(ValueT(read(dim, dim, dim)), isovalue); // i+dim, j+dim, k+dim
+    p[7] = isInsideValue(ValueT(read(0, dim, dim)), isovalue);   // i, j+dim, k+dim
 
     // Check if the corner sign configuration is ambiguous
     unsigned signs = 0;
@@ -846,111 +915,115 @@ isNonManifold(const AccessorT& accessor, const Coord& ijk,
     // Manifold check
 
     // Evaluate edges
-    const int i = ijk[0], ip = ijk[0] + hDim, ipp = ijk[0] + dim;
-    const int j = ijk[1], jp = ijk[1] + hDim, jpp = ijk[1] + dim;
-    const int k = ijk[2], kp = ijk[2] + hDim, kpp = ijk[2] + dim;
+    const int i = 0, ip = hDim, ipp = dim;
+    const int j = 0, jp = hDim, jpp = dim;
+    const int k = 0, kp = hDim, kpp = dim;
 
     // edge 1
-    coord.reset(ip, j, k);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(ip, j, k)), isovalue);
     if (p[0] != m && p[1] != m) return true;
 
     // edge 2
-    coord.reset(ipp, j, kp);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(ipp, j, kp)), isovalue);
     if (p[1] != m && p[2] != m) return true;
 
     // edge 3
-    coord.reset(ip, j, kpp);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(ip, j, kpp)), isovalue);
     if (p[2] != m && p[3] != m) return true;
 
     // edge 4
-    coord.reset(i, j, kp);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(i, j, kp)), isovalue);
     if (p[0] != m && p[3] != m) return true;
 
     // edge 5
-    coord.reset(ip, jpp, k);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(ip, jpp, k)), isovalue);
     if (p[4] != m && p[5] != m) return true;
 
     // edge 6
-    coord.reset(ipp, jpp, kp);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(ipp, jpp, kp)), isovalue);
     if (p[5] != m && p[6] != m) return true;
 
     // edge 7
-    coord.reset(ip, jpp, kpp);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(ip, jpp, kpp)), isovalue);
     if (p[6] != m && p[7] != m) return true;
 
     // edge 8
-    coord.reset(i, jpp, kp);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(i, jpp, kp)), isovalue);
     if (p[7] != m && p[4] != m) return true;
 
     // edge 9
-    coord.reset(i, jp, k);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(i, jp, k)), isovalue);
     if (p[0] != m && p[4] != m) return true;
 
     // edge 10
-    coord.reset(ipp, jp, k);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(ipp, jp, k)), isovalue);
     if (p[1] != m && p[5] != m) return true;
 
     // edge 11
-    coord.reset(ipp, jp, kpp);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(ipp, jp, kpp)), isovalue);
     if (p[2] != m && p[6] != m) return true;
 
 
     // edge 12
-    coord.reset(i, jp, kpp);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(i, jp, kpp)), isovalue);
     if (p[3] != m && p[7] != m) return true;
 
 
     // Evaluate faces
 
     // face 1
-    coord.reset(ip, jp, k);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(ip, jp, k)), isovalue);
     if (p[0] != m && p[1] != m && p[4] != m && p[5] != m) return true;
 
     // face 2
-    coord.reset(ipp, jp, kp);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(ipp, jp, kp)), isovalue);
     if (p[1] != m && p[2] != m && p[5] != m && p[6] != m) return true;
 
     // face 3
-    coord.reset(ip, jp, kpp);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(ip, jp, kpp)), isovalue);
     if (p[2] != m && p[3] != m && p[6] != m && p[7] != m) return true;
 
     // face 4
-    coord.reset(i, jp, kp);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(i, jp, kp)), isovalue);
     if (p[0] != m && p[3] != m && p[4] != m && p[7] != m) return true;
 
     // face 5
-    coord.reset(ip, j, kp);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(ip, j, kp)), isovalue);
     if (p[0] != m && p[1] != m && p[2] != m && p[3] != m) return true;
 
     // face 6
-    coord.reset(ip, jpp, kp);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(ip, jpp, kp)), isovalue);
     if (p[4] != m && p[5] != m && p[6] != m && p[7] != m) return true;
 
     // test cube center
-    coord.reset(ip, jp, kp);
-    m = isInsideValue(accessor.getValue(coord), isovalue);
+    m = isInsideValue(ValueT(read(ip, jp, kp)), isovalue);
     if (p[0] != m && p[1] != m && p[2] != m && p[3] != m &&
         p[4] != m && p[5] != m && p[6] != m && p[7] != m) return true;
 
     return false;
+}
+
+
+template<class AccessorT>
+inline bool
+isNonManifold(const AccessorT& accessor, const Coord& ijk,
+    typename AccessorT::ValueType isovalue, const int dim)
+{
+    return isNonManifoldCell([&](int dx, int dy, int dz) {
+        return accessor.getValue(ijk.offsetBy(dx, dy, dz));
+    }, isovalue, dim);
+}
+
+
+// As above, for the cell at the voxel at @a offset in the region that @a accessor is bound to
+template<typename TreeT>
+inline bool
+isNonManifold(const tree::NeighborAccessor<TreeT>& accessor, const Index offset,
+    typename tree::NeighborAccessor<TreeT>::ValueType isovalue, const int dim)
+{
+    return isNonManifoldCell([&](int dx, int dy, int dz) {
+        return accessor.getValue(offset, dx, dy, dz);
+    }, isovalue, dim);
 }
 
 
@@ -1541,6 +1614,8 @@ ComputePoints<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range
     using IndexArrayMap = std::map<IndexType, IndexArray>;
 
     InputTreeAccessor inputAcc(*mInputTree);
+    // Reads the corners of the cells on the upper faces of each leaf with no search of the tree
+    tree::NeighborAccessor<const InputTreeType> inputNeighbors(*mInputTree);
 
     Vec3d xyz;
     Coord ijk;
@@ -1552,6 +1627,7 @@ ComputePoints<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range
     // reference data accessors
 
     std::unique_ptr<InputTreeAccessor> refInputAcc;
+    std::unique_ptr<tree::NeighborAccessor<const InputTreeType>> refInputNeighbors;
     std::unique_ptr<Index32TreeAccessor> refPointIndexAcc;
     std::unique_ptr<Int16TreeAccessor> refSignFlagsAcc;
 
@@ -1559,6 +1635,7 @@ ComputePoints<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range
 
     if (hasReferenceData) {
         refInputAcc.reset(new InputTreeAccessor(*mRefInputTree));
+        refInputNeighbors.reset(new tree::NeighborAccessor<const InputTreeType>(*mRefInputTree));
         refPointIndexAcc.reset(new Index32TreeAccessor(*mRefPointIndexTree));
         refSignFlagsAcc.reset(new Int16TreeAccessor(*mRefSignFlagsTree));
     }
@@ -1576,10 +1653,12 @@ ComputePoints<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range
         const Index32LeafNodeType * refPointIndexNode = nullptr;
         const Int16LeafNodeType * refSignFlagsNode = nullptr;
 
+        inputNeighbors.moveTo(origin);
         if (hasReferenceData) {
             refInputNode = refInputAcc->probeConstLeaf(origin);
             refPointIndexNode = refPointIndexAcc->probeConstLeaf(origin);
             refSignFlagsNode = refSignFlagsAcc->probeConstLeaf(origin);
+            refInputNeighbors->moveTo(origin);
         }
 
         IndexType pointOffset = IndexType(mNodeOffsets[n]);
@@ -1619,7 +1698,7 @@ ComputePoints<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range
             ijk += origin;
 
             if (inclusiveCell) getCellVertexValues(*inputNode, offset, values);
-            else               getCellVertexValues(inputAcc, ijk, values);
+            else               getCellVertexValues(inputNeighbors, offset, values);
 
             size_t count, weightcount;
 
@@ -1630,7 +1709,7 @@ ComputePoints<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range
                 if (inclusiveCell && refInputNode) {
                     getCellVertexValues(*refInputNode, offset, refValues);
                 } else {
-                    getCellVertexValues(*refInputAcc, ijk, refValues);
+                    getCellVertexValues(*refInputNeighbors, offset, refValues);
                 }
                 count = computeCellPoints(points, weightedPointMask, values, refValues, signs, refSigns,
                     iso, refPointIndexNode->getValue(offset), mQuantizedSeamLinePoints);
@@ -1690,7 +1769,7 @@ ComputePoints<InputTreeType>::operator()(const tbb::blocked_range<size_t>& range
                 const uint8_t signs = uint8_t(SIGNS & sfData[offset]);
 
                 if (inclusiveCell) getCellVertexValues(*inputNode, offset, values);
-                else               getCellVertexValues(inputAcc, ijk, values);
+                else               getCellVertexValues(inputNeighbors, offset, values);
 
                 computeCellPoints(points, values, signs, iso);
 
@@ -1752,10 +1831,11 @@ struct SeamLineWeights
         tree::ValueAccessor<const InputTreeType> inputTreeAcc(*mInputTree);
         tree::ValueAccessor<const Index32TreeType> pointIndexTreeAcc(*mRefPointIndexTree);
         tree::ValueAccessor<const Int16TreeType> signFlagsTreeAcc(*mRefSignFlagsTree);
+        // Reads the corners of the cells on the upper faces of each leaf with no search of the tree
+        tree::NeighborAccessor<const InputTreeType> inputNeighbors(*mInputTree);
 
         std::array<double, 8> values;
         const double iso = double(mIsovalue);
-        Coord ijk;
         Vec3d pos;
 
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
@@ -1771,6 +1851,7 @@ struct SeamLineWeights
             if (!refPointIndexNode) continue;
 
             const InputLeafNodeType* inputNode = inputTreeAcc.probeConstLeaf(origin);
+            inputNeighbors.moveTo(origin);
 
             const auto* const sfData    = signFlagsNode.buffer().data();
             const auto* const rfIdxData = refPointIndexNode->buffer().data();
@@ -1781,11 +1862,9 @@ struct SeamLineWeights
                 const Index offset = it.pos();
                 const Int16 flags = sfData[offset];
 
-                ijk = Index32LeafNodeType::offsetToLocalCoord(offset);
+                const Coord ijk = Index32LeafNodeType::offsetToLocalCoord(offset);
 
                 const bool inclusiveCell = inputNode && isInternalLeafCoord<InputLeafNodeType>(ijk);
-
-                ijk += origin;
 
                 if ((flags & SEAM) && refSignNode->isValueOn(offset)) {
 
@@ -1793,7 +1872,7 @@ struct SeamLineWeights
                     const uint8_t rhsSigns = uint8_t(SIGNS & rsData[offset]);
 
                     if (inclusiveCell) getCellVertexValues(*inputNode, offset, values);
-                    else               getCellVertexValues(inputTreeAcc, ijk, values);
+                    else               getCellVertexValues(inputNeighbors, offset, values);
 
                     for (unsigned i = 1, I = sEdgeGroupTable[lhsSigns][0] + 1; i < I; ++i) {
 
@@ -1959,14 +2038,15 @@ struct MaskSeamLineVoxels
         using ValueOnCIter = typename LeafNodeType::ValueOnCIter;
         using ValueType = typename LeafNodeType::ValueType;
 
-        tree::ValueAccessor<const TreeType> signFlagsAcc(*mSignFlagsTree);
+        // Reads the voxels across the lower faces of each leaf with no search of the tree
+        tree::NeighborAccessor<const TreeType> signFlagsAcc(*mSignFlagsTree);
         tree::ValueAccessor<BoolTreeType> maskAcc(*mMask);
-        Coord ijk;
 
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
             LeafNodeType& signFlagsNode = *mSignFlagsNodes[n];
             auto* const sfData = signFlagsNode.buffer().data();
+            signFlagsAcc.moveTo(signFlagsNode.origin());
 
             for (ValueOnCIter it = signFlagsNode.cbeginValueOn(); it; ++it) {
 
@@ -1974,38 +2054,32 @@ struct MaskSeamLineVoxels
 
                 if (!(flags & SEAM) && (flags & EDGES)) {
 
-                    ijk = it.getCoord();
-
                     bool isSeamLineVoxel = false;
 
                     if (flags & XEDGE) {
-                        ijk[1] -= 1;
-                        isSeamLineVoxel = (signFlagsAcc.getValue(ijk) & SEAM);
-                        ijk[2] -= 1;
-                        isSeamLineVoxel = isSeamLineVoxel || (signFlagsAcc.getValue(ijk) & SEAM);
-                        ijk[1] += 1;
-                        isSeamLineVoxel = isSeamLineVoxel || (signFlagsAcc.getValue(ijk) & SEAM);
-                        ijk[2] += 1;
+                        isSeamLineVoxel = (signFlagsAcc.template getValue<0, -1, 0>(it) & SEAM);
+                        isSeamLineVoxel = isSeamLineVoxel ||
+                            (signFlagsAcc.template getValue<0, -1, -1>(it) & SEAM);
+                        isSeamLineVoxel = isSeamLineVoxel ||
+                            (signFlagsAcc.template getValue<0, 0, -1>(it) & SEAM);
                     }
 
                     if (!isSeamLineVoxel && flags & YEDGE) {
-                        ijk[2] -= 1;
-                        isSeamLineVoxel = isSeamLineVoxel || (signFlagsAcc.getValue(ijk) & SEAM);
-                        ijk[0] -= 1;
-                        isSeamLineVoxel = isSeamLineVoxel || (signFlagsAcc.getValue(ijk) & SEAM);
-                        ijk[2] += 1;
-                        isSeamLineVoxel = isSeamLineVoxel || (signFlagsAcc.getValue(ijk) & SEAM);
-                        ijk[0] += 1;
+                        isSeamLineVoxel = isSeamLineVoxel ||
+                            (signFlagsAcc.template getValue<0, 0, -1>(it) & SEAM);
+                        isSeamLineVoxel = isSeamLineVoxel ||
+                            (signFlagsAcc.template getValue<-1, 0, -1>(it) & SEAM);
+                        isSeamLineVoxel = isSeamLineVoxel ||
+                            (signFlagsAcc.template getValue<-1, 0, 0>(it) & SEAM);
                     }
 
                     if (!isSeamLineVoxel && flags & ZEDGE) {
-                        ijk[1] -= 1;
-                        isSeamLineVoxel = isSeamLineVoxel || (signFlagsAcc.getValue(ijk) & SEAM);
-                        ijk[0] -= 1;
-                        isSeamLineVoxel = isSeamLineVoxel || (signFlagsAcc.getValue(ijk) & SEAM);
-                        ijk[1] += 1;
-                        isSeamLineVoxel = isSeamLineVoxel || (signFlagsAcc.getValue(ijk) & SEAM);
-                        ijk[0] += 1;
+                        isSeamLineVoxel = isSeamLineVoxel ||
+                            (signFlagsAcc.template getValue<0, -1, 0>(it) & SEAM);
+                        isSeamLineVoxel = isSeamLineVoxel ||
+                            (signFlagsAcc.template getValue<-1, -1, 0>(it) & SEAM);
+                        isSeamLineVoxel = isSeamLineVoxel ||
+                            (signFlagsAcc.template getValue<-1, 0, 0>(it) & SEAM);
                     }
 
                     if (isSeamLineVoxel) {
@@ -2158,9 +2232,7 @@ MergeVoxelRegions<InputGridType>::operator()(const tbb::blocked_range<size_t>& r
     using Vec3sType = math::Vec3<float>;
     using Vec3sLeafNodeType = typename InputLeafNodeType::template ValueConverter<Vec3sType>::Type;
 
-    using InputTreeAccessor = tree::ValueAccessor<const InputTreeType>;
     using FloatTreeAccessor = tree::ValueAccessor<const FloatTreeType>;
-    using Index32TreeAccessor = tree::ValueAccessor<const Index32TreeType>;
     using Int16TreeAccessor = tree::ValueAccessor<const Int16TreeType>;
     using BoolTreeAccessor = tree::ValueAccessor<const BoolTreeType>;
 
@@ -2179,8 +2251,10 @@ MergeVoxelRegions<InputGridType>::operator()(const tbb::blocked_range<size_t>& r
         refSignFlagsAcc.reset(new Int16TreeAccessor(*mRefSignFlagsTree));
     }
 
-    InputTreeAccessor inputAcc(*mInputTree);
-    Index32TreeAccessor pointIndexAcc(*mPointIndexTree);
+    // Read the voxels of each leaf and the voxels across its faces with no search of the trees
+    tree::NeighborAccessor<const InputTreeType> inputAcc(*mInputTree);
+    math::NeighborStencil<const InputTreeType> inputStencil(*mInputTree);
+    tree::NeighborAccessor<const Index32TreeType> pointIndexAcc(*mPointIndexTree);
 
     MaskLeafNodeType mask;
 
@@ -2233,6 +2307,7 @@ MergeVoxelRegions<InputGridType>::operator()(const tbb::blocked_range<size_t>& r
         }
 
         // Mask off ambiguous voxels
+        pointIndexAcc.moveTo(signFlagsNode.origin());
         for (auto it = signFlagsNode.cbeginValueOn(); it; ++it) {
             const Int16 flags = it.getValue();
             const unsigned char signs = static_cast<unsigned char>(SIGNS & int(flags));
@@ -2245,37 +2320,24 @@ MergeVoxelRegions<InputGridType>::operator()(const tbb::blocked_range<size_t>& r
 
                 bool maskRegion = false;
 
-                ijk = it.getCoord();
-                if (!pointIndexAcc.isValueOn(ijk)) maskRegion = true;
+                if (!pointIndexAcc.isValueOn(it)) maskRegion = true;
 
                 if (!maskRegion && flags & XEDGE) {
-                    ijk[1] -= 1;
-                    if (!maskRegion && !pointIndexAcc.isValueOn(ijk)) maskRegion = true;
-                    ijk[2] -= 1;
-                    if (!maskRegion && !pointIndexAcc.isValueOn(ijk)) maskRegion = true;
-                    ijk[1] += 1;
-                    if (!maskRegion && !pointIndexAcc.isValueOn(ijk)) maskRegion = true;
-                    ijk[2] += 1;
+                    maskRegion = !pointIndexAcc.template isValueOn<0, -1, 0>(it) ||
+                        !pointIndexAcc.template isValueOn<0, -1, -1>(it) ||
+                        !pointIndexAcc.template isValueOn<0, 0, -1>(it);
                 }
 
                 if (!maskRegion && flags & YEDGE) {
-                    ijk[2] -= 1;
-                    if (!maskRegion && !pointIndexAcc.isValueOn(ijk)) maskRegion = true;
-                    ijk[0] -= 1;
-                    if (!maskRegion && !pointIndexAcc.isValueOn(ijk)) maskRegion = true;
-                    ijk[2] += 1;
-                    if (!maskRegion && !pointIndexAcc.isValueOn(ijk)) maskRegion = true;
-                    ijk[0] += 1;
+                    maskRegion = !pointIndexAcc.template isValueOn<0, 0, -1>(it) ||
+                        !pointIndexAcc.template isValueOn<-1, 0, -1>(it) ||
+                        !pointIndexAcc.template isValueOn<-1, 0, 0>(it);
                 }
 
                 if (!maskRegion && flags & ZEDGE) {
-                    ijk[1] -= 1;
-                    if (!maskRegion && !pointIndexAcc.isValueOn(ijk)) maskRegion = true;
-                    ijk[0] -= 1;
-                    if (!maskRegion && !pointIndexAcc.isValueOn(ijk)) maskRegion = true;
-                    ijk[1] += 1;
-                    if (!maskRegion && !pointIndexAcc.isValueOn(ijk)) maskRegion = true;
-                    ijk[0] += 1;
+                    maskRegion = !pointIndexAcc.template isValueOn<0, -1, 0>(it) ||
+                        !pointIndexAcc.template isValueOn<-1, -1, 0>(it) ||
+                        !pointIndexAcc.template isValueOn<-1, 0, 0>(it);
                 }
 
                 if (maskRegion) {
@@ -2285,11 +2347,14 @@ MergeVoxelRegions<InputGridType>::operator()(const tbb::blocked_range<size_t>& r
         }
 
         // Mask off topologically ambiguous 2x2x2 voxel sub-blocks
+        inputAcc.moveTo(origin);
         int dim = 2;
         for (ijk[0] = origin[0]; ijk[0] < end[0]; ijk[0] += dim) {
             for (ijk[1] = origin[1]; ijk[1] < end[1]; ijk[1] += dim) {
                 for (ijk[2] = origin[2]; ijk[2] < end[2]; ijk[2] += dim) {
-                    if (!mask.isValueOn(ijk) && isNonManifold(inputAcc, ijk, mIsovalue, dim)) {
+                    if (!mask.isValueOn(ijk) && isNonManifold(inputAcc,
+                        InputLeafNodeType::coordToOffset(ijk), mIsovalue, dim))
+                    {
                         mask.setActiveState(ijk, true);
                     }
                 }
@@ -2311,7 +2376,8 @@ MergeVoxelRegions<InputGridType>::operator()(const tbb::blocked_range<size_t>& r
                 ijk = it.getCoord();
                 if (!mask.isValueOn(ijk & ~1u))
                 {
-                    Vec3sType dir(math::ISGradient<math::CD_2ND>::result(inputAcc, ijk));
+                    inputStencil.moveTo(ijk);
+                    Vec3sType dir(math::ISGradient<math::CD_2ND>::result(inputStencil));
                     dir.normalize();
 
                     if (invertGradientDir) {
@@ -2334,7 +2400,8 @@ MergeVoxelRegions<InputGridType>::operator()(const tbb::blocked_range<size_t>& r
                         adaptivity = adaptivityLeaf.getValue(ijk);
 
                         if (mask.isValueOn(ijk)
-                            || isNonManifold(inputAcc, ijk, mIsovalue, dim)
+                            || isNonManifold(inputAcc, InputLeafNodeType::coordToOffset(ijk),
+                                mIsovalue, dim)
                             || (useGradients && !isMergeable(*gradientNode, ijk, dim, adaptivity)))
                         {
                             mask.setActiveState(ijk & coordMask, true);
@@ -2486,6 +2553,29 @@ private:
 
     size_t mQuadIdx, mTriangleIdx;
     PolygonPool *mPolygonPool;
+};
+
+
+/// @brief Reads by coordinate, as constructPolygons() does, through a tree::NeighborAccessor,
+/// at coordinates in the region it is bound to and in the regions next to it.
+template<typename TreeT>
+struct NeighborCoordReader
+{
+    using ValueType = typename tree::NeighborAccessor<TreeT>::ValueType;
+
+    const ValueType& getValue(const Coord& ijk) const
+    {
+        const Coord d = ijk - mAccessor.origin();
+        return mAccessor.getValue(Index(0), d[0], d[1], d[2]);
+    }
+
+    bool probeValue(const Coord& ijk, ValueType& value) const
+    {
+        const Coord d = ijk - mAccessor.origin();
+        return mAccessor.probeValue(Index(0), d[0], d[1], d[2], value);
+    }
+
+    const tree::NeighborAccessor<TreeT>& mAccessor;
 };
 
 
@@ -3361,7 +3451,8 @@ struct MaskIntersectingVoxels
     }
 
 private:
-    tree::ValueAccessor<const InputTreeType>    mInputAccessor;
+    // Reads the voxel of each cell and its neighbors in +x, +y and +z with no search of the tree
+    tree::NeighborAccessor<const InputTreeType> mInputAccessor;
     BoolLeafNodeType const * const * const      mNodes;
 
     BoolTreeType                        mIntersectionTree;
@@ -3411,6 +3502,8 @@ MaskIntersectingVoxels<InputTreeType>::operator()(const tbb::blocked_range<size_
     for (size_t n = range.begin(); n != range.end(); ++n) {
 
         const BoolLeafNodeType& node = *mNodes[n];
+        mInputAccessor.moveTo(node.origin());
+        const tree::NeighborAccessor<const InputTreeType>& acc = mInputAccessor;
 
         for (auto it = node.cbeginValueOn(); it; ++it) {
 
@@ -3418,17 +3511,17 @@ MaskIntersectingVoxels<InputTreeType>::operator()(const tbb::blocked_range<size_
 
                 ijk = it.getCoord();
 
-                const bool inside = isInsideValue(mInputAccessor.getValue(ijk), mIsovalue);
+                const bool inside = isInsideValue(acc.getValue(it), mIsovalue);
 
-                if (inside != isInsideValue(mInputAccessor.getValue(ijk.offsetBy(1, 0, 0)), mIsovalue)) {
+                if (inside != isInsideValue(acc.template getValue<1, 0, 0>(it), mIsovalue)) {
                     xEdgeAcc.set(ijk);
                 }
 
-                if (inside != isInsideValue(mInputAccessor.getValue(ijk.offsetBy(0, 1, 0)), mIsovalue)) {
+                if (inside != isInsideValue(acc.template getValue<0, 1, 0>(it), mIsovalue)) {
                     yEdgeAcc.set(ijk);
                 }
 
-                if (inside != isInsideValue(mInputAccessor.getValue(ijk.offsetBy(0, 0, 1)), mIsovalue)) {
+                if (inside != isInsideValue(acc.template getValue<0, 0, 1>(it), mIsovalue)) {
                     zEdgeAcc.set(ijk);
                 }
             }
@@ -3460,48 +3553,51 @@ struct MaskBorderVoxels
 
     void operator()(const tbb::blocked_range<size_t>& range)
     {
-        tree::ValueAccessor<const BoolTreeType> maskAcc(*mMaskTree);
+        // Reads the voxels across the upper faces of each leaf with no search of the tree
+        tree::NeighborAccessor<const BoolTreeType> maskAcc(*mMaskTree);
         tree::ValueAccessor<BoolTreeType> borderAcc(*mBorderTree);
-        Coord ijk;
 
         for (size_t n = range.begin(); n != range.end(); ++n) {
 
             const BoolLeafNodeType& node = *mMaskNodes[n];
+            maskAcc.moveTo(node.origin());
 
             for (auto it = node.cbeginValueOn(); it; ++it) {
-
-                ijk = it.getCoord();
 
                 const bool lhs = it.getValue();
                 bool rhs = lhs;
 
                 bool isEdgeVoxel = false;
 
-                ijk[2] += 1; // i, j, k+1
-                isEdgeVoxel = (maskAcc.probeValue(ijk, rhs) && lhs != rhs);
+                // i, j, k+1
+                isEdgeVoxel = (maskAcc.template probeValue<0, 0, 1>(it, rhs) && lhs != rhs);
 
-                ijk[1] += 1; // i, j+1, k+1
-                isEdgeVoxel = isEdgeVoxel || (maskAcc.probeValue(ijk, rhs) && lhs != rhs);
+                // i, j+1, k+1
+                isEdgeVoxel = isEdgeVoxel ||
+                    (maskAcc.template probeValue<0, 1, 1>(it, rhs) && lhs != rhs);
 
-                ijk[0] += 1; // i+1, j+1, k+1
-                isEdgeVoxel = isEdgeVoxel || (maskAcc.probeValue(ijk, rhs) && lhs != rhs);
+                // i+1, j+1, k+1
+                isEdgeVoxel = isEdgeVoxel ||
+                    (maskAcc.template probeValue<1, 1, 1>(it, rhs) && lhs != rhs);
 
-                ijk[1] -= 1; // i+1, j, k+1
-                isEdgeVoxel = isEdgeVoxel || (maskAcc.probeValue(ijk, rhs) && lhs != rhs);
+                // i+1, j, k+1
+                isEdgeVoxel = isEdgeVoxel ||
+                    (maskAcc.template probeValue<1, 0, 1>(it, rhs) && lhs != rhs);
 
+                // i+1, j, k
+                isEdgeVoxel = isEdgeVoxel ||
+                    (maskAcc.template probeValue<1, 0, 0>(it, rhs) && lhs != rhs);
 
-                ijk[2] -= 1; // i+1, j, k
-                isEdgeVoxel = isEdgeVoxel || (maskAcc.probeValue(ijk, rhs) && lhs != rhs);
+                // i+1, j+1, k
+                isEdgeVoxel = isEdgeVoxel ||
+                    (maskAcc.template probeValue<1, 1, 0>(it, rhs) && lhs != rhs);
 
-                ijk[1] += 1; // i+1, j+1, k
-                isEdgeVoxel = isEdgeVoxel || (maskAcc.probeValue(ijk, rhs) && lhs != rhs);
-
-                ijk[0] -= 1; // i, j+1, k
-                isEdgeVoxel = isEdgeVoxel || (maskAcc.probeValue(ijk, rhs) && lhs != rhs);
+                // i, j+1, k
+                isEdgeVoxel = isEdgeVoxel ||
+                    (maskAcc.template probeValue<0, 1, 0>(it, rhs) && lhs != rhs);
 
                 if (isEdgeVoxel) {
-                    ijk[1] -= 1; // i, j, k
-                    borderAcc.setValue(ijk, true);
+                    borderAcc.setValue(it.getCoord(), true);
                 }
             }
         }
@@ -3730,6 +3826,9 @@ struct ComputeAuxiliaryData
 
 private:
     tree::ValueAccessor<const InputTreeType>    mInputAccessor;
+    // Reads the cells on the upper faces of each leaf, and the cells next to ambiguous faces,
+    // with no search of the tree
+    tree::NeighborAccessor<const InputTreeType> mInputNeighbors;
     BoolLeafNodeType const * const * const      mIntersectionNodes;
 
     Int16TreeType                           mSignFlagsTree;
@@ -3749,6 +3848,7 @@ ComputeAuxiliaryData<InputTreeType>::ComputeAuxiliaryData(
     Index32TreeType& pointIndexTree,
     InputValueType iso)
     : mInputAccessor(inputTree)
+    , mInputNeighbors(inputTree)
     , mIntersectionNodes(intersectionLeafNodes.data())
     , mSignFlagsTree(0)
     , mSignFlagsAccessor(signFlagsTree)
@@ -3763,6 +3863,7 @@ ComputeAuxiliaryData<InputTreeType>::ComputeAuxiliaryData(
 template<typename InputTreeType>
 ComputeAuxiliaryData<InputTreeType>::ComputeAuxiliaryData(ComputeAuxiliaryData& rhs, tbb::split)
     : mInputAccessor(rhs.mInputAccessor.tree())
+    , mInputNeighbors(rhs.mInputAccessor.tree())
     , mIntersectionNodes(rhs.mIntersectionNodes)
     , mSignFlagsTree(0)
     , mSignFlagsAccessor(mSignFlagsTree)
@@ -3789,6 +3890,7 @@ ComputeAuxiliaryData<InputTreeType>::operator()(const tbb::blocked_range<size_t>
         const Coord& origin = maskNode.origin();
 
         const InputLeafNodeType* leafPt = mInputAccessor.probeConstLeaf(origin);
+        mInputNeighbors.moveTo(origin);
 
         if (!signsNodePt.get()) signsNodePt.reset(new Int16LeafNodeType(origin, 0));
         else                    signsNodePt->setOrigin(origin);
@@ -3803,7 +3905,7 @@ ComputeAuxiliaryData<InputTreeType>::operator()(const tbb::blocked_range<size_t>
             const bool inclusiveCell = leafPt && isInternalLeafCoord<InputLeafNodeType>(ijk);
 
             if (inclusiveCell) getCellVertexValues(*leafPt, pos, cellVertexValues);
-            else               getCellVertexValues(mInputAccessor, origin + ijk, cellVertexValues);
+            else               getCellVertexValues(mInputNeighbors, pos, cellVertexValues);
 
             uint8_t signFlags = computeSignFlags(cellVertexValues, mIsovalue);
 
@@ -3821,8 +3923,8 @@ ComputeAuxiliaryData<InputTreeType>::operator()(const tbb::blocked_range<size_t>
 
                 const uint8_t ambiguousCellFlags = sAmbiguousFace[signFlags];
                 if (ambiguousCellFlags != 0) {
-                    correctCellSigns(signFlags, ambiguousCellFlags, mInputAccessor,
-                        origin + ijk, mIsovalue);
+                    correctCellSigns(signFlags, ambiguousCellFlags, mInputNeighbors,
+                        pos, mIsovalue);
                 }
 
                 edgeFlags |= int(signFlags);
@@ -4047,6 +4149,12 @@ ComputePolygons<InputTreeType, PrimBuilder>::operator()(const tbb::blocked_range
 
     tree::ValueAccessor<const Index32TreeType> idxAcc(*mIndexTree);
 
+    // Read the voxels across the lower faces of each leaf with no search of the trees
+    tree::NeighborAccessor<const Int16TreeType> signNeighbors(*mSignFlagsTree);
+    tree::NeighborAccessor<const Index32TreeType> idxNeighbors(*mIndexTree);
+    const NeighborCoordReader<const Int16TreeType> signReader{signNeighbors};
+    const NeighborCoordReader<const Index32TreeType> idxReader{idxNeighbors};
+
     const bool invertSurfaceOrientation = mInvertSurfaceOrientation;
 
     PrimBuilder mesher;
@@ -4083,6 +4191,9 @@ ComputePolygons<InputTreeType, PrimBuilder>::operator()(const tbb::blocked_range
         const Int16LeafNodeType *refSignLeafPt = nullptr;
         if (refSignAcc) refSignLeafPt = refSignAcc->probeConstLeaf(origin);
 
+        signNeighbors.moveTo(origin);
+        idxNeighbors.moveTo(origin);
+
         Vec3i offsets;
 
         for (iter = node.cbeginValueOn(); iter; ++iter) {
@@ -4112,7 +4223,7 @@ ComputePolygons<InputTreeType, PrimBuilder>::operator()(const tbb::blocked_range
                     flags, refFlags, offsets, ijk, *signleafPt, *idxLeafPt, mesher);
             } else {
                 constructPolygons(invertSurfaceOrientation,
-                    flags, refFlags, offsets, ijk, signAcc, idxAcc, mesher);
+                    flags, refFlags, offsets, ijk, signReader, idxReader, mesher);
             }
         }
 
