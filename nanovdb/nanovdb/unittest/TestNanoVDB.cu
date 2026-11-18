@@ -104,11 +104,12 @@ void cudaStr()
     cudaCheck(cudaFree(d_str));
 }// cudaStr
 
-// used to test lambdaKernel and offsetLambdaKernel past 2^31 items
+// used to test lambdaKernel and offsetLambdaKernel past 2^32 items
 void lambdaKernel64BitIndex()
 {
-    // Past 2^31 items a 32-bit thread index wraps, and past 2^32 a 32-bit offset: check the last item is reached
-    const size_t numItems = (size_t(1) << 31) + 2, offset = size_t(1) << 32;
+    // Past 2^32 items every 32-bit thread index wraps, signed or unsigned, and a 32-bit offset cannot hold 2^32:
+    // check the last item is reached
+    const size_t numItems = (size_t(1) << 32) + 2, offset = size_t(1) << 32;
     const size_t threadsPerBlock = 128, blockCount = util::cuda::blocksPerGrid(numItems, threadsPerBlock);
     size_t last, *d_last;
     cudaCheck(cudaMalloc((void**)&d_last, sizeof(size_t)));
