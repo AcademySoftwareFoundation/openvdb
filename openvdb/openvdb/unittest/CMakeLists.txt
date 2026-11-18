@@ -105,6 +105,7 @@ else()
     TestGridBbox.cc
     TestGridDescriptor.cc
     TestGridIO.cc
+    TestGridOperators.cc
     TestGridTransformer.cc
     TestIndexFilter.cc
     TestIndexIterator.cc

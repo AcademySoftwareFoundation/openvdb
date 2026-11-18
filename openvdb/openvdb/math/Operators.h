@@ -1478,9 +1478,9 @@ struct Laplacian
             d2_rs = map.applyIJC(d2_is);
         } else {
             // compute the first derivatives with 2nd order accuracy.
-            Vec3d d1_is(D1<CD_2ND>::inX(stencil),
-                        D1<CD_2ND>::inY(stencil),
-                        D1<CD_2ND>::inZ(stencil) );
+            Vec3d d1_is(static_cast<double>(D1<CD_2ND>::inX(stencil)),
+                        static_cast<double>(D1<CD_2ND>::inY(stencil)),
+                        static_cast<double>(D1<CD_2ND>::inZ(stencil)));
 
             d2_rs = map.applyIJC(d2_is, d1_is, stencil.getCenterCoord().asVec3d());
         }
@@ -1850,9 +1850,9 @@ struct MeanCurvature
         using ValueType = typename StencilT::ValueType;
 
          // compute the gradient in index and world space
-         Vec3d d1_is(D1<DiffScheme1>::inX(stencil),
-                     D1<DiffScheme1>::inY(stencil),
-                     D1<DiffScheme1>::inZ(stencil) ), d1_ws;
+         Vec3d d1_is(static_cast<double>(D1<DiffScheme1>::inX(stencil)),
+                     static_cast<double>(D1<DiffScheme1>::inY(stencil)),
+                     static_cast<double>(D1<DiffScheme1>::inZ(stencil))), d1_ws;
          if (is_linear<MapType>::value) {//resolved at compiletime
              d1_ws = map.applyIJT(d1_is);
          } else {
