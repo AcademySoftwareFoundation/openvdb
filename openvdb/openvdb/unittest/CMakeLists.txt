@@ -208,7 +208,7 @@ add_executable(vdb_test ${UNITTEST_SOURCE_FILES})
 # provide header access for the relevant unit tests
 
 target_include_directories(vdb_test PRIVATE
-  ${CMAKE_SOURCE_DIR}/ext/blosc/openvdb/ext/blosc
+  ${OpenVDB_SOURCE_DIR}/ext/blosc/openvdb/ext/blosc
 )
 
 target_link_libraries(vdb_test ${OPENVDB_TEST_DEPENDENT_LIBS})

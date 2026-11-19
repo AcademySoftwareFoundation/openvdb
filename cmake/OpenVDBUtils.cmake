@@ -190,8 +190,9 @@ function(OPENVDB_COMPUTE_X86_INSTRSET_FROM_VCL VCL_INSTRSET)
   # @note would be much faster with try_run but this way doesn't involve
   #   invoking bad instruction sets on unsupported ISAs on the build machine.
   include(CheckCXXSourceCompiles)
+  list(APPEND CMAKE_REQUIRED_INCLUDES "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../ext/vcl")
   check_cxx_source_compiles([[
-    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    #include <openvdb/ext/vcl/instrset.h>
     int main() { static_assert(INSTRSET == 10); return 0; } ]] COMPUTE_VCL_INSTRSET__AVX512VL_DQ_BW__)
   if(COMPUTE_VCL_INSTRSET__AVX512VL_DQ_BW__)
     set(${VCL_INSTRSET} 10 PARENT_SCOPE)
@@ -199,7 +200,7 @@ function(OPENVDB_COMPUTE_X86_INSTRSET_FROM_VCL VCL_INSTRSET)
     return()
   endif()
   check_cxx_source_compiles([[
-    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    #include <openvdb/ext/vcl/instrset.h>
     int main() { static_assert(INSTRSET == 9); return 0; } ]] COMPUTE_VCL_INSTRSET__AVX512F__)
   if(COMPUTE_VCL_INSTRSET__AVX512F__)
     set(${VCL_INSTRSET} 9 PARENT_SCOPE)
@@ -207,7 +208,7 @@ function(OPENVDB_COMPUTE_X86_INSTRSET_FROM_VCL VCL_INSTRSET)
     return()
   endif()
   check_cxx_source_compiles([[
-    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    #include <openvdb/ext/vcl/instrset.h>
     int main() { static_assert(INSTRSET == 8); return 0; } ]] COMPUTE_VCL_INSTRSET__AVX2__)
   if(COMPUTE_VCL_INSTRSET__AVX2__)
     set(${VCL_INSTRSET} 8 PARENT_SCOPE)
@@ -215,7 +216,7 @@ function(OPENVDB_COMPUTE_X86_INSTRSET_FROM_VCL VCL_INSTRSET)
     return()
   endif()
   check_cxx_source_compiles([[
-    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    #include <openvdb/ext/vcl/instrset.h>
     int main() { static_assert(INSTRSET == 7); return 0; } ]] COMPUTE_VCL_INSTRSET__AVX__)
   if(COMPUTE_VCL_INSTRSET__AVX__)
     set(${VCL_INSTRSET} 7 PARENT_SCOPE)
@@ -223,7 +224,7 @@ function(OPENVDB_COMPUTE_X86_INSTRSET_FROM_VCL VCL_INSTRSET)
     return()
   endif()
   check_cxx_source_compiles([[
-    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    #include <openvdb/ext/vcl/instrset.h>
     int main() { static_assert(INSTRSET == 6); return 0; } ]] COMPUTE_VCL_INSTRSET__SSE4_2__)
   if(COMPUTE_VCL_INSTRSET__SSE4_2__)
     set(${VCL_INSTRSET} 6 PARENT_SCOPE)
@@ -231,7 +232,7 @@ function(OPENVDB_COMPUTE_X86_INSTRSET_FROM_VCL VCL_INSTRSET)
     return()
   endif()
   check_cxx_source_compiles([[
-    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    #include <openvdb/ext/vcl/instrset.h>
     int main() { static_assert(INSTRSET == 5); return 0; } ]] COMPUTE_VCL_INSTRSET__SSE4_1__)
   if(COMPUTE_VCL_INSTRSET__SSE4_1__)
     set(${VCL_INSTRSET} 5 PARENT_SCOPE)
@@ -239,7 +240,7 @@ function(OPENVDB_COMPUTE_X86_INSTRSET_FROM_VCL VCL_INSTRSET)
     return()
   endif()
   check_cxx_source_compiles([[
-    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    #include <openvdb/ext/vcl/instrset.h>
     int main() { static_assert(INSTRSET == 4); return 0; } ]] COMPUTE_VCL_INSTRSET__SSSE3__)
   if(COMPUTE_VCL_INSTRSET__SSSE3__)
     set(${VCL_INSTRSET} 4 PARENT_SCOPE)
@@ -247,7 +248,7 @@ function(OPENVDB_COMPUTE_X86_INSTRSET_FROM_VCL VCL_INSTRSET)
     return()
   endif()
   check_cxx_source_compiles([[
-    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    #include <openvdb/ext/vcl/instrset.h>
     int main() { static_assert(INSTRSET == 3); return 0; } ]] COMPUTE_VCL_INSTRSET__SSE3__)
   if(COMPUTE_VCL_INSTRSET__SSE3__)
     set(${VCL_INSTRSET} 3 PARENT_SCOPE)
@@ -255,7 +256,7 @@ function(OPENVDB_COMPUTE_X86_INSTRSET_FROM_VCL VCL_INSTRSET)
     return()
   endif()
   check_cxx_source_compiles([[
-    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    #include <openvdb/ext/vcl/instrset.h>
     int main() { static_assert(INSTRSET == 2); return 0; } ]] COMPUTE_VCL_INSTRSET__SSE2__)
   if(COMPUTE_VCL_INSTRSET__SSE2__)
     set(${VCL_INSTRSET} 2 PARENT_SCOPE)
@@ -263,7 +264,7 @@ function(OPENVDB_COMPUTE_X86_INSTRSET_FROM_VCL VCL_INSTRSET)
     return()
   endif()
   check_cxx_source_compiles([[
-    #include "${CMAKE_SOURCE_DIR}/ext/vcl/openvdb/ext/vcl/instrset.h"
+    #include <openvdb/ext/vcl/instrset.h>
     int main() { static_assert(INSTRSET == 1); return 0; } ]] COMPUTE_VCL_INSTRSET__SSE__)
   if(COMPUTE_VCL_INSTRSET__SSE__)
     set(${VCL_INSTRSET} 1 PARENT_SCOPE)
