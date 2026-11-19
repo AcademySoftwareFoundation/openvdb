@@ -574,11 +574,11 @@ GridHandle<BufferT> readGrid(std::istream& is, int n, const BufferT& pool)
             }// loop over segments
             if (gridCount == 0) return handle;// the stream holds no grids
             auto buffer = BufferT::create(bufferSize, &pool);
-            char *ptr = (char*)buffer.data();
+            char *ptr = static_cast<char*>(buffer.data());
             is.seekg(start);// rewind
             while (seg.read(is)) {
                 for (auto& m : seg.meta) {
-                    if (m.gridSize > bufferSize - uint64_t(ptr - (char*)buffer.data()))
+                    if (m.gridSize > bufferSize - uint64_t(ptr - static_cast<char*>(buffer.data())))
                         throw std::runtime_error("Grid sizes in stream changed between passes");
                     Internal::read(is, ptr, m.gridSize, seg.header.codec, m.fileSize);
                     detail::checkGridHead(ptr, m.gridSize);

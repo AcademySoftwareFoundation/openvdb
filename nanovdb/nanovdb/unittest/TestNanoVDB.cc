@@ -7468,7 +7468,7 @@ TEST_F(TestNanoVDB, MultiFile)
         EXPECT_EQ(16u, handles.size());
         auto& handle = handles.front();
         EXPECT_EQ(1u, handle.gridCount());
-        EXPECT_EQ(std::string("Int32 grid"), handle.gridData()->mGridName);
+        EXPECT_EQ(std::string("Int32 grid"), handle.gridMetaData()->shortGridName());
         EXPECT_FALSE(handle.grid<float>());
         EXPECT_FALSE(handle.grid<double>());
         EXPECT_FALSE(handle.grid<int64_t>());
@@ -7515,7 +7515,7 @@ TEST_F(TestNanoVDB, MultiFile)
         auto& handle = handles[1];
         EXPECT_TRUE(handle);
         EXPECT_EQ(1u, handle.gridCount());
-        EXPECT_EQ(std::string("Int32 grid, empty"), handle.gridData()->mGridName);
+        EXPECT_EQ(std::string("Int32 grid, empty"), handle.gridMetaData()->shortGridName());
         EXPECT_FALSE(handle.grid<float>());
         EXPECT_FALSE(handle.grid<double>());
         EXPECT_FALSE(handle.grid<int64_t>());
@@ -7553,7 +7553,7 @@ TEST_F(TestNanoVDB, MultiFile)
         auto& handle = handles[3];
         EXPECT_EQ(1u, handle.gridCount());
         EXPECT_TRUE(handle);
-        EXPECT_EQ(std::string("Int64 grid"), handle.gridData()->mGridName);
+        EXPECT_EQ(std::string("Int64 grid"), handle.gridMetaData()->shortGridName());
         auto* grid = handle.grid<int64_t>();
         EXPECT_TRUE(grid);
         EXPECT_EQ(handle.gridMetaData()->indexBBox(), grid->indexBBox());
@@ -7578,7 +7578,7 @@ TEST_F(TestNanoVDB, MultiFile)
         auto& handle = handles[4];
         EXPECT_EQ(1u, handle.gridCount());
         EXPECT_TRUE(handle);
-        EXPECT_EQ(std::string("UInt8 grid"), handle.gridData()->mGridName);
+        EXPECT_EQ(std::string("UInt8 grid"), handle.gridMetaData()->shortGridName());
         auto* grid = handle.grid<uint8_t>();
         EXPECT_TRUE(grid);
         EXPECT_EQ(handle.gridMetaData()->indexBBox(), grid->indexBBox());
@@ -7601,7 +7601,7 @@ TEST_F(TestNanoVDB, MultiFile)
         auto& handle = handles[2];
         EXPECT_TRUE(handle);
         EXPECT_EQ(1u, handle.gridCount());
-        EXPECT_EQ(std::string("Float vector grid"), handle.gridData()->mGridName);
+        EXPECT_EQ(std::string("Float vector grid"), handle.gridMetaData()->shortGridName());
         auto* grid = handle.grid<nanovdb::Vec3f>();
         EXPECT_TRUE(grid);
         EXPECT_EQ(1u, grid->activeVoxelCount());
@@ -7623,7 +7623,7 @@ TEST_F(TestNanoVDB, MultiFile)
         auto& handle = handles.back();
         EXPECT_TRUE(handle);
         EXPECT_EQ(1u, handle.gridCount());
-        EXPECT_EQ(std::string("Double grid"), handle.gridData()->mGridName);
+        EXPECT_EQ(std::string("Double grid"), handle.gridMetaData()->shortGridName());
         auto* grid = handle.grid<double>();
         EXPECT_TRUE(grid);
         EXPECT_EQ(1u, grid->activeVoxelCount());
@@ -7946,6 +7946,19 @@ TEST_F(TestNanoVDB, HostBuffer)
     } catch(const std::exception& e) {
         std::cout << "Unable to read \"data/multi1.nvdb\" for unit-test\n" << e.what() << std::endl;
     }
+    {// moving a zero-size buffer moves its registration in the pool, so pool.reset() releases the destination
+        auto pool = nanovdb::HostBuffer::createPool(1024);
+        auto src1 = nanovdb::HostBuffer::create(0, &pool);
+        auto src2 = nanovdb::HostBuffer::create(0, &pool);
+        nanovdb::HostBuffer constructed(std::move(src1));
+        nanovdb::HostBuffer assigned;
+        assigned = std::move(src2);
+        EXPECT_EQ(pool.poolSize(), constructed.poolSize());
+        EXPECT_EQ(pool.poolSize(), assigned.poolSize());
+        pool.reset();
+        EXPECT_EQ(0u, constructed.poolSize());
+        EXPECT_EQ(0u, assigned.poolSize());
+    }// the pool is destroyed here with an empty register
 }// HostBuffer
 
 TEST_F(TestNanoVDB, NodeIterators)
@@ -9960,6 +9973,20 @@ TEST_F(TestNanoVDB, ReadMalformedRawBuffer)
         const std::string bytes = toBytes(makeTinyGrid("a")) + toBytes(makeTinyGrid("b"));
         EXPECT_EQ(std::string("a"), readNamed(bytes, "a").gridData()->mGridName);
         EXPECT_TRUE(throwsWith([&]{ readNamed(bytes, "b"); }, "No raw grid named"));
+    }
+    {// lookup by index never reads a grid after the end of the chain, even when an index is malformed
+        auto pair = [](const std::string& name0, const std::string& name1) {
+            std::vector<GridHandle<>> handles;
+            handles.push_back(makeTinyGrid(name0));
+            handles.push_back(makeTinyGrid(name1));
+            return mergeGrids<HostBuffer, std::vector>(handles);
+        };
+        const auto chain = pair("a", "b");
+        std::string bytes = toBytes(chain) + toBytes(pair("c", "d"));
+        const uint32_t forged = 7;// grid "b" no longer claims index 1, so the walk reaches "d"
+        std::memcpy(&bytes[chain.gridSize(0) + offsetof(GridData, mGridIndex)], &forged, sizeof(forged));
+        std::istringstream is(bytes, std::ios_base::in | std::ios_base::binary);
+        EXPECT_TRUE(throwsWith([&]{ GridHandle<>().read(is, 1u); }, "no raw grid in the chain has index 1"));
     }
     {// grid name without NULL termination
         std::string bytes = raw;

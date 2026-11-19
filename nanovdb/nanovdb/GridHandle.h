@@ -649,7 +649,7 @@ void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
                   "GridHandle::read requires a host-accessible buffer: read into a host-readable handle, then cuda::copyTo");
     const std::streampos start = is.tellg();// remember where the raw buffer begins
     GridData data;
-    if (is.read((char*)&data, sizeof(GridData)) && data.isValid()) {
+    if (is.read(reinterpret_cast<char*>(&data), sizeof(GridData)) && data.isValid()) {
         static_assert(std::is_unsigned<decltype(GridData::mGridSize)>::value,
                       "GridHandle::read relies on unsigned wrap-around to detect overflow");
         const char* truncated = "GridHandle::read: stream is shorter than its raw grid sizes";
@@ -682,11 +682,14 @@ void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool
                   "GridHandle::read requires a host-accessible buffer: read into a host-readable handle, then cuda::copyTo");
     const std::streampos start = is.tellg();
     GridData data;
-    if (is.read((char*)&data, sizeof(GridData)) && data.isValid()) {
+    if (is.read(reinterpret_cast<char*>(&data), sizeof(GridData)) && data.isValid()) {
         if (n>=data.mGridCount) throw std::runtime_error("stream does not contain a #" + std::to_string(n) + " grid");
         const char* truncated = "GridHandle::read: stream is shorter than its raw grid size";
         detail::checkRawGridSize(data);
-        while(data.mGridIndex != n) {
+
+        // visit at most the grid count of the first header, so data after the chain is never read
+        for (uint32_t i = 0, count = data.mGridCount; data.mGridIndex != n;) {
+            if (++i >= count) throw std::runtime_error("GridHandle::read: no raw grid in the chain has index " + std::to_string(n));
             is.seekg(data.mGridSize - sizeof(GridData), std::ios::cur);// skip grid
             detail::readValue(is, data, truncated);
             detail::checkRawGridSize(data);
@@ -694,9 +697,10 @@ void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool
         is.seekg(-sizeof(GridData), std::ios::cur);// rewind
         detail::checkRemaining(is, data.mGridSize, truncated);
         auto buffer = detail::createHostStorage(data.mGridSize, pool);
-        detail::readBytes(is, buffer.data(), data.mGridSize, truncated);
-        detail::checkGridHead(buffer.data(), data.mGridSize);
-        tools::updateGridCount(static_cast<GridData*>(buffer.data()), 0u, 1u);
+        void* grid = buffer.data();
+        detail::readBytes(is, grid, data.mGridSize, truncated);
+        detail::checkGridHead(grid, data.mGridSize);
+        tools::updateGridCount(static_cast<GridData*>(grid), 0u, 1u);
         *this = GridHandle(std::move(buffer));
     } else {
         is.clear();// a stream shorter than GridData is left failed, which would block the rewind
@@ -713,7 +717,7 @@ void GridHandle<BufferT>::read(std::istream& is, const std::string &gridName, co
     static const std::streamsize byteSize = sizeof(GridData);
     const std::streampos start = is.tellg();
     GridData data;
-    const bool isRaw = is.read((char*)&data, byteSize) && data.isValid();
+    const bool isRaw = is.read(reinterpret_cast<char*>(&data), byteSize) && data.isValid();
     is.clear();// a stream shorter than GridData is left failed, which would block the rewind
     is.seekg(start);
     if (isRaw) {
@@ -737,9 +741,10 @@ void GridHandle<BufferT>::read(std::istream& is, const std::string &gridName, co
         detail::checkRawGridSize(data);
         detail::checkRemaining(is, data.mGridSize, truncated);
         auto buffer = detail::createHostStorage(data.mGridSize, pool);
-        detail::readBytes(is, buffer.data(), data.mGridSize, truncated);
-        detail::checkGridHead(buffer.data(), data.mGridSize);
-        tools::updateGridCount(static_cast<GridData*>(buffer.data()), 0u, 1u);
+        void* grid = buffer.data();
+        detail::readBytes(is, grid, data.mGridSize, truncated);
+        detail::checkGridHead(grid, data.mGridSize);
+        tools::updateGridCount(static_cast<GridData*>(grid), 0u, 1u);
         *this = GridHandle(std::move(buffer));
     } else {
         throw std::logic_error("This file does not contain a valid raw buffer");
