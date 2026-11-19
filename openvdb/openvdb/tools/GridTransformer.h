@@ -10,6 +10,7 @@
 #include <openvdb/Grid.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h> // for isApproxEqual()
+#include <openvdb/tree/NeighborAccessor.h>
 #include <openvdb/util/NullInterrupter.h>
 #include "ChangeBackground.h"
 #include "Interpolation.h"
@@ -21,6 +22,7 @@
 #include <tbb/parallel_reduce.h>
 #include <cmath>
 #include <functional>
+#include <type_traits>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -105,7 +107,9 @@ public:
         mEmpty = mBBox.empty();
     }
 
-    bool sample(const TreeT& inTree, const Vec3R& inCoord, ValueT& result) const
+    /// @a AccessorT is TreeT, which is const except for a tree::NeighborAccessor
+    template<typename AccessorT>
+    bool sample(AccessorT& inTree, const Vec3R& inCoord, ValueT& result) const
     {
         if (!mEmpty && mBBox.isInside(inCoord)) { result = mVal; return mActive; }
         return Sampler::sample(inTree, inCoord, result);
@@ -196,9 +200,11 @@ protected:
     bool interrupt() const { return mInterrupt && mInterrupt(); }
 
 private:
+    // InTreeT is a const ValueAccessor or a non-const tree::NeighborAccessor, which moves
+    // when it samples
     template<typename Sampler, typename InTreeT, typename OutTreeT, typename Transformer>
     static void transformBBox(const Transformer&, const CoordBBox& inBBox,
-        const InTreeT& inTree, OutTreeT& outTree, const InterruptFunc&,
+        InTreeT& inTree, OutTreeT& outTree, const InterruptFunc&,
         const Sampler& = Sampler());
 
     template<typename Sampler, typename TreeT, typename Transformer>
@@ -768,7 +774,10 @@ public:
     using TileIterT = typename TreeT::ValueAllCIter;
     using LeafRange = typename tree::IteratorRange<LeafIterT>;
     using TileRange = typename tree::IteratorRange<TileIterT>;
-    using InTreeAccessor = typename tree::ValueAccessor<const TreeT>;
+    // Consecutive samples are near each other, so a NeighborAccessor reads them
+    // with few searches of the tree, if the sampler takes one.
+    using InTreeAccessor = std::conditional_t<HasNeighborAccessorSample<Sampler, const TreeT>::value,
+        tree::NeighborAccessor<const TreeT>, tree::ValueAccessor<const TreeT>>;
     using OutTreeAccessor = typename tree::ValueAccessor<TreeT>;
 
     RangeProcessor(const Transformer& xform, const CoordBBox& b, const TreeT& inT, TreeT& outT):
@@ -940,7 +949,7 @@ void
 GridResampler::transformBBox(
     const Transformer& xform,
     const CoordBBox& bbox,
-    const InTreeT& inTree,
+    InTreeT& inTree,
     OutTreeT& outTree,
     const InterruptFunc& interrupt,
     const Sampler& sampler)

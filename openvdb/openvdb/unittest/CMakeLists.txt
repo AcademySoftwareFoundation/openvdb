@@ -113,6 +113,7 @@ else()
     TestInt64Metadata.cc
     TestInternalNode.cc
     TestInternalOrigin.cc
+    TestInterpolation.cc
     TestLaplacian.cc
     TestLeaf.cc
     TestLeafBool.cc
@@ -140,6 +141,7 @@ else()
     TestMultiResGrid.cc
     TestName.cc
     TestNeighborAccessor.cc
+    TestNeighborSampling.cc
     TestNeighborStencil.cc
     TestNodeIterator.cc
     TestNodeManager.cc
