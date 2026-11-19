@@ -41,7 +41,7 @@
 #include <iostream> // for std::cerr/cout
 #include <string> // for std::string
 #include <sstream> // for std::stringstream
-#include <cstring> // for std::strcmp
+#include <cstring> // for std::strcmp, std::memchr
 #include <type_traits> // for std::is_unsigned
 #include <memory> // for std::unique_ptr
 #include <vector> // for std::vector
@@ -130,17 +130,7 @@ using fileSize_t = uint64_t;
 namespace Internal {
 static constexpr fileSize_t MAX_SIZE = 1UL << 30; // size is 1 GB
 
-/// @brief Add a grid size read from a stream to a running byte count
-/// @throw std::runtime_error if the sum wraps around
-template<typename SizeT>
-inline void addGridSize(SizeT& total, SizeT gridSize)
-{
-    static_assert(std::is_unsigned<SizeT>::value,
-                  "addGridSize relies on unsigned wrap-around to detect overflow");
-    const SizeT sum = total + gridSize;// unsigned wrap-around is well defined
-    if (sum < total) throw std::runtime_error("Grid sizes in stream overflow a byte count");
-    total = sum;
-}
+using nanovdb::detail::addGridSize;// shipped here in v13.2.0
 
 /// @brief Remove a compressed chunk and its size prefix from @a budget, the stored bytes of a grid not yet read
 /// @throw std::runtime_error if the chunk overruns the budget
@@ -149,6 +139,37 @@ inline void takeChunk(fileSize_t& budget, fileSize_t chunkSize)
     if (budget < sizeof(fileSize_t) || chunkSize > budget - sizeof(fileSize_t))
         throw std::runtime_error("Compressed chunk is larger than its grid's file size");
     budget -= sizeof(fileSize_t) + chunkSize;
+}
+
+/// @brief Throw unless the parts of a raw grid that FileGridMetaData reads, i.e. its tree
+///        header, the bounding box at the start of its root, and its name, lie inside the
+///        first @a bytes of the grid
+inline void checkRawGridMetaData(const GridData* grid, uint64_t bytes)
+{
+    static const char* error = "Raw grid metadata extends past the grid";
+    if (bytes < sizeof(GridData) + sizeof(TreeData)) throw std::runtime_error(error);
+    const uint64_t rootOffset = static_cast<const TreeData*>(grid->treePtr())->mNodeOffset[3];// relative to the tree
+    if (rootOffset == 0 || rootOffset % alignof(CoordBBox) != 0 ||
+        rootOffset > bytes - sizeof(GridData) - sizeof(CoordBBox)) throw std::runtime_error(error);
+
+    if (!grid->mFlags.isMaskOn(GridFlags::HasLongGridName)) {
+        if (!std::memchr(grid->mGridName, '\0', GridData::MaxNameSize)) throw std::runtime_error(error);
+        return;
+    }
+
+    // a long name is the blind data of the first blind metadata of class GridName
+    const uint64_t metaOffset = uint64_t(grid->mBlindMetadataOffset), metaCount = grid->mBlindMetadataCount;
+    if (metaOffset > bytes || metaOffset % alignof(GridBlindMetaData) != 0 ||
+        metaCount > (bytes - metaOffset) / sizeof(GridBlindMetaData)) throw std::runtime_error(error);
+    for (uint64_t i = 0; i < metaCount; ++i) {
+        const GridBlindMetaData* meta = grid->blindMetaData(uint32_t(i));
+        if (meta->mDataClass != GridBlindDataClass::GridName) continue;
+        const uint64_t nameOffset = metaOffset + i * sizeof(GridBlindMetaData) + uint64_t(meta->mDataOffset);// wraps when negative
+        if (nameOffset >= bytes) throw std::runtime_error(error);
+        if (!std::memchr(util::PtrAdd<char>(grid, nameOffset), '\0', bytes - nameOffset)) throw std::runtime_error(error);
+        return;
+    }
+    throw std::runtime_error(error);
 }
 
 template<typename BufferT>
@@ -219,6 +240,8 @@ struct Segment
     template<typename BufferT>
     void     add(const GridHandle<BufferT>& h);
     bool     read(std::istream& is);
+    /// @brief Read from a stream that ends at @a end, as measured once by detail::streamEnd
+    bool     read(std::istream& is, std::streampos end);
     void     write(std::ostream& os) const;
     uint64_t memUsage() const;
 }; // Segment
@@ -315,6 +338,7 @@ void Internal::read(std::istream& is, char* data, fileSize_t residual, Codec cod
         fileSize_t size;
         detail::readValue(is, size, error);
         takeChunk(budget, size);
+        if (budget != 0) throw std::runtime_error("Compressed chunks do not fill their grid's file size");
         std::unique_ptr<Bytef[]> tmp(new Bytef[size]);// temp buffer for compressed data
         detail::readBytes(is, tmp.get(), size, error);
         uLongf numBytes = static_cast<uLongf>(residual);
@@ -348,6 +372,7 @@ void Internal::read(std::istream& is, char* data, fileSize_t residual, Codec cod
             data += size_t(chunk);
             residual -= chunk;
         } while (residual > 0);
+        if (budget != 0) throw std::runtime_error("Compressed chunks do not fill their grid's file size");
 #else
         throw std::runtime_error("BLOSC compression codec was disabled during build");
 #endif
@@ -462,7 +487,14 @@ inline void Segment::write(std::ostream& os) const
 
 inline bool Segment::read(std::istream& is)
 {
+    return this->read(is, detail::streamEnd(is));
+}// Segment::read
+
+inline bool Segment::read(std::istream& is, std::streampos end)
+{
+    const bool wasGood = is.good();// a stream that failed earlier, e.g. on a seek, ends the read as before
     if (!is.read(reinterpret_cast<char*>(&header), sizeof(FileHeader))) {
+        if (is.bad() || (wasGood && !is.eof())) throw std::runtime_error("Segment::read: failed to read a file header");
         if (is.gcount() != 0) throw std::runtime_error("Segment::read: stream ends inside a file header");
         is.clear();// end of stream: reset its state so callers can rewind and read again
         return false;
@@ -499,13 +531,16 @@ inline bool Segment::read(std::istream& is)
         throw std::runtime_error("An unrecoverable error in nanovdb::Segment::read:\n\tIncompatible file format: " + ss.str());
     }
     meta.resize(header.gridCount);
-    uint64_t remaining = detail::remainingBytes(is);// measured once, since each measurement seeks
+    uint64_t remaining = detail::remainingBytes(is, end);
     uint64_t storedSize = 0;// cannot wrap, since FileGridMetaData::read bounds each fileSize
     for (auto& m : meta) {
         m.read(is, remaining);
         m.version = header.version;
-        if (header.codec == Codec::NONE && m.gridSize > m.fileSize)
-            throw std::runtime_error("Segment::read: uncompressed grid is larger than its file size");
+
+        // every writer stores an uncompressed grid as exactly its bytes, so readers that seek
+        // past grids and readers that read through them walk the stream the same way
+        if (header.codec == Codec::NONE && m.gridSize != m.fileSize)
+            throw std::runtime_error("Segment::read: uncompressed grid size does not match its file size");
         storedSize += m.fileSize;
     }
 
@@ -577,11 +612,12 @@ GridHandle<BufferT> readGrid(std::istream& is, int n, const BufferT& pool)
             uint64_t bufferSize = 0u;
             uint32_t gridCount = 0u, gridIndex = 0u;
             const auto start = is.tellg();
-            while (seg.read(is)) {
+            const auto end = detail::streamEnd(is);
+            while (seg.read(is, end)) {
                 std::streamoff skipSize = 0;
                 for (auto& m : seg.meta) {
                     ++gridCount;
-                    Internal::addGridSize(bufferSize, m.gridSize);
+                    detail::addGridSize(bufferSize, m.gridSize);
                     skipSize   += m.fileSize;
                 }// loop over grids in segment
                 is.seekg(skipSize, std::ios_base::cur); // skip forward from the current position
@@ -591,9 +627,9 @@ GridHandle<BufferT> readGrid(std::istream& is, int n, const BufferT& pool)
             void* data = buffer.data();
             char *ptr = static_cast<char*>(data);
             is.seekg(start);// rewind
-            while (seg.read(is)) {
+            while (seg.read(is, end)) {
                 for (auto& m : seg.meta) {
-                    if (m.gridSize > bufferSize - uint64_t(ptr - static_cast<char*>(data)))
+                    if (gridIndex >= gridCount || m.gridSize > bufferSize - uint64_t(ptr - static_cast<char*>(data)))
                         throw std::runtime_error("Grid sizes in stream changed between passes");
                     Internal::read(is, ptr, m.gridSize, seg.header.codec, m.fileSize);
                     detail::checkGridHead(ptr, m.gridSize);
@@ -601,16 +637,17 @@ GridHandle<BufferT> readGrid(std::istream& is, int n, const BufferT& pool)
                     ptr += m.gridSize;
                 }// loop over grids in segment
             }// loop over segments
+            if (gridIndex != gridCount) throw std::runtime_error("Grid sizes in stream changed between passes");
             return GridHandle<BufferT>(std::move(buffer));
         }
     } else {// read a specific grid
         try {//first try to read a raw grid buffer
             handle.read(is, uint32_t(n), pool);
-            tools::updateGridCount((GridData*)handle.data(), 0u, 1u);
         } catch(const std::logic_error&) {
             Segment seg;
             int counter = -1;
-            while (seg.read(is)) {
+            const auto end = detail::streamEnd(is);
+            while (seg.read(is, end)) {
                 std::streamoff seek = 0;
                 for (auto& m : seg.meta) {
                     if (++counter == n) {
@@ -666,7 +703,8 @@ GridHandle<BufferT> readGrid(std::istream& is, const std::string& gridName, cons
     } catch(const std::logic_error&) {
         const auto key = stringHash(gridName);
         Segment seg;
-        while (seg.read(is)) {// loop over all segments in stream
+        const auto end = detail::streamEnd(is);
+        while (seg.read(is, end)) {// loop over all segments in stream
             std::streamoff seek = 0;
             for (auto& m : seg.meta) {// loop over all grids in segment
                 if ((m.nameKey == 0u || m.nameKey == key) && m.gridName == gridName) { // check for hash key collision
@@ -716,9 +754,10 @@ VecT<GridHandle<BufferT>> readGrids(std::istream& is, const BufferT& pool = Buff
         handles.push_back(std::move(handle)); // force move copy assignment
     } catch(const std::logic_error&) {
         Segment seg;
-        while (seg.read(is)) {
+        const auto end = detail::streamEnd(is);
+        while (seg.read(is, end)) {
             uint64_t bufferSize = 0;
-            for (auto& m : seg.meta) Internal::addGridSize(bufferSize, m.gridSize);
+            for (auto& m : seg.meta) detail::addGridSize(bufferSize, m.gridSize);
             auto buffer = BufferT::create(bufferSize, &pool);
             uint64_t bufferOffset = 0;
             for (uint16_t i = 0; i < seg.header.gridCount; ++i) {
@@ -761,10 +800,12 @@ inline std::vector<FileGridMetaData> readGridMetaData(std::istream& is)
     try {
         GridHandle<> handle;// if stream contains a raw grid buffer we unfortunately have to load everything
         handle.read(is);
+        for (uint32_t i = 0; i < handle.gridCount(); ++i) Internal::checkRawGridMetaData(handle.gridData(i), handle.gridSize(i));
         seg.add(handle);
         meta = std::move(seg.meta);
     } catch(const std::logic_error&) {
-        while (seg.read(is)) {
+        const auto end = detail::streamEnd(is);
+        while (seg.read(is, end)) {
             std::streamoff skip = 0;
             for (auto& m : seg.meta) {
                 meta.push_back(m);
@@ -789,7 +830,8 @@ inline bool hasGrid(std::istream& is, const std::string& gridName)
 {
     const auto key = stringHash(gridName);
     Segment seg;
-    while (seg.read(is)) {
+    const auto end = detail::streamEnd(is);
+    while (seg.read(is, end)) {
         std::streamoff seek = 0;
         for (auto& m : seg.meta) {
             if (m.nameKey == key && m.gridName == gridName) return true; // check for hash key collision

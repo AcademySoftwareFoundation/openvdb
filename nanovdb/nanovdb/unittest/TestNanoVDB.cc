@@ -9762,7 +9762,6 @@ bool throwsWith(ReadT&& read, const std::string& what)
     return false;
 }
 
-// Returns a handle with one empty float grid named name
 // Buffer whose data() returns a typed pointer rather than void*
 struct TypedByteBuffer
 {
@@ -9786,6 +9785,7 @@ struct TypedByteBuffer
     void clear() { TypedByteBuffer().swap(*this); }
 };
 
+// Returns a handle with one empty float grid named name
 nanovdb::GridHandle<> makeTinyGrid(const std::string& name)
 {
     nanovdb::tools::build::Grid<float> src(0.0f, name);
@@ -9853,12 +9853,60 @@ TEST_F(TestNanoVDB, ReadMalformedFile)
         EXPECT_TRUE(throwsWith([&]{ readOne(bytes, 0); }, "Grid head checksum extends past the grid"));
         EXPECT_TRUE(throwsWith([&]{ readAll(bytes); }, "Grid head checksum extends past the grid"));
     }
-    {// a file size that hides a segment from the first pass of readGrid(is, -1)
+    {// a file size that hides a segment from readers that seek, but not from readers that read through
         const std::string fake = makeSegment(1, 8192, 8192, noName, 1, 8192);
         std::string grid(1024, '\0');
         std::memset(&grid[8], 0xFF, 8);// empty checksum, so updateGridCount reads no further
         const std::string bytes = makeSegment(1, grid.size(), grid.size() + fake.size(), noName, 1, 0) + grid + fake;
-        EXPECT_TRUE(throwsWith([&]{ readOne(bytes, -1); }, "Grid sizes in stream changed between passes"));
+        const std::string error = "uncompressed grid size does not match its file size";
+        EXPECT_TRUE(throwsWith([&]{ readOne(bytes, -1); }, error));
+        EXPECT_TRUE(throwsWith([&]{ readAll(bytes); }, error));
+        EXPECT_TRUE(throwsWith([&]{ readMeta(bytes); }, error));
+    }
+    {// a read error at a segment boundary is reported, not taken for the end of the stream
+        struct FailingBuf : std::stringbuf
+        {
+            using std::stringbuf::stringbuf;
+            int_type underflow() override
+            {
+                const int_type c = std::stringbuf::underflow();
+                if (traits_type::eq_int_type(c, traits_type::eof())) throw std::runtime_error("device error");
+                return c;
+            }
+        };
+        std::ostringstream os(std::ios_base::out | std::ios_base::binary);
+        io::writeGrid(os, makeTinyGrid("a"), io::Codec::NONE);
+        FailingBuf buf(os.str(), std::ios_base::in | std::ios_base::binary);
+        std::istream is(&buf);
+        EXPECT_TRUE(throwsWith([&]{ io::readGrids<HostBuffer>(is); }, "failed to read a file header"));
+    }
+    {// a stream already at its end, with eofbit set, reads as zero grids
+        std::ostringstream os(std::ios_base::out | std::ios_base::binary);
+        io::writeGrid(os, makeTinyGrid("a"), io::Codec::NONE);
+        std::istringstream is(os.str(), std::ios_base::in | std::ios_base::binary);
+        EXPECT_EQ(1u, io::readGrids<HostBuffer>(is).size());
+        is.peek();// sets eofbit
+        EXPECT_TRUE(io::readGrids<HostBuffer>(is).empty());
+        is.peek();
+        EXPECT_TRUE(io::readGridMetaData(is).empty());
+    }
+    {// a stream that cannot seek still answers hasGrid for a name it lacks
+        struct NoSeekBuf : std::stringbuf
+        {
+            using std::stringbuf::stringbuf;
+            pos_type seekoff(off_type, std::ios_base::seekdir, std::ios_base::openmode) override { return pos_type(off_type(-1)); }
+            pos_type seekpos(pos_type, std::ios_base::openmode) override { return pos_type(off_type(-1)); }
+        };
+        std::ostringstream os(std::ios_base::out | std::ios_base::binary);
+        io::writeGrid(os, makeTinyGrid("a"), io::Codec::NONE);
+        NoSeekBuf buf(os.str(), std::ios_base::in | std::ios_base::binary);
+        std::istream is(&buf);
+        EXPECT_FALSE(io::hasGrid(is, "absent"));
+
+        // readers that first probe for a raw buffer cannot rewind such a stream, and say so
+        NoSeekBuf probed(os.str(), std::ios_base::in | std::ios_base::binary);
+        std::istream ps(&probed);
+        EXPECT_TRUE(throwsWith([&]{ io::readGrids<HostBuffer>(ps); }, "cannot rewind a stream"));
     }
     {// file size large enough to wrap a stream offset
         const std::string bytes = makeSegment(2, sizeof(GridData), uint64_t(1) << 63, noName, 1, 8192);
@@ -10027,6 +10075,39 @@ TEST_F(TestNanoVDB, ReadMalformedRawBuffer)
         std::istringstream is(bytes, std::ios_base::in | std::ios_base::binary);
         EXPECT_THROW(GridHandle<>().read(is, std::string(GridData::MaxNameSize, 'A')), std::runtime_error);
     }
+    {// readGridMetaData on a raw buffer only reads the tree header, root bounding box and name inside the grid
+        auto readMeta = [](const std::string& bytes) {
+            std::istringstream is(bytes, std::ios_base::in | std::ios_base::binary);
+            return io::readGridMetaData(is);
+        };
+        const auto valid = readMeta(raw);
+        ASSERT_EQ(1u, valid.size());
+        EXPECT_EQ(name, valid[0].gridName);
+
+        const std::string error = "Raw grid metadata extends past the grid";
+        std::string unterminated = raw;
+        std::memset(header(unterminated)->mGridName, 'A', GridData::MaxNameSize);
+        EXPECT_TRUE(throwsWith([&]{ readMeta(unterminated); }, error));
+
+        std::string headerOnly = raw.substr(0, sizeof(GridData));
+        header(headerOnly)->mGridSize = sizeof(GridData);
+        EXPECT_TRUE(throwsWith([&]{ readMeta(headerOnly); }, error));
+
+        std::string rootOutside = raw;
+        reinterpret_cast<TreeData*>(&rootOutside[sizeof(GridData)])->mNodeOffset[3] = int64_t(1) << 40;
+        EXPECT_TRUE(throwsWith([&]{ readMeta(rootOutside); }, error));
+
+        std::string longNameMissing = raw;
+        header(longNameMissing)->mFlags.setMaskOn(GridFlags::HasLongGridName);
+        EXPECT_TRUE(throwsWith([&]{ readMeta(longNameMissing); }, error));
+
+        const std::string longName(GridData::MaxNameSize + 44, 'L');
+        const auto longHandle = makeTinyGrid(longName);
+        ASSERT_TRUE(longHandle.gridData()->mFlags.isMaskOn(GridFlags::HasLongGridName));
+        const auto longValid = readMeta(toBytes(longHandle));
+        ASSERT_EQ(1u, longValid.size());
+        EXPECT_EQ(longName, longValid[0].gridName);
+    }
 }// ReadMalformedRawBuffer
 
 // make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*ReadPre327EmptyGrid"
@@ -10143,6 +10224,13 @@ TEST_F(TestNanoVDB, ReadMalformedBloscChunk)
         std::memcpy(&bad[chunk], &size, sizeof(size));
         std::istringstream is(bad, std::ios_base::in | std::ios_base::binary);
         EXPECT_TRUE(throwsWith([&]{ io::readGrids<HostBuffer>(is); }, "Compressed chunk is larger than its grid's file size"));
+    }
+    {// file size larger than the chunks, so readers that seek and readers that read through disagree
+        std::string bad = bytes + std::string(16, '\0');
+        const uint64_t fileSize = meta[0].fileSize + 16;
+        std::memcpy(&bad[sizeof(io::FileHeader) + offsetof(io::FileMetaData, fileSize)], &fileSize, sizeof(fileSize));
+        std::istringstream is(bad, std::ios_base::in | std::ios_base::binary);
+        EXPECT_TRUE(throwsWith([&]{ io::readGrids<HostBuffer>(is); }, "Compressed chunks do not fill their grid's file size"));
     }
 }// ReadMalformedBloscChunk
 #endif

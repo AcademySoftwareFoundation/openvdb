@@ -123,18 +123,45 @@ inline void readValue(std::istream& is, T& value, const char* error)
     readBytes(is, &value, sizeof(T), error);
 }
 
-/// @brief Return the bytes left in @a is after its current position, or the
-///        largest uint64_t if the stream cannot report its position
-inline uint64_t remainingBytes(std::istream& is)
+/// @brief Add a grid size read from a stream to a running byte count
+/// @throw std::runtime_error if the sum wraps around
+template<typename SizeT>
+inline void addGridSize(SizeT& total, SizeT gridSize)
+{
+    static_assert(std::is_unsigned<SizeT>::value, "addGridSize relies on unsigned wrap-around to detect overflow");
+    const SizeT sum = total + gridSize;// unsigned wrap-around is well defined
+    if (sum < total) throw std::runtime_error("Grid sizes in stream overflow a byte count");
+    total = sum;
+}
+
+/// @brief Return the end position of @a is, or -1 if the stream cannot report it.
+///        Measuring seeks, which discards a file stream's read buffer, so readers
+///        measure once and pass the result on.
+inline std::streampos streamEnd(std::istream& is)
 {
     const std::streampos pos = is.tellg();
-    if (pos == std::streampos(-1)) return std::numeric_limits<uint64_t>::max();
+    if (pos == std::streampos(-1)) return pos;
     is.seekg(0, std::ios_base::end);
     const std::streampos end = is.tellg();
     is.clear();
     is.seekg(pos);
-    if (end == std::streampos(-1)) return std::numeric_limits<uint64_t>::max();
+    return end;
+}
+
+/// @brief Return the bytes left in @a is before @a end, or the largest uint64_t
+///        if either position is unknown
+inline uint64_t remainingBytes(std::istream& is, std::streampos end)
+{
+    const std::streampos pos = is.tellg();
+    if (pos == std::streampos(-1) || end == std::streampos(-1)) return std::numeric_limits<uint64_t>::max();
     return end > pos ? uint64_t(end - pos) : 0u;
+}
+
+/// @brief Return the bytes left in @a is after its current position, or the
+///        largest uint64_t if the stream cannot report its position
+inline uint64_t remainingBytes(std::istream& is)
+{
+    return remainingBytes(is, streamEnd(is));
 }
 
 /// @brief Throw @a error unless @a is holds at least @a bytes after its current position.
@@ -142,6 +169,19 @@ inline uint64_t remainingBytes(std::istream& is)
 inline void checkRemaining(std::istream& is, uint64_t bytes, const char* error)
 {
     if (bytes > remainingBytes(is)) throw std::runtime_error(error);
+}
+
+/// @brief Return @a is to @a start after a raw-buffer probe that found no raw grid
+/// @throw std::runtime_error if the probe consumed bytes from a stream that cannot report its position
+inline void rewindProbe(std::istream& is, std::streampos start)
+{
+    const std::streamsize consumed = is.gcount();
+    is.clear();// a stream shorter than GridData is left failed, which would block the rewind
+    if (start != std::streampos(-1)) {
+        is.seekg(start);
+    } else if (consumed > 0) {
+        throw std::runtime_error("GridHandle::read: cannot rewind a stream that does not report its position");
+    }
 }
 
 /// @brief Throw unless the size of a raw grid header covers the header
@@ -650,15 +690,11 @@ void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
     const std::streampos start = is.tellg();// remember where the raw buffer begins
     GridData data;
     if (is.read(reinterpret_cast<char*>(&data), sizeof(GridData)) && data.isValid()) {
-        static_assert(std::is_unsigned<decltype(GridData::mGridSize)>::value,
-                      "GridHandle::read relies on unsigned wrap-around to detect overflow");
         const char* truncated = "GridHandle::read: stream is shorter than its raw grid sizes";
         uint64_t size = 0u;
         while (true) {// loop over raw grids in stream
             detail::checkRawGridSize(data);
-            const uint64_t sum = size + data.mGridSize;// unsigned wrap-around is well defined
-            if (sum < size) throw std::runtime_error("GridHandle::read: grid sizes in stream overflow a 64-bit byte count");
-            size = sum;
+            detail::addGridSize(size, data.mGridSize);
             if (data.mGridIndex + 1u >= data.mGridCount) break;
             is.seekg(data.mGridSize - sizeof(GridData), std::ios::cur);// skip grid
             detail::readValue(is, data, truncated);
@@ -669,8 +705,7 @@ void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
         detail::readBytes(is, buffer.data(), buffer.size(), truncated);
         *this = GridHandle(std::move(buffer));
     } else {
-        is.clear();// a stream shorter than GridData is left failed, which would block the rewind
-        is.seekg(start);
+        detail::rewindProbe(is, start);
         throw std::logic_error("This stream does not contain a valid raw grid buffer");
     }
 }// void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
@@ -703,8 +738,7 @@ void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool
         tools::updateGridCount(static_cast<GridData*>(grid), 0u, 1u);
         *this = GridHandle(std::move(buffer));
     } else {
-        is.clear();// a stream shorter than GridData is left failed, which would block the rewind
-        is.seekg(start);
+        detail::rewindProbe(is, start);
         throw std::logic_error("This file does not contain a valid raw buffer");
     }
 }// void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool)
@@ -718,8 +752,7 @@ void GridHandle<BufferT>::read(std::istream& is, const std::string &gridName, co
     const std::streampos start = is.tellg();
     GridData data;
     const bool isRaw = is.read(reinterpret_cast<char*>(&data), byteSize) && data.isValid();
-    is.clear();// a stream shorter than GridData is left failed, which would block the rewind
-    is.seekg(start);
+    detail::rewindProbe(is, start);
     if (isRaw) {
         const char* truncated = "GridHandle::read: stream is shorter than its raw grid size";
         auto nameIs = [&]{// the name comes from the stream, so bound it before comparing
