@@ -7959,6 +7959,16 @@ TEST_F(TestNanoVDB, HostBuffer)
         EXPECT_EQ(0u, constructed.poolSize());
         EXPECT_EQ(0u, assigned.poolSize());
     }// the pool is destroyed here with an empty register
+    {// moving a buffer from createPool leaves it unregistered, so pool.reset() keeps it a pool
+        auto tmp = nanovdb::HostBuffer::createPool(1024);
+        nanovdb::HostBuffer pool(std::move(tmp));
+        auto buffer = nanovdb::HostBuffer::create(256, &pool);
+        pool.reset();
+        EXPECT_EQ(0u, buffer.size());
+        EXPECT_TRUE(pool.isPool());
+        auto reused = nanovdb::HostBuffer::create(256, &pool);
+        EXPECT_EQ(pool.poolSize(), reused.poolSize());
+    }
 }// HostBuffer
 
 TEST_F(TestNanoVDB, NodeIterators)
@@ -9753,6 +9763,29 @@ bool throwsWith(ReadT&& read, const std::string& what)
 }
 
 // Returns a handle with one empty float grid named name
+// Buffer whose data() returns a typed pointer rather than void*
+struct TypedByteBuffer
+{
+    uint8_t* mAlloc = nullptr;// mData is the aligned start of this allocation
+    uint8_t* mData = nullptr;
+    uint64_t mSize = 0;
+    TypedByteBuffer() = default;
+    explicit TypedByteBuffer(uint64_t size)
+        : mAlloc(static_cast<uint8_t*>(std::malloc(size + NANOVDB_DATA_ALIGNMENT)))
+        , mData(nanovdb::alignPtr(mAlloc))
+        , mSize(size) {}
+    TypedByteBuffer(TypedByteBuffer&& other) { this->swap(other); }
+    TypedByteBuffer& operator=(TypedByteBuffer&& other) { this->swap(other); return *this; }
+    ~TypedByteBuffer() { std::free(mAlloc); }
+    void swap(TypedByteBuffer& other) { std::swap(mAlloc, other.mAlloc); std::swap(mData, other.mData); std::swap(mSize, other.mSize); }
+    static TypedByteBuffer create(uint64_t size, const TypedByteBuffer* = nullptr) { return TypedByteBuffer(size); }
+    uint8_t* data() { return mData; }
+    const uint8_t* data() const { return mData; }
+    uint64_t size() const { return mSize; }
+    bool isEmpty() const { return mSize == 0; }
+    void clear() { TypedByteBuffer().swap(*this); }
+};
+
 nanovdb::GridHandle<> makeTinyGrid(const std::string& name)
 {
     nanovdb::tools::build::Grid<float> src(0.0f, name);
@@ -9995,6 +10028,89 @@ TEST_F(TestNanoVDB, ReadMalformedRawBuffer)
         EXPECT_THROW(GridHandle<>().read(is, std::string(GridData::MaxNameSize, 'A')), std::runtime_error);
     }
 }// ReadMalformedRawBuffer
+
+// make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*ReadPre327EmptyGrid"
+TEST_F(TestNanoVDB, ReadPre327EmptyGrid)
+{
+    using namespace nanovdb;
+
+    // an empty grid as NanoVDB 32.3 through 32.6 wrote it, with no upper nodes and a partial checksum
+    auto makeOld = [](const std::string& name) {
+        auto handle = makeTinyGrid(name);
+        auto* data = const_cast<GridData*>(handle.gridData());
+        data->mVersion = Version(32, 6, 0);
+        static_cast<TreeData*>(data->treePtr())->mNodeOffset[2] = 0;
+        data->mChecksum = Checksum(tools::crc32Head(data), Checksum::EMPTY32);
+        return handle;
+    };
+    auto toFile = [](const GridHandle<>& handle, io::Codec codec) {
+        std::ostringstream os(std::ios_base::out | std::ios_base::binary);
+        io::writeGrid(os, handle, codec);
+        std::string bytes = os.str();
+        const Version version(32, 6, 0);
+        std::memcpy(&bytes[offsetof(io::FileHeader, version)], &version, sizeof(version));
+        return bytes;
+    };
+    auto stream = [](const std::string& bytes) { return std::istringstream(bytes, std::ios_base::in | std::ios_base::binary); };
+
+    const auto old = makeOld("empty");
+    std::vector<io::Codec> codecs{io::Codec::NONE};
+#if defined(NANOVDB_USE_ZIP)
+    codecs.push_back(io::Codec::ZIP);
+#endif
+#if defined(NANOVDB_USE_BLOSC)
+    codecs.push_back(io::Codec::BLOSC);
+#endif
+    for (const io::Codec codec : codecs) {
+        const std::string bytes = toFile(old, codec);
+        auto is0 = stream(bytes);
+        EXPECT_TRUE(io::readGrid<HostBuffer>(is0, 0, HostBuffer()));
+        auto is1 = stream(bytes);
+        EXPECT_TRUE(io::readGrid<HostBuffer>(is1, std::string("empty"), HostBuffer()));
+        auto is2 = stream(bytes);
+        EXPECT_TRUE(io::readGrid<HostBuffer>(is2, -1, HostBuffer()));
+        auto is3 = stream(bytes);
+        EXPECT_EQ(1u, io::readGrids<HostBuffer>(is3).size());
+    }
+    {// raw readers
+        std::ostringstream os(std::ios_base::out | std::ios_base::binary);
+        old.write(os);
+        const std::string bytes = os.str();
+        auto is0 = stream(bytes), is1 = stream(bytes);
+        GridHandle<> byIndex, byName;
+        byIndex.read(is0, 0u);
+        byName.read(is1, std::string("empty"));
+        EXPECT_TRUE(byIndex);
+        EXPECT_TRUE(byName);
+    }
+    {// two empty grids in one buffer, so changing their index or count re-hashes each head
+        std::vector<GridHandle<>> handles;
+        handles.push_back(makeOld("a"));
+        handles.push_back(makeOld("b"));
+        const auto merged = mergeGrids<HostBuffer, std::vector>(handles);
+        EXPECT_TRUE(tools::validateChecksum(merged.gridData(0)));
+        EXPECT_TRUE(tools::validateChecksum(merged.gridData(1)));
+        auto is = stream(toFile(merged, io::Codec::NONE));
+        const auto second = io::readGrid<HostBuffer>(is, 1, HostBuffer());
+        ASSERT_TRUE(second);
+        EXPECT_TRUE(tools::validateChecksum(second.gridData()));
+    }
+}// ReadPre327EmptyGrid
+
+// make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*ReadIntoTypedBuffer"
+TEST_F(TestNanoVDB, ReadIntoTypedBuffer)
+{
+    using namespace nanovdb;
+    std::ostringstream os(std::ios_base::out | std::ios_base::binary);
+    io::writeGrid(os, makeTinyGrid("a"), io::Codec::NONE);
+    const std::string bytes = os.str();
+    auto stream = [&] { return std::istringstream(bytes, std::ios_base::in | std::ios_base::binary); };
+    auto is0 = stream(), is1 = stream(), is2 = stream(), is3 = stream();
+    EXPECT_TRUE(io::readGrid<TypedByteBuffer>(is0, -1, TypedByteBuffer()));
+    EXPECT_TRUE(io::readGrid<TypedByteBuffer>(is1, 0, TypedByteBuffer()));
+    EXPECT_TRUE(io::readGrid<TypedByteBuffer>(is2, std::string("a"), TypedByteBuffer()));
+    EXPECT_EQ(1u, io::readGrids<TypedByteBuffer>(is3).size());
+}// ReadIntoTypedBuffer
 
 #if defined(NANOVDB_USE_BLOSC)
 // make -j testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*ReadMalformedBloscChunk"

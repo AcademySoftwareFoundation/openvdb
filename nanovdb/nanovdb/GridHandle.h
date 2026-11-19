@@ -158,11 +158,11 @@ inline void checkGridHead(const void* grid, uint64_t bytes)
     if (bytes < sizeof(GridData) + sizeof(TreeData))
         throw std::runtime_error("Grid is smaller than its grid and tree headers");
 
-    // up to v32.6.0 the checksummed head ends at the first upper node, whose offset is grid data
+    // up to v32.6.0 the end of the checksummed head comes from offsets that are grid data
     const GridData* data = static_cast<const GridData*>(grid);
-    if (!data->mChecksum.isEmpty() && data->mVersion <= Version(32,6,0)) {
-        const int64_t offset = static_cast<const TreeData*>(data->treePtr())->mNodeOffset[2];
-        if (offset <= 0 || uint64_t(offset) > bytes - sizeof(GridData))
+    if (!data->mChecksum.isEmpty()) {
+        const uint64_t headSize = tools::crc32HeadSize(data);
+        if (headSize < sizeof(GridData) + sizeof(TreeData) || headSize > bytes)
             throw std::runtime_error("Grid head checksum extends past the grid");
     }
 }
