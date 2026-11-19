@@ -262,6 +262,54 @@ TEST_F(TestDiagnostics, testDiagnose)
     }
 }// testDiagnose
 
+TEST_F(TestDiagnostics, testCheckDivergence)
+{
+    using namespace openvdb;
+
+    // The x component equals the x index, so the central difference divergence is 1
+    // in the interior. The two end planes see the zero background on one side.
+    Vec3SGrid grid(Vec3s(0.0f));
+    for (int i = 0; i < 10; ++i) {
+        for (int j = 0; j < 10; ++j) {
+            for (int k = 0; k < 10; ++k) {
+                grid.tree().setValue(Coord(i, j, k), Vec3s(float(i), 0.0f, 0.0f));
+            }
+        }
+    }
+    // divergence is 0.5 on the i = 0 plane and -4 on the i = 9 plane
+
+    {// everything in range
+        tools::CheckDivergence<Vec3SGrid> check(grid, -5.0f, 2.0f);
+        tools::Diagnose<Vec3SGrid> diagnose(grid);
+        const std::string str = diagnose.check(check, true, true, false, false);
+        EXPECT_TRUE(str.empty());
+        EXPECT_EQ(0, int(diagnose.valueCount()));
+    }
+    {// only the i = 9 plane is out of range
+        tools::CheckDivergence<Vec3SGrid> check(grid, 0.4f, 1.6f);
+        tools::Diagnose<Vec3SGrid> diagnose(grid);
+        const std::string str = diagnose.check(check, true, true, false, false);
+        EXPECT_FALSE(str.empty());
+        EXPECT_EQ(100, int(diagnose.valueCount()));
+    }
+    {// the i = 0 and i = 9 planes are out of range
+        tools::CheckDivergence<Vec3SGrid> check(grid, 0.6f, 1.6f);
+        tools::Diagnose<Vec3SGrid> diagnose(grid);
+        diagnose.check(check, true, true, false, false);
+        EXPECT_EQ(200, int(diagnose.valueCount()));
+    }
+    {// the divergence of the background is zero
+        tools::CheckDivergence<Vec3SGrid> inside(grid, -1.0f, 1.0f);
+        tools::CheckDivergence<Vec3SGrid> outside(grid, 0.5f, 1.0f);
+        tools::Diagnose<Vec3SGrid> diagnose(grid);
+        EXPECT_TRUE(diagnose.check(inside, false, false, false, true).empty());
+        EXPECT_FALSE(diagnose.check(outside, false, false, false, true).empty());
+    }
+    {// invalid range
+        EXPECT_THROW(tools::CheckDivergence<Vec3SGrid>(grid, 1.0f, -1.0f), ValueError);
+    }
+}
+
 TEST_F(TestDiagnostics, testCheckLevelSet)
 {
     using namespace openvdb;
