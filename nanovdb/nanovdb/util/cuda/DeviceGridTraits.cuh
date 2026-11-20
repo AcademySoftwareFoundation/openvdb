@@ -71,6 +71,15 @@ struct DeviceGridTraits
         return gridSize;
     }
 
+    static BitFlags<32> getFlags(const GridT *d_grid, cudaStream_t stream = 0)
+    {
+        BitFlags<32> flags{};
+        std::size_t offset = offsetof(GridT, mFlags);
+        cudaCheck(cudaMemcpyAsync(&flags, util::PtrAdd(d_grid, offset), sizeof(BitFlags<32>), cudaMemcpyDeviceToHost, stream));
+        cudaCheck(cudaStreamSynchronize(stream));
+        return flags;
+    }
+
     static CoordBBox getIndexBBox(const GridT *d_grid, const TreeDataT &h_treeData, cudaStream_t stream = 0)
     {
         CoordBBox box;
