@@ -91,7 +91,6 @@ public:
         , mSDF(stream, resource, 0, nanovdb::cuda::noInit)
         , mNearestTriangle(stream, resource, 0, nanovdb::cuda::noInit)
         , mComponentLabels(stream, resource, 0, nanovdb::cuda::noInit)
-        , mDeviceComponentGrids(stream, resource, 0, nanovdb::cuda::noInit)
         , mNestingDepth(stream, resource, 0, nanovdb::cuda::noInit) {}
 
     /// @brief Toggle on and off verbose mode
@@ -143,7 +142,6 @@ public:
         // Each intermediate is released right after its last use, to cut peak memory. The frees are ordered on
         // mStream behind the kernels that read them.
         mComponentGrids.clear();
-        mDeviceComponentGrids.destroy();
         mNearestTriangle.destroy();
 
         if (mVerbose==1) mTimer.start("Applying the nesting rule");
@@ -182,15 +180,17 @@ private:
 
     // Stage 3b: negate the distances outside the barrier that are not in the exterior barrier-free component.
     BufferT<unsigned long long> findExteriorLabel(const GridT* dBarrierPrunedGrid, uint32_t leaves,
-                                                  const uint32_t* dVoxelLabel);
+                                                  const ComponentLabelT* dVoxelLabel);
     void signNonBarrier(const GridT* dComponentGrid, const GridT* dBarrierPrunedGrid,
-                        const uint32_t* dVoxelLabel, float* dComponentSDF);
+                        const ComponentLabelT* dVoxelLabel, float* dComponentSDF);
 
     // Stage 3c: sign the distances in the barrier by the chosen BarrierSigning.
     void signBarrier(const GridT* dComponentGrid, float* dComponentSDF, const uint32_t* dComponentNearestTriangle);
 
-    // Stage 3d: add one to the nesting depth of every other component this component encloses.
-    void accumulateNesting(const GridT* dComponentGrid, const float* dComponentSDF, ComponentLabelT componentID);
+    // Stage 3d: add one to the nesting depth of every other component this component encloses; dComponentGrids
+    // holds the device grid of every component.
+    void accumulateNesting(const GridT* dComponentGrid, const float* dComponentSDF, ComponentLabelT componentID,
+                           const GridT* const* dComponentGrids);
 
     // Stage 4: with several components, compose their signs by the nesting rule.
     void applyNestingRule();
@@ -221,7 +221,6 @@ private:
     BufferT<ComponentLabelT>    mComponentLabels; // component of each voxel slot, when there are several components
     ComponentLabelT             mComponentCount{0};
     std::vector<HandleT>        mComponentGrids;  // [c] the voxels of component c, when there are several components
-    BufferT<const GridT*>       mDeviceComponentGrids; // [c] device pointer of mComponentGrids[c]
     BufferT<uint32_t>           mNestingDepth;  // [c] the number of other components that enclose component c
 
 }; // tools::cuda::MeshToSDF<BuildT, ResourceT>
@@ -258,15 +257,9 @@ void MeshToSDF<BuildT, ResourceT>::partitionComponents()
 
     mComponentGrids = PartitionGrid<BuildT, ResourceT>(dFullGrid, mStream, *mResource)
                           .getHandles(mComponentLabels.data(), mComponentCount, mGridHandle.buffer());
-    std::vector<const GridT*> grids;
-    for (const auto& handle : mComponentGrids) grids.push_back(handle.template deviceGrid<BuildT>());
-    mDeviceComponentGrids = BufferT<const GridT*>(mStream, this->ref(), mComponentCount, nanovdb::cuda::noInit);
-    cudaCheck(cudaMemcpyAsync(mDeviceComponentGrids.data(), grids.data(), mDeviceComponentGrids.size_bytes(),
-                              cudaMemcpyHostToDevice, mStream));
 
     mNestingDepth = BufferT<uint32_t>(mStream, this->ref(), mComponentCount, nanovdb::cuda::noInit);
     cudaCheck(cudaMemsetAsync(mNestingDepth.data(), 0, mNestingDepth.size_bytes(), mStream));
-    cudaCheck(cudaStreamSynchronize(mStream)); // the copy above reads grids, which goes out of scope here
 } // MeshToSDF<BuildT, ResourceT>::partitionComponents
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -299,10 +292,18 @@ void MeshToSDF<BuildT, ResourceT>::signComponents()
         return;
     }
 
+    // The device grid of each component: on the host for the loop below, and on the device for accumulateNesting.
+    std::vector<const GridT*> deviceComponentGrids(mComponentCount);
+    for (ComponentLabelT componentID = 0; componentID < mComponentCount; ++componentID)
+        deviceComponentGrids[componentID] = mComponentGrids[componentID].template deviceGrid<BuildT>();
+    BufferT<const GridT*> dComponentGrids(mStream, this->ref(), mComponentCount, nanovdb::cuda::noInit);
+    cudaCheck(cudaMemcpyAsync(dComponentGrids.data(), deviceComponentGrids.data(), dComponentGrids.size_bytes(),
+                              cudaMemcpyHostToDevice, mStream));
+
     for (ComponentLabelT componentID = 0; componentID < mComponentCount; ++componentID) {
         // The distances and nearest triangles of the component, indexed by its own grid. The copies write every
         // slot but slot 0, the background, which the memsets define.
-        const auto*    dComponentGrid = mComponentGrids[componentID].template deviceGrid<BuildT>();
+        const auto*    dComponentGrid = deviceComponentGrids[componentID];
         const uint64_t slots          = TraitsT::getTreeData(dComponentGrid, mStream).mVoxelCount + 1;
         BufferT<float>    componentSDF(mStream, this->ref(), slots, nanovdb::cuda::noInit);
         BufferT<uint32_t> componentNearestTriangle(mStream, this->ref(), slots, nanovdb::cuda::noInit);
@@ -312,7 +313,7 @@ void MeshToSDF<BuildT, ResourceT>::signComponents()
         copySidecar(dFullGrid, dComponentGrid, dFullNearestTriangle, componentNearestTriangle.data());
 
         signSingleComponent(dComponentGrid, componentSDF.data(), componentNearestTriangle.data());
-        accumulateNesting(dComponentGrid, componentSDF.data(), componentID);
+        accumulateNesting(dComponentGrid, componentSDF.data(), componentID, dComponentGrids.data());
 
         copySidecar(dComponentGrid, dFullGrid, componentSDF.data(), dFullSDF);
     }
@@ -429,10 +430,12 @@ namespace sdf::detail {
 template <typename BuildT>
 struct FindExteriorLabelFunctor
 {
+    using ComponentLabelT = ConnectedComponentsBase::ComponentLabelT;
+    static_assert(sizeof(ComponentLabelT) <= sizeof(uint32_t), "the key holds the label in its low 32 bits");
     static constexpr int MaxThreadsPerBlock         = NanoLeaf<BuildT>::SIZE;
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
-    __device__ void operator()(const NanoGrid<BuildT>* dBarrierPrunedGrid, const uint32_t* dVoxelLabel,
+    __device__ void operator()(const NanoGrid<BuildT>* dBarrierPrunedGrid, const ComponentLabelT* dVoxelLabel,
                                unsigned long long* dMinKey)
     {
         const int leafID = blockIdx.x, n = threadIdx.x;
@@ -441,7 +444,7 @@ struct FindExteriorLabelFunctor
         if (leaf.isActive(uint32_t(n))) {
             const uint64_t v = leaf.getValue(uint32_t(n));
             const nanovdb::Coord ijk = leaf.offsetToGlobalCoord(uint32_t(n));
-            const uint32_t label = dVoxelLabel[v];
+            const ComponentLabelT label = dVoxelLabel[v];
             // Shift signed x into unsigned order, preserving its coordinate order.
             const uint32_t unsignedX = uint32_t(int64_t(ijk[0]) + (int64_t(1) << 31));
             // Pack x in the high 32 bits and label in the low 32 bits: the minimum key gives the label at minimum x.
@@ -460,16 +463,17 @@ struct FindExteriorLabelFunctor
 template <typename BuildT>
 struct SignNonBarrierFunctor
 {
+    using ComponentLabelT = ConnectedComponentsBase::ComponentLabelT;
     static constexpr int MaxThreadsPerBlock         = NanoLeaf<BuildT>::SIZE;
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
-    __device__ void operator()(const NanoGrid<BuildT>* dBarrierPrunedGrid, const uint32_t* dVoxelLabel,
+    __device__ void operator()(const NanoGrid<BuildT>* dBarrierPrunedGrid, const ComponentLabelT* dVoxelLabel,
                                const unsigned long long* dMinKey, const NanoGrid<BuildT>* dComponentGrid,
                                float* dComponentSDF)
     {
         const int leafID = blockIdx.x, n = threadIdx.x;
         const auto& leaf = dBarrierPrunedGrid->tree().template getFirstNode<0>()[leafID];
-        const uint32_t exteriorLabel = uint32_t(*dMinKey);  // low 32 bits of the key
+        const ComponentLabelT exteriorLabel = ComponentLabelT(*dMinKey);  // low 32 bits of the key
         if (!leaf.isActive(uint32_t(n)) || dVoxelLabel[leaf.getValue(uint32_t(n))] == exteriorLabel) return;
         const uint64_t v = dComponentGrid->tree().root().probeLeaf(leaf.origin())->getValue(uint32_t(n));
         dComponentSDF[v] = -dComponentSDF[v];
@@ -483,7 +487,7 @@ struct SignNonBarrierFunctor
 template <typename BuildT, typename ResourceT>
 typename MeshToSDF<BuildT, ResourceT>::template BufferT<unsigned long long>
 MeshToSDF<BuildT, ResourceT>::findExteriorLabel(const GridT* dBarrierPrunedGrid, uint32_t leaves,
-                                                const uint32_t* dVoxelLabel)
+                                                const ComponentLabelT* dVoxelLabel)
 {
     BufferT<unsigned long long> minKey(mStream, this->ref(), 1, nanovdb::cuda::noInit);
     cudaCheck(cudaMemsetAsync(minKey.data(), 0xFF, sizeof(unsigned long long), mStream));
@@ -496,7 +500,7 @@ MeshToSDF<BuildT, ResourceT>::findExteriorLabel(const GridT* dBarrierPrunedGrid,
 
 template <typename BuildT, typename ResourceT>
 void MeshToSDF<BuildT, ResourceT>::signNonBarrier(const GridT* dComponentGrid, const GridT* dBarrierPrunedGrid,
-                                                  const uint32_t* dVoxelLabel, float* dComponentSDF)
+                                                  const ComponentLabelT* dVoxelLabel, float* dComponentSDF)
 {
     const uint32_t leaves = TraitsT::getTreeData(dBarrierPrunedGrid, mStream).mNodeCount[0];
     if (leaves == 0) return;
@@ -727,19 +731,23 @@ __hostdev__ inline bool isInverted(const NanoGrid<BuildT>& grid, const nanovdb::
     return leafMasks[lower->getChild(l) - tree.getFirstLeaf()].isOn(LeafT::CoordToOffset(ijk));
 } // isInverted
 
-/// @brief Count component j as enclosed by the component of @a dComponentGrid if a voxel of component j is in its interior.
-/// @details Any voxel of component j gives the same answer: its voxels are connected and none is active in @a dComponentGrid,
-///          so they all lie in one region of the inactive space of @a dComponentGrid. The first active voxel of the first leaf
-///          of component j's grid is used. That leaf exists and holds an active voxel: every label has a voxel, and
-///          PartitionGrid builds an output leaf only where a source leaf keeps a voxel of that label.
+/// @brief Count component j as enclosed by the component of @a dComponentGrid if a voxel of component j is in its
+///        interior.
+/// @details Any voxel of component j gives the same answer: its voxels are connected and none is active in
+///          @a dComponentGrid, so they all lie in one region of the inactive space of @a dComponentGrid. The first
+///          active voxel of the first leaf of component j's grid, @a dComponentGrids[j], is used. That leaf exists and
+///          holds an active voxel: every label has a voxel, and PartitionGrid builds an output leaf only where a
+///          source leaf keeps a voxel of that label.
 template <typename BuildT>
 struct AccumulateNestingFunctor
 {
+    using ComponentLabelT = ConnectedComponentsBase::ComponentLabelT;
+
     __device__ void operator()(size_t j, const NanoGrid<BuildT>* dComponentGrid,
                                const NanoGrid<BuildT>* const* dComponentGrids,
                                const nanovdb::Mask<3>* dLeafMasks, const nanovdb::Mask<4>* dLowerMasks,
                                const nanovdb::Mask<5>* dUpperMasks, const nanovdb::Coord* dRootOrigins,
-                               uint64_t rootOriginCount, uint32_t componentID, uint32_t* dDepth) const
+                               uint64_t rootOriginCount, ComponentLabelT componentID, uint32_t* dDepth) const
     {
         if (j == componentID) return;
         const auto* leaf = dComponentGrids[j]->tree().getFirstLeaf();
@@ -755,7 +763,7 @@ struct AccumulateNestingFunctor
 ///        @a dComponentSDF, encloses. The test reads the invert masks PropagateSign computes for this component.
 template <typename BuildT, typename ResourceT>
 void MeshToSDF<BuildT, ResourceT>::accumulateNesting(const GridT* dComponentGrid, const float* dComponentSDF,
-                                                   ComponentLabelT componentID)
+                                                   ComponentLabelT componentID, const GridT* const* dComponentGrids)
 {
     const auto tree = TraitsT::getTreeData(dComponentGrid, mStream);
     BufferT<nanovdb::Mask<3>> leafMasks(mStream, this->ref(), tree.mNodeCount[0], nanovdb::cuda::noInit);
@@ -768,7 +776,7 @@ void MeshToSDF<BuildT, ResourceT>::accumulateNesting(const GridT* dComponentGrid
     static constexpr unsigned int threadsPerBlock = 256;
     const auto blocks = util::cuda::blocksPerGrid(mComponentCount, threadsPerBlock);
     util::cuda::lambdaKernel<<<blocks, threadsPerBlock, 0, mStream>>>(
-        mComponentCount, FunctorT{}, dComponentGrid, mDeviceComponentGrids.data(),
+        mComponentCount, FunctorT{}, dComponentGrid, dComponentGrids,
         leafMasks.data(), lowerMasks.data(), upperMasks.data(),
         rootOrigins.data(), uint64_t(rootOrigins.size()), componentID, mNestingDepth.data());
     cudaCheckError();
@@ -785,8 +793,10 @@ namespace sdf::detail {
 ///       component if the voxel is in that component's interior, i.e. its distance is negative.
 struct ApplyNestingRuleFunctor
 {
-    __device__ void operator()(size_t v, const uint32_t* dComponentLabel, const uint32_t* dDepth, bool evenOdd,
-                               float* dFullSDF) const
+    using ComponentLabelT = ConnectedComponentsBase::ComponentLabelT;
+
+    __device__ void operator()(size_t v, const ComponentLabelT* dComponentLabel, const uint32_t* dDepth,
+                               bool evenOdd, float* dFullSDF) const
     {
         if (v == 0) return;                                  // slot 0 is the background
         const uint32_t enclosing = dDepth[dComponentLabel[v]] + uint32_t(signbit(dFullSDF[v]));
