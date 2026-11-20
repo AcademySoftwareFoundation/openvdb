@@ -1,0 +1,80 @@
+name: NanoVDB CUDA tests (simulated H100)
+
+# Optional, non-required check. The hosted runners have no GPU, so the NanoVDB
+# CUDA unit tests are excluded from nanovdb.yml. This builds them and runs them
+# on a simulated NVIDIA H100 (https://github.com/pantheongpu/pantheonsim). A
+# simulator cannot reproduce hardware-specific behavior or timing, so it
+# complements real-GPU testing and does not replace it.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "nanovdb/nanovdb/**"
+      - "cmake/**"
+      - ".github/workflows/gpu-sim.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  nanovdb-cuda-sim:
+    name: NanoVDB, CUDA 13.0, simulated H100
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up the simulated GPU and CUDA toolkit
+        uses: pantheongpu/setup-pantheonsim@ca87fe3143b29166822b923d6050945c5179408c # v0.1.5
+        with:
+          gpu: nvidia/h100
+          cuda-toolkit: "13.0"
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build libgtest-dev
+
+      # The simulator runs PTX only (90-virtual) and needs a shared CUDA
+      # runtime. NanoVDB is configured on its own, without OpenVDB, TBB,
+      # Blosc or zlib, which the CUDA tests do not use.
+      - name: Configure NanoVDB
+        run: |
+          cmake -S nanovdb/nanovdb -B build -GNinja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_CUDA_COMPILER=/usr/local/cuda-13.0/bin/nvcc \
+                -DCUDAToolkit_ROOT=/usr/local/cuda-13.0 \
+                -DCMAKE_CUDA_ARCHITECTURES=90-virtual \
+                -DCMAKE_CUDA_RUNTIME_LIBRARY=Shared \
+                -DNANOVDB_USE_CUDA=ON \
+                -DNANOVDB_BUILD_UNITTESTS=ON \
+                -DNANOVDB_BUILD_TOOLS=OFF \
+                -DNANOVDB_USE_OPENVDB=OFF \
+                -DNANOVDB_USE_TBB=OFF \
+                -DNANOVDB_USE_BLOSC=OFF \
+                -DNANOVDB_USE_ZLIB=OFF
+
+      - name: Build the CUDA unit tests
+        run: |
+          cmake --build build -j3 --target \
+                nanovdb_test_cuda \
+                nanovdb_test_cuda_memory_resource \
+                nanovdb_test_cuda_util
+
+      - name: Run the CUDA unit tests
+        working-directory: build/unittest
+        run: |
+          # ManyTiles_CudaPointsToGrid (1M random points in a 16000^3 box) uses
+          # a lot of device memory. The simulator backs device memory with
+          # host RAM, and on a hosted runner it ran out of host memory here.
+          vgpu run ./nanovdb_test_cuda --gtest_filter=-*ManyTiles*
+          vgpu run ./nanovdb_test_cuda_memory_resource
+          vgpu run ./nanovdb_test_cuda_util
