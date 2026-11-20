@@ -121,10 +121,6 @@ CoarsenGrid<BuildT, ResourceT>::getHandle(const BufferT &pool)
     if (mVerbose==1) mTimer.start("\nCoarsening root node");
     coarsenRoot();
 
-    // Allocate memory for coarsened upper/lower masks
-    if (mVerbose==1) mTimer.restart("Allocating internal node mask buffers");
-    mBuilder.allocateInternalMaskBuffers(mStream);
-
     // Coarsen masks of upper/lower nodes
     if (mVerbose==1) mTimer.restart("Coarsening internal nodes");
     coarsenInternalNodes();
@@ -200,14 +196,15 @@ void CoarsenGrid<BuildT, ResourceT>::coarsenRoot()
 template<typename BuildT, typename ResourceT>
 void CoarsenGrid<BuildT, ResourceT>::coarsenInternalNodes()
 {
-    // Computes the masks of upper and (densified) lower internal nodes, as a result of the coarsening operation
-    // Masks of lower internal nodes are densified in the sense that a serialized array of them is allocated,
-    // as if every upper node had a full set of 32^3 lower children
-    if (auto srcLeafCount = mSrcTreeData.mNodeCount[0]) { // Unless it's an empty grid
+    // Computes the upper and lower internal-node masks of the coarsened topology. Each source
+    // lower node coarsens into one lower node, which bounds the lower-mask rows.
+    const auto srcLeafCount = mSrcTreeData.mNodeCount[0];
+    mBuilder.buildInternalMasks(mStream, mSrcTreeData.mNodeCount[1], [&](Mask<5> *upperMasks, auto lowerMasks) {
+        if (srcLeafCount == 0) return; // Empty grid
         util::cuda::lambdaKernel<<<numBlocks(srcLeafCount), mNumThreads, 0, mStream>>>(
             srcLeafCount, util::morphology::cuda::CoarsenInternalNodesFunctor<BuildT>(),
-            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks() );
-    }
+            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), upperMasks, lowerMasks);
+    });
 }// CoarsenGrid<BuildT, ResourceT>::coarsenInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

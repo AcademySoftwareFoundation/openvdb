@@ -121,10 +121,6 @@ RefineGrid<BuildT, ResourceT>::getHandle(const BufferT &pool)
     if (mVerbose==1) mTimer.start("\nRefining root node");
     refineRoot();
 
-    // Allocate memory for refined upper/lower masks
-    if (mVerbose==1) mTimer.restart("Allocating internal node mask buffers");
-    mBuilder.allocateInternalMaskBuffers(mStream);
-
     // Refine masks of upper/lower nodes
     if (mVerbose==1) mTimer.restart("Refining internal nodes");
     refineInternalNodes();
@@ -211,14 +207,15 @@ void RefineGrid<BuildT, ResourceT>::refineRoot()
 template<typename BuildT, typename ResourceT>
 void RefineGrid<BuildT, ResourceT>::refineInternalNodes()
 {
-    // Computes the masks of upper and (densified) lower internal nodes, as a result of the refinement operation
-    // Masks of lower internal nodes are densified in the sense that a serialized array of them is allocated,
-    // as if every upper node had a full set of 32^3 lower children
-    if (auto srcLeafCount = mSrcTreeData.mNodeCount[0]) { // Unless it's an empty grid
+    // Computes the upper and lower internal-node masks of the refined topology. Each source
+    // lower node refines into at most 8 lower nodes, which bounds the lower-mask rows.
+    const auto srcLeafCount = mSrcTreeData.mNodeCount[0];
+    mBuilder.buildInternalMasks(mStream, 8ull * mSrcTreeData.mNodeCount[1], [&](Mask<5> *upperMasks, auto lowerMasks) {
+        if (srcLeafCount == 0) return; // Empty grid
         util::cuda::lambdaKernel<<<numBlocks(srcLeafCount), mNumThreads, 0, mStream>>>(
             srcLeafCount, util::morphology::cuda::RefineInternalNodesFunctor<BuildT>(),
-            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mBuilder.deviceUpperMasks(), mBuilder.deviceLowerMasks() );
-    }
+            mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), upperMasks, lowerMasks);
+    });
 }// RefineGrid<BuildT, ResourceT>::refineInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
