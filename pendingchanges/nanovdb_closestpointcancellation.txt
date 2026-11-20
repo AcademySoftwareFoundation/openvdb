@@ -1,0 +1,7 @@
+NanoVDB:
+  Fixes:
+  - Fixed math::closestPointOnTriangleToPoint, and so math::pointToTriangleDistSqr, losing precision in float for
+    long, thin triangles far from the origin. Its Voronoi-region tests subtracted two nearly equal products, and
+    the rounding could move the closest point and overestimate the distance by more than a voxel in
+    tools::cuda::MeshToGrid. The difference of products is now computed with Kahan's algorithm, accurate to about
+    1.5 ulp.
