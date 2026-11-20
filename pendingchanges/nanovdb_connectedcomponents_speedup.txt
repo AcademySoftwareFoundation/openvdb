@@ -1,0 +1,7 @@
+NanoVDB:
+
+  Improvements:
+  - tools::cuda::ConnectedComponents is faster, with the same interface and the same labels. The per-leaf
+    union-find runs over the z-runs of a leaf instead of its voxels, with one warp per leaf; components that touch
+    across a leaf face are united where they are found, without an intermediate edge list; and each component's
+    label is read once and written at all of its voxels.
