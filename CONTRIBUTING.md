@@ -88,6 +88,35 @@ If a maintainer is no longer interested or cannot perform the maintainer duties 
 should volunteer to be moved to emeritus status. In extreme cases this can also occur by a vote of
 the maintainers per the voting process below.
 
+## NanoVDB Maintainer
+
+The NanoVDB maintainer role is a scoped sub-variant of the [maintainer](#maintainer) role, responsible for helping to maintain NanoVDB.
+
+All NanoVDB feature work is staged on the `develop/nanovdb` branch with features merged into `master` after some time for testing and stabilization. A pull request targeting `develop/nanovdb` requires an approving review from a NanoVDB maintainer, a [maintainer](#maintainer), or a [TSC member](#technical-steering-committee-tsc-member) before it can be merged.
+
+This role enables the member to approve, request changes on, and dismiss reviews of pull requests targeting `develop/nanovdb` or sub-feature branches (`develop/nanovdb/*`), and to merge them in the same manner a [maintainer](#maintainer) or a [TSC member](#technical-steering-committee-tsc-member) can. However, the role does not grant these permissions on any other branch, including `master`. It also comes with the obligation to be a responsible leader in the NanoVDB community.
+
+### Process for becoming a NanoVDB maintainer
+
+* Show your experience with the NanoVDB codebase through contributions and engagement on the community channels.
+* Request to become a NanoVDB maintainer.
+* Have the majority of maintainers approve you becoming a NanoVDB maintainer.
+* Your name and email is added to the MAINTAINERS.md file for the project.
+
+### NanoVDB maintainer responsibilities
+
+* Monitor email aliases.
+* Monitor Slack (delayed response is perfectly acceptable).
+* Triage GitHub issues and perform pull request reviews for NanoVDB, for other committers and the community.
+* Make sure that ongoing NanoVDB PRs are moving forward at the right pace or close them.
+* Remain an active contributor to the project in general and the NanoVDB code base in particular.
+
+### When does a NanoVDB maintainer lose NanoVDB maintainer status?
+
+If a NanoVDB maintainer is no longer interested or cannot perform the NanoVDB maintainer duties listed above, they
+should volunteer to be moved to emeritus status. In extreme cases this can also occur by a vote of
+the maintainers per the voting process below.
+
 ## Technical Steering Committee (TSC) member
 
 The Technical Steering Committee (TSC) oversees the overall technical direction of OpenVDB, as defined in the [charter](charter.md).
