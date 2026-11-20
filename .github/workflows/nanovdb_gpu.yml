@@ -1,0 +1,68 @@
+name: NanoVDB GPU (simulated)
+
+# Runs the NanoVDB CUDA unit tests that nanovdb.yml excludes because the
+# hosted runners have no GPU. The GPU is simulated (PantheonSim), so this is a
+# functional check of the CUDA code paths, not a substitute for testing on
+# physical hardware. It is a nightly/manual job and is not meant to be a
+# required status check.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-nanovdb-cuda-simulated:
+    # Avoid running the nightly schedule on forks.
+    if: github.repository_owner == 'AcademySoftwareFoundation' || github.event_name == 'workflow_dispatch'
+    runs-on: ${{ (github.repository_owner == 'AcademySoftwareFoundation' && 'ubuntu-latest-8c-32g-300h') || 'ubuntu-24.04' }}
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build libgtest-dev
+
+      # Two simulated A100s so nanovdb_mgpu_unit_test has a second device.
+      - name: Set up simulated GPUs
+        uses: pantheongpu/setup-pantheonsim@23932d9b811269d55c8d65687332fefc65daeb2c # v0.1.3
+        with:
+          gpu: nvidia/a100
+          count: 2
+          cuda-toolkit: '13.0'
+
+      # The simulator replaces the shared CUDA runtime and runs PTX, so build
+      # PTX-only (80-virtual) against the shared runtime.
+      - name: Build
+        run: |
+          cmake -S nanovdb/nanovdb -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DNANOVDB_USE_CUDA=ON \
+            -DNANOVDB_USE_OPENVDB=OFF \
+            -DNANOVDB_BUILD_UNITTESTS=ON \
+            -DNANOVDB_BUILD_TOOLS=OFF \
+            -DCMAKE_CUDA_ARCHITECTURES=80-virtual \
+            -DCMAKE_CUDA_RUNTIME_LIBRARY=Shared
+          cmake --build build --parallel 4 --target \
+            nanovdb_test_cuda nanovdb_test_mgpu \
+            nanovdb_test_cuda_memory_resource nanovdb_test_cuda_util \
+            nanovdb_test_cuda_util_sync nanovdb_test_cuda_buffer
+
+      # The Large and ManyTiles cases allocate several GB of host memory and
+      # are killed by the runner's memory limit under the simulator.
+      # UnifiedBuffer_IO reads data/3_spheres.nvdb, which only the CPU test
+      # binary (not built here) writes.
+      - name: Test
+        env:
+          GTEST_FILTER: '-*Large*:*ManyTiles*:*UnifiedBuffer_IO*'
+        run: cd build && ctest -V -R ".*cuda.*|.*mgpu.*"
