@@ -1357,3 +1357,18 @@ TEST_F(TestAttributeSet, testAttributeSetGroups)
         EXPECT_TRUE(!descr2.groupIndexCollision(descr1));
     }
 }
+
+
+TEST_F(TestAttributeSet, testCorruptDescriptorLength)
+{
+    using Descriptor = AttributeSet::Descriptor;
+
+    // A huge attribute count followed by almost no data.
+    const Index64 hugeLength = Index64(1) << 62;
+    std::ostringstream ostr(std::ios_base::binary);
+    ostr.write(reinterpret_cast<const char*>(&hugeLength), sizeof(Index64));
+
+    Descriptor descriptor;
+    std::istringstream istr(ostr.str(), std::ios_base::binary);
+    EXPECT_THROW(descriptor.read(istr), openvdb::IoError);
+}

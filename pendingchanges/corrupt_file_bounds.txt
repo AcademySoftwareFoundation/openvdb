@@ -1,0 +1,12 @@
+Improvements:
+  - A corrupt VDB file can no longer make string, metadata or attribute
+    descriptor reads allocate memory from an untrusted length. Strings and
+    metadata are read in chunks, so the allocation follows the bytes the
+    stream really holds. Reported by OpenImageIO fuzz testing.
+Bug Fixes:
+  - openvdb::readString() now throws IoError if the stream ends before the
+    string length, instead of using an uninitialized length.
+  - Reading a negative grid count, or a grid descriptor whose end offset does
+    not move forward, now throws IoError.
+  - Point data pages now check the size in the compressed header before
+    allocating the decompressed buffer.

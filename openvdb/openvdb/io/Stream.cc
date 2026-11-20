@@ -64,7 +64,6 @@ Stream::Stream(std::istream& is, const io::ReadOptions& readOptions)
     // Read in all grids and insert them into mGrids.
     mGrids.reset(new GridPtrVec);
     std::vector<GridDescriptor> descriptors;
-    descriptors.reserve(gridCount);
     Archive::NamedGridMap namedGrids;
     for (int32_t i = 0; i < gridCount; ++i) {
         GridDescriptor gd;

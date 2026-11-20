@@ -1343,11 +1343,13 @@ AttributeSet::Descriptor::read(std::istream& is)
     Index64 arraylength = 0;
     is.read(reinterpret_cast<char*>(&arraylength), sizeof(Index64));
 
-    std::vector<NamePair>(size_t(arraylength)).swap(mTypes);
-
-    for (NamePair& np : mTypes) {
+    // Entries are added as they are read, so a corrupt length does not allocate up front.
+    mTypes.clear();
+    for (Index64 n = 0; n < arraylength; ++n) {
+        NamePair np;
         np.first = readString(is);
         np.second = readString(is);
+        mTypes.push_back(std::move(np));
     }
 
     mNameMap.clear();

@@ -334,14 +334,23 @@ Page::decompress(const std::unique_ptr<char[]>& temp)
 
     bloscValidateCompressedBytes(temp.get(), static_cast<size_t>(mInfo->compressedBytes));
 
+    const size_t expectedBytes = static_cast<size_t>(mInfo->uncompressedBytes);
     size_t uncompressedBytes = bloscUncompressedSize(temp.get());
+
+    // Check the size in the Blosc header before allocating from it. Small buffers
+    // are padded, see bloscDecompress().
+    const bool padded = uncompressedBytes == OPENVDB_BLOSC_PAD_BYTES &&
+        expectedBytes <= OPENVDB_BLOSC_PAD_BYTES;
+    if (uncompressedBytes != expectedBytes && !padded) {
+        OPENVDB_THROW(RuntimeError, "Expected to decompress " << expectedBytes
+            << " byte" << (expectedBytes == 1 ? "" : "s") << ", got "
+            << uncompressedBytes << " byte" << (uncompressedBytes == 1 ? "" : "s"));
+    }
+
     size_t tempBytes = uncompressedBytes;
     tempBytes += uncompressedBytes;
     mData.reset(new char[tempBytes]);
 
-    // page handles index the data using the uncompressed size from the page header,
-    // so the decompressed size must match it
-    const size_t expectedBytes = static_cast<size_t>(mInfo->uncompressedBytes);
     bloscDecompress(mData.get(), expectedBytes, tempBytes, temp.get());
 }
 

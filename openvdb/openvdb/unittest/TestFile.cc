@@ -21,9 +21,11 @@
 #include <chrono>
 #include <algorithm> // for std::sort()
 #include <cstdio> // for remove() and rename()
+#include <cstring> // for memcpy()
 #include <fstream>
 #include <functional> // for std::bind()
 #include <iostream>
+#include <limits>
 #include <map>
 #include <memory>
 #include <set>
@@ -2414,4 +2416,108 @@ TEST_F(TestFile, testAsync)
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     }
+}
+
+
+namespace {
+
+std::string
+writeSingleGridBytes(const char* filename, std::string& gridType)
+{
+    using namespace openvdb;
+    FloatGrid::Ptr grid = FloatGrid::create();
+    grid->setName("g");
+    grid->tree().setValue(Coord(1, 2, 3), 5.0f);
+    gridType = grid->type();
+    {
+        io::File file(filename);
+        file.write(GridCPtrVec{grid});
+    }
+    std::ifstream stream(filename, std::ios_base::binary);
+    std::ostringstream bytes;
+    bytes << stream.rdbuf();
+    return bytes.str();
+}
+
+void
+writeBytes(const char* filename, const std::string& bytes)
+{
+    std::ofstream stream(filename, std::ios_base::binary | std::ios_base::trunc);
+    stream.write(bytes.data(), std::streamsize(bytes.size()));
+}
+
+} // anonymous namespace
+
+
+TEST_F(TestFile, testCorruptGridOffsets)
+{
+    using namespace openvdb;
+    const char* filename = "testCorruptGridOffsets.vdb";
+    std::string gridType;
+    const std::string valid = writeSingleGridBytes(filename, gridType);
+
+    // Offsets follow the grid type and the (empty) instance parent name.
+    const size_t typePosition = valid.find(gridType);
+    ASSERT_TRUE(typePosition != std::string::npos);
+    const size_t offsets = typePosition + gridType.size() + sizeof(uint32_t);
+    ASSERT_TRUE(offsets + 3 * sizeof(int64_t) <= valid.size());
+    const size_t endPosition = offsets + 2 * sizeof(int64_t);
+
+    {
+        io::File file(filename);
+        EXPECT_NO_THROW(file.open());
+    }
+    // An end offset at or before the descriptor would repeat the same descriptor.
+    const int64_t value = 0;
+    std::string bytes = valid;
+    std::memcpy(&bytes[endPosition], &value, sizeof(int64_t));
+    writeBytes(filename, bytes);
+    io::File file(filename);
+    EXPECT_THROW(file.open(), IoError);
+    remove(filename);
+}
+
+
+TEST_F(TestFile, testCorruptGridNameLength)
+{
+    using namespace openvdb;
+    const char* filename = "testCorruptGridNameLength.vdb";
+    std::string gridType;
+    std::string bytes = writeSingleGridBytes(filename, gridType);
+
+    // The grid name "g" is stored with a 4 byte length just before the grid type.
+    const size_t typePosition = bytes.find(gridType);
+    ASSERT_TRUE(typePosition > 5);
+    const size_t lengthPosition = typePosition - sizeof(uint32_t) /*type length*/
+        - 1 /*name*/ - sizeof(uint32_t) /*name length*/;
+    const uint32_t huge = 0xffffffffu;
+    std::memcpy(&bytes[lengthPosition], &huge, sizeof(uint32_t));
+    writeBytes(filename, bytes);
+
+    io::File file(filename);
+    EXPECT_THROW(file.open(), IoError);
+    remove(filename);
+}
+
+
+TEST_F(TestFile, testCorruptGridCount)
+{
+    using namespace openvdb;
+    const char* filename = "testCorruptGridCount.vdb";
+    std::string gridType;
+    const std::string valid = writeSingleGridBytes(filename, gridType);
+
+    // The grid count is the 4 bytes before the first descriptor name length.
+    const size_t typePosition = valid.find(gridType);
+    ASSERT_TRUE(typePosition > 9);
+    const size_t countPosition = typePosition - sizeof(uint32_t) - 1
+        - sizeof(uint32_t) - sizeof(int32_t);
+    for (const int32_t count : {int32_t(-1), std::numeric_limits<int32_t>::max()}) {
+        std::string bytes = valid;
+        std::memcpy(&bytes[countPosition], &count, sizeof(int32_t));
+        writeBytes(filename, bytes);
+        io::File file(filename);
+        EXPECT_THROW(file.open(), IoError);
+    }
+    remove(filename);
 }

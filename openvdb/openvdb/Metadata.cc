@@ -138,12 +138,9 @@ UnknownMetadata::copy(const Metadata& other)
 void
 UnknownMetadata::readValue(std::istream& is, Index32 numBytes)
 {
-    mBytes.clear();
-    if (numBytes > 0) {
-        ByteVec buffer(numBytes);
-        is.read(reinterpret_cast<char*>(&buffer[0]), numBytes);
-        mBytes.swap(buffer);
-    }
+    ByteVec buffer;
+    openvdb::internal::readSizedBuffer(is, buffer, numBytes, "unknown metadata");
+    mBytes.swap(buffer);
 }
 
 
