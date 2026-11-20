@@ -1,0 +1,4 @@
+OpenVDB:
+  Improvements:
+  - LevelSetTracker and LevelSetAdvection read the stencils of all biased gradient schemes
+    directly from the leaf buffers, which makes them 1.6x-3.3x faster on a single thread.
