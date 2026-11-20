@@ -1071,6 +1071,16 @@ TEST(TestBuffer, GridHandlePinnedHostReadable)
     EXPECT_EQ(1u, readBack.gridCount());
     EXPECT_NE(readBack.grid<float>(), nullptr);
     EXPECT_EQ(0, std::memcmp(readBack.data(), handle.data(), handle.bufferSize()));
+
+    // the single-grid raw readers allocate through the same resource
+    std::istringstream byIndex(ss.str()), byName(ss.str());
+    nanovdb::GridHandle<BufT> readIndex, readName;
+    readIndex.read(byIndex, 0u);
+    readName.read(byName, std::string("sphere"));
+    ASSERT_NE(readIndex.grid<float>(), nullptr);
+    ASSERT_NE(readName.grid<float>(), nullptr);
+    EXPECT_EQ(std::string("sphere"), readIndex.grid<float>()->gridName());
+    EXPECT_EQ(std::string("sphere"), readName.grid<float>()->gridName());
 }
 
 TEST(TestBuffer, GridHandlePinnedAsyncResource)

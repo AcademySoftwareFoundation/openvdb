@@ -404,12 +404,12 @@ struct HostBuffer::Pool
         mRegister.erase(buffer);
     }
 
-    /// @brief Replaces buffer1 with buffer2 in the register
+    /// @brief Replaces buffer1 with buffer2 in the register, if buffer1 is registered.
+    ///        A buffer from createPool is not, so moving it leaves the register unchanged.
     void replace(HostBuffer *buffer1, HostBuffer *buffer2)
     {
         const std::lock_guard<std::mutex> lock(mMutex);
-        mRegister.erase( buffer1);
-        mRegister.insert(buffer2);
+        if (mRegister.erase(buffer1)) mRegister.insert(buffer2);
     }
 
     /// @brief Reset the register and all its buffers
@@ -527,7 +527,7 @@ inline HostBuffer::HostBuffer(uint64_t size) : mPool(nullptr), mSize(size), mDat
 
 inline HostBuffer::HostBuffer(HostBuffer&& other) : mPool(other.mPool), mSize(other.mSize), mData(other.mData)
 {
-    if (mPool && mSize != 0) {
+    if (mPool) {// Pool::add registers zero-size buffers too
         mPool->replace(&other, this);
     }
     other.mPool.reset();
@@ -557,7 +557,7 @@ inline HostBuffer& HostBuffer::operator=(HostBuffer&& other)
     mPool = other.mPool;
     mSize = other.mSize;
     mData = other.mData;
-    if (mPool && mSize != 0) {
+    if (mPool) {// Pool::add registers zero-size buffers too
         mPool->replace(&other, this);
     }
     other.mPool.reset();

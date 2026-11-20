@@ -202,6 +202,23 @@ namespace tools {// ============================================================
 //    checksum[2] before v32.6.0: <------------- [0] ------------><-------------- [1] --------------->
 //    checksum[]2 after  v32.6.0: <---[0]---><----------------------------------------[1]---------------------------------------->
 
+// ----------------------------> crc32HeadSize <--------------------------------------
+
+/// @brief Return the byte size, from the start of the grid, of the head that crc32Head checksums.
+///        Up to v32.6.0 the head runs to the first upper node. A grid without upper nodes has
+///        nothing between its root and its blind metadata, so its head runs to the blind
+///        metadata, or to the end of the grid when it has none.
+/// @param gridData Base pointer to the grid.
+/// @return Byte size of the grid's head.
+inline __hostdev__ uint64_t crc32HeadSize(const GridData *gridData)
+{
+    NANOVDB_ASSERT(gridData);
+    if (gridData->mVersion > Version(32,6,0)) return sizeof(GridData) + sizeof(TreeData);
+    const uint64_t nodeOffset = static_cast<const TreeData*>(gridData->treePtr())->mNodeOffset[2];// relative to the tree
+    if (nodeOffset != 0) return sizeof(GridData) + nodeOffset;
+    return gridData->mBlindMetadataCount ? uint64_t(gridData->mBlindMetadataOffset) : gridData->mGridSize;
+}// uint64_t crc32HeadSize(const GridData *gridData)
+
 // ----------------------------> crc32Head <--------------------------------------
 
 /// @brief Compute the crc32 checksum of a grid's head, i.e. its GridData and
@@ -213,8 +230,7 @@ namespace tools {// ============================================================
 inline __hostdev__ uint32_t crc32Head(const GridData *gridData, const uint32_t *lut)
 {
     NANOVDB_ASSERT(gridData);
-    const uint8_t *begin = (const uint8_t*)(gridData), *mid = begin + sizeof(GridData) + sizeof(TreeData);
-    if (gridData->mVersion <= Version(32,6,0)) mid = (const uint8_t*)(gridData->template nodePtr<2>());
+    const uint8_t *begin = (const uint8_t*)(gridData), *mid = begin + crc32HeadSize(gridData);
     return util::crc32(begin + 16u, mid, lut);// exclude GridData::mMagic and GridData::mChecksum
 }// uint32_t crc32Head(const GridData *gridData, const uint32_t *lut)
 
@@ -224,8 +240,7 @@ inline __hostdev__ uint32_t crc32Head(const GridData *gridData, const uint32_t *
 inline __hostdev__ uint32_t crc32Head(const GridData *gridData)
 {
     NANOVDB_ASSERT(gridData);
-    const uint8_t *begin = (const uint8_t*)(gridData), *mid = begin + sizeof(GridData) + sizeof(TreeData);
-    if (gridData->mVersion <= Version(32,6,0)) mid = (const uint8_t*)(gridData->template nodePtr<2>());
+    const uint8_t *begin = (const uint8_t*)(gridData), *mid = begin + crc32HeadSize(gridData);
     return util::crc32(begin + 16, mid);// exclude GridData::mMagic and GridData::mChecksum
 }// uint32_t crc32Head(const GridData *gridData)
 
