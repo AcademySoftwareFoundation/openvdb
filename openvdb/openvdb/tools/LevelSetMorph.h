@@ -14,6 +14,7 @@
 #include "LevelSetTracker.h"
 #include "Interpolation.h" // for BoxSampler, etc.
 #include <openvdb/math/FiniteDifference.h>
+#include <openvdb/tree/NeighborAccessor.h>
 #include <functional>
 #include <limits>
 
@@ -483,20 +484,25 @@ Morph<MapT, SpatialScheme, TemporalScheme>::
 sampleXformedSpeed(const LeafRange& range, Index speedBuffer)
 {
     using VoxelIterT = typename LeafType::ValueOnCIter;
-    using SamplerT = tools::GridSampler<typename GridT::ConstAccessor, tools::BoxSampler>;
+    using NeighborAccessorT = tree::NeighborAccessor<const TreeType>;
 
     const MapT& map = *mMap;
     mParent->mTracker.checkInterrupter();
 
-    typename GridT::ConstAccessor targetAcc = mParent->mTarget->getAccessor();
-    SamplerT target(targetAcc, mParent->mTarget->transform());
+    // The samples of the voxels of a leaf are near each other, so a NeighborAccessor
+    // reads them with few searches of the tree.
+    NeighborAccessorT targetAcc(mParent->mTarget->tree());
+    const math::Transform& targetXform = mParent->mTarget->transform();
+    auto target = [&](const Vec3R& xyz) {
+        return tools::BoxSampler::sample(targetAcc, targetXform.worldToIndex(xyz));
+    };
     if (mParent->mMask == nullptr) {
         for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
             ValueType* speed = leafIter.buffer(speedBuffer).data();
             bool isZero = true;
             for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
                 ValueType& s = speed[voxelIter.pos()];
-                s -= target.wsSample(map.applyMap(voxelIter.getCoord().asVec3d()));
+                s -= target(map.applyMap(voxelIter.getCoord().asVec3d()));
                 if (!math::isApproxZero(s)) isZero = false;
                 mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
             }
@@ -505,16 +511,19 @@ sampleXformedSpeed(const LeafRange& range, Index speedBuffer)
     } else {
         const ValueType min = mParent->mMinMask, invNorm = 1.0f/(mParent->mDeltaMask);
         const bool invMask = mParent->isMaskInverted();
-        typename GridT::ConstAccessor maskAcc = mParent->mMask->getAccessor();
-        SamplerT mask(maskAcc,  mParent->mMask->transform());
+        NeighborAccessorT maskAcc(mParent->mMask->tree());
+        const math::Transform& maskXform = mParent->mMask->transform();
+        auto mask = [&](const Vec3R& xyz) {
+            return tools::BoxSampler::sample(maskAcc, maskXform.worldToIndex(xyz));
+        };
         for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
             ValueType* speed = leafIter.buffer(speedBuffer).data();
             bool isZero = true;
             for (VoxelIterT voxelIter = leafIter->cbeginValueOn(); voxelIter; ++voxelIter) {
                 const Vec3R xyz = map.applyMap(voxelIter.getCoord().asVec3d());//world space
-                const ValueType a = math::SmoothUnitStep((mask.wsSample(xyz)-min)*invNorm);
+                const ValueType a = math::SmoothUnitStep((mask(xyz)-min)*invNorm);
                 ValueType& s = speed[voxelIter.pos()];
-                s -= target.wsSample(xyz);
+                s -= target(xyz);
                 s *= invMask ? 1 - a : a;
                 if (!math::isApproxZero(s)) isZero = false;
                 mMaxAbsS = math::Max(mMaxAbsS, math::Abs(s));
@@ -611,7 +620,7 @@ euler(const LeafRange& range, ValueType dt,
       Index phiBuffer, Index resultBuffer, Index speedBuffer)
 {
     using SchemeT = math::BIAS_SCHEME<SpatialScheme>;
-    using StencilT = typename SchemeT::template ISStencil<GridType>::StencilType;
+    using StencilT = typename SchemeT::template ISStencil<GridType, false>::StencilType;
     using VoxelIterT = typename LeafType::ValueOnCIter;
     using NumGrad = math::GradientNormSqrd<MapT, SpatialScheme>;
 

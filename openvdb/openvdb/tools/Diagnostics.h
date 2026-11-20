@@ -570,10 +570,10 @@ struct CheckDivergence
 
     /// @brief Constructor taking a grid and a range to be tested against.
     CheckDivergence(const GridT&  grid,
-                    const ValueType& _min,
-                    const ValueType& _max)
+                    const ElementType& _min,
+                    const ElementType& _max)
         : acc(grid.getConstAccessor())
-        , invdx(ValueType(1.0/grid.voxelSize()[0]))
+        , invdx(ElementType(1.0/grid.voxelSize()[0]))
         , minVal(_min)
         , maxVal(_max)
     {
@@ -584,12 +584,25 @@ struct CheckDivergence
             OPENVDB_THROW(ValueError, "CheckDivergence: Invalid range (min > max)");
         }
     }
+
+    CheckDivergence(const CheckDivergence& other)
+        : acc(other.acc.tree())
+        , invdx(other.invdx)
+        , minVal(other.minVal)
+        , maxVal(other.maxVal)
+    {
+    }
+
     /// Return true if the value is smaller than min or larger than max.
     inline bool operator()(const ElementType& v) const { return v<minVal || v>maxVal; }
 
     /// @brief Return true if zero is outside the range.
     /// @note We assume that the divergence of a tile is always zero.
     inline bool operator()(const TreeIterT&) const { return (*this)(ElementType(0)); }
+
+    /// @brief Return true if zero is outside the range.
+    /// @note The divergence of the constant background is zero.
+    inline bool operator()(const ValueType&) const { return (*this)(ElementType(0)); }
 
     /// @brief Return true if the divergence at a voxel location of
     /// the iterator is out of range.
@@ -608,7 +621,7 @@ struct CheckDivergence
     }
 
     AccT acc;
-    const ValueType invdx, minVal, maxVal;
+    const ElementType invdx, minVal, maxVal;
 };// CheckDivergence
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -30,6 +30,8 @@
 #include <openvdb/openvdb.h>
 #include "Interpolation.h" // for Sampler, etc.
 #include <openvdb/math/FiniteDifference.h>
+#include <openvdb/tree/NeighborAccessor.h>
+#include <type_traits>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -38,12 +40,18 @@ namespace tools {
 
 /// @brief Thin wrapper class for a velocity grid
 /// @note Consider replacing BoxSampler with StaggeredBoxSampler
-template <typename VelGridT, typename Interpolator = BoxSampler>
+/// @details @a AccessorT reads the velocity grid. The default ValueAccessor allows
+/// changes to the grid between samples. A tree::NeighborAccessor of the grid's tree
+/// is faster when consecutive samples are near each other, but the grid must
+/// then not change topology while the field is in use.
+template <typename VelGridT, typename Interpolator = BoxSampler,
+          typename AccessorT = typename VelGridT::ConstAccessor>
 class DiscreteField
 {
 public:
     typedef typename VelGridT::ValueType     VectorType;
     typedef typename VectorType::ValueType   ValueType;
+    typedef AccessorT                        AccessorType;
     static_assert(std::is_floating_point<ValueType>::value,
         "DiscreteField requires a floating point grid.");
 
@@ -80,11 +88,20 @@ public:
     /// one instance per thread (which is fine since its lightweight).
     inline VectorType operator() (const Coord& ijk, ValueType/*dummy time*/) const
     {
-        return mAccessor.getValue(ijk);
+        if constexpr (IsNeighborAccessor) {
+            mAccessor.moveTo(ijk);
+            return mAccessor.getValue(VelGridT::TreeType::LeafNodeType::coordToOffset(ijk));
+        } else {
+            return mAccessor.getValue(ijk);
+        }
     }
 
 private:
-    const typename VelGridT::ConstAccessor mAccessor;//Not thread-safe
+    static constexpr bool IsNeighborAccessor =
+        std::is_same_v<AccessorT, tree::NeighborAccessor<const typename VelGridT::TreeType>>;
+
+    // Mutable, since a NeighborAccessor moves when it samples
+    mutable AccessorT                      mAccessor;//Not thread-safe
     const math::Transform*                 mTransform;
 
 }; // end of DiscreteField
@@ -147,25 +164,27 @@ EnrightField<ScalarT>::operator() (const Vec3d& xyz, ValueType time) const
 /// Class to hold a Vec3 field interpreted as a velocity field.
 /// Primarily exists to provide a method(s) that integrate a passive
 /// point forward in the velocity field for a single time-step (dt)
+/// @details @a AccessorT reads the velocity grid, as for DiscreteField.
 template<typename GridT = Vec3fGrid,
          bool Staggered = false,
-         size_t Order = 1>
+         size_t Order = 1,
+         typename AccessorT = typename GridT::ConstAccessor>
 class VelocitySampler
 {
 public:
-    typedef typename GridT::ConstAccessor AccessorType;
+    typedef AccessorT                     AccessorType;
     typedef typename GridT::ValueType     ValueType;
 
     /// @brief Constructor from a grid
     VelocitySampler(const GridT& grid):
         mGrid(&grid),
-        mAcc(grid.getAccessor())
+        mAcc(grid.tree())
     {
     }
     /// @brief Copy-constructor
     VelocitySampler(const VelocitySampler& other):
         mGrid(other.mGrid),
-        mAcc(mGrid->getAccessor())
+        mAcc(mGrid->tree())
     {
     }
     /// @brief Samples the velocity at world position onto result. Supports both
@@ -198,7 +217,8 @@ public:
 private:
     // holding the Grids for the transforms
     const GridT* mGrid; // Velocity vector field
-    AccessorType mAcc;
+    // Mutable, since a NeighborAccessor moves when it samples
+    mutable AccessorType mAcc;
 };// end of VelocitySampler class
 
 ///////////////////////////////////////////////////////////////////////
@@ -209,9 +229,11 @@ private:
 /// @note Note that the order of the velocity sampling is controlled
 /// with the SampleOrder template parameter, which defaults
 /// to one, i.e. a tri-linear interpolation kernel.
+/// @details @a AccessorT reads the velocity grid, as for DiscreteField.
 template<typename GridT = Vec3fGrid,
          bool Staggered = false,
-         size_t SampleOrder = 1>
+         size_t SampleOrder = 1,
+         typename AccessorT = typename GridT::ConstAccessor>
 class VelocityIntegrator
 {
 public:
@@ -265,7 +287,7 @@ public:
                               static_cast<OutType>(P[2]));
     }
 private:
-    VelocitySampler<GridT, Staggered, SampleOrder> mVelSampler;
+    VelocitySampler<GridT, Staggered, SampleOrder, AccessorT> mVelSampler;
 };// end of VelocityIntegrator class
 
 

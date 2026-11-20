@@ -36,6 +36,15 @@
 ///     bool sample(const TreeT& tree, const Vec3R& coord, typename TreeT::ValueType& val);
 /// };
 /// @endcode
+///
+/// The samplers in this file also take a tree::NeighborAccessor, which moves to
+/// the voxels around each sample and reads them as offsets from one voxel, with
+/// no search of the tree. This is faster than a ValueAccessor when consecutive
+/// samples are near each other, as in a loop over the voxels of a leaf.
+/// @code
+/// tree::NeighborAccessor acc(grid.tree());
+/// const float value = BoxSampler::sample(acc, xyz);
+/// @endcode
 
 #ifndef OPENVDB_TOOLS_INTERPOLATION_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_INTERPOLATION_HAS_BEEN_INCLUDED
@@ -45,15 +54,28 @@
 #include <openvdb/math/Math.h>// for SmoothUnitStep
 #include <openvdb/math/Transform.h> // for Transform
 #include <openvdb/Grid.h>
+#include <openvdb/tree/NeighborAccessor.h>
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/util/Assert.h>
 #include <cmath>
 #include <type_traits>
+#include <utility>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {
+
+/// @cond OPENVDB_DOCS_INTERNAL
+namespace interpolation_internal {
+// The overloads of sample() that take a tree::NeighborAccessor, which is not const since it moves.
+// A template argument for the accessor, instead of its tree, keeps a call with an explicit
+// tree or ValueAccessor type from naming a NeighborAccessor of that type.
+template<typename AccessorT>
+using EnableIfNeighbors = std::enable_if_t<tree::IsNeighborAccessor<AccessorT>::value, int>;
+} // namespace interpolation_internal
+/// @endcond
+
 
 /// @brief Provises a unified interface for sampling, i.e. interpolation.
 /// @details Order = 0: closest point
@@ -86,6 +108,22 @@ struct Sampler
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
 };
 
+/// @brief True if @a SamplerT has static overloads of sample() that take a
+/// tree::NeighborAccessor<TreeT>, as the samplers in this file do.
+/// @details Tools that take a sampler type as a template argument use this to
+/// read through a NeighborAccessor when they can, and through a ValueAccessor
+/// otherwise.
+template<typename SamplerT, typename TreeT, typename = void>
+struct HasNeighborAccessorSample: std::false_type {};
+
+template<typename SamplerT, typename TreeT>
+struct HasNeighborAccessorSample<SamplerT, TreeT, std::void_t<
+    decltype(static_cast<typename TreeT::ValueType(*)(tree::NeighborAccessor<TreeT>&, const Vec3R&)>(
+        &SamplerT::template sample<tree::NeighborAccessor<TreeT>>)),
+    decltype(static_cast<bool(*)(tree::NeighborAccessor<TreeT>&, const Vec3R&,
+        typename TreeT::ValueType&)>(&SamplerT::template sample<tree::NeighborAccessor<TreeT>>))>>:
+    std::true_type {};
+
 //////////////////////////////////////// Non-Staggered Samplers
 
 // The following samplers operate in voxel space.
@@ -114,6 +152,14 @@ struct PointSampler
     /// @return the reconstructed value
     template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
+
+    /// @brief As above, with the reads through @a acc, a tree::NeighborAccessor that
+    /// moves to the voxels around @a inCoord. @a acc has the contract of tree::NeighborAccessor.
+    template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT> = 0>
+    static bool sample(AccessorT& acc, const Vec3R& inCoord,
+                       typename AccessorT::ValueType& result);
+    template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT> = 0>
+    static typename AccessorT::ValueType sample(AccessorT& acc, const Vec3R& inCoord);
 };
 
 
@@ -138,6 +184,14 @@ struct BoxSampler
     template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
 
+    /// @brief As above, with the reads through @a acc, a tree::NeighborAccessor that
+    /// moves to the voxels around @a inCoord. @a acc has the contract of tree::NeighborAccessor.
+    template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT> = 0>
+    static bool sample(AccessorT& acc, const Vec3R& inCoord,
+                       typename AccessorT::ValueType& result);
+    template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT> = 0>
+    static typename AccessorT::ValueType sample(AccessorT& acc, const Vec3R& inCoord);
+
     /// @brief Import all eight values from @a inTree to support
     /// tri-linear interpolation.
     template<class ValueT, class TreeT, size_t N>
@@ -148,6 +202,15 @@ struct BoxSampler
     /// @return @c true if any of the eight values are active
     template<class ValueT, class TreeT, size_t N>
     static inline bool probeValues(ValueT (&data)[N][N][N], const TreeT& inTree, Coord ijk);
+
+    /// @brief As getValues() and probeValues(), with the reads through @a acc,
+    /// which moves to @a ijk.
+    template<class ValueT, class TreeT, size_t N>
+    static inline void
+    getValues(ValueT (&data)[N][N][N], tree::NeighborAccessor<TreeT>& acc, const Coord& ijk);
+    template<class ValueT, class TreeT, size_t N>
+    static inline bool
+    probeValues(ValueT (&data)[N][N][N], tree::NeighborAccessor<TreeT>& acc, const Coord& ijk);
 
     /// @brief Find the minimum and maximum values of the eight cell
     /// values in @ data. The default *component wise* less than
@@ -182,6 +245,14 @@ struct QuadraticSampler
     template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
 
+    /// @brief As above, with the reads through @a acc, a tree::NeighborAccessor that
+    /// moves to the voxels around @a inCoord. @a acc has the contract of tree::NeighborAccessor.
+    template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT> = 0>
+    static bool sample(AccessorT& acc, const Vec3R& inCoord,
+                       typename AccessorT::ValueType& result);
+    template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT> = 0>
+    static typename AccessorT::ValueType sample(AccessorT& acc, const Vec3R& inCoord);
+
     template<class ValueT, size_t N>
     static inline ValueT triquadraticInterpolation(ValueT (&data)[N][N][N], const Vec3R& uvw);
 };
@@ -215,6 +286,14 @@ struct StaggeredPointSampler
     /// @return the reconstructed value
     template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
+
+    /// @brief As above, with the reads through @a acc, a tree::NeighborAccessor that
+    /// moves to the voxels around @a inCoord. @a acc has the contract of tree::NeighborAccessor.
+    template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT> = 0>
+    static bool sample(AccessorT& acc, const Vec3R& inCoord,
+                       typename AccessorT::ValueType& result);
+    template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT> = 0>
+    static typename AccessorT::ValueType sample(AccessorT& acc, const Vec3R& inCoord);
 };
 
 
@@ -238,6 +317,14 @@ struct StaggeredBoxSampler
     /// @return the reconstructed value
     template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
+
+    /// @brief As above, with the reads through @a acc, a tree::NeighborAccessor that
+    /// moves to the voxels around @a inCoord. @a acc has the contract of tree::NeighborAccessor.
+    template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT> = 0>
+    static bool sample(AccessorT& acc, const Vec3R& inCoord,
+                       typename AccessorT::ValueType& result);
+    template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT> = 0>
+    static typename AccessorT::ValueType sample(AccessorT& acc, const Vec3R& inCoord);
 };
 
 
@@ -261,6 +348,14 @@ struct StaggeredQuadraticSampler
     /// @return the reconstructed value
     template<class TreeT>
     static typename TreeT::ValueType sample(const TreeT& inTree, const Vec3R& inCoord);
+
+    /// @brief As above, with the reads through @a acc, a tree::NeighborAccessor that
+    /// moves to the voxels around @a inCoord. @a acc has the contract of tree::NeighborAccessor.
+    template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT> = 0>
+    static bool sample(AccessorT& acc, const Vec3R& inCoord,
+                       typename AccessorT::ValueType& result);
+    template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT> = 0>
+    static typename AccessorT::ValueType sample(AccessorT& acc, const Vec3R& inCoord);
 };
 
 
@@ -602,6 +697,83 @@ roundVec3(const Vec3R& v)
     return Vec3i(int(::round(v(0))), int(::round(v(1))), int(::round(v(2))));
 }
 
+
+// Move @a acc to @a ijk and return the offset of @a ijk in its leaf-sized region
+template<typename TreeT>
+inline Index
+moveNeighbors(tree::NeighborAccessor<TreeT>& acc, const Coord& ijk)
+{
+    acc.moveTo(ijk);
+    return tree::NeighborAccessor<TreeT>::LeafNodeType::coordToOffset(ijk);
+}
+
+
+// Read the values at offsets Start to Start + Count - 1 in each axis from the voxel at
+// @a offset into @a data. Each offset is a template argument, so that its arithmetic
+// is done at compile time.
+template<int Start, int Count, typename AccessorT, typename ValueT, size_t N, int... I>
+inline void
+getNeighborValues(const AccessorT& acc, Index offset, ValueT (&data)[N][N][N],
+    std::integer_sequence<int, I...>)
+{
+    static_assert(Count <= int(N) && sizeof...(I) == size_t(Count * Count * Count),
+        "one read for each element of data");
+    ((data[I / (Count * Count)][(I / Count) % Count][I % Count] = acc.template getValue<
+        Start + I / (Count * Count), Start + (I / Count) % Count, Start + I % Count>(offset)), ...);
+}
+
+
+// As getNeighborValues(), and return true if any of the values is active
+template<int Start, int Count, typename AccessorT, typename ValueT, size_t N, int... I>
+inline bool
+probeNeighborValues(const AccessorT& acc, Index offset, ValueT (&data)[N][N][N],
+    std::integer_sequence<int, I...>)
+{
+    static_assert(Count <= int(N) && sizeof...(I) == size_t(Count * Count * Count),
+        "one read for each element of data");
+    bool active = false;
+    ((active |= acc.template probeValue<
+        Start + I / (Count * Count), Start + (I / Count) % Count, Start + I % Count>(
+            offset, data[I / (Count * Count)][(I / Count) % Count][I % Count])), ...);
+    return active;
+}
+
+
+// Sample each component at the center of its face, for the staggered samplers
+template<typename SamplerT, typename TreeT>
+inline bool
+sampleStaggered(tree::NeighborAccessor<TreeT>& acc, const Vec3R& inCoord,
+    typename TreeT::ValueType& result)
+{
+    using ValueT = typename TreeT::ValueType;
+
+    ValueT tempX = zeroVal<ValueT>(), tempY = zeroVal<ValueT>(), tempZ = zeroVal<ValueT>();
+    bool active = false;
+
+    active = SamplerT::sample(acc, inCoord + Vec3R(0.5, 0, 0), tempX) || active;
+    active = SamplerT::sample(acc, inCoord + Vec3R(0, 0.5, 0), tempY) || active;
+    active = SamplerT::sample(acc, inCoord + Vec3R(0, 0, 0.5), tempZ) || active;
+
+    result.x() = tempX.x();
+    result.y() = tempY.y();
+    result.z() = tempZ.z();
+
+    return active;
+}
+
+template<typename SamplerT, typename TreeT>
+inline typename TreeT::ValueType
+sampleStaggered(tree::NeighborAccessor<TreeT>& acc, const Vec3R& inCoord)
+{
+    using ValueT = typename TreeT::ValueType;
+
+    const ValueT tempX = SamplerT::sample(acc, inCoord + Vec3R(0.5, 0.0, 0.0));
+    const ValueT tempY = SamplerT::sample(acc, inCoord + Vec3R(0.0, 0.5, 0.0));
+    const ValueT tempZ = SamplerT::sample(acc, inCoord + Vec3R(0.0, 0.0, 0.5));
+
+    return ValueT(tempX.x(), tempY.y(), tempZ.z());
+}
+
 } // namespace local_util
 
 
@@ -621,6 +793,23 @@ inline typename TreeT::ValueType
 PointSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 {
     return inTree.getValue(Coord(local_util::roundVec3(inCoord)));
+}
+
+template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT>>
+inline bool
+PointSampler::sample(AccessorT& acc, const Vec3R& inCoord,
+                     typename AccessorT::ValueType& result)
+{
+    const Index offset = local_util::moveNeighbors(acc, Coord(local_util::roundVec3(inCoord)));
+    return acc.probeValue(offset, result);
+}
+
+template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT>>
+inline typename AccessorT::ValueType
+PointSampler::sample(AccessorT& acc, const Vec3R& inCoord)
+{
+    const Index offset = local_util::moveNeighbors(acc, Coord(local_util::roundVec3(inCoord)));
+    return acc.getValue(offset);
 }
 
 
@@ -685,6 +874,23 @@ BoxSampler::probeValues(ValueT (&data)[N][N][N], const TreeT& inTree, Coord ijk)
     hasActiveValues |= inTree.probeValue(ijk, data[1][1][0]); // i+1, j+1, k
 
     return hasActiveValues;
+}
+
+template<class ValueT, class TreeT, size_t N>
+inline void
+BoxSampler::getValues(ValueT (&data)[N][N][N], tree::NeighborAccessor<TreeT>& acc, const Coord& ijk)
+{
+    const Index offset = local_util::moveNeighbors(acc, ijk);
+    local_util::getNeighborValues<0, 2>(acc, offset, data, std::make_integer_sequence<int, 8>());
+}
+
+template<class ValueT, class TreeT, size_t N>
+inline bool
+BoxSampler::probeValues(ValueT (&data)[N][N][N], tree::NeighborAccessor<TreeT>& acc, const Coord& ijk)
+{
+    const Index offset = local_util::moveNeighbors(acc, ijk);
+    return local_util::probeNeighborValues<0, 2>(acc, offset, data,
+        std::make_integer_sequence<int, 8>());
 }
 
 template<class ValueT, size_t N>
@@ -777,6 +983,38 @@ BoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 
     BoxSampler::getValues(data, inTree, Coord(inIdx));
 
+    return BoxSampler::trilinearInterpolation(data, uvw);
+}
+
+
+template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT>>
+inline bool
+BoxSampler::sample(AccessorT& acc, const Vec3R& inCoord,
+                   typename AccessorT::ValueType& result)
+{
+    using ValueT = typename AccessorT::ValueType;
+
+    const Vec3i inIdx = local_util::floorVec3(inCoord);
+    const Vec3R uvw = inCoord - inIdx;
+
+    ValueT data[2][2][2];
+    const bool hasActiveValues = BoxSampler::probeValues(data, acc, Coord(inIdx));
+    result = BoxSampler::trilinearInterpolation(data, uvw);
+    return hasActiveValues;
+}
+
+
+template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT>>
+inline typename AccessorT::ValueType
+BoxSampler::sample(AccessorT& acc, const Vec3R& inCoord)
+{
+    using ValueT = typename AccessorT::ValueType;
+
+    const Vec3i inIdx = local_util::floorVec3(inCoord);
+    const Vec3R uvw = inCoord - inIdx;
+
+    ValueT data[2][2][2];
+    BoxSampler::getValues(data, acc, Coord(inIdx));
     return BoxSampler::trilinearInterpolation(data, uvw);
 }
 
@@ -877,6 +1115,40 @@ QuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
     return QuadraticSampler::triquadraticInterpolation(data, uvw);
 }
 
+template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT>>
+inline bool
+QuadraticSampler::sample(AccessorT& acc, const Vec3R& inCoord,
+    typename AccessorT::ValueType& result)
+{
+    using ValueT = typename AccessorT::ValueType;
+
+    const Vec3i inIdx = local_util::floorVec3(inCoord);
+    const Vec3R uvw = inCoord - inIdx;
+
+    // The 27 voxels from inIdx - 1 to inIdx + 1
+    ValueT data[3][3][3];
+    const Index offset = local_util::moveNeighbors(acc, Coord(inIdx));
+    const bool active = local_util::probeNeighborValues<-1, 3>(acc, offset, data,
+        std::make_integer_sequence<int, 27>());
+    result = QuadraticSampler::triquadraticInterpolation(data, uvw);
+    return active;
+}
+
+template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT>>
+inline typename AccessorT::ValueType
+QuadraticSampler::sample(AccessorT& acc, const Vec3R& inCoord)
+{
+    using ValueT = typename AccessorT::ValueType;
+
+    const Vec3i inIdx = local_util::floorVec3(inCoord);
+    const Vec3R uvw = inCoord - inIdx;
+
+    ValueT data[3][3][3];
+    const Index offset = local_util::moveNeighbors(acc, Coord(inIdx));
+    local_util::getNeighborValues<-1, 3>(acc, offset, data, std::make_integer_sequence<int, 27>());
+    return QuadraticSampler::triquadraticInterpolation(data, uvw);
+}
+
 
 //////////////////////////////////////// StaggeredPointSampler
 
@@ -913,6 +1185,22 @@ StaggeredPointSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
     const ValueT tempZ = PointSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.0, 0.0, 0.5));
 
     return ValueT(tempX.x(), tempY.y(), tempZ.z());
+}
+
+
+template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT>>
+inline bool
+StaggeredPointSampler::sample(AccessorT& acc, const Vec3R& inCoord,
+    typename AccessorT::ValueType& result)
+{
+    return local_util::sampleStaggered<PointSampler>(acc, inCoord, result);
+}
+
+template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT>>
+inline typename AccessorT::ValueType
+StaggeredPointSampler::sample(AccessorT& acc, const Vec3R& inCoord)
+{
+    return local_util::sampleStaggered<PointSampler>(acc, inCoord);
 }
 
 
@@ -955,6 +1243,22 @@ StaggeredBoxSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
 }
 
 
+template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT>>
+inline bool
+StaggeredBoxSampler::sample(AccessorT& acc, const Vec3R& inCoord,
+    typename AccessorT::ValueType& result)
+{
+    return local_util::sampleStaggered<BoxSampler>(acc, inCoord, result);
+}
+
+template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT>>
+inline typename AccessorT::ValueType
+StaggeredBoxSampler::sample(AccessorT& acc, const Vec3R& inCoord)
+{
+    return local_util::sampleStaggered<BoxSampler>(acc, inCoord);
+}
+
+
 //////////////////////////////////////// StaggeredQuadraticSampler
 
 
@@ -990,6 +1294,22 @@ StaggeredQuadraticSampler::sample(const TreeT& inTree, const Vec3R& inCoord)
     const ValueT tempZ = QuadraticSampler::sample<TreeT>(inTree, inCoord + Vec3R(0.0, 0.0, 0.5));
 
     return ValueT(tempX.x(), tempY.y(), tempZ.z());
+}
+
+
+template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT>>
+inline bool
+StaggeredQuadraticSampler::sample(AccessorT& acc, const Vec3R& inCoord,
+    typename AccessorT::ValueType& result)
+{
+    return local_util::sampleStaggered<QuadraticSampler>(acc, inCoord, result);
+}
+
+template<class AccessorT, interpolation_internal::EnableIfNeighbors<AccessorT>>
+inline typename AccessorT::ValueType
+StaggeredQuadraticSampler::sample(AccessorT& acc, const Vec3R& inCoord)
+{
+    return local_util::sampleStaggered<QuadraticSampler>(acc, inCoord);
 }
 
 //////////////////////////////////////// Sampler

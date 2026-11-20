@@ -21,6 +21,7 @@
 #include <openvdb/math/Transform.h>
 #include <openvdb/tree/NodeManager.h>
 #include <openvdb/tree/LeafManager.h>
+#include <openvdb/tree/NeighborAccessor.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
 #include <openvdb/util/Assert.h>
@@ -176,11 +177,13 @@ private:
 
     void cook(LeafManagerType& leafs);
 
+    // The mean along Axis, over the voxels at most width away. Call acc.moveTo() with the
+    // origin of each leaf before averaging around its voxels.
     template<size_t Axis>
     struct Avg {
         Avg(const GridT* grid, Int32 w): acc(grid->tree()), width(w), frac(1.f/float(2*w+1)) {}
-        inline ValueType operator()(Coord xyz);
-        typename GridT::ConstAccessor acc;
+        inline ValueType operator()(const VoxelCIterT& iter) const;
+        tree::NeighborAccessor<const TreeType> acc;
         const Int32 width;
         const float frac;
     };
@@ -503,11 +506,13 @@ inline void accum(bool& sum, bool addend) { sum = sum || addend; }
 template<typename GridT, typename MaskT, typename InterruptT>
 template<size_t Axis>
 inline typename GridT::ValueType
-Filter<GridT, MaskT, InterruptT>::Avg<Axis>::operator()(Coord xyz)
+Filter<GridT, MaskT, InterruptT>::Avg<Axis>::operator()(const VoxelCIterT& iter) const
 {
     ValueType sum = zeroVal<ValueType>();
-    Int32 &i = xyz[Axis], j = i + width;
-    for (i -= width; i <= j; ++i) filter_internal::accum(sum, acc.getValue(xyz));
+    for (Int32 d = -width; d <= width; ++d) {
+        filter_internal::accum(sum,
+            acc.getValue(iter, Axis == 0 ? d : 0, Axis == 1 ? d : 0, Axis == 2 ? d : 0));
+    }
     if constexpr(std::is_same<ValueType, bool>::value) {
         return sum && frac > 0.0f;
     } else {
@@ -755,11 +760,12 @@ Filter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
         AlphaMaskT alpha(*mGrid, *mMask, mMinMask, mMaxMask, mInvertMask);
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             BufferT& buffer = leafIter.buffer(1);
+            avg.acc.moveTo(leafIter->origin());
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 const Coord xyz = iter.getCoord();
                 if (alpha(xyz, a, b)) {
                     OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
-                    const ValueType value(b*(*iter) + a*avg(xyz));
+                    const ValueType value(b*(*iter) + a*avg(iter));
                     OPENVDB_NO_TYPE_CONVERSION_WARNING_END
                     buffer.setValue(iter.pos(), value);
                 }
@@ -768,8 +774,9 @@ Filter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
     } else {
         for (LeafIterT leafIter=range.begin(); leafIter; ++leafIter) {
             BufferT& buffer = leafIter.buffer(1);
+            avg.acc.moveTo(leafIter->origin());
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
-                buffer.setValue(iter.pos(), avg(iter.getCoord()));
+                buffer.setValue(iter.pos(), avg(iter));
             }
         }
     }
@@ -782,7 +789,7 @@ void
 Filter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int width)
 {
     this->wasInterrupted();
-    typename math::DenseStencil<GridType> stencil(*mGrid, width);//creates local cache!
+    typename math::DenseStencil<GridType, false> stencil(*mGrid, width);//creates local cache!
     if (mMask) {
         typename AlphaMaskT::FloatType a, b;
         AlphaMaskT alpha(*mGrid, *mMask, mMinMask, mMaxMask, mInvertMask);

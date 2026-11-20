@@ -707,7 +707,7 @@ struct MarkPointsOutsideIso
         , mDeadIndex(deadIndex) {}
 
     void operator()(const LeafManagerT::LeafRange& range) const {
-        openvdb::math::BoxStencil<const SurfaceGridT> stencil(mGrid);
+        openvdb::math::BoxStencil<const SurfaceGridT, false> stencil(mGrid);
         for (auto leaf = range.begin(); leaf; ++leaf)  {
 
             PositionHandleT::Ptr positionHandle =

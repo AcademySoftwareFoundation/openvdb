@@ -27,6 +27,7 @@
 #include <tbb/parallel_for.h>
 
 #include <functional>
+#include <type_traits>
 
 
 namespace openvdb {
@@ -368,9 +369,17 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
     using LeafManagerT = typename tree::LeafManager<TreeT>;
     using LeafNodeT = typename LeafManagerT::LeafNodeType;
     using LeafRangeT = typename LeafManagerT::LeafRange;
-    using VelocityIntegratorT = VelocityIntegrator<VelocityGridT, StaggeredVelocity>;
+    // The velocity grid does not change during the advection, and the samples of
+    // the voxels of a leaf are near each other.
+    using VelocityIntegratorT = VelocityIntegrator<VelocityGridT, StaggeredVelocity, 1,
+        tree::NeighborAccessor<const typename VelocityGridT::TreeType>>;
     using RealT = typename VelocityIntegratorT::ElementType;
     using VoxelIterT = typename TreeT::LeafNodeType::ValueOnIter;
+    using NeighborAccT = tree::NeighborAccessor<const TreeT>;
+    // Samples near each other read without a search of the tree through a NeighborAccessor,
+    // if the sampler takes one.
+    using SampleAccT = std::conditional_t<
+        HasNeighborAccessorSample<SamplerT, const TreeT>::value, NeighborAccT, AccT>;
 
     Advect(const VolumeGridT& inGrid, const VolumeAdvection& parent)
         : mTask(nullptr)
@@ -482,7 +491,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
     {
         if (mParent->interrupt()) return;
         const math::Transform& xform = mInGrid->transform();
-        AccT acc = grid->getAccessor();
+        SampleAccT acc(grid->tree());
         for (typename LeafRangeT::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
             ValueT* phi = leafIter.buffer( n ).data();
             for (VoxelIterT voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
@@ -500,7 +509,7 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
         const bool doClamp = mParent->mLimiter == Scheme::CLAMP;
         ValueT data[2][2][2], vMin, vMax;
         const math::Transform& xform = mInGrid->transform();
-        AccT acc = mInGrid->getAccessor();
+        NeighborAccT acc(mInGrid->tree());
         const ValueT backg = mInGrid->background();
         for (typename LeafRangeT::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
             ValueT* phi = leafIter.buffer( 0 ).data();

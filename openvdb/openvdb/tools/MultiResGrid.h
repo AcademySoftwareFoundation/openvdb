@@ -29,6 +29,7 @@
 #include <openvdb/math/Stencils.h>
 #include <openvdb/Metadata.h>
 #include <openvdb/tree/LeafManager.h>
+#include <openvdb/tree/NeighborAccessor.h>
 #include <openvdb/tree/NodeManager.h>
 #include <openvdb/util/Assert.h>
 
@@ -324,6 +325,8 @@ private:
     // For optimal performance we disable registration of the ValueAccessor
     using Accessor = tree::ValueAccessor<TreeType, false>;
     using ConstAccessor = tree::ValueAccessor<const TreeType, false>;
+    // Reads the voxels around one voxel with no search of the tree
+    using NeighborAccessorT = tree::NeighborAccessor<const TreeType>;
 
     void topDownRestrict(bool useInjection);
 
@@ -575,7 +578,7 @@ typename TreeType::ValueType MultiResGrid<TreeType>::
 prolongateVoxel(const Coord& ijk, const size_t level) const
 {
     OPENVDB_ASSERT( level+1 < mTrees.size() );
-    const ConstAccessor acc(*mTrees[level + 1]);// has disabled registration!
+    NeighborAccessorT acc(*mTrees[level + 1]);
     return ProlongateOp::run(ijk, acc);
 }
 
@@ -596,7 +599,7 @@ restrictVoxel(Coord ijk, const size_t destlevel, bool useInjection) const
     OPENVDB_ASSERT( destlevel > 0 && destlevel < mTrees.size() );
     const TreeType &fineTree = *mTrees[ destlevel-1 ];
     if ( useInjection ) return fineTree.getValue(ijk<<1);
-    const ConstAccessor acc( fineTree );// has disabled registration!
+    NeighborAccessorT acc( fineTree );
     return RestrictOp::run( ijk, acc);
 }
 
@@ -815,7 +818,8 @@ struct MultiResGrid<TreeType>::FractionOp
         const float b = math::FractionalPart(mLevel), a = 1.0f - b;
         const float scale0 = math::Pow( 2.0f, b );
         const float scale1 = math::Pow( 2.0f,-a );
-        ConstAccessor acc0( *mTree0 ), acc1( *mTree1 );
+        // The samples of the voxels of a leaf are near each other
+        NeighborAccessorT acc0( *mTree0 ), acc1( *mTree1 );
         for (typename Range2::Iterator leafIter = r.begin(); leafIter; ++leafIter) {
             for (VoxelIter voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
                 const Vec3R xyz =  Vec3R( voxelIter.getCoord().data() );// mid level coord
@@ -859,7 +863,8 @@ struct MultiResGrid<TreeType>::CookOp
         }
     }
 
-    const ConstAccessor acc;
+    // Each task has its own copy, and the voxels of a leaf read from nearby regions
+    mutable NeighborAccessorT acc;
 };// CookOp
 
 
@@ -868,29 +873,34 @@ struct MultiResGrid<TreeType>::RestrictOp
 {
     /// @brief Static method that performs restriction by full weighting
     /// @param ijk Coordinate location on the coarse tree
-    /// @param acc ValueAccessor to the fine tree
-    static ValueType run(Coord ijk, const ConstAccessor &acc)
+    /// @param acc NeighborAccessor to the fine tree, which moves to ijk on the fine tree
+    static ValueType run(Coord ijk, NeighborAccessorT& acc)
     {
         ijk <<= 1;
+        acc.moveTo(ijk);
+        const Index n = TreeType::LeafNodeType::coordToOffset(ijk);
         // Overlapping grid point
-        ValueType v = 8*acc.getValue(ijk);
+        ValueType v = 8*acc.getValue(n);
         // neighbors in one axial direction
-        v += 4*(acc.getValue(ijk.offsetBy(-1, 0, 0)) + acc.getValue(ijk.offsetBy( 1, 0, 0)) +// x
-                acc.getValue(ijk.offsetBy( 0,-1, 0)) + acc.getValue(ijk.offsetBy( 0, 1, 0)) +// y
-                acc.getValue(ijk.offsetBy( 0, 0,-1)) + acc.getValue(ijk.offsetBy( 0, 0, 1)));// z
+        v += 4*(acc.template getValue<-1, 0, 0>(n) + acc.template getValue< 1, 0, 0>(n) +// x
+                acc.template getValue< 0,-1, 0>(n) + acc.template getValue< 0, 1, 0>(n) +// y
+                acc.template getValue< 0, 0,-1>(n) + acc.template getValue< 0, 0, 1>(n));// z
         // neighbors in two axial directions
-        v += 2*(acc.getValue(ijk.offsetBy(-1,-1, 0)) + acc.getValue(ijk.offsetBy(-1, 1, 0)) +// xy
-                acc.getValue(ijk.offsetBy( 1,-1, 0)) + acc.getValue(ijk.offsetBy( 1, 1, 0)) +// xy
-                acc.getValue(ijk.offsetBy(-1, 0,-1)) + acc.getValue(ijk.offsetBy(-1, 0, 1)) +// xz
-                acc.getValue(ijk.offsetBy( 1, 0,-1)) + acc.getValue(ijk.offsetBy( 1, 0, 1)) +// xz
-                acc.getValue(ijk.offsetBy( 0,-1,-1)) + acc.getValue(ijk.offsetBy( 0,-1, 1)) +// yz
-                acc.getValue(ijk.offsetBy( 0, 1,-1)) + acc.getValue(ijk.offsetBy( 0, 1, 1)));// yz
+        v += 2*(acc.template getValue<-1,-1, 0>(n) + acc.template getValue<-1, 1, 0>(n) +// xy
+                acc.template getValue< 1,-1, 0>(n) + acc.template getValue< 1, 1, 0>(n) +// xy
+                acc.template getValue<-1, 0,-1>(n) + acc.template getValue<-1, 0, 1>(n) +// xz
+                acc.template getValue< 1, 0,-1>(n) + acc.template getValue< 1, 0, 1>(n) +// xz
+                acc.template getValue< 0,-1,-1>(n) + acc.template getValue< 0,-1, 1>(n) +// yz
+                acc.template getValue< 0, 1,-1>(n) + acc.template getValue< 0, 1, 1>(n));// yz
         // neighbors in three axial directions
-        for (int i=-1; i<=1; i+=2) {
-            for (int j=-1; j<=1; j+=2) {
-                for (int k=-1; k<=1; k+=2) v += acc.getValue(ijk.offsetBy(i,j,k));// xyz
-            }
-        }
+        v += acc.template getValue<-1,-1,-1>(n);
+        v += acc.template getValue<-1,-1, 1>(n);
+        v += acc.template getValue<-1, 1,-1>(n);
+        v += acc.template getValue<-1, 1, 1>(n);
+        v += acc.template getValue< 1,-1,-1>(n);
+        v += acc.template getValue< 1,-1, 1>(n);
+        v += acc.template getValue< 1, 1,-1>(n);
+        v += acc.template getValue< 1, 1, 1>(n);
         v *= ValueType(1.0f/64.0f);
         return v;
     }
@@ -901,44 +911,49 @@ struct MultiResGrid<TreeType>::ProlongateOp
 {
     /// @brief Interpolate values from a coarse grid (acc) into the index space (ijk) of a fine grid
     /// @param ijk Coordinate location on the fine tree
-    /// @param acc ValueAccessor to the coarse tree
-    static ValueType run(const Coord& ijk, const ConstAccessor &acc)
+    /// @param acc NeighborAccessor to the coarse tree, which moves to ijk >> 1
+    /// @details In an odd axis, (ijk - 1) >> 1 and (ijk + 1) >> 1 are the voxels at
+    /// offsets 0 and 1 from ijk >> 1.
+    static ValueType run(const Coord& ijk, NeighborAccessorT& acc)
     {
+        const Coord base = ijk >> 1;
+        acc.moveTo(base);
+        const Index n = TreeType::LeafNodeType::coordToOffset(base);
         switch ( (ijk[0] & 1) | ((ijk[1] & 1) << 1) | ((ijk[2] & 1) << 2) ) {
         case 0:// all even
-            return acc.getValue(ijk>>1);
+            return acc.getValue(n);
         case 1:// x is odd
-            return ValueType(0.5)*(acc.getValue(ijk.offsetBy(-1,0,0)>>1) +
-                                   acc.getValue(ijk.offsetBy( 1,0,0)>>1));
+            return ValueType(0.5)*(acc.getValue(n) + acc.template getValue<1,0,0>(n));
         case 2:// y is odd
-            return ValueType(0.5)*(acc.getValue(ijk.offsetBy(0,-1,0)>>1) +
-                                   acc.getValue(ijk.offsetBy(0, 1,0)>>1));
+            return ValueType(0.5)*(acc.getValue(n) + acc.template getValue<0,1,0>(n));
         case 3:// x&y are odd
-            return ValueType(0.25)*(acc.getValue(ijk.offsetBy(-1,-1,0)>>1) +
-                                    acc.getValue(ijk.offsetBy(-1, 1,0)>>1) +
-                                    acc.getValue(ijk.offsetBy( 1,-1,0)>>1) +
-                                    acc.getValue(ijk.offsetBy( 1, 1,0)>>1));
+            return ValueType(0.25)*(acc.getValue(n) +
+                                    acc.template getValue<0,1,0>(n) +
+                                    acc.template getValue<1,0,0>(n) +
+                                    acc.template getValue<1,1,0>(n));
         case 4:// z is odd
-            return ValueType(0.5)*(acc.getValue(ijk.offsetBy(0,0,-1)>>1) +
-                                   acc.getValue(ijk.offsetBy(0,0, 1)>>1));
+            return ValueType(0.5)*(acc.getValue(n) + acc.template getValue<0,0,1>(n));
         case 5:// x&z are odd
-            return ValueType(0.25)*(acc.getValue(ijk.offsetBy(-1,0,-1)>>1) +
-                                    acc.getValue(ijk.offsetBy(-1,0, 1)>>1) +
-                                    acc.getValue(ijk.offsetBy( 1,0,-1)>>1) +
-                                    acc.getValue(ijk.offsetBy( 1,0, 1)>>1));
+            return ValueType(0.25)*(acc.getValue(n) +
+                                    acc.template getValue<0,0,1>(n) +
+                                    acc.template getValue<1,0,0>(n) +
+                                    acc.template getValue<1,0,1>(n));
         case 6:// y&z are odd
-            return ValueType(0.25)*(acc.getValue(ijk.offsetBy(0,-1,-1)>>1) +
-                                    acc.getValue(ijk.offsetBy(0,-1, 1)>>1) +
-                                    acc.getValue(ijk.offsetBy(0, 1,-1)>>1) +
-                                    acc.getValue(ijk.offsetBy(0, 1, 1)>>1));
+            return ValueType(0.25)*(acc.getValue(n) +
+                                    acc.template getValue<0,0,1>(n) +
+                                    acc.template getValue<0,1,0>(n) +
+                                    acc.template getValue<0,1,1>(n));
         }
         // all are odd
         ValueType v = zeroVal<ValueType>();
-        for (int i=-1; i<=1; i+=2) {
-            for (int j=-1; j<=1; j+=2) {
-                for (int k=-1; k<=1; k+=2) v += acc.getValue(ijk.offsetBy(i,j,k)>>1);// xyz
-            }
-        }
+        v += acc.getValue(n);
+        v += acc.template getValue<0,0,1>(n);
+        v += acc.template getValue<0,1,0>(n);
+        v += acc.template getValue<0,1,1>(n);
+        v += acc.template getValue<1,0,0>(n);
+        v += acc.template getValue<1,0,1>(n);
+        v += acc.template getValue<1,1,0>(n);
+        v += acc.template getValue<1,1,1>(n);
         return ValueType(0.125) * v;
     }
 };// ProlongateOp

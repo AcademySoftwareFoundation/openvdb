@@ -1,0 +1,24 @@
+OpenVDB:
+  New features:
+  - Added tree::NeighborAccessor, a fast read-only accessor bound to one leaf-sized region of a tree and the 26 regions around it. It outperforms the ValueAccessor for relative indexing operations such as stencils.
+  - Added math::NeighborStencil, a stencil with no fixed shape that reads each value through a tree::NeighborAccessor. It is fast when used with an operator that read each neighbor only once.
+
+  Improvements:
+  - The math:: stencils with IsSafe false read through a tree::NeighborAccessor instead of an unregistered ValueAccessor.
+  - Added math::NeighborAccessor overloads to the samplers in tools/Interpolation.h and BoxSampler::getValues() and probeValues().
+  - tools::DiscreteField, tools::VelocitySampler and tools::VelocityIntegrator take the type of the accessor to the velocity grid as a template argument. The default is the ValueAccessor used before.
+  - points::SampleWithRounding has an overload of sample() that takes a tree::NeighborAccessor.
+  - The stencil overloads of the general math::MeanCurvature take the stencil by reference instead of copying it.
+  - LevelSetTracker, LevelSetAdvection, LevelSetMorphing, LevelSetFilter, Filter::median, FastSweeping and LevelSetMeasure use NeighborAccessor stencils.
+  - Added BaseStencil::clear(), which discards everything a stencil has read from the tree.
+  - tools::opStatistics and tools::opExtrema now read using a math::NeighborStencil.
+  - tools::CheckNormGrad and tools::CheckDivergence now read using a math::NeighborStencil.
+  - tools::cpt, curl, divergence, gradient, laplacian, meanCurvature, magnitude and normalize can now read the input grid through a math::NeighborStencil.
+  - The mean, gaussian and box filters of tools::Filter and tools::LevelSetFilter, and the Laplacian matrix of tools::poisson now read neighbor voxels through a tree::NeighborAccessor.
+  - tools::VolumeAdvection (the volume and the velocity), points::sampleGrid, the target and mask of tools::LevelSetMorphing, the restriction, prolongation and fractional levels of tools::MultiResGrid, and tools::GridTransformer and resampleToMatch now sample using a tree::NeighborAccessor.
+  - tools::volumeToMesh, tools::meshToVolume and the level set utilities in tools/LevelSetUtil.h now read the voxels using a tree::NeighborAccessor instead of a ValueAccessor.
+  - The Scatter and Noise SOPs use stencils with IsSafe false.
+
+  Bug fixes:
+  - tools::opStatistics and tools::opExtrema evaluated the operator at the origin of an active tile for every voxel of the tile, instead of at each voxel.
+  - tools::CheckDivergence could not be used, since it compared the divergence with a range of vectors. It now takes a range of the vector element type.

@@ -34,6 +34,7 @@
 #include <openvdb/math/Math.h> // for Abs() and isExactlyEqual()
 #include <openvdb/math/Stencils.h> // for GradStencil
 #include <openvdb/tree/LeafManager.h>
+#include <openvdb/tree/NeighborAccessor.h>
 #include <openvdb/tree/NodeManager.h> // for PruneMinMaxFltKernel
 #include <openvdb/util/Assert.h>
 
@@ -1600,6 +1601,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
         inline static Coord ijk(const Coord &p, int i) { return p + FastSweeping::mOffset[i]; }
         NN() : v(), n() {}
         NN(const SdfAccT &a, const Coord &p, int i) : v(math::Abs(a.getValue(ijk(p,i)))), n(i) {}
+        NN(SdfValueT value, int i) : v(math::Abs(value)), n(i) {}
         inline Coord operator()(const Coord &p) const { return ijk(p, n); }
         inline bool operator<(const NN &rhs) const { return v < rhs.v; }
         inline operator bool() const { return v < SdfValueT(1000); }
@@ -1649,7 +1651,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
         auto kernel = [&](const tbb::blocked_range<size_t>& range) {
             using LeafT = typename SdfGridT::TreeType::LeafNodeType;
 
-            SdfAccT acc1(mParent->mSdfGrid->tree());
+            tree::NeighborAccessor<SdfTreeT> neighbors(mParent->mSdfGrid->tree());
             auto acc2 = std::unique_ptr<ExtAccT>(tree2 ? new ExtAccT(*tree2) : nullptr);
             auto acc3 = std::unique_ptr<ExtAccT>(tree3 ? new ExtAccT(*tree3) : nullptr);
             SdfValueT absV, sign, update, D;
@@ -1669,24 +1671,29 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                 const NodeMaskPtrT& nodeMask = leafSlice.second;
 
                 const Coord& origin = leafNodeOrigins[leafIdx];
+                neighbors.moveTo(origin);
 
                 Coord ijk;
                 for (auto indexIter = nodeMask->beginOn(); indexIter; ++indexIter) {
 
                     // Get coordinate of center point of the FD stencil
-                    ijk = origin + LeafT::offsetToLocalCoord(indexIter.pos());
+                    const Index offset = indexIter.pos();
+                    ijk = origin + LeafT::offsetToLocalCoord(offset);
 
                     // Find the closes neighbors in the three axial directions
-                    d1 = std::min(NN(acc1, ijk, 0), NN(acc1, ijk, 1));
-                    d2 = std::min(NN(acc1, ijk, 2), NN(acc1, ijk, 3));
-                    d3 = std::min(NN(acc1, ijk, 4), NN(acc1, ijk, 5));
+                    d1 = std::min(NN(neighbors.template getValue<-1,0,0>(offset), 0),
+                                  NN(neighbors.template getValue<1,0,0>(offset), 1));
+                    d2 = std::min(NN(neighbors.template getValue<0,-1,0>(offset), 2),
+                                  NN(neighbors.template getValue<0,1,0>(offset), 3));
+                    d3 = std::min(NN(neighbors.template getValue<0,0,-1>(offset), 4),
+                                  NN(neighbors.template getValue<0,0,1>(offset), 5));
 
                     if (!(d1 || d2 || d3)) continue;//no valid neighbors
 
                     // Get the center point of the FD stencil (assumed to be an active voxel)
                     // Note this const_cast is normally unsafe but by design we know the tree
                     // to be static, of floating-point type and containing active voxels only!
-                    SdfValueT &value = const_cast<SdfValueT&>(acc1.getValue(ijk));
+                    SdfValueT &value = const_cast<SdfValueT&>(neighbors.getValue(offset));
 
                     // Extract the sign
                     sign = value >= SdfValueT(0) ? SdfValueT(1) : SdfValueT(-1);

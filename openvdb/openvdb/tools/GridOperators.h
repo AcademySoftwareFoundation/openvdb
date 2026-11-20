@@ -12,6 +12,7 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/Grid.h>
 #include <openvdb/math/Operators.h>
+#include <openvdb/math/Stencils.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/thread/Threading.h>
 #include <openvdb/tree/LeafManager.h>
@@ -20,6 +21,9 @@
 #include "ValueTransformer.h" // for tools::foreach()
 
 #include <tbb/parallel_for.h>
+
+#include <type_traits>
+#include <utility>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -287,9 +291,23 @@ struct ToMaskGrid {
 };
 
 
+/// @brief True if OperatorT has a method of the form
+/// <tt>result(const MapT&, const StencilT&)</tt>, as the operators in math/Operators.h do.
+template<typename OperatorT, typename MapT, typename StencilT, typename = void>
+struct HasStencilResult: std::false_type {};
+
+template<typename OperatorT, typename MapT, typename StencilT>
+struct HasStencilResult<OperatorT, MapT, StencilT, std::void_t<decltype(
+    OperatorT::result(std::declval<const MapT&>(), std::declval<const StencilT&>()))>>:
+    std::true_type {};
+
+
 /// @brief Apply an operator to an input grid to produce an output grid
 /// with the same active voxel topology but a potentially different value type.
 /// @details To facilitate inlining, this class is also templated on a Map type.
+/// An operator with a method of the form <tt>result(const MapT&, const StencilT&)</tt>
+/// reads the input grid at the voxels through a math::NeighborStencil, and an
+/// operator without one reads it through a ValueAccessor.
 ///
 /// @note This is a helper class and should never be used directly.
 template<
@@ -390,15 +408,28 @@ public:
             thread::cancelGroupExecution();
         }
 
-        for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
-            for (typename OutLeafT::ValueOnIter value=leaf->beginValueOn(); value; ++value) {
-                value.setValue(OperatorT::result(mMap, mAcc, value.getCoord()));
+        if constexpr (HasStencilResult<OperatorT, MapT, StencilT>::value) {
+            // The output leaves have the size of the input leaves, so their
+            // voxels are read without a search of the input tree.
+            StencilT stencil(mAcc.tree());
+            for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
+                for (typename OutLeafT::ValueOnIter value=leaf->beginValueOn(); value; ++value) {
+                    stencil.moveTo(value);
+                    value.setValue(OperatorT::result(mMap, stencil));
+                }
+            }
+        } else {
+            for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
+                for (typename OutLeafT::ValueOnIter value=leaf->beginValueOn(); value; ++value) {
+                    value.setValue(OperatorT::result(mMap, mAcc, value.getCoord()));
+                }
             }
         }
     }
 
 protected:
     typedef typename InGridT::ConstAccessor  AccessorT;
+    typedef math::NeighborStencil<const typename InGridT::TreeType> StencilT;
     mutable AccessorT   mAcc;
     const MapT&         mMap;
     InterruptT*         mInterrupt;
@@ -450,6 +481,13 @@ private:
         {
             return math::CPT<MapT, math::CD_2ND>::result(map, acc, xyz);
         }
+
+        template<typename MapT, typename StencilT>
+        static typename OutGridType::ValueType
+        result(const MapT& map, const StencilT& stencil)
+        {
+            return math::CPT<MapT, math::CD_2ND>::result(map, stencil);
+        }
     };
     struct WsOpT
     {
@@ -458,6 +496,13 @@ private:
         result(const MapT& map, const AccT& acc, const Coord& xyz)
         {
             return math::CPT_RANGE<MapT, math::CD_2ND>::result(map, acc, xyz);
+        }
+
+        template<typename MapT, typename StencilT>
+        static typename OutGridType::ValueType
+        result(const MapT& map, const StencilT& stencil)
+        {
+            return math::CPT_RANGE<MapT, math::CD_2ND>::result(map, stencil);
         }
     };
     struct Functor
@@ -840,6 +885,10 @@ protected:
         template<typename MapT, typename AccT>
         static typename OutGridType::ValueType
         result(const MapT&, const AccT& acc, const Coord& xyz) { return acc.getValue(xyz).length();}
+
+        template<typename MapT, typename StencilT>
+        static typename OutGridType::ValueType
+        result(const MapT&, const StencilT& stencil) { return stencil.getCenterValue().length(); }
     };
     struct Functor
     {
@@ -914,6 +963,15 @@ protected:
         result(const MapT&, const AccT& acc, const Coord& xyz)
         {
             typename OutGridType::ValueType vec = acc.getValue(xyz);
+            if ( !vec.normalize() ) vec.setZero();
+            return vec;
+        }
+
+        template<typename MapT, typename StencilT>
+        static typename OutGridType::ValueType
+        result(const MapT&, const StencilT& stencil)
+        {
+            typename OutGridType::ValueType vec = stencil.getCenterValue();
             if ( !vec.normalize() ) vec.setZero();
             return vec;
         }

@@ -8,6 +8,8 @@
 #include "util.h" // for unittest_util::makeSphere()
 #include <gtest/gtest.h>
 
+#include <memory>
+
 // @todo gaussian!
 class TestFilter: public ::testing::Test {};
 
@@ -489,3 +491,149 @@ TEST_F(TestFilter, testFilterTiles)
     }
 }
 
+
+
+namespace {
+
+float
+boxFieldValue(const openvdb::Coord& xyz)
+{
+    const float x = float(xyz.x()), y = float(xyz.y()), z = float(xyz.z());
+    return 0.0625f * (x * x + 2.0f * y * y + z * z) - 0.25f * x * z - 3.0f;
+}
+
+// A block of 3x3x3 leaves with some inactive voxels, next to active and inactive
+// tiles of the leaf size and the background
+template<typename GridT>
+typename GridT::Ptr
+makeBoxFilterGrid()
+{
+    using namespace openvdb;
+    constexpr int dim = int(GridT::TreeType::LeafNodeType::DIM);
+    typename GridT::Ptr grid = GridT::create(boxFieldValue(Coord(40, -30, 20)));
+    auto& tree = grid->tree();
+    for (int x = -dim; x < 2 * dim; ++x) {
+        for (int y = -dim; y < 2 * dim; ++y) {
+            for (int z = -dim; z < 2 * dim; ++z) {
+                const Coord xyz(x, y, z);
+                if ((x + 2 * y + z) % 5 == 0) tree.setValueOff(xyz, boxFieldValue(xyz));
+                else tree.setValueOn(xyz, boxFieldValue(xyz));
+            }
+        }
+    }
+    tree.addTile(1, Coord(2 * dim, 0, 0), boxFieldValue(Coord(-7, 3, 2)), true);
+    tree.addTile(1, Coord(-2 * dim, 0, 0), boxFieldValue(Coord(5, -4, 1)), false);
+    tree.addTile(1, Coord(0, 2 * dim, dim), boxFieldValue(Coord(2, 9, -6)), true);
+    tree.addTile(1, Coord(dim, 0, -2 * dim), boxFieldValue(Coord(-3, -3, 8)), false);
+    return grid;
+}
+
+// One pass of the box filter of tools::Filter along @a axis, through a ValueAccessor
+template<typename GridT, typename MaskGridT>
+typename GridT::Ptr
+referenceBoxPass(const GridT& input, int axis, int width, const MaskGridT* mask)
+{
+    using namespace openvdb;
+    using ValueT = typename GridT::ValueType;
+    typename GridT::Ptr output = input.deepCopy();
+    tree::ValueAccessor<const typename GridT::TreeType> acc(input.tree());
+    const float frac = 1.f / float(2 * width + 1);
+    std::unique_ptr<tools::AlphaMask<GridT, MaskGridT>> alpha;
+    if (mask) {
+        alpha.reset(new tools::AlphaMask<GridT, MaskGridT>(input, *mask, 0.0f, 1.0f, false));
+    }
+    for (auto leaf = output->tree().beginLeaf(); leaf; ++leaf) {
+        for (auto iter = leaf->beginValueOn(); iter; ++iter) {
+            const Coord xyz = iter.getCoord();
+            Coord ijk = xyz;
+            ValueT sum = zeroVal<ValueT>();
+            for (int d = -width; d <= width; ++d) {
+                ijk[axis] = xyz[axis] + d;
+                sum += acc.getValue(ijk);
+            }
+            const ValueT average = static_cast<ValueT>(sum * frac);
+            if (!alpha) {
+                iter.setValue(average);
+                continue;
+            }
+            float a, b;
+            if ((*alpha)(xyz, a, b)) iter.setValue(ValueT(b * acc.getValue(xyz) + a * average));
+        }
+    }
+    return output;
+}
+
+// The passes of tools::Filter::mean() or gaussian(), which run x, then z, then y
+template<typename GridT, typename MaskGridT>
+typename GridT::Ptr
+referenceBoxFilter(const GridT& input, int width, int passes, const MaskGridT* mask)
+{
+    typename GridT::Ptr grid = input.deepCopy();
+    for (int pass = 0; pass < passes; ++pass) {
+        for (int axis : {0, 2, 1}) grid = referenceBoxPass(*grid, axis, width, mask);
+    }
+    return grid;
+}
+
+template<typename GridT>
+void
+checkSameGrid(const GridT& expected, const GridT& grid)
+{
+    EXPECT_TRUE(expected.tree().hasSameTopology(grid.tree()));
+    openvdb::tree::ValueAccessor<const typename GridT::TreeType> acc(grid.tree());
+    for (auto iter = expected.cbeginValueAll(); iter; ++iter) {
+        EXPECT_EQ(*iter, acc.getValue(iter.getCoord())) << " at " << iter.getCoord();
+    }
+}
+
+template<typename GridT>
+void
+checkBoxFilters()
+{
+    using namespace openvdb;
+    using MaskGridT = typename GridT::template ValueConverter<float>::Type;
+    const typename GridT::Ptr input = makeBoxFilterGrid<GridT>();
+
+    // A mask with values from 0 to 1 across the block
+    typename MaskGridT::Ptr mask = MaskGridT::create(0.0f);
+    constexpr int dim = int(GridT::TreeType::LeafNodeType::DIM);
+    for (int x = -dim; x < 2 * dim; ++x) {
+        for (int y = -dim; y < 2 * dim; ++y) {
+            mask->tree().setValueOn(Coord(x, y, 0), float(x + dim) / float(3 * dim));
+        }
+    }
+
+    for (int width : {1, 4, 8, 9}) {
+        for (int iterations : {1, 2}) {
+            typename GridT::Ptr grid = input->deepCopy();
+            tools::Filter<GridT> filter(*grid);
+            filter.mean(width, iterations);
+            checkSameGrid(*referenceBoxFilter(*input, width, iterations,
+                static_cast<const MaskGridT*>(nullptr)), *grid);
+        }
+        {
+            typename GridT::Ptr grid = input->deepCopy();
+            tools::Filter<GridT> filter(*grid);
+            filter.mean(width, 1, mask.get());
+            checkSameGrid(*referenceBoxFilter(*input, width, 1, mask.get()), *grid);
+        }
+    }
+    {
+        typename GridT::Ptr grid = input->deepCopy();
+        tools::Filter<GridT> filter(*grid);
+        filter.gaussian(/*width=*/2, /*iterations=*/1);
+        checkSameGrid(*referenceBoxFilter(*input, 2, 4, static_cast<const MaskGridT*>(nullptr)),
+            *grid);
+    }
+}
+
+} // unnamed namespace
+
+
+TEST_F(TestFilter, testBoxFilterNeighbors)
+{
+    checkBoxFilters<openvdb::FloatGrid>();
+    // Smaller leaves, so that wide filters read more than one leaf away
+    checkBoxFilters<openvdb::Grid<openvdb::tree::Tree4<float, 3, 3, 2>::Type>>();
+    checkBoxFilters<openvdb::Grid<openvdb::tree::Tree4<float, 3, 3, 1>::Type>>();
+}

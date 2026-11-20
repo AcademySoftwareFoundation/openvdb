@@ -105,6 +105,7 @@ else()
     TestGridBbox.cc
     TestGridDescriptor.cc
     TestGridIO.cc
+    TestGridOperators.cc
     TestGridTransformer.cc
     TestIndexFilter.cc
     TestIndexIterator.cc
@@ -113,6 +114,7 @@ else()
     TestInt64Metadata.cc
     TestInternalNode.cc
     TestInternalOrigin.cc
+    TestInterpolation.cc
     TestLaplacian.cc
     TestLeaf.cc
     TestLeafBool.cc
@@ -139,6 +141,9 @@ else()
     TestMorphology.cc
     TestMultiResGrid.cc
     TestName.cc
+    TestNeighborAccessor.cc
+    TestNeighborSampling.cc
+    TestNeighborStencil.cc
     TestNodeIterator.cc
     TestNodeManager.cc
     TestNodeMask.cc
