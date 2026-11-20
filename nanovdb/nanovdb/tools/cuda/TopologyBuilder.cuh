@@ -634,6 +634,8 @@ namespace topology::detail {
 template <typename BuildT>
 struct BuildGridTreeRootFunctor
 {
+    double scale = 1.0;
+
     __device__
     void operator()(size_t g, TopologyBuilderData<BuildT> *d_data) {
         const auto &d = d_data[g];
@@ -684,7 +686,16 @@ struct BuildGridTreeRootFunctor
         grid.mGridCount = d.gridCount;
         grid.mGridSize = d.size;
         // grid.mGridName expected to have been copied verbatim from input
-        // grid.mMap expected to have been copied verbatim from input
+        // Adjust the index-to-world map for the new voxel resolution
+        if (scale != 1.0) {
+            auto& map = grid.mMap;
+            for (int i = 0; i < 9; ++i) {
+                map.mMatF[i] *= static_cast<float>(scale);
+                map.mMatD[i] *= scale;
+                map.mInvMatF[i] /= static_cast<float>(scale);
+                map.mInvMatD[i] /= scale;
+            }
+        }
         grid.mWorldBBox = Vec3dBBox();// invalid bbox
         grid.mVoxelSize = grid.mMap.getVoxelSize();
         NANOVDB_ASSERT(grid.mGridClass == GridClass::IndexGrid);

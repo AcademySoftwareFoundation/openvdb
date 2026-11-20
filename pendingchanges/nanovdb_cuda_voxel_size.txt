@@ -1,0 +1,4 @@
+NanoVDB:
+  Bug Fixes:
+  - Fix incorrect voxel size and index-to-world transformations in CUDA
+    CoarsenGrid and RefineGrid operations.
