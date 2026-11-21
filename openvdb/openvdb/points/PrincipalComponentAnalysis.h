@@ -78,8 +78,8 @@ struct PcaSettings
     ///   limit values to try and include all points. If, for example, you
     ///   want include every point against eachother, consider computing the
     ///   extents of the grid and using that as the searchRadius.
-    /// @warning  Valid range is [0, inf). Behaviour is undefined when outside
-    ///   this range.
+    /// @warning  Valid range is [0, FLT_MAX]. Behaviour is undefined when
+    ///   outside this range.
     float searchRadius = 1.0f;
     /// @param allowedAnisotropyRatio  the maximum allowed ratio between the
     ///   components in each ellipse' stretch coefficients such that:
@@ -111,8 +111,9 @@ struct PcaSettings
     /// @warning  Changing this value does not change the size or number of
     ///   point neighborhood lookups. As such, increasing this value only
     ///   speeds up the number of calculated covariance matrices. Valid range
-    ///   is [0, inf], where 0 effectively disables all covariance calculations
-    ///   and 1 enables them for every point.
+    ///   is [0, SIZE_MAX], where 0 effectively disables all covariance
+    ///   calculations, 1 enables them for every point, and values greater than
+    ///   1 control the cutoff point.
     size_t neighbourThreshold = 20;
     /// @param The maximum number of source points to gather for contributions
     ///   to each target point, per voxel. When a voxel contains more points
@@ -123,8 +124,8 @@ struct PcaSettings
     ///   ids which all lie outside. This is rarely an issue in practice and
     ///   choosing an appropriate value for this setting can significantly
     ///   increase performance without a large impact to the results.
-    /// @warning  Valid range is [1, inf). Behaviour is undefined if this value
-    ///   is set to zero.
+    /// @warning  Valid range is [1, SIZE_MAX]. Behaviour is undefined if this
+    ///   value is set to zero.
     size_t maxSourcePointsPerVoxel = 8;
     /// @param The maximum number of target points to write anisotropy values
     ///   to. When a voxel contains more points than this value, target point
@@ -137,8 +138,8 @@ struct PcaSettings
     ///   consider choosing a lower value (e.g. same value as
     ///   maxSourcePointsPerVoxel) to speed up iterations and only
     ///   increase if necessary.
-    /// @warning  Valid range is [1, inf). Behaviour is undefined if this value
-    ///   is set to zero.
+    /// @warning  Valid range is [1, SIZE_MAX]. Behaviour is undefined if this
+    ///   value is set to zero.
     size_t maxTargetPointsPerVoxel = std::numeric_limits<size_t>::max();
     /// @param averagePositions  the amount (between 0 and 1) to average out
     ///   positions. All points, whether they end up as ellipses or not,

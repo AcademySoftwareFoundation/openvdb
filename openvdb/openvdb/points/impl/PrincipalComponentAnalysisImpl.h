@@ -166,7 +166,16 @@ struct PcaTransfer
     size_t maxTargetPointsPerVoxel() const { return mSettings.maxTargetPointsPerVoxel; }
 
     Vec3i range(const Coord&, size_t) const { return this->range(); }
-    Vec3i range() const { return Vec3i(math::Round(mSettings.searchRadius * mDxInv)); }
+    Vec3i range() const
+    {
+        const int32_t indexRange = static_cast<int32_t>(math::Clamp(
+            math::Round(mSettings.searchRadius * mDxInv),
+            RealT(0),
+            // avoid double->int32 overflow (although search radius should
+            // always be some sensible value and not just ->inf)
+            RealT(std::numeric_limits<int32_t>::max())));
+        return Vec3i(indexRange);
+    }
 
     inline LeafNodeType* initialize(const Coord& origin, const size_t idx, const CoordBBox& bounds)
     {
