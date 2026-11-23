@@ -25,6 +25,7 @@
 #include <mutex>
 #include <array>
 #include <atomic>
+#include <type_traits>
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/util/Range.h>
@@ -1927,11 +1928,8 @@ template <typename Func>
 void Grid<BuildT>::operator()(const Func& func, const CoordBBox& bbox, ValueType /*delta*/)
 {
     auto &root = this->tree().root();
-#if __cplusplus >= 201703L
-    static_assert(util::is_same<ValueType, typename std::invoke_result<Func,const Coord&>::type>::value, "GridBuilder: mismatched ValueType");
-#else// invoke_result was introduced in C++17 and result_of was removed in C++20
-    static_assert(util::is_same<ValueType, typename std::result_of<Func(const Coord&)>::type>::value, "GridBuilder: mismatched ValueType");
-#endif
+    static_assert(util::is_same<ValueType, std::invoke_result_t<Func, const Coord&>>::value,
+                  "GridBuilder: mismatched ValueType");
     const CoordBBox leafBBox(bbox[0] >> Node0::TOTAL, bbox[1] >> Node0::TOTAL);
     std::mutex mutex;
     util::forEach(leafBBox, [&](const CoordBBox& b) {
