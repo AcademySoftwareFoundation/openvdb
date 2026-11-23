@@ -16,6 +16,7 @@
 #include "String.h"
 
 #include <openvdb/version.h>
+#include <openvdb/Platform.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Mat3.h>
 #include <openvdb/math/Mat4.h>
@@ -303,7 +304,7 @@ struct FunctionTraits<R(*)(Args...)> : public FunctionTraits<R(Args...)> {};
 // Only enable noexcept signatures from C++17 onwards when it is actually
 // respected. Otherwise the compiler ignores it and we get duplicating
 // definitions for FunctionTraits specializations.
-#if __cplusplus >= 201703L
+#if OPENVDB_CPLUSPLUS >= 201703L
 template<typename R, typename... Args>
 struct FunctionTraits<R(Args...) noexcept> : public FunctionTraits<R(Args...)> {};
 

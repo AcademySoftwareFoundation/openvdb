@@ -35,10 +35,19 @@
     #define OPENVDB_CHECK_GCC(MAJOR, MINOR) 0
 #endif
 
+/// C++ language version, accounting for MSVC without /Zc:__cplusplus.
+#ifndef OPENVDB_CPLUSPLUS
+#if defined(_MSVC_LANG) && !defined(__clang__)
+    #define OPENVDB_CPLUSPLUS _MSVC_LANG
+#else
+    #define OPENVDB_CPLUSPLUS __cplusplus
+#endif
+#endif
+
 /// OpenVDB now requires C++17
 #define OPENVDB_HAS_CXX11 1 // kept for backward compatibility
 
-#if __cplusplus >= 202002L
+#if OPENVDB_CPLUSPLUS >= 202002L
     #define OPENVDB_HAS_CXX20
 #endif
 

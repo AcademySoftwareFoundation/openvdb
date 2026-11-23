@@ -34,9 +34,7 @@ typedef unsigned long long uint64_t;
 #else // !__CUDACC_RTC__
 
 #include <stdlib.h> //    for abs in clang7
-#if __cplusplus >= 202002L
 #include <atomic> //      for std::atomic_ref (C++20)
-#endif
 #include <stdint.h> //    for types like int32_t etc
 #include <stddef.h> //    for size_t type
 #include <cassert> //     for assert
@@ -726,7 +724,7 @@ __hostdev__ inline uint64_t atomicOr(uint64_t* target, uint64_t mask)
 #if defined(__CUDA_ARCH__) || defined(__HIP__)
     return static_cast<uint64_t>(::atomicOr(reinterpret_cast<unsigned long long int*>(target),
                                             static_cast<unsigned long long int>(mask)));
-#elif __cplusplus >= 202002L
+#elif defined(__cpp_lib_atomic_ref)
     return std::atomic_ref<uint64_t>(*target).fetch_or(mask, std::memory_order_relaxed);
 #elif defined(__GNUC__) || defined(__clang__)
     return __atomic_fetch_or(target, mask, __ATOMIC_RELAXED);
@@ -750,7 +748,7 @@ __hostdev__ inline uint64_t atomicAnd(uint64_t* target, uint64_t mask)
 #if defined(__CUDA_ARCH__) || defined(__HIP__)
     return static_cast<uint64_t>(::atomicAnd(reinterpret_cast<unsigned long long int*>(target),
                                              static_cast<unsigned long long int>(mask)));
-#elif __cplusplus >= 202002L
+#elif defined(__cpp_lib_atomic_ref)
     return std::atomic_ref<uint64_t>(*target).fetch_and(mask, std::memory_order_relaxed);
 #elif defined(__GNUC__) || defined(__clang__)
     return __atomic_fetch_and(target, mask, __ATOMIC_RELAXED);
