@@ -5,3 +5,9 @@ NanoVDB:
     now aliases, and the non-owning indexed-mesh views math::TriangleMeshView and
     math::TriangleMeshBatchView. tools::cuda::MeshToGrid takes a TriangleMeshView in an
     added constructor.
+  - Added nanovdb::tools::cuda::DualContour, a CUDA dual-contouring (QEF) triangle-mesh
+    extraction from a scalar field (e.g. a signed distance field) on the active voxels of
+    ValueOnIndex grids. It meshes one grid, or a batch of grids together through a batched
+    VoxelBlockManager with a constant number of host synchronizations per chunk of grids,
+    each grid's mesh being identical to meshing it alone. Added an ex_dual_contour_cuda
+    example and unit tests.

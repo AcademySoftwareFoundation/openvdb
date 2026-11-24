@@ -27,6 +27,7 @@
 #include <nanovdb/tools/cuda/RefineGrid.cuh>
 #include <nanovdb/util/cuda/Injection.cuh>
 #include <nanovdb/tools/cuda/MeshToGrid.cuh>
+#include <nanovdb/tools/cuda/DualContour.cuh>
 #include <nanovdb/math/Proximity.h>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/Timer.h>
@@ -5308,3 +5309,228 @@ TEST(TestNanoVDBCUDA, ConnectedComponents_InFlightGrid)
     cudaCheck(cudaFree(d_bytes));
     cudaCheck(cudaFreeHost(pinned));
 }// ConnectedComponents_InFlightGrid
+
+//-------------------------------------------------------------------------------------------------
+// DualContour
+
+namespace {
+
+// A narrow-band level-set sphere as a device ValueOnIndex grid plus a device sidecar of its
+// signed distances indexed by value index (entry 0 unused), the input DualContour takes.
+struct DualContourSdfGrid
+{
+    nanovdb::GridHandle<nanovdb::cuda::Buffer<std::byte>> handle;
+    std::vector<float> sidecar; // host copy, valueCount entries
+    float* d_sidecar = nullptr;
+    uint64_t voxelCount = 0;
+    uint32_t leafCount = 0;
+
+    DualContourSdfGrid(double radius, const nanovdb::Vec3d& center, double voxelSize, bool noSurface = false)
+    {
+        auto floatHandle = nanovdb::tools::createLevelSetSphere<float>(radius, center, voxelSize, 3.0);
+        auto indexHandle = nanovdb::tools::createNanoGrid<nanovdb::NanoGrid<float>, nanovdb::ValueOnIndex>(
+            *floatHandle.grid<float>(), 1u, false, false);
+        const auto* grid = indexHandle.grid<nanovdb::ValueOnIndex>();
+        voxelCount = grid->activeVoxelCount();
+        leafCount = grid->tree().nodeCount(0);
+        const float* values = grid->getBlindData<float>(0);
+        sidecar.assign(values, values + grid->valueCount());
+        if (noSurface) // all outside: the grid has voxels but no surface
+            for (float& v : sidecar) v = std::abs(v) + 1.f;
+        handle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(indexHandle, cudaStream_t(0));
+        cudaCheck(cudaMalloc(&d_sidecar, sidecar.size() * sizeof(float)));
+        cudaCheck(cudaMemcpy(d_sidecar, sidecar.data(), sidecar.size() * sizeof(float), cudaMemcpyHostToDevice));
+    }
+    DualContourSdfGrid(const DualContourSdfGrid&) = delete;
+    ~DualContourSdfGrid() { cudaFree(d_sidecar); }
+    const nanovdb::NanoGrid<nanovdb::ValueOnIndex>* deviceGrid() const
+    {
+        return handle.deviceGrid<nanovdb::ValueOnIndex>();
+    }
+};
+
+struct DualContourHostMesh
+{
+    std::vector<nanovdb::Vec3f> points, normals;
+    std::vector<nanovdb::Vec3i> triangles;
+    std::vector<uint64_t> pointOffsets, triangleOffsets;
+
+    template<typename MeshT>
+    explicit DualContourHostMesh(const MeshT& mesh)
+        : points(mesh.pointCount()), normals(mesh.pointCount()), triangles(mesh.triangleCount())
+        , pointOffsets(mesh.hostPointOffsets), triangleOffsets(mesh.hostTriangleOffsets)
+    {
+        EXPECT_EQ(mesh.points.size(), points.size());
+        EXPECT_EQ(mesh.triangles.size(), triangles.size());
+        cudaCheck(cudaMemcpy(points.data(), mesh.points.data(), points.size() * sizeof(nanovdb::Vec3f), cudaMemcpyDeviceToHost));
+        cudaCheck(cudaMemcpy(normals.data(), mesh.normals.data(), normals.size() * sizeof(nanovdb::Vec3f), cudaMemcpyDeviceToHost));
+        cudaCheck(cudaMemcpy(triangles.data(), mesh.triangles.data(), triangles.size() * sizeof(nanovdb::Vec3i), cudaMemcpyDeviceToHost));
+        std::vector<uint64_t> deviceOffsets(pointOffsets.size());
+        cudaCheck(cudaMemcpy(deviceOffsets.data(), mesh.pointOffsets.data(), deviceOffsets.size() * sizeof(uint64_t), cudaMemcpyDeviceToHost));
+        EXPECT_EQ(pointOffsets, deviceOffsets);
+        cudaCheck(cudaMemcpy(deviceOffsets.data(), mesh.triangleOffsets.data(), deviceOffsets.size() * sizeof(uint64_t), cudaMemcpyDeviceToHost));
+        EXPECT_EQ(triangleOffsets, deviceOffsets);
+    }
+
+    // mesh g's points, normals and triangles (its triangles index its own points)
+    DualContourHostMesh(const DualContourHostMesh& batch, uint32_t g)
+        : points(batch.points.begin() + batch.pointOffsets[g], batch.points.begin() + batch.pointOffsets[g + 1])
+        , normals(batch.normals.begin() + batch.pointOffsets[g], batch.normals.begin() + batch.pointOffsets[g + 1])
+        , triangles(batch.triangles.begin() + batch.triangleOffsets[g], batch.triangles.begin() + batch.triangleOffsets[g + 1])
+        , pointOffsets{0, points.size()}, triangleOffsets{0, triangles.size()} {}
+};
+
+// Bitwise comparison of two single meshes.
+void expectSameMesh(const DualContourHostMesh& a, const DualContourHostMesh& b)
+{
+    ASSERT_EQ(a.points.size(), b.points.size());
+    ASSERT_EQ(a.triangles.size(), b.triangles.size());
+    EXPECT_EQ(0, std::memcmp(a.points.data(), b.points.data(), a.points.size() * sizeof(nanovdb::Vec3f)));
+    EXPECT_EQ(0, std::memcmp(a.normals.data(), b.normals.data(), a.normals.size() * sizeof(nanovdb::Vec3f)));
+    EXPECT_EQ(0, std::memcmp(a.triangles.data(), b.triangles.data(), a.triangles.size() * sizeof(nanovdb::Vec3i)));
+}
+
+// The mesh is a closed, consistently oriented 2-manifold: every directed edge appears exactly
+// once and its reverse appears too. Returns the Euler characteristic V - E + F.
+int64_t checkClosedManifold(const DualContourHostMesh& mesh)
+{
+    std::vector<std::pair<int64_t, int64_t>> directed;
+    std::vector<bool> used(mesh.points.size(), false);
+    for (const auto& t : mesh.triangles) {
+        for (int k = 0; k < 3; ++k) {
+            EXPECT_GE(t[k], 0);
+            EXPECT_LT(t[k], int32_t(mesh.points.size()));
+            used[t[k]] = true;
+            directed.emplace_back(t[k], t[(k + 1) % 3]);
+        }
+    }
+    for (bool u : used) EXPECT_TRUE(u); // no unreferenced vertices
+    std::sort(directed.begin(), directed.end());
+    EXPECT_TRUE(std::adjacent_find(directed.begin(), directed.end()) == directed.end()) << "a directed edge repeats";
+    for (const auto& e : directed)
+        EXPECT_TRUE(std::binary_search(directed.begin(), directed.end(), std::make_pair(e.second, e.first)))
+            << "edge (" << e.first << ", " << e.second << ") has no opposite";
+    const int64_t edges = int64_t(directed.size() / 2);
+    return int64_t(mesh.points.size()) - edges + int64_t(mesh.triangles.size());
+}
+
+double signedVolume(const DualContourHostMesh& mesh)
+{
+    double volume = 0;
+    for (const auto& t : mesh.triangles) {
+        const nanovdb::Vec3d a(mesh.points[t[0]]), b(mesh.points[t[1]]), c(mesh.points[t[2]]);
+        volume += a.dot(b.cross(c)) / 6.0;
+    }
+    return volume;
+}
+
+} // namespace
+
+TEST(TestNanoVDBCUDA, DualContour_Sphere)
+{
+    // radius 6 world units at voxel size 0.25: the vertices are in world space (the grid's map)
+    const double radius = 6.0, voxelSize = 0.25;
+    const nanovdb::Vec3d center(1.0, -2.0, 0.5);
+    DualContourSdfGrid sdf(radius, center, voxelSize);
+
+    nanovdb::tools::cuda::DualContour<nanovdb::ValueOnIndex> dc;
+    const DualContourHostMesh mesh(dc.getMesh(sdf.deviceGrid(), sdf.d_sidecar));
+    ASSERT_EQ(2u, mesh.pointOffsets.size());
+    EXPECT_GT(mesh.points.size(), 1000u);
+    EXPECT_EQ(2, checkClosedManifold(mesh)); // a sphere
+    const double volume = signedVolume(mesh), exact = 4.0 / 3.0 * 3.14159265358979 * radius * radius * radius;
+    EXPECT_NEAR(1.0, volume / exact, 0.01); // positive: the triangles face outward
+    for (size_t i = 0; i < mesh.points.size(); ++i) {
+        const nanovdb::Vec3d offset = nanovdb::Vec3d(mesh.points[i]) - center;
+        EXPECT_NEAR(radius, offset.length(), 0.1 * voxelSize);
+        EXPECT_NEAR(1.0, nanovdb::Vec3d(mesh.normals[i]).length(), 1e-5);
+        EXPECT_GT(nanovdb::Vec3d(mesh.normals[i]).dot(offset) / offset.length(), 0.95);
+    }
+
+    // in index space, and at an iso value of half a voxel the sphere grows by that much
+    const DualContourHostMesh indexMesh(dc.getMesh(sdf.deviceGrid(), sdf.d_sidecar, nanovdb::tools::cuda::DualContourIndexSpace()));
+    ASSERT_EQ(mesh.points.size(), indexMesh.points.size());
+    EXPECT_NEAR(double(mesh.points[0][0]), double(indexMesh.points[0][0]) * voxelSize, 1e-4);
+    dc.setIsoValue(float(0.5 * voxelSize));
+    const DualContourHostMesh grown(dc.getMesh(sdf.deviceGrid(), sdf.d_sidecar));
+    EXPECT_EQ(2, checkClosedManifold(grown));
+    for (const auto& p : grown.points) EXPECT_NEAR(radius + 0.5 * voxelSize, (nanovdb::Vec3d(p) - center).length(), 0.1 * voxelSize);
+}// DualContour_Sphere
+
+TEST(TestNanoVDBCUDA, DualContour_BatchMatchesSingleGrids)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    constexpr int L = 7;
+    using VBM = nanovdb::tools::cuda::VoxelBlockManager<L>;
+    // spheres of different sizes and places, a grid without voxels, and one without a surface
+    std::vector<std::unique_ptr<DualContourSdfGrid>> sdfs;
+    sdfs.emplace_back(new DualContourSdfGrid(5.0, nanovdb::Vec3d(0.0), 0.5));
+    sdfs.emplace_back(nullptr); // no voxels
+    sdfs.emplace_back(new DualContourSdfGrid(3.0, nanovdb::Vec3d(10.0, 0.0, 0.0), 0.25));
+    sdfs.emplace_back(new DualContourSdfGrid(4.0, nanovdb::Vec3d(0.0), 0.5, true)); // no surface
+    sdfs.emplace_back(new DualContourSdfGrid(7.0, nanovdb::Vec3d(-3.0, 2.0, 1.0), 0.5));
+    sdfs.emplace_back(nullptr); // no voxels, at the end
+    const uint32_t gridCount = uint32_t(sdfs.size());
+
+    // each grid meshed alone
+    nanovdb::tools::cuda::DualContour<BuildT> dc;
+    std::vector<std::unique_ptr<DualContourHostMesh>> singles;
+    for (const auto& sdf : sdfs) {
+        if (sdf) singles.emplace_back(new DualContourHostMesh(dc.getMesh(sdf->deviceGrid(), sdf->d_sidecar)));
+        else singles.emplace_back(nullptr);
+    }
+    EXPECT_TRUE(singles[3]->points.empty());
+
+    // the batch's VBM, with a gap block before every grid
+    std::vector<nanovdb::tools::cuda::VoxelBlockManagerBatchEntry> entries(gridCount);
+    uint32_t leafCount = 0;
+    uint64_t blockCount = 0;
+    std::vector<float> packedField, paddedField; // values without, and with, each grid's entry 0
+    std::vector<int64_t> paddedOffsets;
+    for (uint32_t g = 0; g < gridCount; ++g) {
+        ++blockCount;
+        const auto& sdf = sdfs[g];
+        entries[g] = {sdf ? sdf->deviceGrid() : nullptr, sdf ? sdf->voxelCount : 0, blockCount, leafCount};
+        paddedOffsets.push_back(int64_t(paddedField.size()));
+        if (!sdf) continue;
+        leafCount += sdf->leafCount;
+        blockCount += (sdf->voxelCount + VBM::BlockWidth - 1) / VBM::BlockWidth;
+        packedField.insert(packedField.end(), sdf->sidecar.begin() + 1, sdf->sidecar.end());
+        paddedField.insert(paddedField.end(), sdf->sidecar.begin(), sdf->sidecar.end());
+    }
+    VoxelBlockManagerBatchTestArrays arrays; // device memory, freed at scope exit
+    const VoxelBlockManagerBatchTestSource source = arrays.source(entries); // fvdb-style derived entries
+    uint32_t* d_firstLeafID = arrays.upload(std::vector<uint32_t>(blockCount));
+    uint64_t* d_jumpMap = arrays.upload(std::vector<uint64_t>(blockCount * VBM::JumpMapLength));
+    float* d_packed = arrays.upload(packedField);
+    float* d_padded = arrays.upload(paddedField);
+    int64_t* d_paddedOffsets = arrays.upload(paddedOffsets);
+    nanovdb::tools::cuda::buildVoxelBlockManagerBatch<L>(source, gridCount, leafCount, blockCount, d_firstLeafID, d_jumpMap);
+    cudaCheck(cudaDeviceSynchronize());
+    const nanovdb::tools::cuda::VoxelBlockManagerBatchView<L, VoxelBlockManagerBatchTestSource> view(
+        source, gridCount, blockCount, d_firstLeafID, d_jumpMap);
+    const nanovdb::tools::cuda::VoxelBlockManagerBatchEntryArray hostEntries{entries.data()};
+
+    auto checkBatch = [&](const DualContourHostMesh& batch) {
+        ASSERT_EQ(gridCount + 1, batch.pointOffsets.size());
+        ASSERT_EQ(gridCount + 1, batch.triangleOffsets.size());
+        for (uint32_t g = 0; g < gridCount; ++g) {
+            const DualContourHostMesh mesh(batch, g);
+            if (singles[g]) {
+                expectSameMesh(*singles[g], mesh);
+            } else {
+                EXPECT_TRUE(mesh.points.empty());
+                EXPECT_TRUE(mesh.triangles.empty());
+            }
+        }
+    };
+    // one chunk, with packed and with padded field layouts
+    checkBatch(DualContourHostMesh(dc.getMesh(view, hostEntries, d_packed)));
+    checkBatch(DualContourHostMesh(dc.getMesh(view, hostEntries, d_padded, d_paddedOffsets)));
+    // several chunks: at most two small grids, or one large grid, per chunk
+    dc.setMaxChunkVoxels(std::max(sdfs[0]->voxelCount + sdfs[2]->voxelCount, sdfs[2]->voxelCount + sdfs[3]->voxelCount));
+    checkBatch(DualContourHostMesh(dc.getMesh(view, hostEntries, d_packed)));
+    // one grid per chunk
+    dc.setMaxChunkVoxels(1);
+    checkBatch(DualContourHostMesh(dc.getMesh(view, hostEntries, d_packed)));
+}// DualContour_BatchMatchesSingleGrids

@@ -24,6 +24,7 @@
 #include <nanovdb/tools/cuda/GridStats.cuh>
 #include <nanovdb/cuda/HandleStorage.h> // for cuda::copyTo
 #include <nanovdb/tools/cuda/ConnectedComponents.cuh>
+#include <nanovdb/tools/cuda/DualContour.cuh>
 
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
@@ -609,6 +610,39 @@ TEST(TestMemoryResource, ConnectedComponents_InjectedResourceSeam)
     }                                        // op and labels destroyed -> everything freed via res
     ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
     EXPECT_EQ(res.allocs, res.deallocs);
+}
+
+TEST(TestMemoryResource, DualContour_InjectedResourceSeam)
+{
+    // All of the operator's scratch, its cub temp pool and the returned mesh allocate through
+    // the injected resource. A 4x4x4 block of voxels whose field crosses zero between x = 1 and
+    // x = 2 gives a (small, open) surface.
+    std::vector<nanovdb::Coord> voxels;
+    for (int i = 0; i < 4; ++i) for (int j = 0; j < 4; ++j) for (int k = 0; k < 4; ++k) voxels.emplace_back(i, j, k);
+    auto src = buildIndexGrid(voxels);
+    auto* d_srcGrid = src.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_srcGrid, nullptr);
+    auto hostSrc = nanovdb::cuda::copyTo<nanovdb::HostBuffer>(src, cudaStream_t(0));
+    const auto* grid = hostSrc.grid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(grid, nullptr);
+    std::vector<float> field(grid->valueCount(), 0.f);
+    for (const auto& ijk : voxels) field[grid->tree().getValue(ijk)] = float(ijk[0]) - 1.5f;
+    float* d_field = nullptr;
+    ASSERT_EQ(cudaMalloc(&d_field, field.size() * sizeof(float)), cudaSuccess);
+    ASSERT_EQ(cudaMemcpy(d_field, field.data(), field.size() * sizeof(float), cudaMemcpyHostToDevice), cudaSuccess);
+
+    CountingResource res;
+    {
+        nanovdb::tools::cuda::DualContour<nanovdb::ValueOnIndex, CountingResource> op(0, res);
+        auto mesh = op.getMesh(d_srcGrid, d_field);
+        EXPECT_GT(mesh.triangleCount(), 0u);
+        EXPECT_NE(mesh.points.data(), nullptr);
+        EXPECT_GT(res.allocs, res.deallocs); // the mesh is still held
+    }                                        // op and mesh destroyed -> everything freed via res
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_GT(res.allocs, 0);
+    EXPECT_EQ(res.allocs, res.deallocs);
+    cudaFree(d_field);
 }
 
 TEST(TestMemoryResource, ConnectedComponents_LabelsOutliveTheOperator)
