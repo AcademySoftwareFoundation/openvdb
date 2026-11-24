@@ -1,0 +1,30 @@
+vdb_tool:
+  Improvements:
+  - New shrink wrap algorithm in ShrinkWrap.h. Offsets are built from unsigned
+    distances and an exterior flood fill, so they don't depend on normals or
+    surface orientation, and enclosed cavities are filled. By default the
+    starting offset is chosen from the closing threshold, followed by one
+    erosion-and-union step per finer voxel size. Optionally, erosion-and-union
+    steps are repeated at each level until the field converges or an iteration
+    limit is reached.
+  - The vdb_tool unit tests only print std::clog and std::cerr output for
+    failing tests.
+
+  API Changes:
+  - -shrinkwrap: removed the mode option. erode is now the maximum number of
+    erosion iterations per level (default 128) and thres is the target gap
+    size in world units. Added barrier (use a conservative sqrt(3) voxel
+    offset radius) and thresSeed (choose the starting offset from thres,
+    default true).
+  - -mesh2offset: replaced the mode option with barrier.
+  - ShrinkWrap.h: removed ShrinkWrapLimit, the dim-based constructor and
+    shrinkWrap overloads, and the experimental offset_mode parameter. The
+    ShrinkWrap constructor takes the finest voxel size, and shrinkWrap and
+    ShrinkWrap::process take closingThreshold, maxErodeIterations,
+    useConservativeOffset and useThresholdSeed. Invalid parameters now throw
+    ValueError.
+
+  Bug Fixes:
+  - Fractional narrow-band half-widths are now rounded up when setting the
+    renormalization count, so the whole band is renormalized.
+  - Tool::ax() is now inline, like the other out-of-line definitions in Tool.h.
