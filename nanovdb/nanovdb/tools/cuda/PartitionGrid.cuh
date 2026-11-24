@@ -88,7 +88,8 @@ public:
     }
 
     /// @brief Splits the grid by the selection mask.
-    /// @return two handles: the first holds the voxels whose selection bit is on, the second the rest.
+    /// @return the handles of the two output grids: the first holds the voxels whose selection bit is on, the second
+    ///         the rest.
     /// @tparam BufferT Buffer type of the returned grid handles.
     /// @param pool Prototype buffer the outputs take their resource from.
     /// @note The stream is synchronized before this method returns.
@@ -249,14 +250,13 @@ void PartitionGridBinary<BuildT, ResourceT>::partitionLeafNodes()
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 /// @brief Splits the active voxels of a ValueOnIndex grid into one grid per label.
-/// @details Output l holds the active voxels with label l, and is a valid empty grid if there are none. As with the
-///          other topology operators, grids with active tiles are rejected.
-///          The label range is split at the label that halves the voxel count, by one PartitionGridBinary, and each
-///          side again until it holds one label: labelCount - 1 splits, each over its own side's voxels. A single
-///          label still takes one split, since the source itself is never returned.
-///          The labels are given to getHandles, not to the constructor as PartitionGridBinary's mask is: their type
-///          is deduced there, so labels of any unsigned width need no copy, and one operator can apply several
-///          labelings.
+/// @details The l-th output grid holds the active voxels with label l, and is a valid empty grid if there are none.
+///          As with the other topology operators, grids with active tiles are rejected.
+///          The labels are split recursively, each time at the label that halves the voxel count, by one
+///          PartitionGridBinary. A single label still takes one split, since the source itself is never returned.
+///          Unlike PartitionGridBinary, which takes its selection bitmask in the constructor, this operator takes the
+///          labels as a sidecar in getHandles: their type is deduced there, so labels of any unsigned width need no
+///          copy, and one operator can apply several labelings.
 /// @tparam BuildT NanoVDB build type; only ValueOnIndex is supported.
 /// @tparam ResourceT Stream-ordered resource used for all scratch allocations.
 template <typename BuildT, typename ResourceT = nanovdb::cuda::DeviceResource>
@@ -291,7 +291,8 @@ public:
     void setChecksum(CheckMode mode = CheckMode::Disable) { mChecksum = mode; }
 
     /// @brief Splits the grid by label.
-    /// @return one handle per label, in label order: handle l holds the active voxels with label l.
+    /// @return the handles of the output grids, in label order: the l-th output grid holds the active voxels with
+    ///         label l.
     /// @tparam BufferT Buffer type of the returned grid handles.
     /// @tparam LabelT Unsigned integer label type, deduced from d_srcLabels.
     /// @param d_srcLabels device labels, one per value index (the grid's value count), e.g. from ConnectedComponents.
@@ -336,7 +337,8 @@ private:
     // The label that splits [lo, hi) in two, by voxel count.
     uint32_t pivotLabel(uint32_t lo, uint32_t hi) const;
 
-    // One split of d_grid at pivot: the first handle holds the voxels with a label below pivot, the second the rest.
+    // One split of d_grid at pivot, into two grids: the first holds the voxels with a label below pivot, the second
+    // the rest.
     template<typename LabelT, typename BufferT>
     std::array<GridHandle<BufferT>, 2> splitAt(const LabelT* d_srcLabels, const GridT* d_grid, uint32_t pivot,
                                                const BufferT& pool);
@@ -367,8 +369,7 @@ PartitionGrid<BuildT, ResourceT>::getHandles(const LabelT* d_srcLabels, uint32_t
     // labelCount gets there, so this only catches a corrupt one, such as an underflowed ~0u
     if (labelCount >= uint32_t(std::numeric_limits<int>::max()))
         throw std::runtime_error("nanovdb::tools::cuda::PartitionGrid: labelCount + 1 does not fit in an int");
-    // Active tiles are rejected here, whatever labelCount, as the other topology operators do. An active tile has
-    // a value index, so it could carry a label, but only leaf voxels are partitioned
+    // Active tiles are rejected here, whatever labelCount, as the other topology operators do
     const TreeData srcTreeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid, mStream);
     if (srcTreeData.mTileCount[0] || srcTreeData.mTileCount[1] || srcTreeData.mTileCount[2])
         throw std::runtime_error("Topological operations not supported on grids with value tiles");
