@@ -1,0 +1,7 @@
+NanoVDB:
+
+  New Features:
+  - Added nanovdb/math/Primitives.h with math::Triangle, which tools::cuda::Triangle
+    now aliases, and the non-owning indexed-mesh views math::TriangleMeshView and
+    math::TriangleMeshBatchView. tools::cuda::MeshToGrid takes a TriangleMeshView in an
+    added constructor.

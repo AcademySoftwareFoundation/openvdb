@@ -34,6 +34,7 @@
 #include <nanovdb/util/Timer.h>
 #include <nanovdb/tools/VoxelBlockManager.h>
 #include <nanovdb/math/HalfLite.h>
+#include <nanovdb/math/Primitives.h>
 
 #if !defined(_MSC_VER) // does not compile in msvc c++ due to zero-sized arrays.
 #include <nanovdb/CNanoVDB.h>
@@ -10583,6 +10584,39 @@ TEST_F(TestNanoVDB, GridHandleRejectsMalformedHostChain)
     EXPECT_THROW(forge([](nanovdb::GridData& d) { d.mMagic = 0; }), std::runtime_error);// corrupted magic
     EXPECT_THROW(forge([](nanovdb::GridData& d) { d.mGridCount = 2; d.mGridSize = sizeof(nanovdb::GridData) + 1; }), std::runtime_error);// a second header read from an unaligned offset into grid bytes: rejected as invalid, never dereferenced in place
 }// GridHandleRejectsMalformedHostChain
+
+TEST_F(TestNanoVDB, TriangleMeshViews)
+{
+    using nanovdb::Vec3f;
+    using nanovdb::Vec3i;
+    // two meshes back to back: a single triangle, then a two-triangle quad; each mesh's
+    // triangles index its own points from 0
+    const std::vector<Vec3f> points = {Vec3f(0, 0, 0), Vec3f(1, 0, 0), Vec3f(0, 1, 0),
+                                       Vec3f(0, 0, 2), Vec3f(1, 0, 2), Vec3f(1, 1, 2), Vec3f(0, 1, 2)};
+    const std::vector<Vec3i> triangles = {Vec3i(0, 1, 2), Vec3i(0, 1, 2), Vec3i(0, 2, 3)};
+    const std::vector<uint64_t> pointOffsets = {0, 3, 7}, triangleOffsets = {0, 1, 3};
+
+    const nanovdb::math::TriangleMeshBatchView batch{points.data(), triangles.data(), pointOffsets.data(),
+                                                     triangleOffsets.data(), 2};
+    EXPECT_EQ(7u, batch.pointCount());
+    EXPECT_EQ(3u, batch.triangleCount());
+
+    const nanovdb::math::TriangleMeshView first = batch.mesh(0), second = batch.mesh(1);
+    EXPECT_EQ(3u, first.pointCount);
+    EXPECT_EQ(1u, first.triangleCount);
+    EXPECT_EQ(4u, second.pointCount);
+    EXPECT_EQ(2u, second.triangleCount);
+
+    const nanovdb::math::Triangle t = second.triangle(1);
+    EXPECT_EQ(Vec3f(0, 0, 2), t[0]);
+    EXPECT_EQ(Vec3f(1, 1, 2), t[1]);
+    EXPECT_EQ(Vec3f(0, 1, 2), t[2]);
+    EXPECT_EQ(Vec3f(1, 0, 0), first.triangle(0)[1]);
+
+    const nanovdb::math::TriangleMeshBatchView empty{};
+    EXPECT_EQ(0u, empty.pointCount());
+    EXPECT_EQ(0u, empty.triangleCount());
+}// TriangleMeshViews
 
 int main(int argc, char** argv)
 {

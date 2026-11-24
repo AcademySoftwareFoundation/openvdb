@@ -362,6 +362,7 @@ set(NANOVDB_INCLUDE_MATH_FILES
   math/HalfLite.h
   math/HDDA.h
   math/Math.h
+  math/Primitives.h
   math/Proximity.h
   math/Ray.h
   math/SampleFromVoxels.h
