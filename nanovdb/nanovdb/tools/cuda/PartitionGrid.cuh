@@ -28,7 +28,7 @@
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
 
-#include <cub/cub.cuh> // cub::DeviceHistogram
+#include <cub/cub.cuh> // cub::DeviceHistogram, cub::DeviceScan
 
 #include <algorithm> // std::upper_bound
 #include <array>     // std::array
@@ -365,11 +365,11 @@ std::vector<GridHandle<BufferT>>
 PartitionGrid<BuildT, ResourceT>::getHandles(const LabelT* d_srcLabels, uint32_t labelCount, const BufferT& pool)
 {
     static_assert(std::is_unsigned<LabelT>::value, "PartitionGrid labels must be unsigned integers");
-    // CUB's histogram takes the level count, labelCount + 1, as an int. Memory runs out long before a valid
-    // labelCount gets there, so this only catches a corrupt one, such as an underflowed ~0u
+    // CUB's histogram requires labelCount + 1 to fit in an int. Memory runs out long before a valid labelCount gets
+    // there, so this only catches a corrupt one, such as an underflowed ~0u
     if (labelCount >= uint32_t(std::numeric_limits<int>::max()))
         throw std::runtime_error("nanovdb::tools::cuda::PartitionGrid: labelCount + 1 does not fit in an int");
-    // Active tiles are rejected here, whatever labelCount, as the other topology operators do
+    // Value tiles are not supported, and are rejected up front, regardless of labelCount
     const TreeData srcTreeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid, mStream);
     if (srcTreeData.mTileCount[0] || srcTreeData.mTileCount[1] || srcTreeData.mTileCount[2])
         throw std::runtime_error("Topological operations not supported on grids with value tiles");
@@ -408,34 +408,45 @@ PartitionGrid<BuildT, ResourceT>::getHandles(const LabelT* d_srcLabels, uint32_t
 
 // Stage 1: the voxel count of each label.
 //
-// One histogram of the labels, computed once: a split never changes a voxel's label, only which grid holds it, so
-// the counts hold for the whole recursion. Labels outside [0, labelCount) are not counted.
+// One histogram, computed once: a split moves voxels between grids but never changes their labels, so the counts
+// hold for the whole recursion. Their exclusive prefix sum is computed on the device too, and read back once.
+
+// Calls a CUB device algorithm twice: once to size the scratch in pool, once to run on it
+#ifdef CALL_CUBS
+#error "PartitionGrid.cuh: conflicting declaration of CALL_CUBS"
+#endif
+#define CALL_CUBS(pool, func, ...) \
+    cudaCheck(cub::func(nullptr, (pool).requestedSize(), __VA_ARGS__, mStream)); \
+    (pool).reallocate(mStream); \
+    cudaCheck(cub::func((pool).data(), (pool).size(), __VA_ARGS__, mStream));
+
 template<typename BuildT, typename ResourceT>
 template<typename LabelT>
 void PartitionGrid<BuildT, ResourceT>::countLabels(const LabelT* d_srcLabels, uint32_t labelCount,
                                                    uint64_t activeVoxelCount)
 {
-    // One label per active voxel, from slot 1: slot 0 (the background) is never read. Without tiles or stats these
-    // are exactly the active voxels' slots, and the reads stay within a sidecar sized to the active voxels anyway
-    // 64-bit counters, since one label may hold more than 2^32 voxels (unsigned long long, which atomicAdd takes)
-    BufT<unsigned long long> d_counts(mStream, this->ref(), labelCount, nanovdb::cuda::noInit);
     nanovdb::cuda::TempPool<ResourceT> tempPool(*mResource);
-    // getHandles checked that the level count labelCount + 1 fits in an int. The levels are uint32_t
-    // whatever LabelT is, since labelCount may not fit in LabelT: CUB compares in their common type
-    cudaCheck(cub::DeviceHistogram::HistogramEven(nullptr, tempPool.requestedSize(), d_srcLabels + 1,
-                                                  d_counts.data(), int(labelCount) + 1, 0u, labelCount,
-                                                  activeVoxelCount, mStream));
-    tempPool.reallocate(mStream);
-    cudaCheck(cub::DeviceHistogram::HistogramEven(tempPool.data(), tempPool.size(), d_srcLabels + 1,
-                                                  d_counts.data(), int(labelCount) + 1, 0u, labelCount,
-                                                  activeVoxelCount, mStream));
 
-    std::vector<unsigned long long> counts(labelCount);
-    cudaCheck(cudaMemcpyAsync(counts.data(), d_counts.data(), d_counts.size_bytes(), cudaMemcpyDeviceToHost, mStream));
+    // 64-bit counters, as one label may hold more than 2^32 voxels
+    BufT<unsigned long long> d_counts(mStream, this->ref(), labelCount, nanovdb::cuda::noInit);
+    // The active voxels' labels are slots 1, ..., activeVoxelCount; slot 0 (the background) is skipped. One
+    // unit-wide bin per label, with edges 0, 1, ..., labelCount: the edges are uint32_t regardless of the LabelT
+    // type, since labelCount may not fit in a narrow LabelT, and CUB compares in the wider type
+    CALL_CUBS(tempPool, DeviceHistogram::HistogramEven, d_srcLabels + 1, d_counts.data(), int(labelCount) + 1, 0u,
+              labelCount, activeVoxelCount);
+
+    // The exclusive prefix sum of the counts, with the total last: a leading 0, then their inclusive sum
+    BufT<uint64_t> d_offsets(mStream, this->ref(), labelCount + 1, nanovdb::cuda::noInit);
+    cudaCheck(cudaMemsetAsync(d_offsets.data(), 0, sizeof(uint64_t), mStream));
+    CALL_CUBS(tempPool, DeviceScan::InclusiveSum, d_counts.data(), d_offsets.data() + 1, labelCount);
+
+    mLabelOffsets.resize(labelCount + 1);
+    cudaCheck(cudaMemcpyAsync(mLabelOffsets.data(), d_offsets.data(), d_offsets.size_bytes(),
+                              cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaStreamSynchronize(mStream));
-    mLabelOffsets.assign(labelCount + 1, 0);
-    for (uint32_t l = 0; l < labelCount; l++) mLabelOffsets[l + 1] = mLabelOffsets[l] + counts[l];
 }// PartitionGrid<BuildT, ResourceT>::countLabels
+
+#undef CALL_CUBS
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
