@@ -6,7 +6,8 @@
 /// @brief Unit tests for the CUDA memory-resource concept (cuda::DeviceResource,
 ///        cuda::PinnedResource) and the resource plumbing of cuda::TempPool and
 ///        the tools::cuda builders (PointsToGrid, the TopologyBuilder consumers,
-///        IndexToGrid, GridStats, SignedFloodFill, addBlindData, ConnectedComponents).
+///        IndexToGrid, GridStats, SignedFloodFill, addBlindData, ConnectedComponents,
+///        PropagateSign).
 
 #include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/DeviceResource.h>
@@ -24,6 +25,9 @@
 #include <nanovdb/tools/cuda/GridStats.cuh>
 #include <nanovdb/cuda/HandleStorage.h> // for cuda::copyTo
 #include <nanovdb/tools/cuda/ConnectedComponents.cuh>
+#include <nanovdb/tools/cuda/PropagateSign.cuh>
+#include <nanovdb/tools/CreatePrimitives.h>
+#include <nanovdb/tools/CreateNanoGrid.h>
 
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
@@ -664,6 +668,96 @@ TEST(TestMemoryResource, ConnectedComponents_NonBlockingStream)
     ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
     EXPECT_EQ(cudaGetLastError(), cudaSuccess);
     EXPECT_GT(n, 0u);
+    EXPECT_EQ(res.allocs, res.deallocs);
+    ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
+}
+
+//======================================================================
+// PropagateSign routes its root face seeds, its cub temp pool and the
+// root-tile origins it returns through an injected resource instance;
+// the caller allocates the invert masks. The input is the narrow band of
+// a small sphere, the level set from createLevelSetSphere converted to a
+// ValueOnIndex grid whose blind data channel 0 is the SDF sidecar; no
+// upper-node-sized region without a root-table entry is interior.
+//======================================================================
+
+TEST(TestMemoryResource, PropagateSign_InjectedResourceSeam)
+{
+    auto sphere = nanovdb::tools::createLevelSetSphere<float>(6.0, nanovdb::Vec3d(0.3, -0.2, 0.1), 1.0, 2.0);
+    auto src = nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, nanovdb::ValueOnIndex>(
+        *sphere.grid<float>(), 1u, false, false);// one channel, no stats or tiles
+    const auto* srcGrid = src.grid<nanovdb::ValueOnIndex>();
+    auto d_src = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(src);
+    auto* d_srcGrid = d_src.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_srcGrid, nullptr);
+    // The sidecar is blind data, so it lies at the same offset from the grid on the device as on the host
+    const float* d_sdf = nanovdb::util::PtrAdd<float>(d_srcGrid,
+                                                      nanovdb::util::PtrDiff(srcGrid->getBlindData<float>(0), srcGrid));
+    const auto& tree = srcGrid->tree();
+    nanovdb::cuda::Buffer<nanovdb::Mask<3>> leafMasks(cudaStream_t(0), tree.nodeCount(0), nanovdb::cuda::noInit);
+    nanovdb::cuda::Buffer<nanovdb::Mask<4>> lowerMasks(cudaStream_t(0), tree.nodeCount(1), nanovdb::cuda::noInit);
+    nanovdb::cuda::Buffer<nanovdb::Mask<5>> upperMasks(cudaStream_t(0), tree.nodeCount(2), nanovdb::cuda::noInit);
+
+    CountingResource res;
+    {
+        nanovdb::tools::cuda::PropagateSign<nanovdb::ValueOnIndex, float, CountingResource>
+            op(d_srcGrid, d_sdf, 0, res);
+        auto result = op.propagate(leafMasks.data(), lowerMasks.data(), upperMasks.data());
+        EXPECT_FALSE(result.second);
+        EXPECT_GT(res.allocs, 0);            // the root face seeds at least
+    }                                        // op and the origins destroyed -> everything freed via res
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+    EXPECT_EQ(res.allocs, res.deallocs);
+}
+
+TEST(TestMemoryResource, PropagateSign_NonBlockingStream)
+{
+    // The operator frees its scratch on its own stream, so on a cudaStreamNonBlocking
+    // stream nothing is recycled while a kernel that reads it is still in flight.
+    cudaStream_t stream;
+    ASSERT_EQ(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking), cudaSuccess);
+
+    auto sphere = nanovdb::tools::createLevelSetSphere<float>(6.0, nanovdb::Vec3d(0.3, -0.2, 0.1), 1.0, 2.0);
+    const auto* sphereGrid = sphere.grid<float>();
+    uint64_t insideCount = 0;// the inactive voxels inside the sphere, which all lie in its leaves
+    const auto* leaves = sphereGrid->tree().getFirstLeaf();
+    for (uint32_t i = 0; i < sphereGrid->tree().nodeCount(0); ++i)
+        for (uint32_t n = 0; n < 512u; ++n)
+            insideCount += !leaves[i].isActive(n) && leaves[i].getValue(n) < 0;
+    auto src = nanovdb::tools::createNanoGrid<nanovdb::FloatGrid, nanovdb::ValueOnIndex>(
+        *sphereGrid, 1u, false, false);// one channel, no stats or tiles
+    const auto* srcGrid = src.grid<nanovdb::ValueOnIndex>();
+    auto d_src = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(src);
+    auto* d_srcGrid = d_src.deviceGrid<nanovdb::ValueOnIndex>();
+    ASSERT_NE(d_srcGrid, nullptr);
+    // The sidecar is blind data, so it lies at the same offset from the grid on the device as on the host
+    const float* d_sdf = nanovdb::util::PtrAdd<float>(d_srcGrid,
+                                                      nanovdb::util::PtrDiff(srcGrid->getBlindData<float>(0), srcGrid));
+    // The upload is ordered on the default stream, which a non-blocking stream does not wait for
+    ASSERT_EQ(cudaStreamSynchronize(0), cudaSuccess);
+
+    const auto& tree = srcGrid->tree();
+    CountingResource res;
+    uint64_t insideBits = 0;
+    {
+        nanovdb::cuda::Buffer<nanovdb::Mask<3>> leafMasks(stream, tree.nodeCount(0), nanovdb::cuda::noInit);
+        nanovdb::cuda::Buffer<nanovdb::Mask<4>> lowerMasks(stream, tree.nodeCount(1), nanovdb::cuda::noInit);
+        nanovdb::cuda::Buffer<nanovdb::Mask<5>> upperMasks(stream, tree.nodeCount(2), nanovdb::cuda::noInit);
+        {
+            nanovdb::tools::cuda::PropagateSign<nanovdb::ValueOnIndex, float, CountingResource>
+                op(d_srcGrid, d_sdf, stream, res);
+            op.propagate(leafMasks.data(), lowerMasks.data(), upperMasks.data());
+        }
+        std::vector<nanovdb::Mask<3>> hostLeafMasks(tree.nodeCount(0));
+        ASSERT_EQ(cudaMemcpyAsync(hostLeafMasks.data(), leafMasks.data(), leafMasks.size_bytes(),
+                                  cudaMemcpyDeviceToHost, stream), cudaSuccess);
+        ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+        for (const auto& mask : hostLeafMasks) insideBits += mask.countOn();
+    }                                        // the masks are freed on stream here
+    ASSERT_EQ(cudaStreamSynchronize(stream), cudaSuccess);
+    EXPECT_EQ(cudaGetLastError(), cudaSuccess);
+    EXPECT_GT(insideCount, 0u);
+    EXPECT_EQ(insideCount, insideBits);
     EXPECT_EQ(res.allocs, res.deallocs);
     ASSERT_EQ(cudaStreamDestroy(stream), cudaSuccess);
 }
