@@ -9,5 +9,6 @@ NanoVDB:
     extraction from a scalar field (e.g. a signed distance field) on the active voxels of
     ValueOnIndex grids. It meshes one grid, or a batch of grids together through a batched
     VoxelBlockManager with a constant number of host synchronizations per chunk of grids,
-    each grid's mesh being identical to meshing it alone. Added an ex_dual_contour_cuda
-    example and unit tests.
+    each grid's mesh being identical to meshing it alone. Optional cluster-collapse
+    decimation, uniform (setReduce) or curvature-adaptive (setAdaptivity), never merges
+    vertices of different grids. Added an ex_dual_contour_cuda example and unit tests.

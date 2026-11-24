@@ -50,13 +50,15 @@ DeviceLevelSet upload(const nanovdb::GridHandle<>& floatHandle)
 }
 
 template<typename MeshT>
-void report(const std::string& name, const MeshT& mesh, uint32_t g)
+void report(const std::string& name, const MeshT& mesh, uint32_t g, bool closed = true)
 {
     const uint64_t points = mesh.hostPointOffsets[g + 1] - mesh.hostPointOffsets[g];
     const uint64_t triangles = mesh.hostTriangleOffsets[g + 1] - mesh.hostTriangleOffsets[g];
-    // a closed triangle mesh has 3T/2 edges, so its Euler characteristic is V - T/2
-    std::cout << "  " << name << ": " << points << " vertices, " << triangles << " triangles, Euler characteristic "
-              << int64_t(points) - int64_t(triangles / 2) << "\n";
+    std::cout << "  " << name << ": " << points << " vertices, " << triangles << " triangles";
+    // a closed triangle mesh has 3T/2 edges, so its Euler characteristic is V - T/2 (decimation
+    // can leave non-manifold edges, so this is reported only at full resolution)
+    if (closed) std::cout << ", Euler characteristic " << int64_t(points) - int64_t(triangles / 2);
+    std::cout << "\n";
 }
 
 } // namespace
@@ -75,6 +77,13 @@ int main(int argc, char* argv[])
             const auto mesh = dualContour.getMesh(torus.grid.deviceGrid<BuildT>(), torus.sidecar.data());
             std::cout << "Single grid:\n";
             report("torus", mesh, 0);
+            // cluster-collapse decimation: uniform 2x2x2 blocks, then curvature-adaptive blocks
+            dualContour.setReduce(2);
+            report("torus, reduce 2", dualContour.getMesh(torus.grid.deviceGrid<BuildT>(), torus.sidecar.data()), 0, false);
+            dualContour.setReduce(1);
+            dualContour.setAdaptivity(0.5f);
+            report("torus, adaptivity 0.5", dualContour.getMesh(torus.grid.deviceGrid<BuildT>(), torus.sidecar.data()), 0, false);
+            dualContour.setAdaptivity(0.f);
         }
 
         // A batch: one batched VoxelBlockManager over both grids. Each grid's blocks follow the

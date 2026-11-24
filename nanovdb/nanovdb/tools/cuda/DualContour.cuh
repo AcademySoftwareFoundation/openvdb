@@ -50,6 +50,7 @@
 #include <cub/cub.cuh>
 #include <cuda/iterator> // cuda::counting_iterator
 
+#include <cmath> // std::cos
 #include <cstdint>
 #include <limits>
 #include <stdexcept> // std::runtime_error
@@ -428,7 +429,8 @@ struct SurfaceGridFunctor
     }
 };
 
-/// @brief cellVertex[surfaceCells[i]] = i (every other slot holds -1).
+/// @brief cellVertex[surfaceCells[i]] = i (every other slot holds -1); cellVertex[i] = i when
+///        surfaceCells is null.
 struct CellVertexFunctor
 {
     static constexpr int MaxThreadsPerBlock = 256;
@@ -437,7 +439,7 @@ struct CellVertexFunctor
     __device__ void operator()(uint64_t n, const int32_t* surfaceCells, int32_t* cellVertex) const
     {
         const uint64_t i = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
-        if (i < n) cellVertex[surfaceCells[i]] = int32_t(i);
+        if (i < n) cellVertex[surfaceCells ? surfaceCells[i] : int32_t(i)] = int32_t(i);
     }
 };
 
@@ -664,6 +666,363 @@ struct FillFunctor
     }
 };
 
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+// Decimation (setReduce / setAdaptivity). Instead of one vertex per surface cell, cells are grouped into
+// clusters with one vertex each: uniform F x F x F index-space blocks, or, adaptively, coarse blocks whose
+// cells' normals agree (flat regions) while the cells of the other blocks stay apart. Each cell's QEF is
+// summed into its cluster and one vertex is solved per cluster; quads whose cells collapsed onto one vertex
+// then degenerate and are dropped. Every grid has its own range of cluster keys, so clusters never span
+// grids. The cluster sums use double atomics, so the summation order, and with it the decimated vertex
+// positions to the last bits, can vary from run to run. This is a single-level form of the octree
+// simplification of Ju et al. 2002.
+
+/// @brief Per-grid parameters of the cluster keys, one row per grid of the chunk: the grid's key origin
+///        (its minimum surface-cell coordinate), its key spans, and the base of its range of
+///        2 * fineCount keys (fine per-voxel keys, then the adaptive pass's coarse keys).
+enum GridKeyParam : int { KeyOriginX = 0, KeyOriginY, KeyOriginZ, KeySpanY, KeySpanZ, KeyFineCount, KeyBase, GridKeyParamCount };
+
+__device__ inline long long packKey(long long x, long long y, long long z, long long spanY, long long spanZ)
+{
+    return (x * spanY + y) * spanZ + z;
+}
+
+/// @brief A surface cell's coordinate relative to its grid's key origin, and the grid's key parameters.
+struct CellKeyFrame
+{
+    const int64_t* params;
+    long long      x, y, z;
+
+    __device__ CellKeyFrame(uint64_t i, const int32_t* surfaceCells, const int32_t* surfaceGrid, int32_t gridBegin,
+                            const int32_t* voxelCoord, const int64_t* gridKeyParams)
+        : params(gridKeyParams + int64_t(surfaceGrid[i] - gridBegin) * GridKeyParamCount)
+    {
+        const int64_t cell = surfaceCells[i];
+        x = voxelCoord[cell * 3 + 0] - params[KeyOriginX];
+        y = voxelCoord[cell * 3 + 1] - params[KeyOriginY];
+        z = voxelCoord[cell * 3 + 2] - params[KeyOriginZ];
+    }
+};
+
+/// @brief Per-grid bounds [min x, y, z, max x, y, z] of the surface-cell coordinates (initialised to
+///        +/- INT32_MAX). Surface cells are grouped by grid, so almost every warp holds one grid: it then
+///        reduces in registers and issues one atomic per bound rather than 32 contending ones.
+struct SurfaceBoundsFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 256;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+    static_assert(MaxThreadsPerBlock % 32 == 0, "the reduction works on whole warps");
+
+    __device__ void operator()(uint64_t n, const int32_t* surfaceCells, const int32_t* surfaceGrid, int32_t gridBegin,
+                               const int32_t* voxelCoord, int32_t* bounds) const
+    {
+        const uint64_t i = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+        if (i >= n) return;
+        const int32_t g = surfaceGrid[i];
+        const int64_t cell = surfaceCells[i];
+        int32_t lo[3], hi[3];
+#pragma unroll
+        for (int axis = 0; axis < 3; ++axis) lo[axis] = hi[axis] = voxelCoord[cell * 3 + axis];
+        // every lane of a warp whose last index is in range got past the return above, so the warp
+        // can synchronize as a whole
+        constexpr unsigned fullMask = 0xffffffffu;
+        const bool fullWarp = (i - (threadIdx.x & 31)) + 32 <= n;
+        if (fullWarp && __all_sync(fullMask, g == __shfl_sync(fullMask, g, 0))) {
+#pragma unroll
+            for (int offset = 16; offset > 0; offset >>= 1) {
+#pragma unroll
+                for (int axis = 0; axis < 3; ++axis) {
+                    lo[axis] = min(lo[axis], __shfl_xor_sync(fullMask, lo[axis], offset));
+                    hi[axis] = max(hi[axis], __shfl_xor_sync(fullMask, hi[axis], offset));
+                }
+            }
+            if ((threadIdx.x & 31) != 0) return;
+        }
+        int32_t* gridBounds = bounds + int64_t(g - gridBegin) * 6;
+#pragma unroll
+        for (int axis = 0; axis < 3; ++axis) {
+            atomicMin(&gridBounds[axis], lo[axis]);
+            atomicMax(&gridBounds[3 + axis], hi[axis]);
+        }
+    }
+};
+
+/// @brief The key parameters of each grid of the chunk from its bounds; also writes the size of its
+///        key range (2 * fineCount, 0 for a grid without surface cells) for the scan into key bases.
+struct GridKeyParamsFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 256;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+
+    __device__ void operator()(uint64_t n, const int32_t* bounds, int64_t* gridKeyParams, int64_t* keyRange) const
+    {
+        const uint64_t g = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+        if (g >= n) return;
+        const int32_t* b = bounds + g * 6;
+        int64_t* params = gridKeyParams + g * GridKeyParamCount;
+        int64_t span[3];
+        for (int axis = 0; axis < 3; ++axis) {
+            params[KeyOriginX + axis] = b[axis];
+            span[axis] = int64_t(b[3 + axis]) - int64_t(b[axis]) + 1;
+            if (span[axis] < 0) span[axis] = 0; // no surface cells
+        }
+        params[KeySpanY] = span[1];
+        params[KeySpanZ] = span[2];
+        params[KeyFineCount] = span[0] * span[1] * span[2];
+        keyRange[g] = 2 * params[KeyFineCount];
+    }
+};
+
+/// @brief Initialise the per-grid bounds to [+INT32_MAX x 3, -INT32_MAX - 1 x 3].
+struct InitBoundsFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 256;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+
+    __device__ void operator()(uint64_t n, int32_t* bounds) const
+    {
+        const uint64_t i = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+        if (i < n) bounds[i] = (i % 6) < 3 ? 2147483647 : -2147483647 - 1;
+    }
+};
+
+/// @brief Copy the scanned key bases into the key parameters.
+struct SetKeyBaseFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 256;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+
+    __device__ void operator()(uint64_t n, const int64_t* keyBase, int64_t* gridKeyParams) const
+    {
+        const uint64_t g = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+        if (g < n) gridKeyParams[g * GridKeyParamCount + KeyBase] = keyBase[g];
+    }
+};
+
+/// @brief The uniform-block cluster key of each surface cell (also the coarse-block key of the
+///        adaptive pass), in its grid's key range.
+struct ClusterKeyFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 256;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+
+    __device__ void operator()(uint64_t n, const int32_t* surfaceCells, const int32_t* surfaceGrid, int32_t gridBegin,
+                               const int32_t* voxelCoord, const int64_t* gridKeyParams, int blockSize, int64_t* keys) const
+    {
+        const uint64_t i = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+        if (i >= n) return;
+        const CellKeyFrame f(i, surfaceCells, surfaceGrid, gridBegin, voxelCoord, gridKeyParams);
+        keys[i] = f.params[KeyBase] + packKey(f.x / blockSize, f.y / blockSize, f.z / blockSize,
+                                              f.params[KeySpanY], f.params[KeySpanZ]);
+    }
+};
+
+/// @brief The adaptive cluster key: a cell of a flat block takes the block's coarse key (offset past
+///        the fine keys, so the two never collide) and collapses with it; any other cell keeps its own
+///        fine key and stays at full resolution.
+struct ClusterKeyAdaptiveFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 256;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+
+    __device__ void operator()(uint64_t n, const int32_t* surfaceCells, const int32_t* surfaceGrid, int32_t gridBegin,
+                               const int32_t* voxelCoord, const int64_t* gridKeyParams, int blockSize,
+                               const int32_t* blockOfCell, const uint8_t* blockIsFlat, int64_t* keys) const
+    {
+        const uint64_t i = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+        if (i >= n) return;
+        const CellKeyFrame f(i, surfaceCells, surfaceGrid, gridBegin, voxelCoord, gridKeyParams);
+        const long long spanY = f.params[KeySpanY], spanZ = f.params[KeySpanZ];
+        if (blockIsFlat[blockOfCell[i]])
+            keys[i] = f.params[KeyBase] + f.params[KeyFineCount] +
+                      packKey(f.x / blockSize, f.y / blockSize, f.z / blockSize, spanY, spanZ);
+        else
+            keys[i] = f.params[KeyBase] + packKey(f.x, f.y, f.z, spanY, spanZ);
+    }
+};
+
+/// @brief Head flags of a sorted key array: 1 where a key differs from its predecessor.
+struct HeadFlagsFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 256;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+
+    __device__ void operator()(uint64_t n, const int64_t* sortedKeys, int32_t* flags) const
+    {
+        const uint64_t i = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+        if (i < n) flags[i] = (i == 0 || sortedKeys[i] != sortedKeys[i - 1]) ? 1 : 0;
+    }
+};
+
+/// @brief label[sortedIndex[i]] = rank[i] - 1: each element's dense rank among the distinct keys.
+struct ScatterRanksFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 256;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+
+    __device__ void operator()(uint64_t n, const int32_t* sortedIndex, const int32_t* rank, int32_t* label) const
+    {
+        const uint64_t i = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+        if (i < n) label[sortedIndex[i]] = rank[i] - 1;
+    }
+};
+
+/// @brief Each surface cell's flatness signal: the normalized sum of its unit edge-crossing normals,
+///        near unit length on a flat patch and shorter where the normals disagree.
+struct CellNormalFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 256;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+
+    __device__ void operator()(uint64_t n, const int32_t* surfaceCells, const int32_t* neighborTable, const float* value,
+                               const float* gradient, BoxStencilGeometry geometry, float iso, Vec3f* cellNormals) const
+    {
+        const uint64_t i = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+        if (i >= n) return;
+        float cornerValue[8], cornerGradient[8][3];
+        loadCellCorners(surfaceCells[i], neighborTable, value, gradient, geometry, cornerValue, cornerGradient);
+        float sum[3] = {0, 0, 0};
+#pragma unroll
+        for (int edge = 0; edge < 12; ++edge) {
+            EdgeCrossing ec;
+            if (!computeEdgeCrossing(edge, cornerValue, cornerGradient, geometry, iso, ec)) continue;
+            sum[0] += ec.normal[0];
+            sum[1] += ec.normal[1];
+            sum[2] += ec.normal[2];
+        }
+        const float invLen = rsqrtf(sum[0] * sum[0] + sum[1] * sum[1] + sum[2] * sum[2] + 1e-24f);
+        cellNormals[i] = Vec3f(sum[0] * invLen, sum[1] * invLen, sum[2] * invLen);
+    }
+};
+
+/// @brief Sum the cell normals and count the cells of each coarse block.
+struct BlockNormalSumFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 256;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+
+    __device__ void operator()(uint64_t n, const int32_t* blockOfCell, const Vec3f* cellNormals, float* blockNormalSum,
+                               uint32_t* blockCellCount) const
+    {
+        const uint64_t i = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+        if (i >= n) return;
+        const int64_t b = blockOfCell[i];
+        atomicAdd(&blockNormalSum[b * 3 + 0], cellNormals[i][0]);
+        atomicAdd(&blockNormalSum[b * 3 + 1], cellNormals[i][1]);
+        atomicAdd(&blockNormalSum[b * 3 + 2], cellNormals[i][2]);
+        atomicAdd(&blockCellCount[b], 1u);
+    }
+};
+
+/// @brief A coarse block is flat when the mean of its cells' normals is at least cosThreshold long.
+struct BlockFlatFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 256;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+
+    __device__ void operator()(uint64_t n, const float* blockNormalSum, const uint32_t* blockCellCount,
+                               float cosThreshold, uint8_t* blockIsFlat) const
+    {
+        const uint64_t b = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+        if (b >= n) return;
+        const float x = blockNormalSum[b * 3 + 0], y = blockNormalSum[b * 3 + 1], z = blockNormalSum[b * 3 + 2];
+        const float count = float(blockCellCount[b] ? blockCellCount[b] : 1u);
+        blockIsFlat[b] = (sqrtf(x * x + y * y + z * z) / count >= cosThreshold) ? 1u : 0u;
+    }
+};
+
+/// @brief cellVertex[surfaceCells[i]] = clusterId[i], and the grid of each cluster (all cells of a
+///        cluster are in one grid, so the concurrent writes agree).
+struct ClusterVertexFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 256;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+
+    __device__ void operator()(uint64_t n, const int32_t* surfaceCells, const int32_t* surfaceGrid,
+                               const int32_t* clusterId, int32_t* cellVertex, int32_t* clusterGrid) const
+    {
+        const uint64_t i = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+        if (i >= n) return;
+        cellVertex[surfaceCells[i]] = clusterId[i];
+        clusterGrid[clusterId[i]] = surfaceGrid[i];
+    }
+};
+
+/// @brief The per-cluster QEF: each surface cell adds the terms of its edge crossings, expressed in
+///        its grid's key frame (shared by the cells of a cluster), to its cluster's sums.
+/// @note  sums holds 16 doubles per cluster: A (6), b (3), crossing sum (3), crossing count (1),
+///        normal sum (3).
+struct ClusterQefFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 256;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+
+    __device__ void operator()(uint64_t n, const int32_t* surfaceCells, const int32_t* surfaceGrid, int32_t gridBegin,
+                               const int32_t* clusterId, const int32_t* neighborTable, const float* value,
+                               const float* gradient, const int32_t* voxelCoord, BoxStencilGeometry geometry,
+                               float iso, const int64_t* gridKeyParams, double* sums) const
+    {
+        const uint64_t i = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+        if (i >= n) return;
+        float cornerValue[8], cornerGradient[8][3];
+        loadCellCorners(surfaceCells[i], neighborTable, value, gradient, geometry, cornerValue, cornerGradient);
+        const CellKeyFrame f(i, surfaceCells, surfaceGrid, gridBegin, voxelCoord, gridKeyParams);
+        const double ox = double(f.x), oy = double(f.y), oz = double(f.z);
+        double local[16] = {};
+        int crossingCount = 0;
+#pragma unroll
+        for (int edge = 0; edge < 12; ++edge) {
+            EdgeCrossing ec;
+            if (!computeEdgeCrossing(edge, cornerValue, cornerGradient, geometry, iso, ec)) continue;
+            const float  nx = ec.normal[0], ny = ec.normal[1], nz = ec.normal[2];
+            const double px = ox + ec.point[0], py = oy + ec.point[1], pz = oz + ec.point[2];
+            const double np = nx * px + ny * py + nz * pz;
+            local[0] += nx * nx; local[1] += nx * ny; local[2] += nx * nz;
+            local[3] += ny * ny; local[4] += ny * nz; local[5] += nz * nz;
+            local[6] += nx * np; local[7] += ny * np; local[8] += nz * np;
+            local[9] += px; local[10] += py; local[11] += pz;
+            local[13] += nx; local[14] += ny; local[15] += nz;
+            ++crossingCount;
+        }
+        local[12] = double(crossingCount);
+        double* clusterSums = sums + int64_t(clusterId[i]) * 16;
+        for (int j = 0; j < 16; ++j) atomicAdd(&clusterSums[j], local[j]);
+    }
+};
+
+/// @brief One vertex per cluster from its summed QEF (centroid-regularised as for single cells, then
+///        clamped to within blockSize of the crossing centroid), with the summed normal as its
+///        reference normal.
+template<typename ViewT, typename XformT>
+struct ClusterSolveFunctor
+{
+    static constexpr int MaxThreadsPerBlock = 256;
+    static constexpr int MinBlocksPerMultiprocessor = 1;
+
+    __device__ void operator()(uint64_t n, const int32_t* clusterGrid, int32_t gridBegin, const double* sums,
+                               const int64_t* gridKeyParams, int blockSize, ViewT view, XformT xform, Vec3f* points,
+                               Vec3f* refNormals) const
+    {
+        const uint64_t c = uint64_t(blockIdx.x) * blockDim.x + threadIdx.x;
+        if (c >= n) return;
+        const double* s = sums + c * 16;
+        const double invCount = s[12] > 0 ? 1.0 / s[12] : 0.0;
+        const double centroid[3] = {s[9] * invCount, s[10] * invCount, s[11] * invCount};
+        const double regularized[6] = {s[0] + 0.05, s[1], s[2], s[3] + 0.05, s[4], s[5] + 0.05};
+        const double rhs[3] = {s[6] + 0.05 * centroid[0], s[7] + 0.05 * centroid[1], s[8] + 0.05 * centroid[2]};
+        double x[3];
+        solveSymmetric3x3(regularized, rhs, x);
+        for (int axis = 0; axis < 3; ++axis)
+            x[axis] = fmin(fmax(x[axis], centroid[axis] - blockSize), centroid[axis] + blockSize);
+        // from the grid's key frame back to index space
+        const uint32_t g = uint32_t(clusterGrid[c]);
+        const int64_t* params = gridKeyParams + int64_t(g - gridBegin) * GridKeyParamCount;
+        const Vec3f ijk(float(x[0] + params[KeyOriginX]), float(x[1] + params[KeyOriginY]), float(x[2] + params[KeyOriginZ]));
+        points[c] = xform(view.entry(g).grid, g, ijk);
+        refNormals[c] = Vec3f(float(s[13]), float(s[14]), float(s[15]));
+    }
+};
+
 } // namespace dualcontour::detail
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -715,6 +1074,17 @@ public:
     /// @brief Set the iso value of the extracted surface (default 0)
     void setIsoValue(float iso) { mIso = iso; }
 
+    /// @brief Set uniform cluster-collapse decimation: cells are grouped into reduce^3 index-space blocks
+    ///        with one vertex each (default 1, i.e. no decimation unless adaptivity > 0). With
+    ///        adaptivity > 0 it sets the coarse-block size instead (8 when reduce <= 1).
+    void setReduce(int reduce) { mReduce = reduce > 1 ? reduce : 1; }
+
+    /// @brief Set curvature-adaptive decimation in [0, 1.5] (default 0, off): coarse blocks whose cells'
+    ///        normals agree within adaptivity * 60 degrees collapse to one vertex, while the cells of the
+    ///        other blocks keep full resolution. Decimated vertex positions are summed with double
+    ///        atomics, so their last bits can vary from run to run.
+    void setAdaptivity(float adaptivity) { mAdaptivity = adaptivity < 0.f ? 0.f : (adaptivity > 1.5f ? 1.5f : adaptivity); }
+
     /// @brief Set the most active voxels meshed together (default 2^22); consecutive grids are
     ///        grouped into chunks of at most this many voxels, a larger grid forming its own chunk.
     ///        The per-voxel scratch (~90 bytes per voxel) is sized by the largest chunk.
@@ -760,6 +1130,9 @@ private:
                    const XformT& xform, uint64_t& pointBase, uint64_t& triangleBase, uint64_t* d_pointOffsets,
                    uint64_t* d_triangleOffsets, std::vector<ChunkMesh>& chunks);
 
+    /// @brief label[i] = the dense rank of keys[i] among the distinct keys; returns their count
+    uint64_t denseRelabel(const int64_t* keys, uint64_t n, int32_t* label);
+
     /// @brief Launch functor Op over @a threads threads (none when 0) with the given arguments
     template<typename Op, typename... Args>
     void launch(uint64_t threads, Args... args)
@@ -786,6 +1159,8 @@ private:
     ResourceT*                         mResource; // non-owning
     nanovdb::cuda::TempPool<ResourceT> mTempDevicePool;
     float                              mIso{0.f};
+    int                                mReduce{1};
+    float                              mAdaptivity{0.f};
     uint64_t                           mMaxChunkVoxels{uint64_t(1) << 22};
 }; // tools::cuda::DualContour<BuildT, ResourceT>
 
@@ -903,16 +1278,35 @@ DualContourMesh<ResourceT> DualContour<BuildT, ResourceT>::getMesh(
     return mesh;
 }
 
+template<typename BuildT, typename ResourceT>
+uint64_t DualContour<BuildT, ResourceT>::denseRelabel(const int64_t* keys, uint64_t n, int32_t* label)
+{
+    namespace dc = dualcontour::detail;
+    auto sortedKeys = this->template alloc<int64_t>(n);
+    auto index = this->template alloc<int32_t>(n);
+    auto sortedIndex = this->template alloc<int32_t>(n);
+    auto rank = this->template alloc<int32_t>(n);
+    this->template launch<dc::CellVertexFunctor>(n, uint64_t(n), static_cast<const int32_t*>(nullptr), index.data());
+    CALL_CUBS(DeviceRadixSort::SortPairs, keys, sortedKeys.data(), index.data(), sortedIndex.data(), int64_t(n), 0,
+              int(sizeof(int64_t) * 8));
+    this->template launch<dc::HeadFlagsFunctor>(n, uint64_t(n), sortedKeys.data(), rank.data());
+    CALL_CUBS(DeviceScan::InclusiveSum, rank.data(), rank.data(), int64_t(n));
+    this->template launch<dc::ScatterRanksFunctor>(n, uint64_t(n), sortedIndex.data(), rank.data(), label);
+    return uint64_t(this->readBack(rank.data() + n - 1)); // host sync
+}
+
 /// @brief Mesh the consecutive grids [gridBegin, gridEnd). Pipeline:
 ///   1. gather: one VBM decode per voxel -> neighbor table, value, gradient, surface flag, coordinate
 ///   2. compact the surface cells and find each one's grid
-///   3. place one vertex per surface cell (QEF)
+///   3. place one vertex per surface cell (QEF), or when decimating group the cells into
+///      per-grid clusters and solve one vertex per cluster
 ///   4. connectivity: one quad per bipolar minimal edge, split into triangles (count -> scan ->
 ///      write), oriented by the gradient
 ///   5. drop unreferenced vertices, normalize the normals, renumber the triangles onto their
 ///      grid's vertices and record the per-grid offsets
 /// Surface cells, and hence vertices and triangles, are ordered by slot and so grouped by grid,
-/// and a grid's part is the same as when it is meshed alone. Host syncs: steps 2, 4 and 5 once each.
+/// and a grid's part is the same as when it is meshed alone. Host syncs: steps 2, 4 and 5 once each,
+/// plus one or two cluster relabels when decimating.
 template<typename BuildT, typename ResourceT>
 template<int Log2BlockWidth, typename EntrySource, typename XformT>
 void DualContour<BuildT, ResourceT>::meshChunk(
@@ -963,18 +1357,83 @@ void DualContour<BuildT, ResourceT>::meshChunk(
                                                       gridEnd, chunkVoxelBase, surfaceGrid.data());
     }
 
-    // 3. one vertex per surface cell
+    // 3. one vertex per surface cell, or per cluster of surface cells when decimating
     auto cellVertex = this->template alloc<int32_t>(valueCount);
     cudaCheck(cudaMemsetAsync(cellVertex.data(), 0xff, valueCount * sizeof(int32_t), mStream)); // -1
-    this->template launch<dc::CellVertexFunctor>(surfaceCellCount, uint64_t(surfaceCellCount), surfaceCells.data(), cellVertex.data());
-    const uint64_t vertexCount = surfaceCellCount;
-    auto points = this->template alloc<Vec3f>(vertexCount);
-    auto refNormals = this->template alloc<Vec3f>(vertexCount);
     using ViewT = VoxelBlockManagerBatchView<Log2BlockWidth, EntrySource>;
-    this->template launch<dc::PlaceVerticesFunctor<ViewT, XformT>>(
-        surfaceCellCount, uint64_t(surfaceCellCount), surfaceCells.data(), surfaceGrid.data(), neighborTable.data(), value.data(),
-        gradient.data(), voxelCoord.data(), geometry, mIso, vbm, xform, points.data(), refNormals.data());
-    const int32_t* vertexGrid = surfaceGrid.data();
+    const bool decimate = mReduce != 1 || mAdaptivity > 0.f;
+    uint64_t vertexCount = surfaceCellCount;
+    auto points = this->template alloc<Vec3f>(0);
+    auto refNormals = this->template alloc<Vec3f>(0);
+    auto clusterGrid = this->template alloc<int32_t>(0);
+    if (!decimate) {
+        this->template launch<dc::CellVertexFunctor>(surfaceCellCount, uint64_t(surfaceCellCount), surfaceCells.data(),
+                                                     cellVertex.data());
+        points = this->template alloc<Vec3f>(vertexCount);
+        refNormals = this->template alloc<Vec3f>(vertexCount);
+        this->template launch<dc::PlaceVerticesFunctor<ViewT, XformT>>(
+            surfaceCellCount, uint64_t(surfaceCellCount), surfaceCells.data(), surfaceGrid.data(), neighborTable.data(),
+            value.data(), gradient.data(), voxelCoord.data(), geometry, mIso, vbm, xform, points.data(), refNormals.data());
+    } else {
+        // cluster blocks: uniform reduce^3 blocks, or 8^3 coarse blocks for the adaptive collapse
+        const int blockSize = (mAdaptivity > 0.f && mReduce <= 1) ? 8 : mReduce;
+        const int32_t gb = int32_t(gridBegin);
+        const uint64_t n = surfaceCellCount;
+        // per-grid key parameters, from the bounds of each grid's surface cells
+        auto bounds = this->template alloc<int32_t>(uint64_t(chunkGridCount) * 6);
+        this->template launch<dc::InitBoundsFunctor>(uint64_t(chunkGridCount) * 6, uint64_t(chunkGridCount) * 6, bounds.data());
+        this->template launch<dc::SurfaceBoundsFunctor>(n, n, surfaceCells.data(), surfaceGrid.data(), gb,
+                                                        voxelCoord.data(), bounds.data());
+        auto gridKeyParams = this->template alloc<int64_t>(uint64_t(chunkGridCount) * dc::GridKeyParamCount);
+        auto keyRange = this->template alloc<int64_t>(chunkGridCount);
+        auto keyBase = this->template alloc<int64_t>(chunkGridCount);
+        this->template launch<dc::GridKeyParamsFunctor>(chunkGridCount, uint64_t(chunkGridCount), bounds.data(),
+                                                        gridKeyParams.data(), keyRange.data());
+        CALL_CUBS(DeviceScan::ExclusiveSum, keyRange.data(), keyBase.data(), int64_t(chunkGridCount));
+        this->template launch<dc::SetKeyBaseFunctor>(chunkGridCount, uint64_t(chunkGridCount), keyBase.data(),
+                                                     gridKeyParams.data());
+
+        auto keys = this->template alloc<int64_t>(n);
+        auto clusterId = this->template alloc<int32_t>(n);
+        this->template launch<dc::ClusterKeyFunctor>(n, n, surfaceCells.data(), surfaceGrid.data(), gb, voxelCoord.data(),
+                                                     gridKeyParams.data(), blockSize, keys.data());
+        if (mAdaptivity > 0.f) { // flat coarse blocks collapse, the cells of the others stay apart
+            auto cellNormals = this->template alloc<Vec3f>(n);
+            this->template launch<dc::CellNormalFunctor>(n, n, surfaceCells.data(), neighborTable.data(), value.data(),
+                                                         gradient.data(), geometry, mIso, cellNormals.data());
+            auto blockOfCell = this->template alloc<int32_t>(n);
+            const uint64_t blockCount = this->denseRelabel(keys.data(), n, blockOfCell.data()); // host sync
+            auto blockNormalSum = this->template alloc<float>(blockCount * 3);
+            auto blockCellCount = this->template alloc<uint32_t>(blockCount);
+            auto blockIsFlat = this->template alloc<uint8_t>(blockCount);
+            cudaCheck(cudaMemsetAsync(blockNormalSum.data(), 0, blockCount * 3 * sizeof(float), mStream));
+            cudaCheck(cudaMemsetAsync(blockCellCount.data(), 0, blockCount * sizeof(uint32_t), mStream));
+            this->template launch<dc::BlockNormalSumFunctor>(n, n, blockOfCell.data(), cellNormals.data(),
+                                                             blockNormalSum.data(), blockCellCount.data());
+            const float cosThreshold = float(std::cos(double(mAdaptivity) * 60.0 * 3.14159265358979323846 / 180.0));
+            this->template launch<dc::BlockFlatFunctor>(blockCount, blockCount, blockNormalSum.data(),
+                                                        blockCellCount.data(), cosThreshold, blockIsFlat.data());
+            this->template launch<dc::ClusterKeyAdaptiveFunctor>(n, n, surfaceCells.data(), surfaceGrid.data(), gb,
+                                                                 voxelCoord.data(), gridKeyParams.data(), blockSize,
+                                                                 blockOfCell.data(), blockIsFlat.data(), keys.data());
+        }
+        vertexCount = this->denseRelabel(keys.data(), n, clusterId.data()); // host sync
+        // clusters are numbered in key order, and so grouped by grid like the surface cells
+        clusterGrid = this->template alloc<int32_t>(vertexCount);
+        this->template launch<dc::ClusterVertexFunctor>(n, n, surfaceCells.data(), surfaceGrid.data(), clusterId.data(),
+                                                        cellVertex.data(), clusterGrid.data());
+        auto sums = this->template alloc<double>(vertexCount * 16);
+        cudaCheck(cudaMemsetAsync(sums.data(), 0, vertexCount * 16 * sizeof(double), mStream));
+        this->template launch<dc::ClusterQefFunctor>(n, n, surfaceCells.data(), surfaceGrid.data(), gb, clusterId.data(),
+                                                     neighborTable.data(), value.data(), gradient.data(),
+                                                     voxelCoord.data(), geometry, mIso, gridKeyParams.data(), sums.data());
+        points = this->template alloc<Vec3f>(vertexCount);
+        refNormals = this->template alloc<Vec3f>(vertexCount);
+        this->template launch<dc::ClusterSolveFunctor<ViewT, XformT>>(vertexCount, vertexCount, clusterGrid.data(), gb,
+                                                                      sums.data(), gridKeyParams.data(), blockSize, vbm,
+                                                                      xform, points.data(), refNormals.data());
+    }
+    const int32_t* vertexGrid = decimate ? clusterGrid.data() : surfaceGrid.data();
 
     // 4. connectivity: count -> exclusive scan -> write, then orient
     auto triangleCounts = this->template alloc<uint32_t>(surfaceCellCount);

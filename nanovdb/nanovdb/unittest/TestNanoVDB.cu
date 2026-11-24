@@ -5457,6 +5457,38 @@ TEST(TestNanoVDBCUDA, DualContour_Sphere)
     for (const auto& p : grown.points) EXPECT_NEAR(radius + 0.5 * voxelSize, (nanovdb::Vec3d(p) - center).length(), 0.1 * voxelSize);
 }// DualContour_Sphere
 
+TEST(TestNanoVDBCUDA, DualContour_Decimation)
+{
+    const double radius = 8.0, voxelSize = 0.25;
+    DualContourSdfGrid sdf(radius, nanovdb::Vec3d(0.0), voxelSize);
+    const double exact = 4.0 / 3.0 * 3.14159265358979 * radius * radius * radius;
+    nanovdb::tools::cuda::DualContour<nanovdb::ValueOnIndex> dc;
+    const DualContourHostMesh full(dc.getMesh(sdf.deviceGrid(), sdf.d_sidecar));
+    for (const auto& [reduce, adaptivity] : {std::pair<int, float>{2, 0.f}, {4, 0.f}, {1, 0.5f}, {1, 1.5f}, {2, 0.3f}}) {
+        dc.setReduce(reduce);
+        dc.setAdaptivity(adaptivity);
+        const DualContourHostMesh mesh(dc.getMesh(sdf.deviceGrid(), sdf.d_sidecar));
+        EXPECT_GT(mesh.points.size(), 0u);
+        EXPECT_LT(mesh.points.size(), full.points.size()) << "reduce " << reduce << ", adaptivity " << adaptivity;
+        EXPECT_LT(mesh.triangles.size(), full.triangles.size());
+        std::vector<bool> used(mesh.points.size(), false);
+        for (const auto& t : mesh.triangles)
+            for (int k = 0; k < 3; ++k) {
+                ASSERT_GE(t[k], 0);
+                ASSERT_LT(t[k], int32_t(mesh.points.size()));
+                used[t[k]] = true;
+            }
+        for (bool u : used) EXPECT_TRUE(u);
+        EXPECT_NEAR(1.0, signedVolume(mesh) / exact, 0.05); // still the sphere, facing outward
+        for (const auto& p : mesh.points) EXPECT_NEAR(radius, nanovdb::Vec3d(p).length(), 2.0 * reduce * voxelSize);
+    }
+    // a uniform reduction by 4 keeps roughly 1/16 of the vertices
+    dc.setReduce(4);
+    dc.setAdaptivity(0.f);
+    const DualContourHostMesh reduced(dc.getMesh(sdf.deviceGrid(), sdf.d_sidecar));
+    EXPECT_LT(reduced.points.size() * 8, full.points.size());
+}// DualContour_Decimation
+
 TEST(TestNanoVDBCUDA, DualContour_BatchMatchesSingleGrids)
 {
     using BuildT = nanovdb::ValueOnIndex;
@@ -5470,16 +5502,10 @@ TEST(TestNanoVDBCUDA, DualContour_BatchMatchesSingleGrids)
     sdfs.emplace_back(new DualContourSdfGrid(4.0, nanovdb::Vec3d(0.0), 0.5, true)); // no surface
     sdfs.emplace_back(new DualContourSdfGrid(7.0, nanovdb::Vec3d(-3.0, 2.0, 1.0), 0.5));
     sdfs.emplace_back(nullptr); // no voxels, at the end
-    const uint32_t gridCount = uint32_t(sdfs.size());
+    const uint32_t gridCount = uint32_t(sdfs.size()) + 1; // the last grid repeats grid 0 (same place, same field)
+    auto sdfOf = [&](uint32_t g) -> const DualContourSdfGrid* { return g + 1 < gridCount ? sdfs[g].get() : sdfs[0].get(); };
 
-    // each grid meshed alone
     nanovdb::tools::cuda::DualContour<BuildT> dc;
-    std::vector<std::unique_ptr<DualContourHostMesh>> singles;
-    for (const auto& sdf : sdfs) {
-        if (sdf) singles.emplace_back(new DualContourHostMesh(dc.getMesh(sdf->deviceGrid(), sdf->d_sidecar)));
-        else singles.emplace_back(nullptr);
-    }
-    EXPECT_TRUE(singles[3]->points.empty());
 
     // the batch's VBM, with a gap block before every grid
     std::vector<nanovdb::tools::cuda::VoxelBlockManagerBatchEntry> entries(gridCount);
@@ -5489,7 +5515,7 @@ TEST(TestNanoVDBCUDA, DualContour_BatchMatchesSingleGrids)
     std::vector<int64_t> paddedOffsets;
     for (uint32_t g = 0; g < gridCount; ++g) {
         ++blockCount;
-        const auto& sdf = sdfs[g];
+        const DualContourSdfGrid* sdf = sdfOf(g);
         entries[g] = {sdf ? sdf->deviceGrid() : nullptr, sdf ? sdf->voxelCount : 0, blockCount, leafCount};
         paddedOffsets.push_back(int64_t(paddedField.size()));
         if (!sdf) continue;
@@ -5511,26 +5537,54 @@ TEST(TestNanoVDBCUDA, DualContour_BatchMatchesSingleGrids)
         source, gridCount, blockCount, d_firstLeafID, d_jumpMap);
     const nanovdb::tools::cuda::VoxelBlockManagerBatchEntryArray hostEntries{entries.data()};
 
-    auto checkBatch = [&](const DualContourHostMesh& batch) {
+    // each grid meshed alone, with the current settings
+    auto meshSingles = [&] {
+        std::vector<std::unique_ptr<DualContourHostMesh>> singles;
+        for (uint32_t g = 0; g < gridCount; ++g) {
+            const DualContourSdfGrid* sdf = sdfOf(g);
+            singles.emplace_back(sdf ? new DualContourHostMesh(dc.getMesh(sdf->deviceGrid(), sdf->d_sidecar)) : nullptr);
+        }
+        return singles;
+    };
+    // exact: bitwise equal; otherwise (decimation, whose cluster sums are order-dependent) the same
+    // counts and points equal to rounding
+    auto checkBatch = [&](const DualContourHostMesh& batch, bool exact) {
+        const auto singles = meshSingles();
+        EXPECT_TRUE(singles[3]->points.empty()); // the grid without a surface
         ASSERT_EQ(gridCount + 1, batch.pointOffsets.size());
         ASSERT_EQ(gridCount + 1, batch.triangleOffsets.size());
         for (uint32_t g = 0; g < gridCount; ++g) {
             const DualContourHostMesh mesh(batch, g);
-            if (singles[g]) {
-                expectSameMesh(*singles[g], mesh);
-            } else {
+            if (!singles[g]) {
                 EXPECT_TRUE(mesh.points.empty());
                 EXPECT_TRUE(mesh.triangles.empty());
+            } else if (exact) {
+                expectSameMesh(*singles[g], mesh);
+            } else {
+                ASSERT_EQ(singles[g]->points.size(), mesh.points.size()) << "grid " << g;
+                ASSERT_EQ(singles[g]->triangles.size(), mesh.triangles.size()) << "grid " << g;
+                for (size_t i = 0; i < mesh.points.size(); ++i)
+                    EXPECT_LT((nanovdb::Vec3d(mesh.points[i]) - nanovdb::Vec3d(singles[g]->points[i])).length(), 1e-4);
             }
         }
     };
     // one chunk, with packed and with padded field layouts
-    checkBatch(DualContourHostMesh(dc.getMesh(view, hostEntries, d_packed)));
-    checkBatch(DualContourHostMesh(dc.getMesh(view, hostEntries, d_padded, d_paddedOffsets)));
+    checkBatch(DualContourHostMesh(dc.getMesh(view, hostEntries, d_packed)), true);
+    checkBatch(DualContourHostMesh(dc.getMesh(view, hostEntries, d_padded, d_paddedOffsets)), true);
+    // decimated: clusters never span grids, so the repeated grid 0 is decimated as if alone
+    for (const auto& [reduce, adaptivity] : {std::pair<int, float>{4, 0.f}, {1, 0.5f}, {2, 0.3f}}) {
+        dc.setReduce(reduce);
+        dc.setAdaptivity(adaptivity);
+        checkBatch(DualContourHostMesh(dc.getMesh(view, hostEntries, d_packed)), false);
+    }
+    dc.setReduce(1);
+    dc.setAdaptivity(0.f);
     // several chunks: at most two small grids, or one large grid, per chunk
     dc.setMaxChunkVoxels(std::max(sdfs[0]->voxelCount + sdfs[2]->voxelCount, sdfs[2]->voxelCount + sdfs[3]->voxelCount));
-    checkBatch(DualContourHostMesh(dc.getMesh(view, hostEntries, d_packed)));
+    checkBatch(DualContourHostMesh(dc.getMesh(view, hostEntries, d_packed)), true);
     // one grid per chunk
     dc.setMaxChunkVoxels(1);
-    checkBatch(DualContourHostMesh(dc.getMesh(view, hostEntries, d_packed)));
+    checkBatch(DualContourHostMesh(dc.getMesh(view, hostEntries, d_packed)), true);
+    dc.setReduce(4);
+    checkBatch(DualContourHostMesh(dc.getMesh(view, hostEntries, d_packed)), false);
 }// DualContour_BatchMatchesSingleGrids
