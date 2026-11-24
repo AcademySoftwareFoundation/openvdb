@@ -57,15 +57,23 @@ protected:
                 std::cerr << "Successfully created \"data\" directory\n";
             }
         }
-        // Code here will be called immediately after the constructor (right
-        // before each test).
+        // Capture diagnostics written to std::clog and std::cerr, e.g. by expected
+        // failures, so they are only printed if the test fails (see TearDown).
+        mOldClog = std::clog.rdbuf(mCaptured.rdbuf());
+        mOldCerr = std::cerr.rdbuf(mCaptured.rdbuf());
     }
 
     void TearDown() override
     {
-        // Code here will be called immediately after each test (right
-        // before the destructor).
+        std::clog.rdbuf(mOldClog);
+        std::cerr.rdbuf(mOldCerr);
+        if (HasFailure() && !mCaptured.str().empty()) {
+            std::cerr << "Captured std::clog/std::cerr output:\n" << mCaptured.str();
+        }
     }
+
+    std::ostringstream mCaptured;
+    std::streambuf *mOldClog = nullptr, *mOldCerr = nullptr;
 
     // produce vector of tokenized c-strings from a single input string
     static std::vector<char*> getArgs(const std::string &line)
@@ -4130,8 +4138,8 @@ TEST_F(Test_vdb_tool, ActionHistogram)
     }
 }// ActionHistogram
 
-// Exercises the ShrinkWrap.h API directly (PolySoup, ShrinkWrapLimit, the
-// ShrinkWrap<GridType> class and the shrinkWrap() free-function overloads),
+// Exercises the ShrinkWrap.h API directly (PolySoup, the ShrinkWrap<GridType>
+// class and the shrinkWrap() free-function overloads),
 // independent of the vdb_tool command-line action.
 TEST_F(Test_vdb_tool, ShrinkWrapClassAPI)
 {
@@ -4139,8 +4147,7 @@ TEST_F(Test_vdb_tool, ShrinkWrapClassAPI)
     using GridT = openvdb::FloatGrid;
 
     // A simple watertight quad-cube, large enough that a halfWidth=3 narrow
-    // band fits comfortably inside its bounding box for every mode/dim/voxel
-    // combination exercised below.
+    // band fits comfortably inside its bounding box at the tested resolutions.
     auto makeCubeSoup = []() {
         PolySoup poly;
         poly.vtx = {
@@ -4152,20 +4159,6 @@ TEST_F(Test_vdb_tool, ShrinkWrapClassAPI)
         return poly;
     };
 
-    // ShrinkWrapLimit: with thres=0 it always returns erode; otherwise it ramps
-    // linearly from 1 (dx<=thres) to erode (dx>=2*thres).
-    {
-        const ShrinkWrapLimit D(8.0f, 0.0f);
-        EXPECT_FLOAT_EQ(D(0.01f), 8.0f);
-        EXPECT_FLOAT_EQ(D(100.0f), 8.0f);
-
-        const ShrinkWrapLimit D2(8.0f, 1.0f);
-        EXPECT_FLOAT_EQ(D2(0.5f), 1.0f);
-        EXPECT_FLOAT_EQ(D2(2.0f), 8.0f);
-        EXPECT_GT(D2(1.5f), 1.0f);
-        EXPECT_LT(D2(1.5f), 8.0f);
-    }
-
     // ShrinkWrap<GridT>::getBBox()
     {
         const PolySoup poly = makeCubeSoup();
@@ -4175,16 +4168,16 @@ TEST_F(Test_vdb_tool, ShrinkWrapClassAPI)
         EXPECT_EQ(bbox.max(), openvdb::Vec3f(2, 2, 2));
     }
 
-    // dim-based constructor + process() + LOD accessors (grid/grids/gridCount/mesh).
+    // Constructor + process() + LOD accessors (grid/grids/gridCount/mesh).
     {
-        ShrinkWrap<GridT> sw(makeCubeSoup(), /*dim*/24, /*width*/3.0f);
+        ShrinkWrap<GridT> sw(makeCubeSoup(), /*minVoxelSize*/0.125f);
         EXPECT_GT(sw.minVoxelSize(), 0.0f);
         EXPECT_GT(sw.maxVoxelSize(), sw.minVoxelSize());
         EXPECT_FLOAT_EQ(sw.halfWidth(), 3.0f);
 
-        const ShrinkWrapLimit D(8.0f, 0.0f);
         Spinner spin;
-        sw.process(D, &spin, /*mode*/0);
+        sw.process(/*closingThreshold*/0.0f, /*maxErodeIterations*/8,
+                   /*useConservativeOffset*/false, &spin);
 
         ASSERT_GT(sw.gridCount(), size_t(0));
         ASSERT_TRUE(sw.grid(0) != nullptr);
@@ -4195,57 +4188,120 @@ TEST_F(Test_vdb_tool, ShrinkWrapClassAPI)
         EXPECT_GT(meshed.vtx.size(), size_t(0));
     }
 
-    // voxelSize-based constructor + offset() for all three offset modes.
-    for (int mode = 0; mode < 3; ++mode) {
-        ShrinkWrap<GridT> sw(makeCubeSoup(), /*voxelSize*/0.25f, /*width*/3.0f);
-        auto grid = sw.offset(sw.minVoxelSize(), mode);
-        ASSERT_TRUE(grid != nullptr) << "mode " << mode;
-        EXPECT_GT(grid->activeVoxelCount(), openvdb::Index64(0)) << "mode " << mode;
+    // Enclosing offsets with and without the conservative barrier.
+    for (bool useConservativeOffset : {false, true}) {
+        ShrinkWrap<GridT> sw(makeCubeSoup(), /*minVoxelSize*/0.25f);
+        auto grid = sw.offset(sw.minVoxelSize(), useConservativeOffset);
+        ASSERT_TRUE(grid != nullptr);
+        EXPECT_GT(grid->activeVoxelCount(), openvdb::Index64(0));
     }
 
-    // offset() throws TypeError on an invalid mode.
+    // offset() rejects invalid spacing.
     {
-        ShrinkWrap<GridT> sw(makeCubeSoup(), 0.25f, 3.0f);
-        EXPECT_THROW(sw.offset(sw.minVoxelSize(), /*mode*/99), openvdb::TypeError);
+        ShrinkWrap<GridT> sw(makeCubeSoup(), 0.25f);
+        EXPECT_THROW(sw.offset(0.0f), openvdb::ValueError);
     }
 
     // Constructor validation.
-    EXPECT_THROW((ShrinkWrap<GridT>(makeCubeSoup(), 64, /*width*/0.0f)), openvdb::ValueError);
-    EXPECT_THROW((ShrinkWrap<GridT>(PolySoup(), 64, 3.0f)), openvdb::ValueError);// no geometry
-    EXPECT_THROW((ShrinkWrap<GridT>(makeCubeSoup(), /*dim*/4, /*width*/3.0f)), openvdb::ArithmeticError);// dim too small
+    EXPECT_THROW((ShrinkWrap<GridT>(makeCubeSoup(), 0.25f, /*width*/0.0f)), openvdb::ValueError);
+    EXPECT_THROW((ShrinkWrap<GridT>(PolySoup(), 0.25f)), openvdb::ValueError);// no geometry
+
+    // Processing parameters are validated before any offsets are generated.
+    for (float threshold : {-1.0f, std::numeric_limits<float>::infinity(),
+                            std::numeric_limits<float>::quiet_NaN()}) {
+        ShrinkWrap<GridT> sw(makeCubeSoup(), 0.25f);
+        EXPECT_THROW(sw.process(threshold, 128), openvdb::ValueError);
+        EXPECT_THROW(sw.process(threshold), openvdb::ValueError);
+        EXPECT_EQ(sw.gridCount(), size_t(0));
+    }
+    for (int maxErodeIterations : {0, -1}) {
+        ShrinkWrap<GridT> sw(makeCubeSoup(), 0.25f);
+        EXPECT_THROW(sw.process(0.0f, maxErodeIterations), openvdb::ValueError);
+        EXPECT_EQ(sw.gridCount(), size_t(0));
+    }
+
+    // Check single-offset results from both processing methods, including
+    // spacing above maxVoxelSize().
+    for (float dx : {0.75f, 1.25f}) {
+        for (bool useConservativeOffset : {false, true}) {
+            ShrinkWrap<GridT> sw(makeCubeSoup(), dx);
+            const auto offset = sw.offset(dx, useConservativeOffset);
+            ASSERT_FALSE(offset->empty());
+
+            sw.process(0.0f, 128, useConservativeOffset);
+            ASSERT_EQ(sw.gridCount(), size_t(1));
+            EXPECT_DOUBLE_EQ(sw.grid()->voxelSize()[0], double(dx));
+            EXPECT_DOUBLE_EQ(maxFieldResidual(*offset, *sw.grid()), 0.0);
+
+            ShrinkWrap<GridT> seeded(makeCubeSoup(), dx);
+            seeded.process(0.0f, useConservativeOffset);
+            ASSERT_EQ(seeded.gridCount(), size_t(1));
+            EXPECT_DOUBLE_EQ(seeded.grid()->voxelSize()[0], double(dx));
+            EXPECT_DOUBLE_EQ(maxFieldResidual(*offset, *seeded.grid()), 0.0);
+        }
+    }
+
+    // Default processing uses threshold seeding and returns the finest offset.
+    {
+        ShrinkWrap<GridT> sw(makeCubeSoup(), 0.25f);
+        const auto offset = sw.offset(0.25f);
+        sw.process();
+        ASSERT_EQ(sw.gridCount(), size_t(1));
+        EXPECT_DOUBLE_EQ(maxFieldResidual(*offset, *sw.grid()), 0.0);
+    }
 
     // Non-floating-point grid types are rejected at runtime by the class
     // (the free-standing shrinkWrap() functions instead reject them at
     // compile time via static_assert, so they're not exercised here).
-    EXPECT_THROW((ShrinkWrap<openvdb::Int32Grid>(makeCubeSoup(), 64, 3.0f)), openvdb::TypeError);
+    EXPECT_THROW((ShrinkWrap<openvdb::Int32Grid>(makeCubeSoup(), 0.25f)), openvdb::TypeError);
 
     // Free function shrinkWrap(): single-grid convenience overload.
     {
-        const ShrinkWrapLimit D(8.0f, 0.0f);
-        auto grid = shrinkWrap<GridT>(makeCubeSoup(), /*dim*/24, /*voxelSize*/0.0f, D, /*halfWidth*/3.0f);
+        auto grid = shrinkWrap<GridT>(makeCubeSoup(), 0.125f, 0.0f, 8, false, false, 3.0f);
         ASSERT_TRUE(grid != nullptr);
         EXPECT_EQ(grid->getGridClass(), openvdb::GRID_LEVEL_SET);
         EXPECT_GT(grid->activeVoxelCount(), openvdb::Index64(0));
     }
 
-    // Free function shrinkWrap(): dim + bbox LOD overload.
+    // Free function shrinkWrap(): vector overload with default settings.
     {
         PolySoup poly = makeCubeSoup();
-        const ShrinkWrapLimit D(8.0f, 0.0f);
         std::vector<openvdb::Vec3I> tri;// cube is quad-only
-        auto grids = shrinkWrap<GridT>(/*dim*/24, poly.bbox, poly.vtx, tri, poly.quad, D, /*halfWidth*/3.0f);
+        auto grids = shrinkWrap<GridT>(poly.vtx, tri, poly.quad, poly.bbox, 0.125f);
         EXPECT_GT(grids.size(), size_t(0));
         for (const auto &g : grids) EXPECT_GT(g->activeVoxelCount(), openvdb::Index64(0));
     }
 
-    // Free function shrinkWrap(): minVoxelSize + bbox LOD overload.
-    {
-        PolySoup poly = makeCubeSoup();
-        const ShrinkWrapLimit D(8.0f, 0.0f);
-        std::vector<openvdb::Vec3I> tri;
-        auto grids = shrinkWrap<GridT>(/*minVoxelSize*/0.25f, poly.bbox, poly.vtx, tri, poly.quad, D, /*halfWidth*/3.0f);
-        ASSERT_GT(grids.size(), size_t(0));
-        EXPECT_NEAR(grids.front()->voxelSize()[0], 0.25, 0.05);
+    // The threshold and conservative offset scale determine the iteration limits.
+    // With a budget of two, convergence cannot stop either iteration early.
+    for (float closingThreshold : {0.0f, 1.0f}) {
+        for (bool useConservativeOffset : {false, true}) {
+            PolySoup poly = makeCubeSoup();
+            int iterations = 0;
+            auto progress = [&iterations](const std::string &message) {
+                if (message.find("Shrink wrap iteration=") == 0) ++iterations;
+            };
+            auto grids = shrinkWrap<GridT>(poly.vtx, poly.tri, poly.quad, poly.bbox,
+                0.25f, closingThreshold, 2, useConservativeOffset, false, 3.0f, &progress);
+            ASSERT_EQ(grids.size(), size_t(2));
+            EXPECT_DOUBLE_EQ(grids.front()->voxelSize()[0], 0.25);
+            EXPECT_DOUBLE_EQ(grids.back()->voxelSize()[0], 0.5);
+            // At threshold 1, only the non-conservative finest offset gets one step.
+            EXPECT_EQ(iterations, closingThreshold == 1.0f && !useConservativeOffset ? 3 : 4);
+        }
+    }
+
+    // Direct threshold arguments select the same seed as the free-function API.
+    for (bool useConservativeOffset : {false, true}) {
+        ShrinkWrap<GridT> seeded(makeCubeSoup(), 0.25f);
+        if (useConservativeOffset) seeded.process(1.5f, true);
+        else seeded.process(1.5f);
+        ASSERT_EQ(seeded.gridCount(), size_t(useConservativeOffset ? 1 : 2));
+        EXPECT_DOUBLE_EQ(seeded.grid()->voxelSize()[0], 0.25);
+
+        const auto grid = shrinkWrap<GridT>(makeCubeSoup(), 0.25f,
+            1.5f, 128, useConservativeOffset, true);
+        EXPECT_DOUBLE_EQ(maxFieldResidual(*seeded.grid(), *grid), 0.0);
     }
 }// ShrinkWrapClassAPI
 
@@ -4264,10 +4320,10 @@ TEST_F(Test_vdb_tool, ActionShrinkWrap)
     std::remove("data/shrinkwrap_dep.vdb");
     std::remove("data/shrinkwrap_nowarn.vdb");
 
-    // Basic conversion: sphere level set -> mesh -> shrink-wrapped level set.
+    // Default threshold seeding: this threshold selects only the finest offset.
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -sphere r=1 dim=32 -ls2mesh"
-                          " -shrinkwrap voxel=0.2 width=3 mode=0 name=out"
+                          " -shrinkwrap voxel=0.2 width=3 thres=0.4 barrier=true levels=* name=out"
                           " -write data/shrinkwrap_out.vdb");
       Tool tool(int(args.size()), args.data());
       tool.run();
@@ -4275,18 +4331,21 @@ TEST_F(Test_vdb_tool, ActionShrinkWrap)
     {
       openvdb::io::File f("data/shrinkwrap_out.vdb");
       f.open();
-      auto grid = openvdb::gridPtrCast<openvdb::FloatGrid>(f.readGrid(f.beginName().gridName()));
+      const auto grids = f.getGrids();
       f.close();
+      ASSERT_TRUE(grids != nullptr);
+      ASSERT_EQ(grids->size(), size_t(1));
+      auto grid = openvdb::gridPtrCast<openvdb::FloatGrid>(grids->front());
       ASSERT_TRUE(grid != nullptr);
       EXPECT_EQ(grid->getGridClass(), openvdb::GRID_LEVEL_SET);
       EXPECT_GT(grid->activeVoxelCount(), openvdb::Index64(0));
     }
     std::remove("data/shrinkwrap_out.vdb");
 
-    // levels="*" outputs the entire LOD hierarchy as multiple named grids.
+    // Disable threshold seeding to output the full refined hierarchy with levels="*".
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -sphere r=1 dim=32 -ls2mesh"
-                          " -shrinkwrap voxel=0.2 width=3 levels=* name=lod"
+                          " -shrinkwrap voxel=0.2 width=3 thresSeed=false levels=* name=lod"
                           " -write data/shrinkwrap_lod.vdb");
       Tool tool(int(args.size()), args.data());
       tool.run();

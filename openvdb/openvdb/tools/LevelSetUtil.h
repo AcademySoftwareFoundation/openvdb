@@ -151,6 +151,21 @@ extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
     std::vector<typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr>& masks);
 
 
+/// @brief Return a mask for each connected component of the given grid's active voxels,
+///        unless rejected by the callback.
+///
+/// @param volume         Input grid or tree
+/// @param masks          Output set of disjoint active topology masks sorted in descending order
+///                       based on the active voxel count.
+/// @param rejectSegment  Callback receiving a const ActiveVoxelSegment view before its mask is
+///                       allocated. Return true to reject the segment, or false to keep it.
+template<typename GridOrTreeType, typename RejectSegment>
+void
+extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
+    std::vector<typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr>& masks,
+    RejectSegment rejectSegment);
+
+
 /// @brief  Separates disjoint active topology components into distinct grids or trees.
 ///
 /// @details Supports volumes with active tiles.
@@ -1555,7 +1570,7 @@ struct ConnectNodeMaskSegments
                     it = connections[i].begin(), end =  connections[i].end();
 
                 std::vector<NodeMaskSegmentType*>& segmentConnections = segments[i]->connections;
-                segmentConnections.reserve(connections.size());
+                segmentConnections.reserve(connections[i].size());
                 for (; it != end; ++it) {
                     segmentConnections.push_back(*it);
                 }
@@ -2365,10 +2380,58 @@ extractIsosurfaceMask(const GridOrTreeType& volume, typename GridOrTreeType::Val
 ////////////////////////////////////////
 
 
+/// @brief Read-only view of a connected segment of active voxels.
+/// @details Passed to the callback of extractActiveVoxelSegmentMasks().
+///          The view is valid only during the callback.
+/// @tparam LeafNodeType Leaf node type of the Boolean mask tree.
+template<typename LeafNodeType>
+class ActiveVoxelSegment
+{
+    using NodeMaskSegmentType = level_set_util_internal::NodeMaskSegment<LeafNodeType>;
+
+public:
+    /// Construct a view of existing node mask segments, which must outlive the view.
+    explicit ActiveVoxelSegment(const std::vector<NodeMaskSegmentType*>& nodeSegments)
+        : mNodeSegments(nodeSegments) {}
+
+    /// Return whether the segment contains the active voxel at @a ijk.
+    bool contains(const Coord& ijk) const
+    {
+        const Coord origin = ijk & ~Int32(LeafNodeType::DIM - 1);
+        const Index offset = LeafNodeType::coordToOffset(ijk);
+        for (const auto* nodeSegment : mNodeSegments) {
+            if (nodeSegment->origin == origin && nodeSegment->mask.isOn(offset)) return true;
+        }
+        return false;
+    }
+
+    /// Return the number of active voxels in the segment.
+    Index64 voxelCount() const
+    {
+        Index64 count = 0;
+        for (const auto* nodeSegment : mNodeSegments) count += nodeSegment->mask.countOn();
+        return count;
+    }
+
+private:
+    const std::vector<NodeMaskSegmentType*>& mNodeSegments;
+};
+
+
 template<typename GridOrTreeType>
 void
 extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
     std::vector<typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr>& masks)
+{
+    extractActiveVoxelSegmentMasks(volume, masks, [](const auto&) { return false; });
+}
+
+
+template<typename GridOrTreeType, typename RejectSegment>
+void
+extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
+    std::vector<typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr>& masks,
+    RejectSegment rejectSegment)
 {
     using TreeType = typename TreeAdapter<GridOrTreeType>::TreeType;
     using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
@@ -2418,75 +2481,53 @@ extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
 
     topologyMask.clear();
 
-    size_t nodeSegmentCount = 0;
-    for (size_t n = 0, N = leafnodes.size(); n < N; ++n) {
-        nodeSegmentCount += nodeSegmentArray[n].size();
-    }
-
     // 3. Group connected segments
 
     std::deque<NodeMaskSegmentRawPtrVector> nodeSegmentGroups;
 
-    NodeMaskSegmentType* nextSegment = nodeSegmentArray[0][0].get();
-    while (nextSegment) {
+    // Consider each segment once as a seed for a new connected group.
+    for (size_t n = 0, N = leafnodes.size(); n < N; ++n) {
+        for (const auto& seed : nodeSegmentArray[n]) {
+            if (seed->visited) continue;
 
-        nodeSegmentGroups.push_back(NodeMaskSegmentRawPtrVector());
+            nodeSegmentGroups.emplace_back();
+            auto& segmentGroup = nodeSegmentGroups.back();
+            seed->visited = true;
+            segmentGroup.push_back(seed.get());
 
-        std::vector<NodeMaskSegmentType*>& segmentGroup = nodeSegmentGroups.back();
-        segmentGroup.reserve(nodeSegmentCount);
-
-        std::deque<NodeMaskSegmentType*> segmentQueue;
-        segmentQueue.push_back(nextSegment);
-        nextSegment = nullptr;
-
-        while (!segmentQueue.empty()) {
-
-            NodeMaskSegmentType* segment = segmentQueue.back();
-            segmentQueue.pop_back();
-
-            if (segment->visited) continue;
-            segment->visited = true;
-
-            segmentGroup.push_back(segment);
-
-            // queue connected segments
-            std::vector<NodeMaskSegmentType*>& connections = segment->connections;
-            for (size_t n = 0, N = connections.size(); n < N; ++n) {
-                if (!connections[n]->visited) segmentQueue.push_back(connections[n]);
-            }
-        }
-
-        // find first unvisited segment
-        for (size_t n = 0, N = leafnodes.size(); n < N; ++n) {
-            NodeMaskSegmentPtrVector& nodeSegments = nodeSegmentArray[n];
-            for (size_t i = 0, I = nodeSegments.size(); i < I; ++i) {
-                if (!nodeSegments[i]->visited) nextSegment = nodeSegments[i].get();
+            // The group also serves as the traversal queue. Mark segments when
+            // adding them so each is queued once, even if several neighbors connect.
+            for (size_t i = 0; i < segmentGroup.size(); ++i) {
+                for (auto* neighbor : segmentGroup[i]->connections) {
+                    if (neighbor->visited) continue;
+                    neighbor->visited = true;
+                    segmentGroup.push_back(neighbor);
+                }
             }
         }
     }
 
     // 4. Mask segment groups
 
-    if (nodeSegmentGroups.size() == 1) {
+    for (const auto& segmentGroup : nodeSegmentGroups) {
+        const ActiveVoxelSegment<BoolLeafNodeType> segment(segmentGroup);
+        if (rejectSegment(segment)) continue;
 
-        BoolTreePtrType mask(new BoolTreeType(tree, false, TopologyCopy()));
+        if (nodeSegmentGroups.size() == 1) {
+            // Copy the input topology only when it originally contained one segment.
+            BoolTreePtrType mask(new BoolTreeType(tree, false, TopologyCopy()));
 
-        tools::pruneInactive(*mask);
+            tools::pruneInactive(*mask);
 
-        if (mask->hasActiveTiles()) {
-            mask->voxelizeActiveTiles();
-        }
+            if (mask->hasActiveTiles()) {
+                mask->voxelizeActiveTiles();
+            }
 
-        masks.push_back(
-            level_set_util_internal::GridOrTreeConstructor<GridOrTreeType>::constructMask(
-                volume, mask));
+            masks.push_back(
+                level_set_util_internal::GridOrTreeConstructor<GridOrTreeType>::constructMask(
+                    volume, mask));
 
-    } else if (nodeSegmentGroups.size() > 1) {
-
-        for (size_t n = 0, N = nodeSegmentGroups.size(); n < N; ++n) {
-
-            NodeMaskSegmentRawPtrVector& segmentGroup = nodeSegmentGroups[n];
-
+        } else {
             level_set_util_internal::MaskSegmentGroup<BoolTreeType> op(segmentGroup);
             tbb::parallel_reduce(tbb::blocked_range<size_t>(0, segmentGroup.size()), op);
 
