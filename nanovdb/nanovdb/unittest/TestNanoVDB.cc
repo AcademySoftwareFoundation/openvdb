@@ -23,6 +23,7 @@
 #include <nanovdb/math/Ray.h>
 #include <nanovdb/math/HDDA.h>
 #include <nanovdb/math/DitherLUT.h>
+#include <nanovdb/math/Proximity.h>
 #include <nanovdb/math/SampleFromVoxels.h>
 #include <nanovdb/math/Stencils.h>
 #include <nanovdb/util/Range.h>
@@ -1515,6 +1516,20 @@ TEST_F(TestNanoVDB, MatMultAssociation)
     static_assert(nanovdb::math::matMult(m, t, nanovdb::math::Vec3<float>(1, 2, 3))
                   == nanovdb::math::Vec3<float>(7, 4, 6), "");
 }// MatMultAssociation
+
+TEST_F(TestNanoVDB, ClosestPointOnTriangleCancellation)
+{
+    using namespace nanovdb::math;
+
+    // A long, thin triangle far from the origin, as in a fine index grid. The Voronoi-region tests
+    // compute a*b - c*d from products of up to about 1e11 that differ by only about 1e5. Rounding each
+    // product to float before the subtraction moved the closest point and gave a distance of 4.53
+    // instead of 0.875.
+    const Vec3<float> a(1024, 2048, 3072), b(2048, 2050, 3069), c(1535, 2049, 3070), p(1600, 2048.25f, 3070.25f);
+    const double exact = std::sqrt(pointToTriangleDistSqr(Vec3<double>(a), Vec3<double>(b), Vec3<double>(c), Vec3<double>(p)));
+    EXPECT_NEAR(exact, 0.8752345, 1e-6);
+    EXPECT_NEAR(exact, std::sqrt(pointToTriangleDistSqr(a, b, c, p)), 1e-3);
+}// ClosestPointOnTriangleCancellation
 
 namespace {
 // Downstream code derives from the Vec/Mat classes, e.g. fvdb-core's
