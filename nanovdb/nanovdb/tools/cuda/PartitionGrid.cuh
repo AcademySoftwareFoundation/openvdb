@@ -450,53 +450,11 @@ void PartitionGrid<BuildT, ResourceT>::countLabels(const LabelT* d_srcLabels, ui
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-namespace partition::detail {
-
 // Stage 2: recursive bisection of the labels.
 //
 // Each split builds a selection mask of the voxels with a label below the pivot and runs PartitionGridBinary with it.
 // Depth first, and a grid is released once it is split, so only the grids on the path from the source and their
 // siblings are alive at once.
-
-/// @brief Selection mask of one leaf of a grid that was split off from a source grid: a voxel is selected when it is
-///        active and its label is below the pivot. The labels are indexed by the source grid's value indices, so a
-///        voxel's label is read through the source leaf with the same origin, which holds that voxel at the same n.
-///        One warp per leaf, lane i testing voxels i, i + 32, ..., so that a warp reads the labels of 32 consecutive
-///        voxels at once.
-template <typename BuildT, typename LabelT>
-struct LabelBelowPivotFunctor
-{
-    // Intended to be called via nanovdb::util::cuda::lambdaKernel, with one warp (32 threads) per leaf
-    __device__
-    void operator()(
-        size_t tID,
-        const NanoGrid<BuildT>* grid,
-        const NanoGrid<BuildT>* srcGrid,
-        const LabelT* srcLabels,
-        uint32_t pivot,
-        Mask<3>* leafMasks) const
-    {
-        const size_t leafID = tID >> 5;   // tID / 32
-        const uint32_t lane = tID & 31;   // tID % 32
-        const auto& leaf = grid->tree().template getFirstNode<0>()[leafID];
-        // grid and srcGrid number their values differently, but a split only drops voxels and never moves them:
-        // every leaf of grid has the origin of a leaf of srcGrid, and its voxel n is that source leaf's voxel n.
-        // So the label of voxel n is found through the source leaf with the same origin.
-        const auto* srcLeaf = srcGrid->tree().root().probeLeaf(leaf.origin());
-        NANOVDB_ASSERT(srcLeaf);
-        // Compared as uint64_t: pivot may not fit in a narrow LabelT, and a narrow label would otherwise promote to int
-        auto selected = [&](uint32_t n) {
-            return leaf.isActive(n) && uint64_t(srcLabels[srcLeaf->getValue(n)]) < pivot; };
-        // The Mask<3> words recast as 32-bit words: one ballot fills one, bit i from lane i (voxel h * 32 + i)
-        uint32_t* maskWords_u32 = reinterpret_cast<uint32_t*>(leafMasks[leafID].words());
-        for (uint32_t h = 0; h < 2 * Mask<3>::WORD_COUNT; h++) {
-            const uint32_t ballot = __ballot_sync(0xFFFFFFFF, selected(h * 32 + lane));
-            if (lane == 0) maskWords_u32[h] = ballot;
-        }
-    }
-};
-
-}// namespace partition::detail
 
 template<typename BuildT, typename ResourceT>
 template<typename LabelT, typename BufferT>
@@ -519,6 +477,8 @@ void PartitionGrid<BuildT, ResourceT>::split(const LabelT* d_srcLabels, GridHand
     split(d_srcLabels, std::move(halves[1]), pivot, hi, pool, outputs);
 }// PartitionGrid<BuildT, ResourceT>::split
 
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 template<typename BuildT, typename ResourceT>
 uint32_t PartitionGrid<BuildT, ResourceT>::pivotLabel(uint32_t lo, uint32_t hi) const
 {
@@ -537,6 +497,49 @@ uint32_t PartitionGrid<BuildT, ResourceT>::pivotLabel(uint32_t lo, uint32_t hi) 
     if (below == lo) return above; // lo would leave the left side empty
     return half - mLabelOffsets[below] <= mLabelOffsets[above] - half ? below : above;
 }// PartitionGrid<BuildT, ResourceT>::pivotLabel
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace partition::detail {
+
+/// @brief Fills the selection mask of each leaf of grid: a voxel is selected when it is active and its label is below
+///        the pivot. One warp per leaf, lane i testing voxels i, i + 32, ..., so that a warp reads the labels of 32
+///        consecutive voxels at once.
+template <typename BuildT, typename LabelT>
+struct LabelBelowPivotFunctor
+{
+    // Intended to be called via nanovdb::util::cuda::lambdaKernel, with one warp (32 threads) per leaf: the thread
+    // count is a multiple of 32, so warps past the last leaf exit whole, and the full-mask ballot below is safe
+    __device__
+    void operator()(
+        size_t tID,
+        const NanoGrid<BuildT>* grid,
+        const NanoGrid<BuildT>* srcGrid,
+        const LabelT* srcLabels,
+        uint32_t pivot,
+        Mask<3>* leafMasks) const
+    {
+        const size_t leafID = tID >> 5;   // tID / 32
+        const uint32_t lane = tID & 31;   // tID % 32
+        const auto& leaf = grid->tree().template getFirstNode<0>()[leafID];
+        // grid is srcGrid or was split off from it, and may number its values differently. A split drops voxels but
+        // never moves them, so voxel n of this leaf is voxel n of the source leaf with the same origin, whose value
+        // indices index the labels
+        const auto* srcLeaf = srcGrid->tree().root().probeLeaf(leaf.origin());
+        NANOVDB_ASSERT(srcLeaf);
+        // Compared as uint64_t: pivot may not fit in a narrow LabelT, and a narrow label would otherwise promote to int
+        auto selected = [&](uint32_t n) {
+            return leaf.isActive(n) && uint64_t(srcLabels[srcLeaf->getValue(n)]) < pivot; };
+        // The Mask<3> words recast as 32-bit words: one ballot fills one, bit i from lane i (voxel h * 32 + i)
+        uint32_t* maskWords_u32 = reinterpret_cast<uint32_t*>(leafMasks[leafID].words());
+        for (uint32_t h = 0; h < 2 * Mask<3>::WORD_COUNT; h++) {
+            const uint32_t ballot = __ballot_sync(0xFFFFFFFF, selected(h * 32 + lane));
+            if (lane == 0) maskWords_u32[h] = ballot;
+        }
+    }
+};
+
+}// namespace partition::detail
 
 template<typename BuildT, typename ResourceT>
 template<typename LabelT, typename BufferT>
