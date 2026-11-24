@@ -1,0 +1,15 @@
+OpenVDB:
+  New features:
+  - Added an overload of tools::extractActiveVoxelSegmentMasks that takes a
+    callback, which receives a read-only ActiveVoxelSegment view (contains(ijk),
+    voxelCount()) of each connected segment and can reject it before its mask
+    is allocated.
+
+  Improvements:
+  - tools::extractActiveVoxelSegmentMasks now visits each segment once when
+    grouping connected segments, instead of searching all segments for the next
+    unvisited one after each group.
+
+  Bug Fixes:
+  - Fixed tools::extractActiveVoxelSegmentMasks reserving space for connections
+    based on the number of leaf nodes instead of each node's connection count.
