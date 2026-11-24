@@ -20,7 +20,7 @@ template<typename BufferT> nb::class_<nanovdb::GridHandle<BufferT>> defineGridHa
         .def(nb::init<>())
         .def("reset", &nanovdb::GridHandle<BufferT>::reset)
         .def("size", &nanovdb::GridHandle<BufferT>::bufferSize)
-        .def("isEmpty", &nanovdb::GridHandle<BufferT>::isEmpty)
+        .def("isEmpty", &nanovdb::GridHandle<BufferT>::empty)
         .def("empty", &nanovdb::GridHandle<BufferT>::empty)
         .def(
             "__bool__", [](const nanovdb::GridHandle<BufferT>& handle) { return !handle.empty(); }, nb::is_operator())
