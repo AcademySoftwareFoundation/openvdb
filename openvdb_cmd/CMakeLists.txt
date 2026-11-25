@@ -15,6 +15,7 @@ include(GNUInstallDirs)
 ###### OpenVDB Binary Component Options
 
 option(OPENVDB_BUILD_VDB_PRINT "Build vdb_print" ON)
+option(OPENVDB_BUILD_VDB_BENCH "Build vdb_bench" OFF)
 option(OPENVDB_BUILD_VDB_LOD "Build vdb_lod" OFF)
 option(OPENVDB_BUILD_VDB_RENDER "Build vdb_render" OFF)
 option(OPENVDB_BUILD_VDB_VIEW "Build vdb_view" OFF)
@@ -62,6 +63,10 @@ endif()
 
 if (OPENVDB_BUILD_VDB_PRINT)
   add_subdirectory(vdb_print)
+endif()
+
+if (OPENVDB_BUILD_VDB_BENCH)
+  add_subdirectory(vdb_bench)
 endif()
 
 if (OPENVDB_BUILD_VDB_LOD)
