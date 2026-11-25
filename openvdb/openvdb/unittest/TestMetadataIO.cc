@@ -1,7 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: Apache-2.0
 
+#include <openvdb/Exceptions.h>
 #include <openvdb/Metadata.h>
+#include <openvdb/MetaMap.h>
 #include <openvdb/Types.h>
 
 #include <gtest/gtest.h>
@@ -120,3 +122,40 @@ TEST_F(TestMetadataIO, testMultipleVec2i) { testMultiple<openvdb::Vec2i>(); }
 
 TEST_F(TestMetadataIO, testVec4d) { test<openvdb::Vec4d>(); }
 TEST_F(TestMetadataIO, testMultipleVec4d) { testMultiple<openvdb::Vec4d>(); }
+
+TEST_F(TestMetadataIO, testCorruptStringSize)
+{
+    std::string bytes("\xff\xff\xff\xff", 4);
+    bytes += "abc";
+    std::istringstream istr(bytes, std::ios_base::binary);
+    openvdb::StringMetadata metadata;
+    EXPECT_THROW(metadata.read(istr), openvdb::IoError);
+}
+
+TEST_F(TestMetadataIO, testCorruptUnknownSize)
+{
+    std::string bytes("\xff\xff\xff\xff", 4);
+    bytes += "abc";
+    std::istringstream istr(bytes, std::ios_base::binary);
+    openvdb::UnknownMetadata metadata("unregistered");
+    EXPECT_THROW(metadata.read(istr), openvdb::IoError);
+}
+
+TEST_F(TestMetadataIO, testCorruptMetaMapCount)
+{
+    // Huge count with no entries.
+    std::istringstream istr(std::string("\xff\xff\xff\xff", 4), std::ios_base::binary);
+    openvdb::MetaMap map;
+    EXPECT_THROW(map.readMeta(istr), openvdb::IoError);
+}
+
+TEST_F(TestMetadataIO, testLargeString)
+{
+    openvdb::StringMetadata metadata(std::string(1 << 20, 'y'));
+    std::ostringstream ostr(std::ios_base::binary);
+    metadata.write(ostr);
+    std::istringstream istr(ostr.str(), std::ios_base::binary);
+    openvdb::StringMetadata result;
+    result.read(istr);
+    EXPECT_TRUE(metadata == result);
+}

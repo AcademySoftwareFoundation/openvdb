@@ -6,6 +6,8 @@
 
 #include <gtest/gtest.h>
 
+#include <sstream>
+
 
 class TestName : public ::testing::Test
 {
@@ -66,4 +68,33 @@ TEST_F(TestName, testMultipleIO)
 
     EXPECT_TRUE(name == n);
     EXPECT_TRUE(name2 == n2);
+}
+
+
+TEST_F(TestName, testCorruptLength)
+{
+    // Length of 4 GiB - 1 followed by only a few bytes.
+    std::string bytes("\xff\xff\xff\xff", 4);
+    bytes += "0123456789";
+    std::istringstream istr(bytes, std::ios_base::binary);
+    EXPECT_THROW(openvdb::readString(istr), openvdb::IoError);
+}
+
+TEST_F(TestName, testTruncatedLength)
+{
+    std::istringstream istr(std::string("\x05\x00", 2), std::ios_base::binary);
+    EXPECT_THROW(openvdb::readString(istr), openvdb::IoError);
+}
+
+TEST_F(TestName, testLargeStrings)
+{
+    // Sizes around the chunk boundary and well past it.
+    for (const size_t size : {size_t(0), size_t(1), size_t(65535), size_t(65536),
+        size_t(65537), size_t(200000), size_t(1) << 20}) {
+        const openvdb::Name name(size, 'x');
+        std::ostringstream ostr(std::ios_base::binary);
+        openvdb::writeString(ostr, name);
+        std::istringstream istr(ostr.str(), std::ios_base::binary);
+        EXPECT_TRUE(name == openvdb::readString(istr));
+    }
 }

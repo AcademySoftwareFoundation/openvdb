@@ -140,6 +140,12 @@ unzipFromStream(std::istream& is, char* data, size_t numBytes)
             is.read(data, -numZippedBytes);
         }
     } else {
+        // Compressed data is only stored when it is smaller than the input, so a larger
+        // size can only come from a corrupt file.
+        if (uint64_t(numZippedBytes) > uint64_t(compressBound(uLong(numBytes)))) {
+            OPENVDB_THROW(IoError, "Invalid compressed size " << numZippedBytes
+                << " for a " << numBytes << "-byte zip chunk");
+        }
         if (data == nullptr) {
             // Seek over the compressed data.
             is.seekg(numZippedBytes, std::ios_base::cur);
@@ -264,6 +270,12 @@ bloscFromStream(std::istream& is, char* data, size_t numBytes)
             is.read(data, -numCompressedBytes);
         }
     } else {
+        // The writer allocates numBytes plus the blosc overhead for the output, so a larger
+        // size can only come from a corrupt file.
+        if (uint64_t(numCompressedBytes) > uint64_t(numBytes) + OPENVDB_BLOSC_MAX_OVERHEAD) {
+            OPENVDB_THROW(IoError, "Invalid compressed size " << numCompressedBytes
+                << " for a " << numBytes << "-byte blosc chunk");
+        }
         if (data == nullptr) {
             // Seek over the compressed data.
             is.seekg(numCompressedBytes, std::ios_base::cur);

@@ -6,6 +6,9 @@
 
 #include <openvdb/Platform.h>
 #include <openvdb/version.h>
+#include <openvdb/Exceptions.h>
+#include <algorithm>
+#include <cstdint>
 #include <string>
 #include <iostream>
 #include <vector>
@@ -18,13 +21,41 @@ namespace OPENVDB_VERSION_NAME {
 
 typedef std::string Name;
 
+namespace internal {
+
+/// Read @a size bytes into @a buffer without trusting @a size. Small reads use one
+/// call. Large reads grow the buffer in chunks, so a corrupt size only allocates
+/// about as much as the stream holds.
+template<typename BufferT>
+inline void
+readSizedBuffer(std::istream& is, BufferT& buffer, size_t size, const char* what)
+{
+    constexpr size_t minimumChunk = size_t(64) << 10;
+    buffer.clear();
+    size_t bytesRead = 0;
+    while (bytesRead < size) {
+        const size_t chunk = std::min(size - bytesRead, std::max(minimumChunk, bytesRead));
+        buffer.resize(bytesRead + chunk);
+        is.read(reinterpret_cast<char*>(&buffer[bytesRead]), std::streamsize(chunk));
+        if (!is) {
+            OPENVDB_THROW(IoError, "unexpected end of stream while reading "
+                << what << " (" << size << " bytes expected)");
+        }
+        bytesRead += chunk;
+    }
+}
+
+} // namespace internal
+
+
 inline Name
 readString(std::istream& is)
 {
-    uint32_t size;
+    uint32_t size = 0;
     is.read(reinterpret_cast<char*>(&size), sizeof(uint32_t));
-    std::string buffer(size, ' ');
-    if (size>0) is.read(&buffer[0], size);
+    if (!is) OPENVDB_THROW(IoError, "unexpected end of stream while reading a string length");
+    Name buffer;
+    internal::readSizedBuffer(is, buffer, size, "string");
     return buffer;
 }
 

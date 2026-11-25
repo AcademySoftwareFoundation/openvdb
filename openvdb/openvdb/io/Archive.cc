@@ -897,6 +897,7 @@ Archive::readGridCount(std::istream& is)
 {
     int32_t gridCount = 0;
     is.read(reinterpret_cast<char*>(&gridCount), sizeof(int32_t));
+    if (gridCount < 0) OPENVDB_THROW(IoError, "invalid grid count " << gridCount);
     return gridCount;
 }
 

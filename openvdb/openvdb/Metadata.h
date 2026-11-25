@@ -399,8 +399,7 @@ template<>
 inline void
 StringMetadata::readValue(std::istream& is, Index32 size)
 {
-    mValue.resize(size, '\0');
-    is.read(&mValue[0], size);
+    openvdb::internal::readSizedBuffer(is, mValue, size, "string metadata");
 }
 
 template<>

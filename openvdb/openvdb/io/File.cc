@@ -258,6 +258,14 @@ File::open()
             gd.readHeader(inputStream());
             gd.readStreamPos(inputStream());
 
+            // The next descriptor must be further on, otherwise a corrupt file
+            // can make this loop read the same descriptor repeatedly.
+            if (gd.getEndPos() <= int64_t(inputStream().tellg())) {
+                OPENVDB_THROW(IoError, mFilename << ": grid "
+                    << GridDescriptor::nameAsString(gd.uniqueName())
+                    << " has an invalid end offset");
+            }
+
             // Add the descriptor to the dictionary.
             mGridDescriptors.insert(std::make_pair(gd.gridName(), gd));
 
