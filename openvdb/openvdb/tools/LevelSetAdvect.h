@@ -547,7 +547,7 @@ Advect<MapT, SpatialScheme, TemporalScheme>::
 euler(const LeafRange& range, ValueType dt, Index phiBuffer, Index resultBuffer)
 {
     using SchemeT = math::BIAS_SCHEME<SpatialScheme>;
-    using StencilT = typename SchemeT::template ISStencil<GridType>::StencilType;
+    using StencilT = typename SchemeT::template ISStencil<GridType, false>::StencilType;
     using VoxelIterT = typename LeafType::ValueOnCIter;
     using GradT = math::GradientBiased<MapT, SpatialScheme>;
 

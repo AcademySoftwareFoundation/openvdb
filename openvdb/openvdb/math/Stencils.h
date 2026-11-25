@@ -14,9 +14,12 @@
 #define OPENVDB_MATH_STENCILS_HAS_BEEN_INCLUDED
 
 #include <algorithm>
+#include <array>
+#include <type_traits>
 #include <vector>                          // for std::vector
 #include <bitset>                          // for std::bitset
 #include <openvdb/Types.h>                 // for Real
+#include <openvdb/tree/NeighborAccessor.h>
 #include <openvdb/tree/ValueAccessor.h>
 
 #include "Math.h"             // for Pow2, needed by WENO and Godunov
@@ -31,7 +34,24 @@ namespace math {
 
 ////////////////////////////////////////
 
-template<typename DerivedType, typename GridT, bool IsSafe>
+namespace internal {
+
+/// Stands in for a tree::NeighborAccessor when a stencil uses a registered ValueAccessor
+template<typename TreeT>
+struct NoNeighborAccessor
+{
+    explicit NoNeighborAccessor(const TreeT&) {}
+};
+
+} // namespace internal
+
+
+/// @details With IsSafe true, a stencil reads through a registered
+/// ValueAccessor, which tolerates changes to the tree between calls to moveTo.
+/// With IsSafe false, a stencil reads through a tree::NeighborAccessor, which
+/// is faster but requires that the tree topology does not change while the
+/// accessor is in use.
+template<typename DerivedType, typename GridT, bool IsSafe, int Size = 0>
 class BaseStencil
 {
 public:
@@ -39,7 +59,13 @@ public:
     typedef typename GridT::TreeType                    TreeType;
     typedef typename GridT::ValueType                   ValueType;
     typedef tree::ValueAccessor<const TreeType, IsSafe> AccessorType;
-    typedef std::vector<ValueType>                      BufferType;
+    // A fixed size lets the compiler keep the values in registers. The size is a
+    // template argument since the derived class is incomplete here. A Size of 0
+    // is for a stencil whose size is only known at run time or is deemed too large
+    // for storing on the stack. The default remains to use heap storage.
+    typedef std::conditional_t<(Size > 0),
+        std::array<ValueType, size_t(Size > 0 ? Size : 1)>,
+        std::vector<ValueType>>                         BufferType;
 
     /// @brief Initialize the stencil buffer with the values of voxel (i, j, k)
     /// and its neighbors.
@@ -47,7 +73,8 @@ public:
     inline void moveTo(const Coord& ijk)
     {
         mCenter = ijk;
-        mValues[0] = mAcc.getValue(ijk);
+        this->moveNeighbors();
+        mValues[0] = this->template readValue<0, 0, 0>();
         static_cast<DerivedType&>(*this).init(mCenter);
     }
 
@@ -59,6 +86,7 @@ public:
     inline void moveTo(const Coord& ijk, const ValueType& centerValue)
     {
         mCenter = ijk;
+        this->moveNeighbors();
         mValues[0] = centerValue;
         static_cast<DerivedType&>(*this).init(mCenter);
     }
@@ -72,6 +100,7 @@ public:
     inline void moveTo(const IterType& iter)
     {
         mCenter = iter.getCoord();
+        this->moveNeighbors();
         mValues[0] = *iter;
         static_cast<DerivedType&>(*this).init(mCenter);
     }
@@ -115,7 +144,7 @@ public:
     }
 
     /// @brief Return the size of the stencil buffer.
-    inline int size() { return mValues.size(); }
+    inline int size() { return int(mValues.size()); }
 
     /// @brief Return the median value of the current stencil.
     inline ValueType median() const
@@ -203,22 +232,162 @@ public:
     /// associated with this Stencil.
     inline const AccessorType& accessor() const { return mAcc; }
 
+    /// @brief Discard everything cached from the tree. Call this after the
+    /// tree has changed, then call moveTo() before reading again.
+    inline void clear()
+    {
+        mAcc.clear();
+        if constexpr (!IsSafe) mNeighbors.clear();
+        mCenter = Coord::max();
+    }
+
 protected:
+    using NeighborAccessorType = std::conditional_t<IsSafe,
+        internal::NoNeighborAccessor<TreeType>, tree::NeighborAccessor<const TreeType>>;
+
     // Constructor is protected to prevent direct instantiation.
     BaseStencil(const GridType& grid, int size)
         : mGrid(&grid)
         , mAcc(grid.tree())
-        , mValues(size)
+        , mNeighbors(grid.tree())
+        , mValues(makeBuffer(size))
         , mCenter(Coord::max())
     {
+        if constexpr (Size > 0) {
+            static_assert(DerivedType::SIZE == Size, "the stencil size must match SIZE");
+        }
     }
 
-    const GridType* mGrid;
-    AccessorType    mAcc;
-    BufferType      mValues;
-    Coord           mCenter;
+    static BufferType makeBuffer(int size)
+    {
+        if constexpr (Size > 0) {
+            OPENVDB_ASSERT(size == Size);
+            return BufferType{};
+        } else {
+            return BufferType(size);
+        }
+    }
+
+    /// Bind the NeighborAccessor to the region of the center, for use in moveTo()
+    OPENVDB_FORCE_INLINE void moveNeighbors()
+    {
+        if constexpr (!IsSafe) {
+            mNeighbors.moveTo(mCenter);
+            mOffset = TreeType::LeafNodeType::coordToOffset(mCenter);
+        }
+    }
+
+    /// Return the value at a fixed offset from the center, for use in init()
+    template<int DX, int DY, int DZ>
+    OPENVDB_FORCE_INLINE const ValueType& readValue() const
+    {
+        if constexpr (IsSafe) {
+            return mAcc.getValue(mCenter.offsetBy(DX, DY, DZ));
+        } else {
+            return mNeighbors.template getValue<DX, DY, DZ>(mOffset);
+        }
+    }
+
+    /// Return the value at an offset from the center that is known at run time
+    OPENVDB_FORCE_INLINE const ValueType& readValue(int dx, int dy, int dz) const
+    {
+        if constexpr (IsSafe) {
+            return mAcc.getValue(mCenter.offsetBy(dx, dy, dz));
+        } else {
+            return mNeighbors.getValue(mOffset, dx, dy, dz);
+        }
+    }
+
+    const GridType*      mGrid;
+    AccessorType         mAcc;
+    NeighborAccessorType mNeighbors;
+    BufferType           mValues;
+    Coord                mCenter;
+    Index                mOffset = 0; // offset of mCenter in its leaf-sized region, if not IsSafe
 
 }; // BaseStencil class
+
+
+////////////////////////////////////////
+
+
+/// @brief A stencil with no fixed shape, which reads each value using a
+/// tree::NeighborAccessor without any local caching.
+/// @details Any operator in math/Operators.h can use it, with any scheme and
+/// map. A NeighborStencil is fast when an operator is used that only reads
+/// each neighbor once. A fixed shape stencil like SevenPointStencil is fast
+/// when an operator is used that reads each neighbor multiple times.
+/// The topology of the tree must not change while the stencil is in use.
+/// @code
+/// math::NeighborStencil stencil(grid.tree());
+/// for (auto iter = leaf.cbeginValueOn(); iter; ++iter) {
+///     stencil.moveTo(iter);
+///     gradient = math::Gradient<MapT, math::CD_2ND>::result(map, stencil);
+/// }
+/// @endcode
+template<typename TreeT>
+class NeighborStencil
+{
+public:
+    /// NeighborStencil<const FloatTree> behaves the same as NeighborStencil<FloatTree>
+    using TreeType = std::remove_const_t<TreeT>;
+    using ValueType = typename TreeType::ValueType;
+
+    explicit NeighborStencil(const TreeType& tree) : mNeighbors(tree) {}
+
+    /// Center the stencil at the voxel @a ijk
+    OPENVDB_FORCE_INLINE void moveTo(const Coord& ijk)
+    {
+        mCenter = ijk;
+        mNeighbors.moveTo(ijk);
+        mOffset = TreeType::LeafNodeType::coordToOffset(ijk);
+    }
+
+    /// @brief Center the stencil at the voxel of @a iter.
+    /// @details @a iter may belong to another tree, since the center value is
+    /// read from this tree and not from the iterator.
+    template<typename IterT>
+    OPENVDB_FORCE_INLINE void moveTo(const IterT& iter) { this->moveTo(iter.getCoord()); }
+
+    /// Return the value at (@a I, @a J, @a K) from the center
+    template<int I, int J, int K>
+    OPENVDB_FORCE_INLINE const ValueType& getValue() const
+    {
+        return mNeighbors.template getValue<I, J, K>(mOffset);
+    }
+
+    /// Return the value at (@a i, @a j, @a k) from the center
+    OPENVDB_FORCE_INLINE const ValueType& getValue(int i, int j, int k) const
+    {
+        return mNeighbors.getValue(mOffset, i, j, k);
+    }
+
+    /// Return the value at the center
+    OPENVDB_FORCE_INLINE const ValueType& getCenterValue() const { return mNeighbors.getValue(mOffset); }
+
+    /// Return the coordinates of the center, or Coord::max() before the first moveTo()
+    const Coord& getCenterCoord() const { return mCenter; }
+
+    const TreeType& tree() const { return mNeighbors.tree(); }
+
+    /// @brief Discard everything read from the tree. Call this after the tree
+    /// has changed, then call moveTo() before reading again.
+    void clear()
+    {
+        mNeighbors.clear();
+        mCenter = Coord::max();
+        mOffset = 0;
+    }
+
+private:
+    tree::NeighborAccessor<const TreeType> mNeighbors;
+    Coord mCenter = Coord::max();
+    Index mOffset = 0; // offset of mCenter in its leaf-sized region
+}; // class NeighborStencil
+
+// The tree type is deduced and always const
+template<typename TreeT>
+NeighborStencil(const TreeT&) -> NeighborStencil<const TreeT>;
 
 
 ////////////////////////////////////////
@@ -240,10 +409,10 @@ namespace { // anonymous namespace for stencil-layout map
 
 
 template<typename GridT, bool IsSafe = true>
-class SevenPointStencil: public BaseStencil<SevenPointStencil<GridT, IsSafe>, GridT, IsSafe>
+class SevenPointStencil: public BaseStencil<SevenPointStencil<GridT, IsSafe>, GridT, IsSafe, 7>
 {
     typedef SevenPointStencil<GridT, IsSafe>  SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
+    typedef BaseStencil<SelfT, GridT, IsSafe, 7> BaseType;
 public:
     typedef GridT                             GridType;
     typedef typename GridT::TreeType          TreeType;
@@ -258,20 +427,19 @@ public:
     unsigned int pos() const { return SevenPt<i,j,k>::idx; }
 
 private:
-    inline void init(const Coord& ijk)
+    inline void init(const Coord&)
     {
-        BaseType::template setValue<-1, 0, 0>(mAcc.getValue(ijk.offsetBy(-1, 0, 0)));
-        BaseType::template setValue< 1, 0, 0>(mAcc.getValue(ijk.offsetBy( 1, 0, 0)));
+        BaseType::template setValue<-1, 0, 0>(this->template readValue<-1, 0, 0>());
+        BaseType::template setValue< 1, 0, 0>(this->template readValue<1, 0, 0>());
 
-        BaseType::template setValue< 0,-1, 0>(mAcc.getValue(ijk.offsetBy( 0,-1, 0)));
-        BaseType::template setValue< 0, 1, 0>(mAcc.getValue(ijk.offsetBy( 0, 1, 0)));
+        BaseType::template setValue< 0,-1, 0>(this->template readValue<0, -1, 0>());
+        BaseType::template setValue< 0, 1, 0>(this->template readValue<0, 1, 0>());
 
-        BaseType::template setValue< 0, 0,-1>(mAcc.getValue(ijk.offsetBy( 0, 0,-1)));
-        BaseType::template setValue< 0, 0, 1>(mAcc.getValue(ijk.offsetBy( 0, 0, 1)));
+        BaseType::template setValue< 0, 0,-1>(this->template readValue<0, 0, -1>());
+        BaseType::template setValue< 0, 0, 1>(this->template readValue<0, 0, 1>());
     }
 
-    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
+    template<typename, typename, bool, int> friend class BaseStencil; // allow base class to call init()
     using BaseType::mValues;
 };// SevenPointStencil class
 
@@ -294,10 +462,10 @@ namespace { // anonymous namespace for stencil-layout map
 }
 
 template<typename GridT, bool IsSafe = true>
-class BoxStencil: public BaseStencil<BoxStencil<GridT, IsSafe>, GridT, IsSafe>
+class BoxStencil: public BaseStencil<BoxStencil<GridT, IsSafe>, GridT, IsSafe, 8>
 {
     typedef BoxStencil<GridT, IsSafe>         SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
+    typedef BaseStencil<SelfT, GridT, IsSafe, 8> BaseType;
 public:
     typedef GridT                             GridType;
     typedef typename GridT::TreeType          TreeType;
@@ -411,19 +579,18 @@ public:
     }
 
 private:
-    inline void init(const Coord& ijk)
+    inline void init(const Coord&)
     {
-        BaseType::template setValue< 0, 0, 1>(mAcc.getValue(ijk.offsetBy( 0, 0, 1)));
-        BaseType::template setValue< 0, 1, 1>(mAcc.getValue(ijk.offsetBy( 0, 1, 1)));
-        BaseType::template setValue< 0, 1, 0>(mAcc.getValue(ijk.offsetBy( 0, 1, 0)));
-        BaseType::template setValue< 1, 0, 0>(mAcc.getValue(ijk.offsetBy( 1, 0, 0)));
-        BaseType::template setValue< 1, 0, 1>(mAcc.getValue(ijk.offsetBy( 1, 0, 1)));
-        BaseType::template setValue< 1, 1, 1>(mAcc.getValue(ijk.offsetBy( 1, 1, 1)));
-        BaseType::template setValue< 1, 1, 0>(mAcc.getValue(ijk.offsetBy( 1, 1, 0)));
+        BaseType::template setValue< 0, 0, 1>(this->template readValue<0, 0, 1>());
+        BaseType::template setValue< 0, 1, 1>(this->template readValue<0, 1, 1>());
+        BaseType::template setValue< 0, 1, 0>(this->template readValue<0, 1, 0>());
+        BaseType::template setValue< 1, 0, 0>(this->template readValue<1, 0, 0>());
+        BaseType::template setValue< 1, 0, 1>(this->template readValue<1, 0, 1>());
+        BaseType::template setValue< 1, 1, 1>(this->template readValue<1, 1, 1>());
+        BaseType::template setValue< 1, 1, 0>(this->template readValue<1, 1, 0>());
     }
 
-    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
+    template<typename, typename, bool, int> friend class BaseStencil; // allow base class to call init()
     using BaseType::mValues;
 };// BoxStencil class
 
@@ -465,10 +632,10 @@ namespace { // anonymous namespace for stencil-layout map
 
 template<typename GridT, bool IsSafe = true>
 class SecondOrderDenseStencil
-    : public BaseStencil<SecondOrderDenseStencil<GridT, IsSafe>, GridT, IsSafe >
+    : public BaseStencil<SecondOrderDenseStencil<GridT, IsSafe>, GridT, IsSafe, 19>
 {
     typedef SecondOrderDenseStencil<GridT, IsSafe> SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe >     BaseType;
+    typedef BaseStencil<SelfT, GridT, IsSafe, 19>     BaseType;
 public:
     typedef GridT                                  GridType;
     typedef typename GridT::TreeType               TreeType;
@@ -483,34 +650,33 @@ public:
     unsigned int pos() const { return DensePt<i,j,k>::idx; }
 
 private:
-    inline void init(const Coord& ijk)
+    inline void init(const Coord&)
     {
-        mValues[DensePt< 1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,  0,  0));
-        mValues[DensePt< 0, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,  1,  0));
-        mValues[DensePt< 0, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0,  1));
+        mValues[DensePt< 1, 0, 0>::idx] = this->template readValue<1, 0, 0>();
+        mValues[DensePt< 0, 1, 0>::idx] = this->template readValue<0, 1, 0>();
+        mValues[DensePt< 0, 0, 1>::idx] = this->template readValue<0, 0, 1>();
 
-        mValues[DensePt<-1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,  0,  0));
-        mValues[DensePt< 0,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, -1,  0));
-        mValues[DensePt< 0, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0, -1));
+        mValues[DensePt<-1, 0, 0>::idx] = this->template readValue<-1, 0, 0>();
+        mValues[DensePt< 0,-1, 0>::idx] = this->template readValue<0, -1, 0>();
+        mValues[DensePt< 0, 0,-1>::idx] = this->template readValue<0, 0, -1>();
 
-        mValues[DensePt<-1,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, -1,  0));
-        mValues[DensePt< 1,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, -1,  0));
-        mValues[DensePt<-1, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,  1,  0));
-        mValues[DensePt< 1, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,  1,  0));
+        mValues[DensePt<-1,-1, 0>::idx] = this->template readValue<-1, -1, 0>();
+        mValues[DensePt< 1,-1, 0>::idx] = this->template readValue<1, -1, 0>();
+        mValues[DensePt<-1, 1, 0>::idx] = this->template readValue<-1, 1, 0>();
+        mValues[DensePt< 1, 1, 0>::idx] = this->template readValue<1, 1, 0>();
 
-        mValues[DensePt<-1, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy(-1,  0, -1));
-        mValues[DensePt< 1, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 1,  0, -1));
-        mValues[DensePt<-1, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy(-1,  0,  1));
-        mValues[DensePt< 1, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 1,  0,  1));
+        mValues[DensePt<-1, 0,-1>::idx] = this->template readValue<-1, 0, -1>();
+        mValues[DensePt< 1, 0,-1>::idx] = this->template readValue<1, 0, -1>();
+        mValues[DensePt<-1, 0, 1>::idx] = this->template readValue<-1, 0, 1>();
+        mValues[DensePt< 1, 0, 1>::idx] = this->template readValue<1, 0, 1>();
 
-        mValues[DensePt< 0,-1,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, -1, -1));
-        mValues[DensePt< 0, 1,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  1, -1));
-        mValues[DensePt< 0,-1, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, -1,  1));
-        mValues[DensePt< 0, 1, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  1,  1));
+        mValues[DensePt< 0,-1,-1>::idx] = this->template readValue<0, -1, -1>();
+        mValues[DensePt< 0, 1,-1>::idx] = this->template readValue<0, 1, -1>();
+        mValues[DensePt< 0,-1, 1>::idx] = this->template readValue<0, -1, 1>();
+        mValues[DensePt< 0, 1, 1>::idx] = this->template readValue<0, 1, 1>();
     }
 
-    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
+    template<typename, typename, bool, int> friend class BaseStencil; // allow base class to call init()
     using BaseType::mValues;
 };// SecondOrderDenseStencil class
 
@@ -545,10 +711,10 @@ namespace { // anonymous namespace for stencil-layout map
 
 template<typename GridT, bool IsSafe = true>
 class ThirteenPointStencil
-    : public BaseStencil<ThirteenPointStencil<GridT, IsSafe>, GridT, IsSafe>
+    : public BaseStencil<ThirteenPointStencil<GridT, IsSafe>, GridT, IsSafe, 13>
 {
     typedef ThirteenPointStencil<GridT, IsSafe> SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe >  BaseType;
+    typedef BaseStencil<SelfT, GridT, IsSafe, 13>  BaseType;
 public:
     typedef GridT                               GridType;
     typedef typename GridT::TreeType            TreeType;
@@ -563,26 +729,25 @@ public:
     unsigned int pos() const { return ThirteenPt<i,j,k>::idx; }
 
 private:
-    inline void init(const Coord& ijk)
+    inline void init(const Coord&)
     {
-        mValues[ThirteenPt< 2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2,  0,  0));
-        mValues[ThirteenPt< 1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,  0,  0));
-        mValues[ThirteenPt<-1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,  0,  0));
-        mValues[ThirteenPt<-2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2,  0,  0));
+        mValues[ThirteenPt< 2, 0, 0>::idx] = this->template readValue<2, 0, 0>();
+        mValues[ThirteenPt< 1, 0, 0>::idx] = this->template readValue<1, 0, 0>();
+        mValues[ThirteenPt<-1, 0, 0>::idx] = this->template readValue<-1, 0, 0>();
+        mValues[ThirteenPt<-2, 0, 0>::idx] = this->template readValue<-2, 0, 0>();
 
-        mValues[ThirteenPt< 0, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,  2,  0));
-        mValues[ThirteenPt< 0, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,  1,  0));
-        mValues[ThirteenPt< 0,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, -1,  0));
-        mValues[ThirteenPt< 0,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, -2,  0));
+        mValues[ThirteenPt< 0, 2, 0>::idx] = this->template readValue<0, 2, 0>();
+        mValues[ThirteenPt< 0, 1, 0>::idx] = this->template readValue<0, 1, 0>();
+        mValues[ThirteenPt< 0,-1, 0>::idx] = this->template readValue<0, -1, 0>();
+        mValues[ThirteenPt< 0,-2, 0>::idx] = this->template readValue<0, -2, 0>();
 
-        mValues[ThirteenPt< 0, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0,  2));
-        mValues[ThirteenPt< 0, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0,  1));
-        mValues[ThirteenPt< 0, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0, -1));
-        mValues[ThirteenPt< 0, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0, -2));
+        mValues[ThirteenPt< 0, 0, 2>::idx] = this->template readValue<0, 0, 2>();
+        mValues[ThirteenPt< 0, 0, 1>::idx] = this->template readValue<0, 0, 1>();
+        mValues[ThirteenPt< 0, 0,-1>::idx] = this->template readValue<0, 0, -1>();
+        mValues[ThirteenPt< 0, 0,-2>::idx] = this->template readValue<0, 0, -2>();
     }
 
-    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
+    template<typename, typename, bool, int> friend class BaseStencil; // allow base class to call init()
     using BaseType::mValues;
 };// ThirteenPointStencil class
 
@@ -679,7 +844,9 @@ class FourthOrderDenseStencil
     : public BaseStencil<FourthOrderDenseStencil<GridT, IsSafe>, GridT, IsSafe>
 {
     typedef FourthOrderDenseStencil<GridT, IsSafe> SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe >     BaseType;
+    // Not setting Size=61 here means that the BaseStencil data is stored
+    // in a std::vector and not a std::array.
+    typedef BaseStencil<SelfT, GridT, IsSafe>   BaseType;
 public:
     typedef GridT                                  GridType;
     typedef typename GridT::TreeType               TreeType;
@@ -694,85 +861,84 @@ public:
     unsigned int pos() const { return FourthDensePt<i,j,k>::idx; }
 
 private:
-    inline void init(const Coord& ijk)
+    inline void init(const Coord&)
     {
-        mValues[FourthDensePt<-2, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2, 2, 0));
-        mValues[FourthDensePt<-1, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, 2, 0));
-        mValues[FourthDensePt< 0, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2, 0));
-        mValues[FourthDensePt< 1, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, 2, 0));
-        mValues[FourthDensePt< 2, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2, 2, 0));
+        mValues[FourthDensePt<-2, 2, 0>::idx] = this->template readValue<-2, 2, 0>();
+        mValues[FourthDensePt<-1, 2, 0>::idx] = this->template readValue<-1, 2, 0>();
+        mValues[FourthDensePt< 0, 2, 0>::idx] = this->template readValue<0, 2, 0>();
+        mValues[FourthDensePt< 1, 2, 0>::idx] = this->template readValue<1, 2, 0>();
+        mValues[FourthDensePt< 2, 2, 0>::idx] = this->template readValue<2, 2, 0>();
 
-        mValues[FourthDensePt<-2, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2, 1, 0));
-        mValues[FourthDensePt<-1, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, 1, 0));
-        mValues[FourthDensePt< 0, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1, 0));
-        mValues[FourthDensePt< 1, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, 1, 0));
-        mValues[FourthDensePt< 2, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2, 1, 0));
+        mValues[FourthDensePt<-2, 1, 0>::idx] = this->template readValue<-2, 1, 0>();
+        mValues[FourthDensePt<-1, 1, 0>::idx] = this->template readValue<-1, 1, 0>();
+        mValues[FourthDensePt< 0, 1, 0>::idx] = this->template readValue<0, 1, 0>();
+        mValues[FourthDensePt< 1, 1, 0>::idx] = this->template readValue<1, 1, 0>();
+        mValues[FourthDensePt< 2, 1, 0>::idx] = this->template readValue<2, 1, 0>();
 
-        mValues[FourthDensePt<-2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0, 0));
-        mValues[FourthDensePt<-1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0, 0));
-        mValues[FourthDensePt< 1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0, 0));
-        mValues[FourthDensePt< 2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0, 0));
+        mValues[FourthDensePt<-2, 0, 0>::idx] = this->template readValue<-2, 0, 0>();
+        mValues[FourthDensePt<-1, 0, 0>::idx] = this->template readValue<-1, 0, 0>();
+        mValues[FourthDensePt< 1, 0, 0>::idx] = this->template readValue<1, 0, 0>();
+        mValues[FourthDensePt< 2, 0, 0>::idx] = this->template readValue<2, 0, 0>();
 
-        mValues[FourthDensePt<-2,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2,-1, 0));
-        mValues[FourthDensePt<-1,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,-1, 0));
-        mValues[FourthDensePt< 0,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1, 0));
-        mValues[FourthDensePt< 1,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,-1, 0));
-        mValues[FourthDensePt< 2,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2,-1, 0));
+        mValues[FourthDensePt<-2,-1, 0>::idx] = this->template readValue<-2, -1, 0>();
+        mValues[FourthDensePt<-1,-1, 0>::idx] = this->template readValue<-1, -1, 0>();
+        mValues[FourthDensePt< 0,-1, 0>::idx] = this->template readValue<0, -1, 0>();
+        mValues[FourthDensePt< 1,-1, 0>::idx] = this->template readValue<1, -1, 0>();
+        mValues[FourthDensePt< 2,-1, 0>::idx] = this->template readValue<2, -1, 0>();
 
-        mValues[FourthDensePt<-2,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2,-2, 0));
-        mValues[FourthDensePt<-1,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,-2, 0));
-        mValues[FourthDensePt< 0,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2, 0));
-        mValues[FourthDensePt< 1,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,-2, 0));
-        mValues[FourthDensePt< 2,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2,-2, 0));
+        mValues[FourthDensePt<-2,-2, 0>::idx] = this->template readValue<-2, -2, 0>();
+        mValues[FourthDensePt<-1,-2, 0>::idx] = this->template readValue<-1, -2, 0>();
+        mValues[FourthDensePt< 0,-2, 0>::idx] = this->template readValue<0, -2, 0>();
+        mValues[FourthDensePt< 1,-2, 0>::idx] = this->template readValue<1, -2, 0>();
+        mValues[FourthDensePt< 2,-2, 0>::idx] = this->template readValue<2, -2, 0>();
 
-        mValues[FourthDensePt<-2, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0, 2));
-        mValues[FourthDensePt<-1, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0, 2));
-        mValues[FourthDensePt< 0, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0, 2));
-        mValues[FourthDensePt< 1, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0, 2));
-        mValues[FourthDensePt< 2, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0, 2));
+        mValues[FourthDensePt<-2, 0, 2>::idx] = this->template readValue<-2, 0, 2>();
+        mValues[FourthDensePt<-1, 0, 2>::idx] = this->template readValue<-1, 0, 2>();
+        mValues[FourthDensePt< 0, 0, 2>::idx] = this->template readValue<0, 0, 2>();
+        mValues[FourthDensePt< 1, 0, 2>::idx] = this->template readValue<1, 0, 2>();
+        mValues[FourthDensePt< 2, 0, 2>::idx] = this->template readValue<2, 0, 2>();
 
-        mValues[FourthDensePt<-2, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0, 1));
-        mValues[FourthDensePt<-1, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0, 1));
-        mValues[FourthDensePt< 0, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0, 1));
-        mValues[FourthDensePt< 1, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0, 1));
-        mValues[FourthDensePt< 2, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0, 1));
+        mValues[FourthDensePt<-2, 0, 1>::idx] = this->template readValue<-2, 0, 1>();
+        mValues[FourthDensePt<-1, 0, 1>::idx] = this->template readValue<-1, 0, 1>();
+        mValues[FourthDensePt< 0, 0, 1>::idx] = this->template readValue<0, 0, 1>();
+        mValues[FourthDensePt< 1, 0, 1>::idx] = this->template readValue<1, 0, 1>();
+        mValues[FourthDensePt< 2, 0, 1>::idx] = this->template readValue<2, 0, 1>();
 
-        mValues[FourthDensePt<-2, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0,-1));
-        mValues[FourthDensePt<-1, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0,-1));
-        mValues[FourthDensePt< 0, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0,-1));
-        mValues[FourthDensePt< 1, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0,-1));
-        mValues[FourthDensePt< 2, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0,-1));
+        mValues[FourthDensePt<-2, 0,-1>::idx] = this->template readValue<-2, 0, -1>();
+        mValues[FourthDensePt<-1, 0,-1>::idx] = this->template readValue<-1, 0, -1>();
+        mValues[FourthDensePt< 0, 0,-1>::idx] = this->template readValue<0, 0, -1>();
+        mValues[FourthDensePt< 1, 0,-1>::idx] = this->template readValue<1, 0, -1>();
+        mValues[FourthDensePt< 2, 0,-1>::idx] = this->template readValue<2, 0, -1>();
 
-        mValues[FourthDensePt<-2, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0,-2));
-        mValues[FourthDensePt<-1, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0,-2));
-        mValues[FourthDensePt< 0, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0,-2));
-        mValues[FourthDensePt< 1, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0,-2));
-        mValues[FourthDensePt< 2, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0,-2));
+        mValues[FourthDensePt<-2, 0,-2>::idx] = this->template readValue<-2, 0, -2>();
+        mValues[FourthDensePt<-1, 0,-2>::idx] = this->template readValue<-1, 0, -2>();
+        mValues[FourthDensePt< 0, 0,-2>::idx] = this->template readValue<0, 0, -2>();
+        mValues[FourthDensePt< 1, 0,-2>::idx] = this->template readValue<1, 0, -2>();
+        mValues[FourthDensePt< 2, 0,-2>::idx] = this->template readValue<2, 0, -2>();
 
 
-        mValues[FourthDensePt< 0,-2, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2, 2));
-        mValues[FourthDensePt< 0,-1, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1, 2));
-        mValues[FourthDensePt< 0, 1, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1, 2));
-        mValues[FourthDensePt< 0, 2, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2, 2));
+        mValues[FourthDensePt< 0,-2, 2>::idx] = this->template readValue<0, -2, 2>();
+        mValues[FourthDensePt< 0,-1, 2>::idx] = this->template readValue<0, -1, 2>();
+        mValues[FourthDensePt< 0, 1, 2>::idx] = this->template readValue<0, 1, 2>();
+        mValues[FourthDensePt< 0, 2, 2>::idx] = this->template readValue<0, 2, 2>();
 
-        mValues[FourthDensePt< 0,-2, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2, 1));
-        mValues[FourthDensePt< 0,-1, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1, 1));
-        mValues[FourthDensePt< 0, 1, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1, 1));
-        mValues[FourthDensePt< 0, 2, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2, 1));
+        mValues[FourthDensePt< 0,-2, 1>::idx] = this->template readValue<0, -2, 1>();
+        mValues[FourthDensePt< 0,-1, 1>::idx] = this->template readValue<0, -1, 1>();
+        mValues[FourthDensePt< 0, 1, 1>::idx] = this->template readValue<0, 1, 1>();
+        mValues[FourthDensePt< 0, 2, 1>::idx] = this->template readValue<0, 2, 1>();
 
-        mValues[FourthDensePt< 0,-2,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2,-1));
-        mValues[FourthDensePt< 0,-1,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1,-1));
-        mValues[FourthDensePt< 0, 1,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1,-1));
-        mValues[FourthDensePt< 0, 2,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2,-1));
+        mValues[FourthDensePt< 0,-2,-1>::idx] = this->template readValue<0, -2, -1>();
+        mValues[FourthDensePt< 0,-1,-1>::idx] = this->template readValue<0, -1, -1>();
+        mValues[FourthDensePt< 0, 1,-1>::idx] = this->template readValue<0, 1, -1>();
+        mValues[FourthDensePt< 0, 2,-1>::idx] = this->template readValue<0, 2, -1>();
 
-        mValues[FourthDensePt< 0,-2,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2,-2));
-        mValues[FourthDensePt< 0,-1,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1,-2));
-        mValues[FourthDensePt< 0, 1,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1,-2));
-        mValues[FourthDensePt< 0, 2,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2,-2));
+        mValues[FourthDensePt< 0,-2,-2>::idx] = this->template readValue<0, -2, -2>();
+        mValues[FourthDensePt< 0,-1,-2>::idx] = this->template readValue<0, -1, -2>();
+        mValues[FourthDensePt< 0, 1,-2>::idx] = this->template readValue<0, 1, -2>();
+        mValues[FourthDensePt< 0, 2,-2>::idx] = this->template readValue<0, 2, -2>();
     }
 
-    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
+    template<typename, typename, bool, int> friend class BaseStencil; // allow base class to call init()
     using BaseType::mValues;
 };// FourthOrderDenseStencil class
 
@@ -815,10 +981,10 @@ namespace { // anonymous namespace for stencil-layout map
 
 template<typename GridT, bool IsSafe = true>
 class NineteenPointStencil
-    : public BaseStencil<NineteenPointStencil<GridT, IsSafe>, GridT, IsSafe>
+    : public BaseStencil<NineteenPointStencil<GridT, IsSafe>, GridT, IsSafe, 19>
 {
     typedef NineteenPointStencil<GridT, IsSafe> SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe >  BaseType;
+    typedef BaseStencil<SelfT, GridT, IsSafe, 19>  BaseType;
 public:
     typedef GridT                               GridType;
     typedef typename GridT::TreeType            TreeType;
@@ -833,32 +999,31 @@ public:
     unsigned int pos() const { return NineteenPt<i,j,k>::idx; }
 
 private:
-    inline void init(const Coord& ijk)
+    inline void init(const Coord&)
     {
-        mValues[NineteenPt< 3, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3,  0,  0));
-        mValues[NineteenPt< 2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2,  0,  0));
-        mValues[NineteenPt< 1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,  0,  0));
-        mValues[NineteenPt<-1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,  0,  0));
-        mValues[NineteenPt<-2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2,  0,  0));
-        mValues[NineteenPt<-3, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3,  0,  0));
+        mValues[NineteenPt< 3, 0, 0>::idx] = this->template readValue<3, 0, 0>();
+        mValues[NineteenPt< 2, 0, 0>::idx] = this->template readValue<2, 0, 0>();
+        mValues[NineteenPt< 1, 0, 0>::idx] = this->template readValue<1, 0, 0>();
+        mValues[NineteenPt<-1, 0, 0>::idx] = this->template readValue<-1, 0, 0>();
+        mValues[NineteenPt<-2, 0, 0>::idx] = this->template readValue<-2, 0, 0>();
+        mValues[NineteenPt<-3, 0, 0>::idx] = this->template readValue<-3, 0, 0>();
 
-        mValues[NineteenPt< 0, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,  3,  0));
-        mValues[NineteenPt< 0, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,  2,  0));
-        mValues[NineteenPt< 0, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,  1,  0));
-        mValues[NineteenPt< 0,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, -1,  0));
-        mValues[NineteenPt< 0,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, -2,  0));
-        mValues[NineteenPt< 0,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, -3,  0));
+        mValues[NineteenPt< 0, 3, 0>::idx] = this->template readValue<0, 3, 0>();
+        mValues[NineteenPt< 0, 2, 0>::idx] = this->template readValue<0, 2, 0>();
+        mValues[NineteenPt< 0, 1, 0>::idx] = this->template readValue<0, 1, 0>();
+        mValues[NineteenPt< 0,-1, 0>::idx] = this->template readValue<0, -1, 0>();
+        mValues[NineteenPt< 0,-2, 0>::idx] = this->template readValue<0, -2, 0>();
+        mValues[NineteenPt< 0,-3, 0>::idx] = this->template readValue<0, -3, 0>();
 
-        mValues[NineteenPt< 0, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0,  3));
-        mValues[NineteenPt< 0, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0,  2));
-        mValues[NineteenPt< 0, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0,  1));
-        mValues[NineteenPt< 0, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0, -1));
-        mValues[NineteenPt< 0, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0, -2));
-        mValues[NineteenPt< 0, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0, -3));
+        mValues[NineteenPt< 0, 0, 3>::idx] = this->template readValue<0, 0, 3>();
+        mValues[NineteenPt< 0, 0, 2>::idx] = this->template readValue<0, 0, 2>();
+        mValues[NineteenPt< 0, 0, 1>::idx] = this->template readValue<0, 0, 1>();
+        mValues[NineteenPt< 0, 0,-1>::idx] = this->template readValue<0, 0, -1>();
+        mValues[NineteenPt< 0, 0,-2>::idx] = this->template readValue<0, 0, -2>();
+        mValues[NineteenPt< 0, 0,-3>::idx] = this->template readValue<0, 0, -3>();
     }
 
-    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
+    template<typename, typename, bool, int> friend class BaseStencil; // allow base class to call init()
     using BaseType::mValues;
 };// NineteenPointStencil class
 
@@ -1034,7 +1199,9 @@ class SixthOrderDenseStencil
     : public BaseStencil<SixthOrderDenseStencil<GridT, IsSafe>, GridT, IsSafe>
 {
     typedef SixthOrderDenseStencil<GridT, IsSafe> SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe >    BaseType;
+    // Not setting Size=127 here means that the BaseStencil data is stored
+    // in a std::vector and not a std::array.
+    typedef BaseStencil<SelfT, GridT, IsSafe>     BaseType;
 public:
     typedef GridT                                 GridType;
     typedef typename GridT::TreeType              TreeType;
@@ -1049,156 +1216,155 @@ public:
     unsigned int pos() const { return SixthDensePt<i,j,k>::idx; }
 
 private:
-    inline void init(const Coord& ijk)
+    inline void init(const Coord&)
     {
-        mValues[SixthDensePt<-3, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3, 3, 0));
-        mValues[SixthDensePt<-2, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2, 3, 0));
-        mValues[SixthDensePt<-1, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, 3, 0));
-        mValues[SixthDensePt< 0, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, 3, 0));
-        mValues[SixthDensePt< 1, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, 3, 0));
-        mValues[SixthDensePt< 2, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2, 3, 0));
-        mValues[SixthDensePt< 3, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3, 3, 0));
+        mValues[SixthDensePt<-3, 3, 0>::idx] = this->template readValue<-3, 3, 0>();
+        mValues[SixthDensePt<-2, 3, 0>::idx] = this->template readValue<-2, 3, 0>();
+        mValues[SixthDensePt<-1, 3, 0>::idx] = this->template readValue<-1, 3, 0>();
+        mValues[SixthDensePt< 0, 3, 0>::idx] = this->template readValue<0, 3, 0>();
+        mValues[SixthDensePt< 1, 3, 0>::idx] = this->template readValue<1, 3, 0>();
+        mValues[SixthDensePt< 2, 3, 0>::idx] = this->template readValue<2, 3, 0>();
+        mValues[SixthDensePt< 3, 3, 0>::idx] = this->template readValue<3, 3, 0>();
 
-        mValues[SixthDensePt<-3, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3, 2, 0));
-        mValues[SixthDensePt<-2, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2, 2, 0));
-        mValues[SixthDensePt<-1, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, 2, 0));
-        mValues[SixthDensePt< 0, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2, 0));
-        mValues[SixthDensePt< 1, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, 2, 0));
-        mValues[SixthDensePt< 2, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2, 2, 0));
-        mValues[SixthDensePt< 3, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3, 2, 0));
+        mValues[SixthDensePt<-3, 2, 0>::idx] = this->template readValue<-3, 2, 0>();
+        mValues[SixthDensePt<-2, 2, 0>::idx] = this->template readValue<-2, 2, 0>();
+        mValues[SixthDensePt<-1, 2, 0>::idx] = this->template readValue<-1, 2, 0>();
+        mValues[SixthDensePt< 0, 2, 0>::idx] = this->template readValue<0, 2, 0>();
+        mValues[SixthDensePt< 1, 2, 0>::idx] = this->template readValue<1, 2, 0>();
+        mValues[SixthDensePt< 2, 2, 0>::idx] = this->template readValue<2, 2, 0>();
+        mValues[SixthDensePt< 3, 2, 0>::idx] = this->template readValue<3, 2, 0>();
 
-        mValues[SixthDensePt<-3, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3, 1, 0));
-        mValues[SixthDensePt<-2, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2, 1, 0));
-        mValues[SixthDensePt<-1, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, 1, 0));
-        mValues[SixthDensePt< 0, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1, 0));
-        mValues[SixthDensePt< 1, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, 1, 0));
-        mValues[SixthDensePt< 2, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2, 1, 0));
-        mValues[SixthDensePt< 3, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3, 1, 0));
+        mValues[SixthDensePt<-3, 1, 0>::idx] = this->template readValue<-3, 1, 0>();
+        mValues[SixthDensePt<-2, 1, 0>::idx] = this->template readValue<-2, 1, 0>();
+        mValues[SixthDensePt<-1, 1, 0>::idx] = this->template readValue<-1, 1, 0>();
+        mValues[SixthDensePt< 0, 1, 0>::idx] = this->template readValue<0, 1, 0>();
+        mValues[SixthDensePt< 1, 1, 0>::idx] = this->template readValue<1, 1, 0>();
+        mValues[SixthDensePt< 2, 1, 0>::idx] = this->template readValue<2, 1, 0>();
+        mValues[SixthDensePt< 3, 1, 0>::idx] = this->template readValue<3, 1, 0>();
 
-        mValues[SixthDensePt<-3, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3, 0, 0));
-        mValues[SixthDensePt<-2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0, 0));
-        mValues[SixthDensePt<-1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0, 0));
-        mValues[SixthDensePt< 1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0, 0));
-        mValues[SixthDensePt< 2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0, 0));
-        mValues[SixthDensePt< 3, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3, 0, 0));
+        mValues[SixthDensePt<-3, 0, 0>::idx] = this->template readValue<-3, 0, 0>();
+        mValues[SixthDensePt<-2, 0, 0>::idx] = this->template readValue<-2, 0, 0>();
+        mValues[SixthDensePt<-1, 0, 0>::idx] = this->template readValue<-1, 0, 0>();
+        mValues[SixthDensePt< 1, 0, 0>::idx] = this->template readValue<1, 0, 0>();
+        mValues[SixthDensePt< 2, 0, 0>::idx] = this->template readValue<2, 0, 0>();
+        mValues[SixthDensePt< 3, 0, 0>::idx] = this->template readValue<3, 0, 0>();
 
-        mValues[SixthDensePt<-3,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3,-1, 0));
-        mValues[SixthDensePt<-2,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2,-1, 0));
-        mValues[SixthDensePt<-1,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,-1, 0));
-        mValues[SixthDensePt< 0,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1, 0));
-        mValues[SixthDensePt< 1,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,-1, 0));
-        mValues[SixthDensePt< 2,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2,-1, 0));
-        mValues[SixthDensePt< 3,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3,-1, 0));
+        mValues[SixthDensePt<-3,-1, 0>::idx] = this->template readValue<-3, -1, 0>();
+        mValues[SixthDensePt<-2,-1, 0>::idx] = this->template readValue<-2, -1, 0>();
+        mValues[SixthDensePt<-1,-1, 0>::idx] = this->template readValue<-1, -1, 0>();
+        mValues[SixthDensePt< 0,-1, 0>::idx] = this->template readValue<0, -1, 0>();
+        mValues[SixthDensePt< 1,-1, 0>::idx] = this->template readValue<1, -1, 0>();
+        mValues[SixthDensePt< 2,-1, 0>::idx] = this->template readValue<2, -1, 0>();
+        mValues[SixthDensePt< 3,-1, 0>::idx] = this->template readValue<3, -1, 0>();
 
-        mValues[SixthDensePt<-3,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3,-2, 0));
-        mValues[SixthDensePt<-2,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2,-2, 0));
-        mValues[SixthDensePt<-1,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,-2, 0));
-        mValues[SixthDensePt< 0,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2, 0));
-        mValues[SixthDensePt< 1,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,-2, 0));
-        mValues[SixthDensePt< 2,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2,-2, 0));
-        mValues[SixthDensePt< 3,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3,-2, 0));
+        mValues[SixthDensePt<-3,-2, 0>::idx] = this->template readValue<-3, -2, 0>();
+        mValues[SixthDensePt<-2,-2, 0>::idx] = this->template readValue<-2, -2, 0>();
+        mValues[SixthDensePt<-1,-2, 0>::idx] = this->template readValue<-1, -2, 0>();
+        mValues[SixthDensePt< 0,-2, 0>::idx] = this->template readValue<0, -2, 0>();
+        mValues[SixthDensePt< 1,-2, 0>::idx] = this->template readValue<1, -2, 0>();
+        mValues[SixthDensePt< 2,-2, 0>::idx] = this->template readValue<2, -2, 0>();
+        mValues[SixthDensePt< 3,-2, 0>::idx] = this->template readValue<3, -2, 0>();
 
-        mValues[SixthDensePt<-3,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3,-3, 0));
-        mValues[SixthDensePt<-2,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2,-3, 0));
-        mValues[SixthDensePt<-1,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,-3, 0));
-        mValues[SixthDensePt< 0,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,-3, 0));
-        mValues[SixthDensePt< 1,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,-3, 0));
-        mValues[SixthDensePt< 2,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2,-3, 0));
-        mValues[SixthDensePt< 3,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3,-3, 0));
+        mValues[SixthDensePt<-3,-3, 0>::idx] = this->template readValue<-3, -3, 0>();
+        mValues[SixthDensePt<-2,-3, 0>::idx] = this->template readValue<-2, -3, 0>();
+        mValues[SixthDensePt<-1,-3, 0>::idx] = this->template readValue<-1, -3, 0>();
+        mValues[SixthDensePt< 0,-3, 0>::idx] = this->template readValue<0, -3, 0>();
+        mValues[SixthDensePt< 1,-3, 0>::idx] = this->template readValue<1, -3, 0>();
+        mValues[SixthDensePt< 2,-3, 0>::idx] = this->template readValue<2, -3, 0>();
+        mValues[SixthDensePt< 3,-3, 0>::idx] = this->template readValue<3, -3, 0>();
 
-        mValues[SixthDensePt<-3, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy(-3, 0, 3));
-        mValues[SixthDensePt<-2, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0, 3));
-        mValues[SixthDensePt<-1, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0, 3));
-        mValues[SixthDensePt< 0, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0, 3));
-        mValues[SixthDensePt< 1, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0, 3));
-        mValues[SixthDensePt< 2, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0, 3));
-        mValues[SixthDensePt< 3, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy( 3, 0, 3));
+        mValues[SixthDensePt<-3, 0, 3>::idx] = this->template readValue<-3, 0, 3>();
+        mValues[SixthDensePt<-2, 0, 3>::idx] = this->template readValue<-2, 0, 3>();
+        mValues[SixthDensePt<-1, 0, 3>::idx] = this->template readValue<-1, 0, 3>();
+        mValues[SixthDensePt< 0, 0, 3>::idx] = this->template readValue<0, 0, 3>();
+        mValues[SixthDensePt< 1, 0, 3>::idx] = this->template readValue<1, 0, 3>();
+        mValues[SixthDensePt< 2, 0, 3>::idx] = this->template readValue<2, 0, 3>();
+        mValues[SixthDensePt< 3, 0, 3>::idx] = this->template readValue<3, 0, 3>();
 
-        mValues[SixthDensePt<-3, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy(-3, 0, 2));
-        mValues[SixthDensePt<-2, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0, 2));
-        mValues[SixthDensePt<-1, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0, 2));
-        mValues[SixthDensePt< 0, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0, 2));
-        mValues[SixthDensePt< 1, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0, 2));
-        mValues[SixthDensePt< 2, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0, 2));
-        mValues[SixthDensePt< 3, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 3, 0, 2));
+        mValues[SixthDensePt<-3, 0, 2>::idx] = this->template readValue<-3, 0, 2>();
+        mValues[SixthDensePt<-2, 0, 2>::idx] = this->template readValue<-2, 0, 2>();
+        mValues[SixthDensePt<-1, 0, 2>::idx] = this->template readValue<-1, 0, 2>();
+        mValues[SixthDensePt< 0, 0, 2>::idx] = this->template readValue<0, 0, 2>();
+        mValues[SixthDensePt< 1, 0, 2>::idx] = this->template readValue<1, 0, 2>();
+        mValues[SixthDensePt< 2, 0, 2>::idx] = this->template readValue<2, 0, 2>();
+        mValues[SixthDensePt< 3, 0, 2>::idx] = this->template readValue<3, 0, 2>();
 
-        mValues[SixthDensePt<-3, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy(-3, 0, 1));
-        mValues[SixthDensePt<-2, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0, 1));
-        mValues[SixthDensePt<-1, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0, 1));
-        mValues[SixthDensePt< 0, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0, 1));
-        mValues[SixthDensePt< 1, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0, 1));
-        mValues[SixthDensePt< 2, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0, 1));
-        mValues[SixthDensePt< 3, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 3, 0, 1));
+        mValues[SixthDensePt<-3, 0, 1>::idx] = this->template readValue<-3, 0, 1>();
+        mValues[SixthDensePt<-2, 0, 1>::idx] = this->template readValue<-2, 0, 1>();
+        mValues[SixthDensePt<-1, 0, 1>::idx] = this->template readValue<-1, 0, 1>();
+        mValues[SixthDensePt< 0, 0, 1>::idx] = this->template readValue<0, 0, 1>();
+        mValues[SixthDensePt< 1, 0, 1>::idx] = this->template readValue<1, 0, 1>();
+        mValues[SixthDensePt< 2, 0, 1>::idx] = this->template readValue<2, 0, 1>();
+        mValues[SixthDensePt< 3, 0, 1>::idx] = this->template readValue<3, 0, 1>();
 
-        mValues[SixthDensePt<-3, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy(-3, 0,-1));
-        mValues[SixthDensePt<-2, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0,-1));
-        mValues[SixthDensePt<-1, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0,-1));
-        mValues[SixthDensePt< 0, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0,-1));
-        mValues[SixthDensePt< 1, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0,-1));
-        mValues[SixthDensePt< 2, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0,-1));
-        mValues[SixthDensePt< 3, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 3, 0,-1));
+        mValues[SixthDensePt<-3, 0,-1>::idx] = this->template readValue<-3, 0, -1>();
+        mValues[SixthDensePt<-2, 0,-1>::idx] = this->template readValue<-2, 0, -1>();
+        mValues[SixthDensePt<-1, 0,-1>::idx] = this->template readValue<-1, 0, -1>();
+        mValues[SixthDensePt< 0, 0,-1>::idx] = this->template readValue<0, 0, -1>();
+        mValues[SixthDensePt< 1, 0,-1>::idx] = this->template readValue<1, 0, -1>();
+        mValues[SixthDensePt< 2, 0,-1>::idx] = this->template readValue<2, 0, -1>();
+        mValues[SixthDensePt< 3, 0,-1>::idx] = this->template readValue<3, 0, -1>();
 
-        mValues[SixthDensePt<-3, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy(-3, 0,-2));
-        mValues[SixthDensePt<-2, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0,-2));
-        mValues[SixthDensePt<-1, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0,-2));
-        mValues[SixthDensePt< 0, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0,-2));
-        mValues[SixthDensePt< 1, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0,-2));
-        mValues[SixthDensePt< 2, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0,-2));
-        mValues[SixthDensePt< 3, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 3, 0,-2));
+        mValues[SixthDensePt<-3, 0,-2>::idx] = this->template readValue<-3, 0, -2>();
+        mValues[SixthDensePt<-2, 0,-2>::idx] = this->template readValue<-2, 0, -2>();
+        mValues[SixthDensePt<-1, 0,-2>::idx] = this->template readValue<-1, 0, -2>();
+        mValues[SixthDensePt< 0, 0,-2>::idx] = this->template readValue<0, 0, -2>();
+        mValues[SixthDensePt< 1, 0,-2>::idx] = this->template readValue<1, 0, -2>();
+        mValues[SixthDensePt< 2, 0,-2>::idx] = this->template readValue<2, 0, -2>();
+        mValues[SixthDensePt< 3, 0,-2>::idx] = this->template readValue<3, 0, -2>();
 
-        mValues[SixthDensePt<-3, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy(-3, 0,-3));
-        mValues[SixthDensePt<-2, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0,-3));
-        mValues[SixthDensePt<-1, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0,-3));
-        mValues[SixthDensePt< 0, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0,-3));
-        mValues[SixthDensePt< 1, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0,-3));
-        mValues[SixthDensePt< 2, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0,-3));
-        mValues[SixthDensePt< 3, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy( 3, 0,-3));
+        mValues[SixthDensePt<-3, 0,-3>::idx] = this->template readValue<-3, 0, -3>();
+        mValues[SixthDensePt<-2, 0,-3>::idx] = this->template readValue<-2, 0, -3>();
+        mValues[SixthDensePt<-1, 0,-3>::idx] = this->template readValue<-1, 0, -3>();
+        mValues[SixthDensePt< 0, 0,-3>::idx] = this->template readValue<0, 0, -3>();
+        mValues[SixthDensePt< 1, 0,-3>::idx] = this->template readValue<1, 0, -3>();
+        mValues[SixthDensePt< 2, 0,-3>::idx] = this->template readValue<2, 0, -3>();
+        mValues[SixthDensePt< 3, 0,-3>::idx] = this->template readValue<3, 0, -3>();
 
-        mValues[SixthDensePt< 0,-3, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0,-3, 3));
-        mValues[SixthDensePt< 0,-2, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2, 3));
-        mValues[SixthDensePt< 0,-1, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1, 3));
-        mValues[SixthDensePt< 0, 1, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1, 3));
-        mValues[SixthDensePt< 0, 2, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2, 3));
-        mValues[SixthDensePt< 0, 3, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 3, 3));
+        mValues[SixthDensePt< 0,-3, 3>::idx] = this->template readValue<0, -3, 3>();
+        mValues[SixthDensePt< 0,-2, 3>::idx] = this->template readValue<0, -2, 3>();
+        mValues[SixthDensePt< 0,-1, 3>::idx] = this->template readValue<0, -1, 3>();
+        mValues[SixthDensePt< 0, 1, 3>::idx] = this->template readValue<0, 1, 3>();
+        mValues[SixthDensePt< 0, 2, 3>::idx] = this->template readValue<0, 2, 3>();
+        mValues[SixthDensePt< 0, 3, 3>::idx] = this->template readValue<0, 3, 3>();
 
-        mValues[SixthDensePt< 0,-3, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-3, 2));
-        mValues[SixthDensePt< 0,-2, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2, 2));
-        mValues[SixthDensePt< 0,-1, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1, 2));
-        mValues[SixthDensePt< 0, 1, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1, 2));
-        mValues[SixthDensePt< 0, 2, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2, 2));
-        mValues[SixthDensePt< 0, 3, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 3, 2));
+        mValues[SixthDensePt< 0,-3, 2>::idx] = this->template readValue<0, -3, 2>();
+        mValues[SixthDensePt< 0,-2, 2>::idx] = this->template readValue<0, -2, 2>();
+        mValues[SixthDensePt< 0,-1, 2>::idx] = this->template readValue<0, -1, 2>();
+        mValues[SixthDensePt< 0, 1, 2>::idx] = this->template readValue<0, 1, 2>();
+        mValues[SixthDensePt< 0, 2, 2>::idx] = this->template readValue<0, 2, 2>();
+        mValues[SixthDensePt< 0, 3, 2>::idx] = this->template readValue<0, 3, 2>();
 
-        mValues[SixthDensePt< 0,-3, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-3, 1));
-        mValues[SixthDensePt< 0,-2, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2, 1));
-        mValues[SixthDensePt< 0,-1, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1, 1));
-        mValues[SixthDensePt< 0, 1, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1, 1));
-        mValues[SixthDensePt< 0, 2, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2, 1));
-        mValues[SixthDensePt< 0, 3, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 3, 1));
+        mValues[SixthDensePt< 0,-3, 1>::idx] = this->template readValue<0, -3, 1>();
+        mValues[SixthDensePt< 0,-2, 1>::idx] = this->template readValue<0, -2, 1>();
+        mValues[SixthDensePt< 0,-1, 1>::idx] = this->template readValue<0, -1, 1>();
+        mValues[SixthDensePt< 0, 1, 1>::idx] = this->template readValue<0, 1, 1>();
+        mValues[SixthDensePt< 0, 2, 1>::idx] = this->template readValue<0, 2, 1>();
+        mValues[SixthDensePt< 0, 3, 1>::idx] = this->template readValue<0, 3, 1>();
 
-        mValues[SixthDensePt< 0,-3,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-3,-1));
-        mValues[SixthDensePt< 0,-2,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2,-1));
-        mValues[SixthDensePt< 0,-1,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1,-1));
-        mValues[SixthDensePt< 0, 1,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1,-1));
-        mValues[SixthDensePt< 0, 2,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2,-1));
-        mValues[SixthDensePt< 0, 3,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 3,-1));
+        mValues[SixthDensePt< 0,-3,-1>::idx] = this->template readValue<0, -3, -1>();
+        mValues[SixthDensePt< 0,-2,-1>::idx] = this->template readValue<0, -2, -1>();
+        mValues[SixthDensePt< 0,-1,-1>::idx] = this->template readValue<0, -1, -1>();
+        mValues[SixthDensePt< 0, 1,-1>::idx] = this->template readValue<0, 1, -1>();
+        mValues[SixthDensePt< 0, 2,-1>::idx] = this->template readValue<0, 2, -1>();
+        mValues[SixthDensePt< 0, 3,-1>::idx] = this->template readValue<0, 3, -1>();
 
-        mValues[SixthDensePt< 0,-3,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-3,-2));
-        mValues[SixthDensePt< 0,-2,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2,-2));
-        mValues[SixthDensePt< 0,-1,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1,-2));
-        mValues[SixthDensePt< 0, 1,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1,-2));
-        mValues[SixthDensePt< 0, 2,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2,-2));
-        mValues[SixthDensePt< 0, 3,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 3,-2));
+        mValues[SixthDensePt< 0,-3,-2>::idx] = this->template readValue<0, -3, -2>();
+        mValues[SixthDensePt< 0,-2,-2>::idx] = this->template readValue<0, -2, -2>();
+        mValues[SixthDensePt< 0,-1,-2>::idx] = this->template readValue<0, -1, -2>();
+        mValues[SixthDensePt< 0, 1,-2>::idx] = this->template readValue<0, 1, -2>();
+        mValues[SixthDensePt< 0, 2,-2>::idx] = this->template readValue<0, 2, -2>();
+        mValues[SixthDensePt< 0, 3,-2>::idx] = this->template readValue<0, 3, -2>();
 
-        mValues[SixthDensePt< 0,-3,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0,-3,-3));
-        mValues[SixthDensePt< 0,-2,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2,-3));
-        mValues[SixthDensePt< 0,-1,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1,-3));
-        mValues[SixthDensePt< 0, 1,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1,-3));
-        mValues[SixthDensePt< 0, 2,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2,-3));
-        mValues[SixthDensePt< 0, 3,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 3,-3));
+        mValues[SixthDensePt< 0,-3,-3>::idx] = this->template readValue<0, -3, -3>();
+        mValues[SixthDensePt< 0,-2,-3>::idx] = this->template readValue<0, -2, -3>();
+        mValues[SixthDensePt< 0,-1,-3>::idx] = this->template readValue<0, -1, -3>();
+        mValues[SixthDensePt< 0, 1,-3>::idx] = this->template readValue<0, 1, -3>();
+        mValues[SixthDensePt< 0, 2,-3>::idx] = this->template readValue<0, 2, -3>();
+        mValues[SixthDensePt< 0, 3,-3>::idx] = this->template readValue<0, 3, -3>();
     }
 
-    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
+    template<typename, typename, bool, int> friend class BaseStencil; // allow base class to call init()
     using BaseType::mValues;
 };// SixthOrderDenseStencil class
 
@@ -1225,10 +1391,10 @@ namespace { // anonymous namespace for stencil-layout map
 /// @note For optimal random access performance this class
 /// includes its own grid accessor.
 template<typename GridT, bool IsSafe = true>
-class GradStencil : public BaseStencil<GradStencil<GridT, IsSafe>, GridT, IsSafe>
+class GradStencil : public BaseStencil<GradStencil<GridT, IsSafe>, GridT, IsSafe, 7>
 {
     typedef GradStencil<GridT, IsSafe>         SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe > BaseType;
+    typedef BaseStencil<SelfT, GridT, IsSafe, 7> BaseType;
 public:
     typedef GridT                              GridType;
     typedef typename GridT::TreeType           TreeType;
@@ -1332,20 +1498,19 @@ public:
 
 private:
 
-    inline void init(const Coord& ijk)
+    inline void init(const Coord&)
     {
-        BaseType::template setValue<-1, 0, 0>(mAcc.getValue(ijk.offsetBy(-1, 0, 0)));
-        BaseType::template setValue< 1, 0, 0>(mAcc.getValue(ijk.offsetBy( 1, 0, 0)));
+        BaseType::template setValue<-1, 0, 0>(this->template readValue<-1, 0, 0>());
+        BaseType::template setValue< 1, 0, 0>(this->template readValue<1, 0, 0>());
 
-        BaseType::template setValue< 0,-1, 0>(mAcc.getValue(ijk.offsetBy( 0,-1, 0)));
-        BaseType::template setValue< 0, 1, 0>(mAcc.getValue(ijk.offsetBy( 0, 1, 0)));
+        BaseType::template setValue< 0,-1, 0>(this->template readValue<0, -1, 0>());
+        BaseType::template setValue< 0, 1, 0>(this->template readValue<0, 1, 0>());
 
-        BaseType::template setValue< 0, 0,-1>(mAcc.getValue(ijk.offsetBy( 0, 0,-1)));
-        BaseType::template setValue< 0, 0, 1>(mAcc.getValue(ijk.offsetBy( 0, 0, 1)));
+        BaseType::template setValue< 0, 0,-1>(this->template readValue<0, 0, -1>());
+        BaseType::template setValue< 0, 0, 1>(this->template readValue<0, 0, 1>());
     }
 
-    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
+    template<typename, typename, bool, int> friend class BaseStencil; // allow base class to call init()
     using BaseType::mValues;
     const ValueType mInv2Dx, mInvDx2;
 }; // GradStencil class
@@ -1359,10 +1524,10 @@ private:
 /// @note For optimal random access performance this class
 /// includes its own grid accessor.
 template<typename GridT, bool IsSafe = true>
-class WenoStencil: public BaseStencil<WenoStencil<GridT, IsSafe>, GridT, IsSafe>
+class WenoStencil: public BaseStencil<WenoStencil<GridT, IsSafe>, GridT, IsSafe, 19>
 {
     typedef WenoStencil<GridT, IsSafe>         SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe > BaseType;
+    typedef BaseStencil<SelfT, GridT, IsSafe, 19> BaseType;
 public:
     typedef GridT                              GridType;
     typedef typename GridT::TreeType           TreeType;
@@ -1473,32 +1638,31 @@ public:
     }
 
 private:
-    inline void init(const Coord& ijk)
+    inline void init(const Coord&)
     {
-        mValues[ 1] = mAcc.getValue(ijk.offsetBy(-3,  0,  0));
-        mValues[ 2] = mAcc.getValue(ijk.offsetBy(-2,  0,  0));
-        mValues[ 3] = mAcc.getValue(ijk.offsetBy(-1,  0,  0));
-        mValues[ 4] = mAcc.getValue(ijk.offsetBy( 1,  0,  0));
-        mValues[ 5] = mAcc.getValue(ijk.offsetBy( 2,  0,  0));
-        mValues[ 6] = mAcc.getValue(ijk.offsetBy( 3,  0,  0));
+        mValues[ 1] = this->template readValue<-3, 0, 0>();
+        mValues[ 2] = this->template readValue<-2, 0, 0>();
+        mValues[ 3] = this->template readValue<-1, 0, 0>();
+        mValues[ 4] = this->template readValue<1, 0, 0>();
+        mValues[ 5] = this->template readValue<2, 0, 0>();
+        mValues[ 6] = this->template readValue<3, 0, 0>();
 
-        mValues[ 7] = mAcc.getValue(ijk.offsetBy( 0, -3,  0));
-        mValues[ 8] = mAcc.getValue(ijk.offsetBy( 0, -2,  0));
-        mValues[ 9] = mAcc.getValue(ijk.offsetBy( 0, -1,  0));
-        mValues[10] = mAcc.getValue(ijk.offsetBy( 0,  1,  0));
-        mValues[11] = mAcc.getValue(ijk.offsetBy( 0,  2,  0));
-        mValues[12] = mAcc.getValue(ijk.offsetBy( 0,  3,  0));
+        mValues[ 7] = this->template readValue<0, -3, 0>();
+        mValues[ 8] = this->template readValue<0, -2, 0>();
+        mValues[ 9] = this->template readValue<0, -1, 0>();
+        mValues[10] = this->template readValue<0, 1, 0>();
+        mValues[11] = this->template readValue<0, 2, 0>();
+        mValues[12] = this->template readValue<0, 3, 0>();
 
-        mValues[13] = mAcc.getValue(ijk.offsetBy( 0,  0, -3));
-        mValues[14] = mAcc.getValue(ijk.offsetBy( 0,  0, -2));
-        mValues[15] = mAcc.getValue(ijk.offsetBy( 0,  0, -1));
-        mValues[16] = mAcc.getValue(ijk.offsetBy( 0,  0,  1));
-        mValues[17] = mAcc.getValue(ijk.offsetBy( 0,  0,  2));
-        mValues[18] = mAcc.getValue(ijk.offsetBy( 0,  0,  3));
+        mValues[13] = this->template readValue<0, 0, -3>();
+        mValues[14] = this->template readValue<0, 0, -2>();
+        mValues[15] = this->template readValue<0, 0, -1>();
+        mValues[16] = this->template readValue<0, 0, 1>();
+        mValues[17] = this->template readValue<0, 0, 2>();
+        mValues[18] = this->template readValue<0, 0, 3>();
     }
 
-    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
+    template<typename, typename, bool, int> friend class BaseStencil; // allow base class to call init()
     using BaseType::mValues;
     const ValueType _mDx2, mInv2Dx, mInvDx2;
     const float mDx2;
@@ -1509,10 +1673,10 @@ private:
 
 
 template<typename GridT, bool IsSafe = true>
-class CurvatureStencil: public BaseStencil<CurvatureStencil<GridT, IsSafe>, GridT, IsSafe>
+class CurvatureStencil: public BaseStencil<CurvatureStencil<GridT, IsSafe>, GridT, IsSafe, 19>
 {
     typedef CurvatureStencil<GridT, IsSafe>   SelfT;
-    typedef BaseStencil<SelfT, GridT, IsSafe> BaseType;
+    typedef BaseStencil<SelfT, GridT, IsSafe, 19> BaseType;
 public:
     typedef GridT                             GridType;
     typedef typename GridT::TreeType          TreeType;
@@ -1658,31 +1822,31 @@ public:
     }
 
 private:
-    inline void init(const Coord &ijk)
+    inline void init(const Coord&)
     {
-        mValues[ 1] = mAcc.getValue(ijk.offsetBy(-1,  0,  0));
-        mValues[ 2] = mAcc.getValue(ijk.offsetBy( 1,  0,  0));
+        mValues[ 1] = this->template readValue<-1, 0, 0>();
+        mValues[ 2] = this->template readValue<1, 0, 0>();
 
-        mValues[ 3] = mAcc.getValue(ijk.offsetBy( 0, -1,  0));
-        mValues[ 4] = mAcc.getValue(ijk.offsetBy( 0,  1,  0));
+        mValues[ 3] = this->template readValue<0, -1, 0>();
+        mValues[ 4] = this->template readValue<0, 1, 0>();
 
-        mValues[ 5] = mAcc.getValue(ijk.offsetBy( 0,  0, -1));
-        mValues[ 6] = mAcc.getValue(ijk.offsetBy( 0,  0,  1));
+        mValues[ 5] = this->template readValue<0, 0, -1>();
+        mValues[ 6] = this->template readValue<0, 0, 1>();
 
-        mValues[ 7] = mAcc.getValue(ijk.offsetBy(-1, -1,  0));
-        mValues[ 8] = mAcc.getValue(ijk.offsetBy( 1, -1,  0));
-        mValues[ 9] = mAcc.getValue(ijk.offsetBy(-1,  1,  0));
-        mValues[10] = mAcc.getValue(ijk.offsetBy( 1,  1,  0));
+        mValues[ 7] = this->template readValue<-1, -1, 0>();
+        mValues[ 8] = this->template readValue<1, -1, 0>();
+        mValues[ 9] = this->template readValue<-1, 1, 0>();
+        mValues[10] = this->template readValue<1, 1, 0>();
 
-        mValues[11] = mAcc.getValue(ijk.offsetBy(-1,  0, -1));
-        mValues[12] = mAcc.getValue(ijk.offsetBy( 1,  0, -1));
-        mValues[13] = mAcc.getValue(ijk.offsetBy(-1,  0,  1));
-        mValues[14] = mAcc.getValue(ijk.offsetBy( 1,  0,  1));
+        mValues[11] = this->template readValue<-1, 0, -1>();
+        mValues[12] = this->template readValue<1, 0, -1>();
+        mValues[13] = this->template readValue<-1, 0, 1>();
+        mValues[14] = this->template readValue<1, 0, 1>();
 
-        mValues[15] = mAcc.getValue(ijk.offsetBy( 0, -1, -1));
-        mValues[16] = mAcc.getValue(ijk.offsetBy( 0,  1, -1));
-        mValues[17] = mAcc.getValue(ijk.offsetBy( 0, -1,  1));
-        mValues[18] = mAcc.getValue(ijk.offsetBy( 0,  1,  1));
+        mValues[15] = this->template readValue<0, -1, -1>();
+        mValues[16] = this->template readValue<0, 1, -1>();
+        mValues[17] = this->template readValue<0, -1, 1>();
+        mValues[18] = this->template readValue<0, 1, 1>();
     }
 
     inline Real Dx()  const { return 0.5*(mValues[2] - mValues[1]); }// * 1/dx
@@ -1746,8 +1910,7 @@ private:
         return true;
     }
 
-    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
+    template<typename, typename, bool, int> friend class BaseStencil; // allow base class to call init()
     using BaseType::mValues;
     const ValueType mInv2Dx, mInvDx2;
 }; // CurvatureStencil class
@@ -1781,6 +1944,7 @@ public:
     inline void moveTo(const Coord& ijk)
     {
         BaseType::mCenter = ijk;
+        BaseType::moveNeighbors();
         this->init(ijk);
     }
     /// @brief Initialize the stencil buffer with the values of voxel
@@ -1789,26 +1953,26 @@ public:
     inline void moveTo(const IterType& iter)
     {
         BaseType::mCenter = iter.getCoord();
+        BaseType::moveNeighbors();
         this->init(BaseType::mCenter);
     }
 
 private:
     /// Initialize the stencil buffer centered at (i, j, k).
     /// @warning The center point is NOT at mValues[0] for this DenseStencil!
-    inline void init(const Coord& ijk)
+    inline void init(const Coord&)
     {
         int n = 0;
-        for (Coord p=ijk.offsetBy(-mHalfWidth), q=ijk.offsetBy(mHalfWidth); p[0] <= q[0]; ++p[0]) {
-            for (p[1] = ijk[1]-mHalfWidth; p[1] <= q[1]; ++p[1]) {
-                for (p[2] = ijk[2]-mHalfWidth; p[2] <= q[2]; ++p[2]) {
-                    mValues[n++] = mAcc.getValue(p);
+        for (int dx = -mHalfWidth; dx <= mHalfWidth; ++dx) {
+            for (int dy = -mHalfWidth; dy <= mHalfWidth; ++dy) {
+                for (int dz = -mHalfWidth; dz <= mHalfWidth; ++dz) {
+                    mValues[n++] = this->readValue(dx, dy, dz);
                 }
             }
         }
     }
 
-    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
+    template<typename, typename, bool, int> friend class BaseStencil; // allow base class to call init()
     using BaseType::mValues;
     const int mHalfWidth;
 };// DenseStencil class

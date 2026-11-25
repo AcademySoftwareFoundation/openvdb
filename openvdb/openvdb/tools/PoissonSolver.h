@@ -64,6 +64,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/ConjGradient.h>
 #include <openvdb/tree/LeafManager.h>
+#include <openvdb/tree/NeighborAccessor.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Assert.h>
@@ -523,95 +524,77 @@ struct ISStaggeredLaplacianOp
         const BoolTreeType& mask, const BoundaryOp& op, VectorT& src):
         laplacian(&m), idxTree(&idx), interiorMask(&mask), boundaryOp(op), source(&src) {}
 
+    using IndexAccessorT = tree::NeighborAccessor<const VIdxTreeT>;
+    using IterT = typename VIdxLeafT::ValueOnCIter;
+
     void operator()(const VIdxLeafT& idxLeaf, size_t /*leafIdx*/) const
     {
-        // Local accessors
-        typename tree::ValueAccessor<const BoolTreeType> interior(*interiorMask);
-        typename tree::ValueAccessor<const VIdxTreeT> vectorIdx(*idxTree);
+        // Local accessors, which read the voxels of this leaf and of its neighbors
+        // with no search of the trees. The interior mask has the leaf size of the index tree.
+        const tree::NeighborAccessor<const BoolTreeType> interior(*interiorMask, idxLeaf.origin());
+        const IndexAccessorT vectorIdx(*idxTree, idxLeaf.origin());
 
-        Coord ijk;
-        VIndex column;
         const ValueT diagonal = -6.f, offDiagonal = 1.f;
 
         // Loop over active voxels in this leaf.
-        for (typename VIdxLeafT::ValueOnCIter it = idxLeaf.cbeginValueOn(); it; ++it) {
+        for (IterT it = idxLeaf.cbeginValueOn(); it; ++it) {
             OPENVDB_ASSERT(it.getValue() > -1);
             const math::pcg::SizeType rowNum = static_cast<math::pcg::SizeType>(it.getValue());
 
             LaplacianMatrix::RowEditor row = laplacian->getRowEditor(rowNum);
 
-            ijk = it.getCoord();
-            if (interior.isValueOn(ijk)) {
+            if (interior.isValueOn(it)) {
                 // The current voxel is an interior voxel.
                 // All of its neighbors are in the solution domain.
 
                 // -x direction
-                row.setValue(vectorIdx.getValue(ijk.offsetBy(-1, 0, 0)), offDiagonal);
+                row.setValue(vectorIdx.template getValue<-1, 0, 0>(it), offDiagonal);
                 // -y direction
-                row.setValue(vectorIdx.getValue(ijk.offsetBy(0, -1, 0)), offDiagonal);
+                row.setValue(vectorIdx.template getValue<0, -1, 0>(it), offDiagonal);
                 // -z direction
-                row.setValue(vectorIdx.getValue(ijk.offsetBy(0, 0, -1)), offDiagonal);
+                row.setValue(vectorIdx.template getValue<0, 0, -1>(it), offDiagonal);
                 // diagonal
                 row.setValue(rowNum, diagonal);
                 // +z direction
-                row.setValue(vectorIdx.getValue(ijk.offsetBy(0, 0, 1)), offDiagonal);
+                row.setValue(vectorIdx.template getValue<0, 0, 1>(it), offDiagonal);
                 // +y direction
-                row.setValue(vectorIdx.getValue(ijk.offsetBy(0, 1, 0)), offDiagonal);
+                row.setValue(vectorIdx.template getValue<0, 1, 0>(it), offDiagonal);
                 // +x direction
-                row.setValue(vectorIdx.getValue(ijk.offsetBy(1, 0, 0)), offDiagonal);
+                row.setValue(vectorIdx.template getValue<1, 0, 0>(it), offDiagonal);
 
             } else {
                 // The current voxel is a boundary voxel.
                 // At least one of its neighbors is outside the solution domain.
 
                 ValueT modifiedDiagonal = 0.f;
+                const Coord ijk = it.getCoord();
 
-                // -x direction
-                if (vectorIdx.probeValue(ijk.offsetBy(-1, 0, 0), column)) {
-                    row.setValue(column, offDiagonal);
-                    modifiedDiagonal -= 1;
-                } else {
-                    boundaryOp(ijk, ijk.offsetBy(-1, 0, 0), source->at(rowNum), modifiedDiagonal);
-                }
-                // -y direction
-                if (vectorIdx.probeValue(ijk.offsetBy(0, -1, 0), column)) {
-                    row.setValue(column, offDiagonal);
-                    modifiedDiagonal -= 1;
-                } else {
-                    boundaryOp(ijk, ijk.offsetBy(0, -1, 0), source->at(rowNum), modifiedDiagonal);
-                }
-                // -z direction
-                if (vectorIdx.probeValue(ijk.offsetBy(0, 0, -1), column)) {
-                    row.setValue(column, offDiagonal);
-                    modifiedDiagonal -= 1;
-                } else {
-                    boundaryOp(ijk, ijk.offsetBy(0, 0, -1), source->at(rowNum), modifiedDiagonal);
-                }
-                // +z direction
-                if (vectorIdx.probeValue(ijk.offsetBy(0, 0, 1), column)) {
-                    row.setValue(column, offDiagonal);
-                    modifiedDiagonal -= 1;
-                } else {
-                    boundaryOp(ijk, ijk.offsetBy(0, 0, 1), source->at(rowNum), modifiedDiagonal);
-                }
-                // +y direction
-                if (vectorIdx.probeValue(ijk.offsetBy(0, 1, 0), column)) {
-                    row.setValue(column, offDiagonal);
-                    modifiedDiagonal -= 1;
-                } else {
-                    boundaryOp(ijk, ijk.offsetBy(0, 1, 0), source->at(rowNum), modifiedDiagonal);
-                }
-                // +x direction
-                if (vectorIdx.probeValue(ijk.offsetBy(1, 0, 0), column)) {
-                    row.setValue(column, offDiagonal);
-                    modifiedDiagonal -= 1;
-                } else {
-                    boundaryOp(ijk, ijk.offsetBy(1, 0, 0), source->at(rowNum), modifiedDiagonal);
-                }
+                this->template addNeighbor<-1, 0, 0>(vectorIdx, it, ijk, rowNum, row, modifiedDiagonal);
+                this->template addNeighbor<0, -1, 0>(vectorIdx, it, ijk, rowNum, row, modifiedDiagonal);
+                this->template addNeighbor<0, 0, -1>(vectorIdx, it, ijk, rowNum, row, modifiedDiagonal);
+                this->template addNeighbor<0, 0, 1>(vectorIdx, it, ijk, rowNum, row, modifiedDiagonal);
+                this->template addNeighbor<0, 1, 0>(vectorIdx, it, ijk, rowNum, row, modifiedDiagonal);
+                this->template addNeighbor<1, 0, 0>(vectorIdx, it, ijk, rowNum, row, modifiedDiagonal);
+
                 // diagonal
                 row.setValue(rowNum, modifiedDiagonal);
             }
         } // end loop over voxels
+    }
+
+    // Add the face neighbor at (DX, DY, DZ) to the row of a boundary voxel if it is
+    // in the solution domain, otherwise apply the boundary condition.
+    template<int DX, int DY, int DZ>
+    void addNeighbor(const IndexAccessorT& vectorIdx, const IterT& it, const Coord& ijk,
+        math::pcg::SizeType rowNum, LaplacianMatrix::RowEditor& row, ValueT& modifiedDiagonal) const
+    {
+        VIndex column;
+        if (vectorIdx.template probeValue<DX, DY, DZ>(it, column)) {
+            row.setValue(column, 1.f);
+            modifiedDiagonal -= 1;
+        } else {
+            boundaryOp(ijk, ijk.offsetBy(DX, DY, DZ), source->at(rowNum), modifiedDiagonal);
+        }
     }
 };
 
@@ -637,21 +620,19 @@ struct ISLaplacianOp
     ISLaplacianOp(LaplacianMatrix& m, const VIdxTreeT& idx, const BoundaryOp& op, VectorT& src):
         laplacian(&m), idxTree(&idx), boundaryOp(op), source(&src) {}
 
+    using IndexAccessorT = tree::NeighborAccessor<const VIdxTreeT>;
+    using IterT = typename VIdxLeafT::ValueOnCIter;
+
     void operator()(const VIdxLeafT& idxLeaf, size_t /*leafIdx*/) const
     {
-        typename tree::ValueAccessor<const VIdxTreeT> vectorIdx(*idxTree);
+        // Reads the voxels of this leaf and of its neighbors with no search of the tree
+        const IndexAccessorT vectorIdx(*idxTree, idxLeaf.origin());
 
-        const int kNumOffsets = 6;
-        const Coord ijkOffset[kNumOffsets] = {
-#if OPENVDB_TOOLS_POISSON_LAPLACIAN_STENCIL == 1
-            Coord(-1,0,0), Coord(1,0,0), Coord(0,-1,0), Coord(0,1,0), Coord(0,0,-1), Coord(0,0,1)
-#else
-            Coord(-2,0,0), Coord(2,0,0), Coord(0,-2,0), Coord(0,2,0), Coord(0,0,-2), Coord(0,0,2)
-#endif
-        };
+        // The distance of the neighbors in each direction
+        constexpr int reach = OPENVDB_TOOLS_POISSON_LAPLACIAN_STENCIL == 1 ? 1 : 2;
 
         // For each active voxel in this leaf...
-        for (typename VIdxLeafT::ValueOnCIter it = idxLeaf.cbeginValueOn(); it; ++it) {
+        for (IterT it = idxLeaf.cbeginValueOn(); it; ++it) {
             OPENVDB_ASSERT(it.getValue() > -1);
 
             const Coord ijk = it.getCoord();
@@ -661,32 +642,44 @@ struct ISLaplacianOp
 
             ValueT modifiedDiagonal = 0.f;
 
-            // For each of the neighbors of the voxel at (i,j,k)...
-            for (int dir = 0; dir < kNumOffsets; ++dir) {
-                const Coord neighbor = ijk + ijkOffset[dir];
-                VIndex column;
-                // For collocated vector grids, the central differencing stencil requires
-                // access to neighbors at a distance of two voxels in each direction
-                // (-x, +x, -y, +y, -z, +z).
-#if OPENVDB_TOOLS_POISSON_LAPLACIAN_STENCIL == 1
-                const bool ijkIsInterior = (vectorIdx.probeValue(neighbor + ijkOffset[dir], column)
-                    && vectorIdx.isValueOn(neighbor));
-#else
-                const bool ijkIsInterior = vectorIdx.probeValue(neighbor, column);
-#endif
-                if (ijkIsInterior) {
-                    // If (i,j,k) is sufficiently far away from the exterior,
-                    // set its weight to one and adjust the center weight accordingly.
-                    row.setValue(column, 1.f);
-                    modifiedDiagonal -= 1.f;
-                } else {
-                    // If (i,j,k) is adjacent to or one voxel away from the exterior,
-                    // invoke the boundary condition functor.
-                    boundaryOp(ijk, neighbor, source->at(rowNum), modifiedDiagonal);
-                }
-            }
+            // For each of the neighbors of the voxel at (i,j,k), in the order -x, +x, -y, +y, -z, +z
+            this->template addNeighbor<-reach, 0, 0>(vectorIdx, it, ijk, rowNum, row, modifiedDiagonal);
+            this->template addNeighbor<reach, 0, 0>(vectorIdx, it, ijk, rowNum, row, modifiedDiagonal);
+            this->template addNeighbor<0, -reach, 0>(vectorIdx, it, ijk, rowNum, row, modifiedDiagonal);
+            this->template addNeighbor<0, reach, 0>(vectorIdx, it, ijk, rowNum, row, modifiedDiagonal);
+            this->template addNeighbor<0, 0, -reach>(vectorIdx, it, ijk, rowNum, row, modifiedDiagonal);
+            this->template addNeighbor<0, 0, reach>(vectorIdx, it, ijk, rowNum, row, modifiedDiagonal);
+
             // Set the (possibly modified) weight for the voxel at (i,j,k).
             row.setValue(rowNum, modifiedDiagonal);
+        }
+    }
+
+    // Add the neighbor at (DX, DY, DZ) to the row if it is far enough from the exterior,
+    // otherwise apply the boundary condition.
+    template<int DX, int DY, int DZ>
+    void addNeighbor(const IndexAccessorT& vectorIdx, const IterT& it, const Coord& ijk,
+        math::pcg::SizeType rowNum, LaplacianMatrix::RowEditor& row, ValueT& modifiedDiagonal) const
+    {
+        VIndex column;
+        // For collocated vector grids, the central differencing stencil requires
+        // access to neighbors at a distance of two voxels in each direction.
+#if OPENVDB_TOOLS_POISSON_LAPLACIAN_STENCIL == 1
+        const bool ijkIsInterior =
+            vectorIdx.template probeValue<2 * DX, 2 * DY, 2 * DZ>(it, column)
+            && vectorIdx.template isValueOn<DX, DY, DZ>(it);
+#else
+        const bool ijkIsInterior = vectorIdx.template probeValue<DX, DY, DZ>(it, column);
+#endif
+        if (ijkIsInterior) {
+            // If (i,j,k) is sufficiently far away from the exterior,
+            // set its weight to one and adjust the center weight accordingly.
+            row.setValue(column, 1.f);
+            modifiedDiagonal -= 1.f;
+        } else {
+            // If (i,j,k) is adjacent to or one voxel away from the exterior,
+            // invoke the boundary condition functor.
+            boundaryOp(ijk, ijk.offsetBy(DX, DY, DZ), source->at(rowNum), modifiedDiagonal);
         }
     }
 };

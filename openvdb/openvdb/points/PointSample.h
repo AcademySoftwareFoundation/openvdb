@@ -13,6 +13,7 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/thread/Threading.h>
 #include <openvdb/tools/Interpolation.h>
+#include <openvdb/tree/NeighborAccessor.h>
 #include <openvdb/util/Assert.h>
 
 #include "PointDataGrid.h"
@@ -86,6 +87,12 @@ struct SampleWithRounding
 {
     template<typename ValueT, typename SamplerT, typename AccessorT>
     inline ValueT sample(const AccessorT& accessor, const Vec3d& position) const;
+
+    /// @brief As above, with the reads through @a accessor, a tree::NeighborAccessor that
+    /// moves to the voxels around @a position
+    template<typename ValueT, typename SamplerT, typename AccessorT,
+        std::enable_if_t<tree::IsNeighborAccessor<AccessorT>::value, int> = 0>
+    inline ValueT sample(AccessorT& accessor, const Vec3d& position) const;
 };
 
 // A dummy struct that is used to mean that the sampled attribute should either match the type

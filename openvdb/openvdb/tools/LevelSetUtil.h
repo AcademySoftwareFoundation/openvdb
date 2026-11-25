@@ -22,6 +22,7 @@
 #include <openvdb/Grid.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>
+#include <openvdb/tree/NeighborAccessor.h>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -542,6 +543,9 @@ struct FillMaskBoundary {
     using LeafNodeType = typename TreeType::LeafNodeType;
     using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
     using BoolLeafNodeType = typename BoolTreeType::LeafNodeType;
+    // Read the regions of a fill mask leaf and of its face neighbors with no search of the trees
+    using MaskNeighborsT = tree::NeighborAccessor<const BoolTreeType>;
+    using DistNeighborsT = tree::NeighborAccessor<const TreeType>;
 
     FillMaskBoundary(const TreeType& tree, ValueType isovalue, const BoolTreeType& fillMask,
         const BoolLeafNodeType ** fillNodes, BoolLeafNodeType ** newNodes)
@@ -555,8 +559,9 @@ struct FillMaskBoundary {
 
     void operator()(const tbb::blocked_range<size_t>& range) const {
 
-        tree::ValueAccessor<const BoolTreeType> maskAcc(*mFillMask);
         tree::ValueAccessor<const TreeType> distAcc(*mTree);
+        MaskNeighborsT maskNeighbors(*mFillMask);
+        DistNeighborsT distNeighbors(*mTree);
 
         std::unique_ptr<char[]> valueMask(new char[BoolLeafNodeType::SIZE]);
 
@@ -568,29 +573,19 @@ struct FillMaskBoundary {
 
             const bool denseNode = node.isDense();
 
+            maskNeighbors.moveTo(origin);
+
             // possible early out if the fill mask is dense
             if (denseNode) {
 
+                // A dense leaf has a full value mask
                 int denseNeighbors = 0;
-
-                const BoolLeafNodeType* neighborNode =
-                    maskAcc.probeConstLeaf(origin.offsetBy(-1, 0, 0));
-                if (neighborNode && neighborNode->isDense()) ++denseNeighbors;
-
-                neighborNode = maskAcc.probeConstLeaf(origin.offsetBy(BoolLeafNodeType::DIM, 0, 0));
-                if (neighborNode && neighborNode->isDense()) ++denseNeighbors;
-
-                neighborNode = maskAcc.probeConstLeaf(origin.offsetBy(0, -1, 0));
-                if (neighborNode && neighborNode->isDense()) ++denseNeighbors;
-
-                neighborNode = maskAcc.probeConstLeaf(origin.offsetBy(0, BoolLeafNodeType::DIM, 0));
-                if (neighborNode && neighborNode->isDense()) ++denseNeighbors;
-
-                neighborNode = maskAcc.probeConstLeaf(origin.offsetBy(0, 0, -1));
-                if (neighborNode && neighborNode->isDense()) ++denseNeighbors;
-
-                neighborNode = maskAcc.probeConstLeaf(origin.offsetBy(0, 0, BoolLeafNodeType::DIM));
-                if (neighborNode && neighborNode->isDense()) ++denseNeighbors;
+                if (isDenseLeaf<-1, 0, 0>(maskNeighbors)) ++denseNeighbors;
+                if (isDenseLeaf< 1, 0, 0>(maskNeighbors)) ++denseNeighbors;
+                if (isDenseLeaf< 0,-1, 0>(maskNeighbors)) ++denseNeighbors;
+                if (isDenseLeaf< 0, 1, 0>(maskNeighbors)) ++denseNeighbors;
+                if (isDenseLeaf< 0, 0,-1>(maskNeighbors)) ++denseNeighbors;
+                if (isDenseLeaf< 0, 0, 1>(maskNeighbors)) ++denseNeighbors;
 
                 if (denseNeighbors == 6) continue;
             }
@@ -619,12 +614,13 @@ struct FillMaskBoundary {
             // check external voxel neighbors
 
             if (!earlyTermination) {
-                evalExternalNeighborsX<true>(valueMask.get(), node, maskAcc, distAcc);
-                evalExternalNeighborsX<false>(valueMask.get(), node, maskAcc, distAcc);
-                evalExternalNeighborsY<true>(valueMask.get(), node, maskAcc, distAcc);
-                evalExternalNeighborsY<false>(valueMask.get(), node, maskAcc, distAcc);
-                evalExternalNeighborsZ<true>(valueMask.get(), node, maskAcc, distAcc);
-                evalExternalNeighborsZ<false>(valueMask.get(), node, maskAcc, distAcc);
+                distNeighbors.moveTo(origin);
+                evalExternalNeighborsX<true>(valueMask.get(), node, maskNeighbors, distNeighbors);
+                evalExternalNeighborsX<false>(valueMask.get(), node, maskNeighbors, distNeighbors);
+                evalExternalNeighborsY<true>(valueMask.get(), node, maskNeighbors, distNeighbors);
+                evalExternalNeighborsY<false>(valueMask.get(), node, maskNeighbors, distNeighbors);
+                evalExternalNeighborsZ<true>(valueMask.get(), node, maskNeighbors, distNeighbors);
+                evalExternalNeighborsZ<false>(valueMask.get(), node, maskNeighbors, distNeighbors);
             }
 
             // Export marked boundary voxels.
@@ -644,6 +640,14 @@ struct FillMaskBoundary {
     }
 
 private:
+    // True if the region at (I, J, K) from the bound region is a leaf with a full value mask
+    template<int I, int J, int K>
+    static bool isDenseLeaf(const MaskNeighborsT& maskNeighbors)
+    {
+        return maskNeighbors.template isLeaf<I, J, K>() &&
+            maskNeighbors.template getValueMask<I, J, K>().isOn();
+    }
+
     // Check internal voxel neighbors in positive {x, y, z} directions.
     void evalInternalNeighborsP(char* valueMask, const BoolLeafNodeType& node,
         const LeafNodeType& distNode) const
@@ -868,15 +872,12 @@ private:
     // If UpWind is true check the X+ oriented node face, else the X- oriented face.
     template<bool UpWind>
     void evalExternalNeighborsX(char* valueMask, const BoolLeafNodeType& node,
-        const tree::ValueAccessor<const BoolTreeType>& maskAcc,
-        const tree::ValueAccessor<const TreeType>& distAcc) const {
+        const MaskNeighborsT& maskAcc, const DistNeighborsT& distAcc) const {
 
-        const Coord& origin = node.origin();
-        Coord ijk(0, 0, 0), nijk;
-        int step = -1;
+        Coord ijk(0, 0, 0);
+        constexpr int step = UpWind ? 1 : -1;
 
         if (UpWind) {
-            step = 1;
             ijk[0] = int(BoolLeafNodeType::DIM) - 1;
         }
 
@@ -889,10 +890,8 @@ private:
                 const Index pos = yPos + ijk[2];
 
                 if (valueMask[pos] == 0 && node.isValueOn(pos)) {
-
-                    nijk = origin + ijk.offsetBy(step, 0, 0);
-
-                    if (!maskAcc.isValueOn(nijk) && distAcc.getValue(nijk) > mIsovalue) {
+                    if (!maskAcc.template isValueOn<step, 0, 0>(pos) &&
+                        distAcc.template getValue<step, 0, 0>(pos) > mIsovalue) {
                         valueMask[pos] = 1;
                     }
                 }
@@ -903,15 +902,12 @@ private:
     // If UpWind is true check the Y+ oriented node face, else the Y- oriented face.
     template<bool UpWind>
     void evalExternalNeighborsY(char* valueMask, const BoolLeafNodeType& node,
-        const tree::ValueAccessor<const BoolTreeType>& maskAcc,
-        const tree::ValueAccessor<const TreeType>& distAcc) const {
+        const MaskNeighborsT& maskAcc, const DistNeighborsT& distAcc) const {
 
-        const Coord& origin = node.origin();
-        Coord ijk(0, 0, 0), nijk;
-        int step = -1;
+        Coord ijk(0, 0, 0);
+        constexpr int step = UpWind ? 1 : -1;
 
         if (UpWind) {
-            step = 1;
             ijk[1] = int(BoolLeafNodeType::DIM) - 1;
         }
 
@@ -924,9 +920,8 @@ private:
                 const Index pos = xPos + ijk[2];
 
                 if (valueMask[pos] == 0 && node.isValueOn(pos)) {
-
-                    nijk = origin + ijk.offsetBy(0, step, 0);
-                    if (!maskAcc.isValueOn(nijk) && distAcc.getValue(nijk) > mIsovalue) {
+                    if (!maskAcc.template isValueOn<0, step, 0>(pos) &&
+                        distAcc.template getValue<0, step, 0>(pos) > mIsovalue) {
                         valueMask[pos] = 1;
                     }
                 }
@@ -937,15 +932,12 @@ private:
     // If UpWind is true check the Z+ oriented node face, else the Z- oriented face.
     template<bool UpWind>
     void evalExternalNeighborsZ(char* valueMask, const BoolLeafNodeType& node,
-        const tree::ValueAccessor<const BoolTreeType>& maskAcc,
-        const tree::ValueAccessor<const TreeType>& distAcc) const {
+        const MaskNeighborsT& maskAcc, const DistNeighborsT& distAcc) const {
 
-        const Coord& origin = node.origin();
-        Coord ijk(0, 0, 0), nijk;
-        int step = -1;
+        Coord ijk(0, 0, 0);
+        constexpr int step = UpWind ? 1 : -1;
 
         if (UpWind) {
-            step = 1;
             ijk[2] = int(BoolLeafNodeType::DIM) - 1;
         }
 
@@ -956,9 +948,8 @@ private:
                 const Index pos = ijk[2] + xPos + (ijk[1] << int(BoolLeafNodeType::LOG2DIM));
 
                 if (valueMask[pos] == 0 && node.isValueOn(pos)) {
-
-                    nijk = origin + ijk.offsetBy(0, 0, step);
-                    if (!maskAcc.isValueOn(nijk) && distAcc.getValue(nijk) > mIsovalue) {
+                    if (!maskAcc.template isValueOn<0, 0, step>(pos) &&
+                        distAcc.template getValue<0, 0, step>(pos) > mIsovalue) {
                         valueMask[pos] = 1;
                     }
                 }
@@ -1220,7 +1211,6 @@ struct MaskIsovalueCrossingVoxels
     void operator()(const tbb::blocked_range<size_t>& range) {
 
         const InputValueType iso = mIsovalue;
-        Coord ijk(0, 0, 0);
 
         BoolLeafNodeType* maskNodePt = nullptr;
 
@@ -1233,44 +1223,33 @@ struct MaskIsovalueCrossingVoxels
 
             bool collectedData = false;
 
+            mInputAccessor.moveTo(node.origin());
+            const tree::NeighborAccessor<const InputTreeType>& acc = mInputAccessor;
+
             for (typename InputLeafNodeType::ValueOnCIter it = node.cbeginValueOn(); it; ++it) {
 
                 bool isUnder = *it < iso;
 
-                ijk = it.getCoord();
-
-                ++ijk[2];
-                bool signChange = isUnder != (mInputAccessor.getValue(ijk) < iso); // +z edge
-                --ijk[2];
+                bool signChange = isUnder != (acc.template getValue<0, 0, 1>(it) < iso); // +z edge
 
                 if (!signChange) {
-                    --ijk[2];
-                    signChange = isUnder != (mInputAccessor.getValue(ijk) < iso); // -z edge
-                    ++ijk[2];
+                    signChange = isUnder != (acc.template getValue<0, 0, -1>(it) < iso); // -z edge
                 }
 
                 if (!signChange) {
-                    ++ijk[1];
-                    signChange = isUnder != (mInputAccessor.getValue(ijk) < iso); // +y edge
-                    --ijk[1];
+                    signChange = isUnder != (acc.template getValue<0, 1, 0>(it) < iso); // +y edge
                 }
 
                 if (!signChange) {
-                    --ijk[1];
-                    signChange = isUnder != (mInputAccessor.getValue(ijk) < iso); // -y edge
-                    ++ijk[1];
+                    signChange = isUnder != (acc.template getValue<0, -1, 0>(it) < iso); // -y edge
                 }
 
                 if (!signChange) {
-                    ++ijk[0];
-                    signChange = isUnder != (mInputAccessor.getValue(ijk) < iso); // +x edge
-                    --ijk[0];
+                    signChange = isUnder != (acc.template getValue<1, 0, 0>(it) < iso); // +x edge
                 }
 
                 if (!signChange) {
-                    --ijk[0];
-                    signChange = isUnder != (mInputAccessor.getValue(ijk) < iso); // -x edge
-                    ++ijk[0];
+                    signChange = isUnder != (acc.template getValue<-1, 0, 0>(it) < iso); // -x edge
                 }
 
                 if (signChange) {
@@ -1293,7 +1272,8 @@ struct MaskIsovalueCrossingVoxels
     }
 
 private:
-    tree::ValueAccessor<const InputTreeType>    mInputAccessor;
+    // Reads the face neighbors of each leaf with no search of the tree
+    tree::NeighborAccessor<const InputTreeType> mInputAccessor;
     InputLeafNodeType const * const * const     mInputNodes;
 
     BoolTreeType                                mMaskTree;

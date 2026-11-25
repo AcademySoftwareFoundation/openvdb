@@ -213,7 +213,7 @@ private:
     struct Normalizer
     {
         using SchemeT = math::BIAS_SCHEME<SpatialScheme>;
-        using StencilT = typename SchemeT::template ISStencil<GridType>::StencilType;
+        using StencilT = typename SchemeT::template ISStencil<GridType, false>::StencilType;
         using MaskLeafT = typename MaskT::LeafNodeType;
         using MaskIterT = typename MaskLeafT::ValueOnCIter;
         using VoxelIterT = typename LeafType::ValueOnCIter;

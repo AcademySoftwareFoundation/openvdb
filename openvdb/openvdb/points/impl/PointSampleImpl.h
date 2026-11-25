@@ -62,7 +62,9 @@ template <size_t T0, bool T1> struct SamplerTraits<tools::Sampler<T0, T1>> {
 template <typename ValueT, typename SamplerT, typename AccessorT, bool Round, bool Compatible = false>
 struct SampleWithRoundingOp
 {
-    static inline void sample(ValueT&, const AccessorT&, const Vec3d&)
+    // @a AccessorRefT is AccessorT, which is const except for a tree::NeighborAccessor
+    template <typename AccessorRefT>
+    static inline void sample(ValueT&, AccessorRefT&, const Vec3d&)
     {
         std::ostringstream ostr;
         ostr << "Cannot sample a " << typeNameAsString<typename AccessorT::ValueType>()
@@ -74,7 +76,8 @@ struct SampleWithRoundingOp
 template <typename ValueT, typename SamplerT, typename AccessorT>
 struct SampleWithRoundingOp<ValueT, SamplerT, AccessorT, /*Round=*/true, /*Compatible=*/true>
 {
-    static inline void sample(ValueT& value, const AccessorT& accessor, const Vec3d& position)
+    template <typename AccessorRefT>
+    static inline void sample(ValueT& value, AccessorRefT& accessor, const Vec3d& position)
     {
         value = ValueT(math::Round(SamplerT::sample(accessor, position)));
     }
@@ -83,11 +86,43 @@ struct SampleWithRoundingOp<ValueT, SamplerT, AccessorT, /*Round=*/true, /*Compa
 template <typename ValueT, typename SamplerT, typename AccessorT>
 struct SampleWithRoundingOp<ValueT, SamplerT, AccessorT, /*Round=*/false, /*Compatible=*/true>
 {
-    static inline void sample(ValueT& value, const AccessorT& accessor, const Vec3d& position)
+    template <typename AccessorRefT>
+    static inline void sample(ValueT& value, AccessorRefT& accessor, const Vec3d& position)
     {
         value = ValueT(SamplerT::sample(accessor, position));
     }
 };
+
+
+// Sample through @a accessor, a const accessor or a non-const tree::NeighborAccessor
+template<typename ValueT, typename SamplerT, typename AccessorRefT>
+inline ValueT
+sampleWithRounding(AccessorRefT& accessor, const Vec3d& position)
+{
+    using AccessorT = std::remove_const_t<AccessorRefT>;
+    using SourceValueT = typename AccessorT::ValueType;
+    static const bool staggered = SamplerTraits<SamplerT>::Staggered;
+    static const bool compatible = CompatibleTypes</*from=*/SourceValueT, /*to=*/ValueT>::value &&
+                                   (!staggered || (staggered && VecTraits<SourceValueT>::Size == 3));
+    static const bool round =   std::is_floating_point<SourceValueT>::value &&
+                                std::is_integral<ValueT>::value;
+    ValueT value;
+    SampleWithRoundingOp<ValueT, SamplerT, AccessorT, round, compatible>::sample(
+        value, accessor, position);
+    return value;
+}
+
+
+// True if @a SamplerT, a sampler of point_sample_internal::PointDataSampler, has a
+// sample() method that takes a tree::NeighborAccessor<TreeT>, as SampleWithRounding does
+template<typename SamplerT, typename ValueT, typename GridSamplerT, typename TreeT, typename = void>
+struct HasNeighborAccessorSample: std::false_type {};
+
+template<typename SamplerT, typename ValueT, typename GridSamplerT, typename TreeT>
+struct HasNeighborAccessorSample<SamplerT, ValueT, GridSamplerT, TreeT, std::void_t<decltype(
+    static_cast<ValueT (SamplerT::*)(tree::NeighborAccessor<TreeT>&, const Vec3d&) const>(
+        &SamplerT::template sample<ValueT, GridSamplerT, tree::NeighborAccessor<TreeT>>))>>:
+    std::true_type {};
 
 
 template <typename PointDataGridT, typename SamplerT, typename FilterT, typename InterrupterT>
@@ -137,7 +172,13 @@ private:
     {
         using ValueType = ValueT;
         using SourceValueType = typename SourceGridT::ValueType;
-        using SourceAccessorT = typename SourceGridT::ConstAccessor;
+        using SourceTreeT = const typename SourceGridT::TreeType;
+        // The points of a leaf are near each other, so a NeighborAccessor reads their
+        // samples with few searches of the tree, if the sampler takes one.
+        static constexpr bool UseNeighbors =
+            HasNeighborAccessorSample<SamplerT, ValueT, GridSamplerT, SourceTreeT>::value;
+        using SourceAccessorT = std::conditional_t<UseNeighbors,
+            tree::NeighborAccessor<SourceTreeT>, typename SourceGridT::ConstAccessor>;
 
         // can only sample from a bool or mask grid using a PointSampler
         static const bool SourceIsBool = std::is_same<SourceValueType, bool>::value ||
@@ -146,7 +187,7 @@ private:
         static const bool IsValid = !SourceIsBool || OrderIsZero;
 
         SamplerWrapper(const SourceGridT& sourceGrid, const SamplerT& sampler)
-            : mAccessor(sourceGrid.getConstAccessor())
+            : mAccessor(sourceGrid.tree())
             , mSampler(sampler) { }
 
         // note that creating a new accessor from the underlying tree is faster than
@@ -169,7 +210,8 @@ private:
         }
 
     private:
-        SourceAccessorT mAccessor;
+        // A NeighborAccessor moves when it samples
+        mutable SourceAccessorT mAccessor;
         const SamplerT& mSampler;
     }; // struct SamplerWrapper
 
@@ -297,17 +339,14 @@ struct AppendAttributeOp<PointDataGridT, DummySampleType>
 template<typename ValueT, typename SamplerT, typename AccessorT>
 ValueT SampleWithRounding::sample(const AccessorT& accessor, const Vec3d& position) const
 {
-    using namespace point_sample_internal;
-    using SourceValueT = typename AccessorT::ValueType;
-    static const bool staggered = SamplerTraits<SamplerT>::Staggered;
-    static const bool compatible = CompatibleTypes</*from=*/SourceValueT, /*to=*/ValueT>::value &&
-                                   (!staggered || (staggered && VecTraits<SourceValueT>::Size == 3));
-    static const bool round =   std::is_floating_point<SourceValueT>::value &&
-                                std::is_integral<ValueT>::value;
-    ValueT value;
-    SampleWithRoundingOp<ValueT, SamplerT, AccessorT, round, compatible>::sample(
-        value, accessor, position);
-    return value;
+    return point_sample_internal::sampleWithRounding<ValueT, SamplerT>(accessor, position);
+}
+
+template<typename ValueT, typename SamplerT, typename AccessorT,
+    std::enable_if_t<tree::IsNeighborAccessor<AccessorT>::value, int>>
+ValueT SampleWithRounding::sample(AccessorT& accessor, const Vec3d& position) const
+{
+    return point_sample_internal::sampleWithRounding<ValueT, SamplerT>(accessor, position);
 }
 
 

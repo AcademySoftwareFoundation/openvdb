@@ -680,6 +680,50 @@ TEST_F(TestStats, testGridOperatorStats)
 }
 
 
+TEST_F(TestStats, testGridOperatorStatsTile)
+{
+    using namespace openvdb;
+
+    using OpT = math::ISOpMagnitude<math::ISGradient<math::FD_1ST>>;
+
+    // A single active tile, the size of one leaf node, next to a different background.
+    FloatGrid grid(/*background=*/0.0f);
+    const CoordBBox bbox = CoordBBox::createCube(Coord(0), 8);
+    grid.fill(bbox, /*value=*/1.0f);
+
+    ASSERT_EQ(Index32(0), grid.tree().leafCount());
+    ASSERT_EQ(Index64(1), grid.tree().activeTileCount());
+
+    // Evaluate the operator at every voxel of the tile. The voxels on the
+    // upper faces see the background, so the results differ across the tile.
+    math::Stats expected;
+    FloatGrid::ConstAccessor accessor = grid.getConstAccessor();
+    for (Coord ijk = bbox.min(); ijk.x() <= bbox.max().x(); ++ijk.x()) {
+        for (ijk.y() = bbox.min().y(); ijk.y() <= bbox.max().y(); ++ijk.y()) {
+            for (ijk.z() = bbox.min().z(); ijk.z() <= bbox.max().z(); ++ijk.z()) {
+                expected.add(OpT::result(accessor, ijk));
+            }
+        }
+    }
+    ASSERT_GT(expected.variance(), 0.0);
+
+    for (int threaded = 0; threaded <= 1; ++threaded) {
+        const math::Stats stats = tools::opStatistics(grid.cbeginValueOn(), OpT(), threaded);
+
+        EXPECT_EQ(expected.size(), stats.size());
+        EXPECT_NEAR(expected.min(), stats.min(), /*tolerance=*/0.0);
+        EXPECT_NEAR(expected.max(), stats.max(), /*tolerance=*/0.0);
+        EXPECT_NEAR(expected.mean(), stats.mean(), /*tolerance=*/1.0e-8);
+        EXPECT_NEAR(expected.variance(), stats.variance(), /*tolerance=*/1.0e-8);
+
+        const math::Extrema extrema = tools::opExtrema(grid.cbeginValueOn(), OpT(), threaded);
+
+        EXPECT_NEAR(expected.min(), extrema.min(), /*tolerance=*/0.0);
+        EXPECT_NEAR(expected.max(), extrema.max(), /*tolerance=*/0.0);
+    }
+}
+
+
 TEST_F(TestStats, testGridHistogram)
 {
     using namespace openvdb;

@@ -484,3 +484,194 @@ TEST_F(TestPoissonSolver, testSolveWithSegmentedDomain)
     }
 #endif
 }
+
+
+namespace {
+
+using openvdb::tools::poisson::LaplacianMatrix;
+using openvdb::tools::poisson::VIndex;
+using LaplacianValueT = LaplacianMatrix::ValueType;
+using LaplacianVectorT = openvdb::math::pcg::Vector<LaplacianValueT>;
+
+// A boundary condition that depends on both voxels, so that a wrong neighbor changes the result
+struct OffsetBoundaryOp
+{
+    void operator()(const openvdb::Coord& ijk, const openvdb::Coord& neighbor,
+        LaplacianValueT& source, LaplacianValueT& diagonal) const
+    {
+        source += 0.01 * (neighbor.x() - 2 * neighbor.y() + 3 * neighbor.z()) + 0.001 * ijk.x();
+        diagonal -= 1.0 + 0.125 * (neighbor.x() - ijk.x()) + 0.0625 * (neighbor.z() - ijk.z());
+    }
+};
+
+// The staggered Laplacian, with reads through ValueAccessors
+template<typename BoolTreeType, typename BoundaryOp>
+struct ReferenceStaggeredLaplacianOp
+{
+    using VIdxTreeT = typename BoolTreeType::template ValueConverter<VIndex>::Type;
+    using VIdxLeafT = typename VIdxTreeT::LeafNodeType;
+
+    void operator()(const VIdxLeafT& idxLeaf, size_t) const
+    {
+        using namespace openvdb;
+        tree::ValueAccessor<const BoolTreeType> interior(*interiorMask);
+        tree::ValueAccessor<const VIdxTreeT> vectorIdx(*idxTree);
+        const Coord offsets[6] = {Coord(-1, 0, 0), Coord(0, -1, 0), Coord(0, 0, -1),
+            Coord(0, 0, 1), Coord(0, 1, 0), Coord(1, 0, 0)};
+        for (auto it = idxLeaf.cbeginValueOn(); it; ++it) {
+            const math::pcg::SizeType rowNum = static_cast<math::pcg::SizeType>(it.getValue());
+            LaplacianMatrix::RowEditor row = laplacian->getRowEditor(rowNum);
+            const Coord ijk = it.getCoord();
+            if (interior.isValueOn(ijk)) {
+                for (int n = 0; n < 3; ++n) row.setValue(vectorIdx.getValue(ijk + offsets[n]), 1.f);
+                row.setValue(rowNum, -6.f);
+                for (int n = 3; n < 6; ++n) row.setValue(vectorIdx.getValue(ijk + offsets[n]), 1.f);
+            } else {
+                LaplacianValueT modifiedDiagonal = 0.f;
+                for (const Coord& offset : offsets) {
+                    VIndex column;
+                    if (vectorIdx.probeValue(ijk + offset, column)) {
+                        row.setValue(column, 1.f);
+                        modifiedDiagonal -= 1;
+                    } else {
+                        boundaryOp(ijk, ijk + offset, source->at(rowNum), modifiedDiagonal);
+                    }
+                }
+                row.setValue(rowNum, modifiedDiagonal);
+            }
+        }
+    }
+
+    LaplacianMatrix* laplacian;
+    const VIdxTreeT* idxTree;
+    const BoolTreeType* interiorMask;
+    BoundaryOp boundaryOp;
+    LaplacianVectorT* source;
+};
+
+// The collocated Laplacian, with reads through a ValueAccessor
+template<typename VIdxTreeT, typename BoundaryOp>
+struct ReferenceLaplacianOp
+{
+    using VIdxLeafT = typename VIdxTreeT::LeafNodeType;
+
+    void operator()(const VIdxLeafT& idxLeaf, size_t) const
+    {
+        using namespace openvdb;
+        tree::ValueAccessor<const VIdxTreeT> vectorIdx(*idxTree);
+#if OPENVDB_TOOLS_POISSON_LAPLACIAN_STENCIL == 1
+        const int reach = 1;
+#else
+        const int reach = 2;
+#endif
+        const Coord offsets[6] = {Coord(-reach, 0, 0), Coord(reach, 0, 0), Coord(0, -reach, 0),
+            Coord(0, reach, 0), Coord(0, 0, -reach), Coord(0, 0, reach)};
+        for (auto it = idxLeaf.cbeginValueOn(); it; ++it) {
+            const Coord ijk = it.getCoord();
+            const math::pcg::SizeType rowNum = static_cast<math::pcg::SizeType>(it.getValue());
+            LaplacianMatrix::RowEditor row = laplacian->getRowEditor(rowNum);
+            LaplacianValueT modifiedDiagonal = 0.f;
+            for (const Coord& offset : offsets) {
+                const Coord neighbor = ijk + offset;
+                VIndex column;
+#if OPENVDB_TOOLS_POISSON_LAPLACIAN_STENCIL == 1
+                const bool ijkIsInterior = vectorIdx.probeValue(neighbor + offset, column)
+                    && vectorIdx.isValueOn(neighbor);
+#else
+                const bool ijkIsInterior = vectorIdx.probeValue(neighbor, column);
+#endif
+                if (ijkIsInterior) {
+                    row.setValue(column, 1.f);
+                    modifiedDiagonal -= 1.f;
+                } else {
+                    boundaryOp(ijk, neighbor, source->at(rowNum), modifiedDiagonal);
+                }
+            }
+            row.setValue(rowNum, modifiedDiagonal);
+        }
+    }
+
+    LaplacianMatrix* laplacian;
+    const VIdxTreeT* idxTree;
+    BoundaryOp boundaryOp;
+    LaplacianVectorT* source;
+};
+
+void
+checkSameMatrix(const LaplacianMatrix& expected, const LaplacianMatrix& matrix)
+{
+    ASSERT_EQ(expected.numRows(), matrix.numRows());
+    for (openvdb::math::pcg::SizeType n = 0; n < expected.numRows(); ++n) {
+        const LaplacianMatrix::ConstRow expectedRow = expected.getConstRow(n);
+        const LaplacianMatrix::ConstRow row = matrix.getConstRow(n);
+        ASSERT_EQ(expectedRow.size(), row.size()) << " in row " << n;
+        auto iter = row.cbegin();
+        for (auto expectedIter = expectedRow.cbegin(); expectedIter; ++expectedIter, ++iter) {
+            EXPECT_EQ(expectedIter.column(), iter.column()) << " in row " << n;
+            EXPECT_EQ(*expectedIter, *iter) << " in row " << n;
+        }
+    }
+}
+
+template<typename TreeT>
+void
+checkLaplacianNeighbors()
+{
+    using namespace openvdb;
+    using BoolTreeT = typename TreeT::template ValueConverter<bool>::Type;
+    using VIdxTreeT = typename TreeT::template ValueConverter<VIndex>::Type;
+
+    // A ball with a box cut out of it, so that the domain has boundaries inside it
+    TreeT domain(0.f);
+    for (int i = -10; i <= 10; ++i) {
+        for (int j = -10; j <= 10; ++j) {
+            for (int k = -10; k <= 10; ++k) {
+                if (i * i + j * j + k * k > 90) continue;
+                if (i > -2 && i < 3 && j > 0 && j < 5) continue;
+                domain.setValueOn(Coord(i, j, k), float(i + j + k));
+            }
+        }
+    }
+    const typename VIdxTreeT::Ptr indexTree = tools::poisson::createIndexTree(domain);
+    const math::pcg::SizeType size = math::pcg::SizeType(indexTree->activeVoxelCount());
+
+    // The interior is the domain less its boundary, with some voxels turned off
+    BoolTreeT interior(*indexTree, false, TopologyCopy());
+    tools::erodeActiveValues(interior, 1, tools::NN_FACE, tools::IGNORE_TILES);
+    int count = 0;
+    for (auto iter = interior.beginValueOn(); iter; ++iter) {
+        if (count++ % 7 == 0) iter.setValueOff();
+    }
+
+    const OffsetBoundaryOp boundaryOp;
+    tree::LeafManager<const VIdxTreeT> leafManager(*indexTree);
+    for (bool staggered : {true, false}) {
+        LaplacianVectorT source(size, 0.5), expectedSource(size, 0.5);
+        const LaplacianMatrix::Ptr laplacian = tools::poisson::createISLaplacianWithBoundaryConditions(
+            *indexTree, interior, boundaryOp, source, staggered);
+
+        LaplacianMatrix expected(size);
+        if (staggered) {
+            leafManager.foreach(ReferenceStaggeredLaplacianOp<BoolTreeT, OffsetBoundaryOp>{
+                &expected, indexTree.get(), &interior, boundaryOp, &expectedSource});
+        } else {
+            leafManager.foreach(ReferenceLaplacianOp<VIdxTreeT, OffsetBoundaryOp>{
+                &expected, indexTree.get(), boundaryOp, &expectedSource});
+        }
+
+        checkSameMatrix(expected, *laplacian);
+        for (math::pcg::SizeType n = 0; n < size; ++n) EXPECT_EQ(expectedSource[n], source[n]);
+    }
+}
+
+} // unnamed namespace
+
+
+TEST_F(TestPoissonSolver, testLaplacianNeighbors)
+{
+    using namespace openvdb;
+    checkLaplacianNeighbors<FloatTree>();
+    // Smaller internal nodes, so that more voxels read across nodes. The leaves
+    // stay at the size that erodeActiveValues supports.
+    checkLaplacianNeighbors<tree::Tree4<float, 4, 3, 3>::Type>();
+}
