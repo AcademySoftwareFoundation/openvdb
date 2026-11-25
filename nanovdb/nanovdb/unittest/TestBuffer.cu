@@ -1914,6 +1914,32 @@ TEST(TestBuffer, MeshToGridMatchesAcrossResources)
     EXPECT_EQ(0, std::memcmp(udfA.data(), udfB.data(), udfA.size()));
 }
 
+TEST(TestBuffer, MeshToGridFromTriangleMeshView)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    using MeshToGridT = nanovdb::tools::cuda::MeshToGrid<BuildT>;
+    const std::vector<nanovdb::Vec3f> points = {{0.f,0.f,0.f}, {1.f,0.f,0.f}, {0.f,1.f,0.f}, {0.f,0.f,1.f}};
+    const std::vector<nanovdb::Vec3i> triangles = {{0,1,2}, {0,2,3}, {0,3,1}, {1,2,3}};
+    auto d_points = toDevice(points);
+    auto d_triangles = toDevice(triangles);
+    nanovdb::Map map;
+    map.set(0.1, nanovdb::Vec3d(0.0));
+
+    // the view constructor builds the same grid as the pointer constructor
+    const nanovdb::math::TriangleMeshView view{d_points.data(), d_triangles.data(), uint32_t(points.size()),
+                                               uint32_t(triangles.size())};
+    auto fromPointers = MeshToGridT(d_points.data(), uint32_t(points.size()), d_triangles.data(),
+                                    uint32_t(triangles.size()), map).getHandle();
+    auto fromView = MeshToGridT(view, map).getHandle();
+    expectSameBytes(hostImage(fromPointers), hostImage(fromView));
+
+    // triangles need both arrays and some points
+    EXPECT_THROW(MeshToGridT(nullptr, 4u, d_triangles.data(), 4u), std::runtime_error);
+    EXPECT_THROW(MeshToGridT(d_points.data(), 4u, nullptr, 4u), std::runtime_error);
+    EXPECT_THROW(MeshToGridT(d_points.data(), 0u, d_triangles.data(), 4u), std::runtime_error);
+    EXPECT_THROW(MeshToGridT(nanovdb::math::TriangleMeshView{nullptr, d_triangles.data(), 4u, 4u}), std::runtime_error);
+}
+
 TEST(TestBuffer, IndexToGridMatchesAcrossResources)
 {
     using BuildT = nanovdb::ValueOnIndex;

@@ -25,6 +25,7 @@
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/GridHandle.h>
+#include <nanovdb/math/Primitives.h>
 #include <nanovdb/cuda/Buffer.h>
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/util/cuda/Timer.h>
@@ -39,20 +40,10 @@ namespace nanovdb {
 
 namespace tools::cuda {
 
-/// @brief POD triangle type with __hostdev__ accessors, safe for use in both host and device code.
-///
-///        Used as the element type of the transformed-triangle device buffer throughout MeshToGrid.
-///        The only interface requirement imposed on this type by the rasterization functors in
-///        Rasterization.cuh is a __hostdev__ const Vec3f& operator[](int) const returning the
-///        i-th vertex (i = 0, 1, 2).
-///
-/// @todo  This type should ultimately migrate to a dedicated geometric-primitives header in
-///        nanovdb/math/ (e.g. nanovdb/math/Primitives.h) once such a header is introduced.
-struct Triangle {
-    nanovdb::Vec3f v[3];
-    __hostdev__ const nanovdb::Vec3f& operator[](int i) const { return v[i]; }
-    __hostdev__       nanovdb::Vec3f& operator[](int i)       { return v[i]; }
-};
+/// @brief POD triangle type, now math::Triangle (nanovdb/math/Primitives.h); this alias keeps
+///        the former name. The rasterization functors in Rasterization.cuh only require a
+///        __hostdev__ const Vec3f& operator[](int) const returning the i-th vertex (i = 0, 1, 2).
+using Triangle = nanovdb::math::Triangle;
 
 /// @brief Pairing of a leaf-node origin with a triangle id. Independent of the
 ///        resource the converter allocates from, so it lives outside MeshToGrid
@@ -94,6 +85,7 @@ public:
     /// @param deviceTriangles Triangle index list
     /// @param triangleCount Triangle count
     /// @param map Affine map to be used in the conversion
+    /// @throw std::runtime_error if there are triangles but no points, or a null array
     MeshToGrid(
         const nanovdb::Vec3f *devicePoints,
         const uint32_t pointCount,
@@ -108,6 +100,21 @@ public:
          mXformedTriangles(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit),
          mBoxTrianglePairsBuffer(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit),
          mUniqueRootOriginsBuffer(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
+    {
+        if (triangleCount && (!devicePoints || !deviceTriangles || !pointCount))
+            throw std::runtime_error("MeshToGrid: triangles without points, or null mesh arrays");
+    }
+
+    /// @brief Constructor from a view of the input triangle mesh
+    /// @param mesh Device-resident indexed triangle mesh
+    /// @param map Affine map to be used in the conversion
+    MeshToGrid(
+        const nanovdb::math::TriangleMeshView &mesh,
+        const nanovdb::Map map = nanovdb::Map(),
+        cudaStream_t stream = 0,
+        ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>()
+    )
+        : MeshToGrid(mesh.points, mesh.pointCount, mesh.triangles, mesh.triangleCount, map, stream, resource)
     {}
 
     /// @brief Toggle on and off verbose mode
