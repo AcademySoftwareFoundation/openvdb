@@ -85,6 +85,7 @@ public:
     /// @param deviceTriangles Triangle index list
     /// @param triangleCount Triangle count
     /// @param map Affine map to be used in the conversion
+    /// @throw std::runtime_error if there are triangles but no points, or a null array
     MeshToGrid(
         const nanovdb::Vec3f *devicePoints,
         const uint32_t pointCount,
@@ -99,7 +100,10 @@ public:
          mXformedTriangles(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit),
          mBoxTrianglePairsBuffer(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit),
          mUniqueRootOriginsBuffer(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
-    {}
+    {
+        if (triangleCount && (!devicePoints || !deviceTriangles || !pointCount))
+            throw std::runtime_error("MeshToGrid: triangles without points, or null mesh arrays");
+    }
 
     /// @brief Constructor from a view of the input triangle mesh
     /// @param mesh Device-resident indexed triangle mesh

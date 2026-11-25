@@ -18,9 +18,14 @@
 #include <nanovdb/tools/cuda/VoxelBlockManager.cuh> // buildVoxelBlockManagerBatch
 #include <nanovdb/tools/cuda/DualContour.cuh>
 
+#include <cstddef> // std::byte
+#include <cstdint>
+#include <exception>
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 #include <string>
+#include <utility> // std::move
 #include <vector>
 
 namespace {
@@ -88,7 +93,7 @@ int main(int argc, char* argv[])
 
         // A batch: one batched VoxelBlockManager over both grids. Each grid's blocks follow the
         // previous grid's; its field is its own sidecar, at the offsets given below.
-        constexpr int Log2BlockWidth = 7;
+        constexpr int Log2BlockWidth = nanovdb::tools::cuda::DualContour<BuildT>::DefaultLog2BlockWidth;
         using VBM = nanovdb::tools::cuda::VoxelBlockManager<Log2BlockWidth>;
         const DeviceLevelSet* levelSets[2] = {&torus, &sphere};
         std::vector<nanovdb::tools::cuda::VoxelBlockManagerBatchEntry> entries;
@@ -130,6 +135,7 @@ int main(int argc, char* argv[])
             cudaCheck(cudaMemcpy(points.data(), mesh.points.data(), points.size() * sizeof(nanovdb::Vec3f), cudaMemcpyDeviceToHost));
             cudaCheck(cudaMemcpy(triangles.data(), mesh.triangles.data(), triangles.size() * sizeof(nanovdb::Vec3i), cudaMemcpyDeviceToHost));
             std::ofstream obj(argv[1]);
+            if (!obj) throw std::runtime_error("cannot open " + std::string(argv[1]));
             for (const auto& p : points) obj << "v " << p[0] << " " << p[1] << " " << p[2] << "\n";
             for (uint32_t g = 0; g < mesh.meshCount(); ++g) {
                 obj << "g grid" << g << "\n";
@@ -137,6 +143,8 @@ int main(int argc, char* argv[])
                 for (uint64_t t = mesh.hostTriangleOffsets[g]; t < mesh.hostTriangleOffsets[g + 1]; ++t)
                     obj << "f " << base + triangles[t][0] << " " << base + triangles[t][1] << " " << base + triangles[t][2] << "\n";
             }
+            obj.close();
+            if (!obj) throw std::runtime_error("cannot write " + std::string(argv[1]));
             std::cout << "Wrote " << argv[1] << "\n";
         }
     }

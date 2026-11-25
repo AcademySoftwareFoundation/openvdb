@@ -8,7 +8,9 @@ NanoVDB:
   - Added nanovdb::tools::cuda::DualContour, a CUDA dual-contouring (QEF) triangle-mesh
     extraction from a scalar field (e.g. a signed distance field) on the active voxels of
     ValueOnIndex grids. It meshes one grid, or a batch of grids together through a batched
-    VoxelBlockManager with a constant number of host synchronizations per chunk of grids,
-    each grid's mesh being identical to meshing it alone. Optional cluster-collapse
-    decimation, uniform (setReduce) or curvature-adaptive (setAdaptivity), never merges
-    vertices of different grids. Added an ex_dual_contour_cuda example and unit tests.
+    VoxelBlockManager with a constant number of host synchronizations per chunk of grids.
+    Optional cluster-collapse decimation, uniform (setReduce) or curvature-adaptive
+    (setAdaptivity), never merges vertices of different grids. Without decimation each
+    grid's mesh is bitwise identical to meshing it alone; decimation sums its QEFs with
+    atomics, so its vertex positions can differ in their last bits from run to run. Added an
+    ex_dual_contour_cuda example and unit tests.

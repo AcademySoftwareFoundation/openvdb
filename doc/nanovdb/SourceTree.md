@@ -53,6 +53,8 @@ $ tree
 │   │   ├── main.cc
 │   │   ├── nanovdb.cu
 │   │   └── openvdb.cc
+│   ├── ex_dual_contour_cuda
+│   │   └── ex_dual_contour_cuda.cu
 │   ├── ex_index_grid_cuda
 │   │   ├── index_grid_cuda.cc
 │   │   └── index_grid_cuda_kernel.cu
@@ -118,6 +120,7 @@ $ tree
 │   ├── HalfLite.h
 │   ├── HDDA.h
 │   ├── Math.h
+│   ├── Primitives.h
 │   ├── Proximity.h
 │   ├── Ray.h
 │   ├── SampleFromVoxels.h
@@ -134,6 +137,7 @@ $ tree
 │   │   ├── CoarsenGrid.cuh
 │   │   ├── DilateGrid.cuh
 │   │   ├── DistributedPointsToGrid.cuh
+│   │   ├── DualContour.cuh
 │   │   ├── GridChecksum.cuh
 │   │   ├── GridStats.cuh
 │   │   ├── GridValidator.cuh

@@ -44,6 +44,8 @@
 #include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
 #include <algorithm>// for std::sort
+#include <limits>
+#include <numeric>// for std::iota
 #include <cstring> // for std::memcpy
 #include <unordered_set>
 #include <iomanip> // for std::setw, std::setfill
@@ -5355,29 +5357,83 @@ struct DualContourHostMesh
     std::vector<nanovdb::Vec3i> triangles;
     std::vector<uint64_t> pointOffsets, triangleOffsets;
 
+    // copies of the device buffers, each sized from its own buffer (so a size mismatch with the
+    // host offsets fails without reading out of bounds)
     template<typename MeshT>
     explicit DualContourHostMesh(const MeshT& mesh)
-        : points(mesh.pointCount()), normals(mesh.pointCount()), triangles(mesh.triangleCount())
+        : points(mesh.points.size()), normals(mesh.normals.size()), triangles(mesh.triangles.size())
         , pointOffsets(mesh.hostPointOffsets), triangleOffsets(mesh.hostTriangleOffsets)
     {
-        EXPECT_EQ(mesh.points.size(), points.size());
-        EXPECT_EQ(mesh.triangles.size(), triangles.size());
-        cudaCheck(cudaMemcpy(points.data(), mesh.points.data(), points.size() * sizeof(nanovdb::Vec3f), cudaMemcpyDeviceToHost));
-        cudaCheck(cudaMemcpy(normals.data(), mesh.normals.data(), normals.size() * sizeof(nanovdb::Vec3f), cudaMemcpyDeviceToHost));
-        cudaCheck(cudaMemcpy(triangles.data(), mesh.triangles.data(), triangles.size() * sizeof(nanovdb::Vec3i), cudaMemcpyDeviceToHost));
-        std::vector<uint64_t> deviceOffsets(pointOffsets.size());
-        cudaCheck(cudaMemcpy(deviceOffsets.data(), mesh.pointOffsets.data(), deviceOffsets.size() * sizeof(uint64_t), cudaMemcpyDeviceToHost));
+        EXPECT_EQ(mesh.pointCount(), points.size());
+        EXPECT_EQ(normals.size(), points.size());
+        EXPECT_EQ(mesh.triangleCount(), triangles.size());
+        copyToHost(points, mesh.points.data());
+        copyToHost(normals, mesh.normals.data());
+        copyToHost(triangles, mesh.triangles.data());
+        std::vector<uint64_t> deviceOffsets(mesh.pointOffsets.size());
+        copyToHost(deviceOffsets, mesh.pointOffsets.data());
         EXPECT_EQ(pointOffsets, deviceOffsets);
-        cudaCheck(cudaMemcpy(deviceOffsets.data(), mesh.triangleOffsets.data(), deviceOffsets.size() * sizeof(uint64_t), cudaMemcpyDeviceToHost));
+        deviceOffsets.resize(mesh.triangleOffsets.size());
+        copyToHost(deviceOffsets, mesh.triangleOffsets.data());
         EXPECT_EQ(triangleOffsets, deviceOffsets);
     }
 
-    // mesh g's points, normals and triangles (its triangles index its own points)
+    // mesh g's points, normals and triangles (its triangles index its own points); empty, with a
+    // failure, when the batch's offsets do not slice its arrays
     DualContourHostMesh(const DualContourHostMesh& batch, uint32_t g)
-        : points(batch.points.begin() + batch.pointOffsets[g], batch.points.begin() + batch.pointOffsets[g + 1])
-        , normals(batch.normals.begin() + batch.pointOffsets[g], batch.normals.begin() + batch.pointOffsets[g + 1])
-        , triangles(batch.triangles.begin() + batch.triangleOffsets[g], batch.triangles.begin() + batch.triangleOffsets[g + 1])
-        , pointOffsets{0, points.size()}, triangleOffsets{0, triangles.size()} {}
+    {
+        const bool inRange = g + 1 < batch.pointOffsets.size() && g + 1 < batch.triangleOffsets.size() &&
+                             batch.pointOffsets[g] <= batch.pointOffsets[g + 1] &&
+                             batch.pointOffsets[g + 1] <= batch.points.size() &&
+                             batch.triangleOffsets[g] <= batch.triangleOffsets[g + 1] &&
+                             batch.triangleOffsets[g + 1] <= batch.triangles.size();
+        if (!inRange) {
+            ADD_FAILURE() << "the offsets of mesh " << g << " do not slice the batch";
+            return;
+        }
+        points.assign(batch.points.begin() + batch.pointOffsets[g], batch.points.begin() + batch.pointOffsets[g + 1]);
+        normals.assign(batch.normals.begin() + batch.pointOffsets[g], batch.normals.begin() + batch.pointOffsets[g + 1]);
+        triangles.assign(batch.triangles.begin() + batch.triangleOffsets[g], batch.triangles.begin() + batch.triangleOffsets[g + 1]);
+        pointOffsets = {0, points.size()};
+        triangleOffsets = {0, triangles.size()};
+    }
+
+private:
+    template<typename T>
+    static void copyToHost(std::vector<T>& host, const T* device)
+    {
+        cudaCheck(cudaMemcpy(host.data(), device, host.size() * sizeof(T), cudaMemcpyDeviceToHost));
+    }
+};
+
+// What a kernel reads through DualContourMesh::deviceView().
+struct DualContourDeviceViewReadback
+{
+    uint64_t pointCount, triangleCount;
+    nanovdb::math::Triangle triangle; // mesh 0's triangle 0
+};
+
+__global__ void readDualContourDeviceView(nanovdb::math::TriangleMeshBatchView view, DualContourDeviceViewReadback* out)
+{
+    out->pointCount = view.pointCount();
+    out->triangleCount = view.triangleCount();
+    out->triangle = view.mesh(0).triangle(0);
+}
+
+// Index space under the reflecting, anisotropic map J = diag(-2, 1, 0.5), of determinant -1.
+struct DualContourReflectingXform
+{
+    template<typename GridT>
+    __device__ nanovdb::Vec3f operator()(const GridT*, uint32_t, const nanovdb::Vec3f& ijk) const
+    {
+        return nanovdb::Vec3f(-2.f * ijk[0], ijk[1], 0.5f * ijk[2]);
+    }
+
+    template<typename GridT>
+    __device__ nanovdb::Vec3f normal(const GridT*, uint32_t, const nanovdb::Vec3f&, const nanovdb::Vec3f& n) const
+    {
+        return nanovdb::Vec3f(-0.5f * n[0], n[1], 2.f * n[2]); // J^-T n
+    }
 };
 
 // Bitwise comparison of two single meshes.
@@ -5390,16 +5446,19 @@ void expectSameMesh(const DualContourHostMesh& a, const DualContourHostMesh& b)
     EXPECT_EQ(0, std::memcmp(a.triangles.data(), b.triangles.data(), a.triangles.size() * sizeof(nanovdb::Vec3i)));
 }
 
-// The mesh is a closed, consistently oriented 2-manifold: every directed edge appears exactly
-// once and its reverse appears too. Returns the Euler characteristic V - E + F.
+// The mesh is closed, consistently oriented and edge-manifold, with no unreferenced vertices:
+// every directed edge appears exactly once and its reverse appears too. Returns the Euler
+// characteristic V - E + F, or INT64_MIN when a triangle indexes past the points.
 int64_t checkClosedManifold(const DualContourHostMesh& mesh)
 {
     std::vector<std::pair<int64_t, int64_t>> directed;
     std::vector<bool> used(mesh.points.size(), false);
     for (const auto& t : mesh.triangles) {
         for (int k = 0; k < 3; ++k) {
-            EXPECT_GE(t[k], 0);
-            EXPECT_LT(t[k], int32_t(mesh.points.size()));
+            if (t[k] < 0 || t[k] >= int32_t(mesh.points.size())) {
+                ADD_FAILURE() << "triangle index " << t[k] << " is outside [0, " << mesh.points.size() << ")";
+                return INT64_MIN;
+            }
             used[t[k]] = true;
             directed.emplace_back(t[k], t[(k + 1) % 3]);
         }
@@ -5412,6 +5471,24 @@ int64_t checkClosedManifold(const DualContourHostMesh& mesh)
             << "edge (" << e.first << ", " << e.second << ") has no opposite";
     const int64_t edges = int64_t(directed.size() / 2);
     return int64_t(mesh.points.size()) - edges + int64_t(mesh.triangles.size());
+}
+
+// The number of connected components of the mesh's triangles.
+size_t componentCount(const DualContourHostMesh& mesh)
+{
+    std::vector<int64_t> parent(mesh.points.size());
+    std::iota(parent.begin(), parent.end(), int64_t(0));
+    auto root = [&](int64_t v) {
+        while (parent[v] != v) v = parent[v] = parent[parent[v]];
+        return v;
+    };
+    for (const auto& t : mesh.triangles) {
+        parent[root(t[1])] = root(t[0]);
+        parent[root(t[2])] = root(t[0]);
+    }
+    size_t count = 0;
+    for (size_t v = 0; v < parent.size(); ++v) count += root(int64_t(v)) == int64_t(v) ? 1 : 0;
+    return count;
 }
 
 double signedVolume(const DualContourHostMesh& mesh)
@@ -5434,11 +5511,13 @@ TEST(TestNanoVDBCUDA, DualContour_Sphere)
     DualContourSdfGrid sdf(radius, center, voxelSize);
 
     nanovdb::tools::cuda::DualContour<nanovdb::ValueOnIndex> dc;
-    const DualContourHostMesh mesh(dc.getMesh(sdf.deviceGrid(), sdf.d_sidecar));
+    const auto deviceMesh = dc.getMesh(sdf.deviceGrid(), sdf.d_sidecar);
+    const DualContourHostMesh mesh(deviceMesh);
     ASSERT_EQ(2u, mesh.pointOffsets.size());
     EXPECT_GT(mesh.points.size(), 1000u);
-    EXPECT_EQ(2, checkClosedManifold(mesh)); // a sphere
-    const double volume = signedVolume(mesh), exact = 4.0 / 3.0 * 3.14159265358979 * radius * radius * radius;
+    EXPECT_EQ(2, checkClosedManifold(mesh)); // with one component: a sphere
+    EXPECT_EQ(1u, componentCount(mesh));
+    const double volume = signedVolume(mesh), exact = 4.0 / 3.0 * nanovdb::math::pi<double>() * radius * radius * radius;
     EXPECT_NEAR(1.0, volume / exact, 0.01); // positive: the triangles face outward
     for (size_t i = 0; i < mesh.points.size(); ++i) {
         const nanovdb::Vec3d offset = nanovdb::Vec3d(mesh.points[i]) - center;
@@ -5447,21 +5526,89 @@ TEST(TestNanoVDBCUDA, DualContour_Sphere)
         EXPECT_GT(nanovdb::Vec3d(mesh.normals[i]).dot(offset) / offset.length(), 0.95);
     }
 
-    // in index space, and at an iso value of half a voxel the sphere grows by that much
+    // a kernel reads the same mesh through the device view
+    {
+        nanovdb::cuda::Buffer<DualContourDeviceViewReadback> d_readback(cudaStream_t(0), 1, nanovdb::cuda::noInit);
+        readDualContourDeviceView<<<1, 1>>>(deviceMesh.deviceView(), d_readback.data());
+        cudaCheck(cudaGetLastError());
+        DualContourDeviceViewReadback readback;
+        cudaCheck(cudaMemcpy(&readback, d_readback.data(), sizeof(readback), cudaMemcpyDeviceToHost));
+        EXPECT_EQ(mesh.points.size(), readback.pointCount);
+        EXPECT_EQ(mesh.triangles.size(), readback.triangleCount);
+        for (int k = 0; k < 3; ++k)
+            EXPECT_EQ(0, std::memcmp(&mesh.points[mesh.triangles[0][k]], &readback.triangle[k], sizeof(nanovdb::Vec3f)));
+    }
+
+    // in index space (the grid's map is a scale by voxelSize), and at an iso value of half a voxel
+    // the sphere grows by that much
     const DualContourHostMesh indexMesh(dc.getMesh(sdf.deviceGrid(), sdf.d_sidecar, nanovdb::tools::cuda::DualContourIndexSpace()));
     ASSERT_EQ(mesh.points.size(), indexMesh.points.size());
-    EXPECT_NEAR(double(mesh.points[0][0]), double(indexMesh.points[0][0]) * voxelSize, 1e-4);
+    for (size_t i = 0; i < mesh.points.size(); ++i)
+        for (int c = 0; c < 3; ++c) EXPECT_NEAR(double(mesh.points[i][c]), double(indexMesh.points[i][c]) * voxelSize, 1e-4);
     dc.setIsoValue(float(0.5 * voxelSize));
     const DualContourHostMesh grown(dc.getMesh(sdf.deviceGrid(), sdf.d_sidecar));
     EXPECT_EQ(2, checkClosedManifold(grown));
     for (const auto& p : grown.points) EXPECT_NEAR(radius + 0.5 * voxelSize, (nanovdb::Vec3d(p) - center).length(), 0.1 * voxelSize);
 }// DualContour_Sphere
 
+TEST(TestNanoVDBCUDA, DualContour_ReflectingTransform)
+{
+    // under a map that reflects and stretches, the triangles still face outward and the normals
+    // follow the mapped gradient; |det J| = 1, so the volume is the index-space sphere's
+    const double radius = 6.0, voxelSize = 0.25, r = radius / voxelSize;
+    DualContourSdfGrid sdf(radius, nanovdb::Vec3d(0.0), voxelSize);
+    nanovdb::tools::cuda::DualContour<nanovdb::ValueOnIndex> dc;
+    const DualContourHostMesh mesh(dc.getMesh(sdf.deviceGrid(), sdf.d_sidecar, DualContourReflectingXform()));
+    EXPECT_EQ(2, checkClosedManifold(mesh));
+    EXPECT_NEAR(1.0, signedVolume(mesh) / (4.0 / 3.0 * nanovdb::math::pi<double>() * r * r * r), 0.01);
+    for (size_t i = 0; i < mesh.points.size(); ++i) {
+        const nanovdb::Vec3d p(mesh.points[i]);
+        const nanovdb::Vec3d q(-0.5 * p[0], p[1], 2.0 * p[2]); // the index-space point
+        const nanovdb::Vec3d expected(-0.5 * q[0], q[1], 2.0 * q[2]); // J^-T of its outward radial direction
+        EXPECT_GT(nanovdb::Vec3d(mesh.normals[i]).dot(expected) / expected.length(), 0.95);
+    }
+}// DualContour_ReflectingTransform
+
+TEST(TestNanoVDBCUDA, DualContour_InvalidArguments)
+{
+    using BuildT = nanovdb::ValueOnIndex;
+    constexpr int L = nanovdb::tools::cuda::DualContour<BuildT>::DefaultLog2BlockWidth;
+    const float nan = std::numeric_limits<float>::quiet_NaN();
+    nanovdb::tools::cuda::DualContour<BuildT> dc;
+    EXPECT_THROW(dc.setIsoValue(nan), std::runtime_error);
+    EXPECT_THROW(dc.setReduce(0), std::runtime_error);
+    EXPECT_THROW(dc.setAdaptivity(-0.1f), std::runtime_error);
+    EXPECT_THROW(dc.setAdaptivity(2.f), std::runtime_error);
+    EXPECT_THROW(dc.setAdaptivity(nan), std::runtime_error);
+    EXPECT_THROW(dc.setMaxChunkVoxels(0), std::runtime_error);
+
+    const DualContourSdfGrid sdf(4.0, nanovdb::Vec3d(0.0), 0.5);
+    EXPECT_THROW(dc.getMesh(nullptr, sdf.d_sidecar), std::runtime_error);
+    EXPECT_THROW(dc.getMesh(sdf.deviceGrid(), nullptr), std::runtime_error);
+
+    // a fog volume's interior is active tiles, which both overloads reject before reading the field
+    auto fog = nanovdb::tools::createFogVolumeSphere<float>(10.0, nanovdb::Vec3d(0.0), 0.5);
+    auto index = nanovdb::tools::createNanoGrid<nanovdb::NanoGrid<float>, BuildT>(*fog.grid<float>(), 1u, false, true);
+    const auto* hostGrid = index.grid<BuildT>();
+    const auto& tree = hostGrid->tree();
+    ASSERT_GT(tree.mTileCount[0] + tree.mTileCount[1] + tree.mTileCount[2], 0u);
+    auto deviceHandle = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte>>(index, cudaStream_t(0));
+    const auto* d_grid = deviceHandle.deviceGrid<BuildT>();
+    EXPECT_THROW(dc.getMesh(d_grid, sdf.d_sidecar), std::runtime_error);
+    const nanovdb::tools::cuda::VoxelBlockManagerBatchEntry entry{d_grid, hostGrid->activeVoxelCount(), 0, 0};
+    VoxelBlockManagerBatchTestArrays arrays; // device memory, freed at scope exit
+    const nanovdb::tools::cuda::VoxelBlockManagerBatchView<L> view(
+        nanovdb::tools::cuda::VoxelBlockManagerBatchEntryArray{arrays.upload(std::vector{entry})}, 1u, 0,
+        nullptr, nullptr);
+    EXPECT_THROW(dc.getMesh(view, nanovdb::tools::cuda::VoxelBlockManagerBatchEntryArray{&entry}, sdf.d_sidecar),
+                 std::runtime_error);
+}// DualContour_InvalidArguments
+
 TEST(TestNanoVDBCUDA, DualContour_Decimation)
 {
     const double radius = 8.0, voxelSize = 0.25;
     DualContourSdfGrid sdf(radius, nanovdb::Vec3d(0.0), voxelSize);
-    const double exact = 4.0 / 3.0 * 3.14159265358979 * radius * radius * radius;
+    const double exact = 4.0 / 3.0 * nanovdb::math::pi<double>() * radius * radius * radius;
     nanovdb::tools::cuda::DualContour<nanovdb::ValueOnIndex> dc;
     const DualContourHostMesh full(dc.getMesh(sdf.deviceGrid(), sdf.d_sidecar));
     for (const auto& [reduce, adaptivity] : {std::pair<int, float>{2, 0.f}, {4, 0.f}, {1, 0.5f}, {1, 1.5f}, {2, 0.3f}}) {
@@ -5471,6 +5618,11 @@ TEST(TestNanoVDBCUDA, DualContour_Decimation)
         EXPECT_GT(mesh.points.size(), 0u);
         EXPECT_LT(mesh.points.size(), full.points.size()) << "reduce " << reduce << ", adaptivity " << adaptivity;
         EXPECT_LT(mesh.triangles.size(), full.triangles.size());
+        if (adaptivity == 0.f) { // uniform: about 1 / reduce^2 of the vertices of a surface
+            const size_t scaled = mesh.points.size() * size_t(reduce * reduce);
+            EXPECT_LT(scaled, 2 * full.points.size()) << "reduce " << reduce;
+            EXPECT_GT(2 * scaled, full.points.size()) << "reduce " << reduce;
+        }
         std::vector<bool> used(mesh.points.size(), false);
         for (const auto& t : mesh.triangles)
             for (int k = 0; k < 3; ++k) {
@@ -5482,17 +5634,12 @@ TEST(TestNanoVDBCUDA, DualContour_Decimation)
         EXPECT_NEAR(1.0, signedVolume(mesh) / exact, 0.05); // still the sphere, facing outward
         for (const auto& p : mesh.points) EXPECT_NEAR(radius, nanovdb::Vec3d(p).length(), 2.0 * reduce * voxelSize);
     }
-    // a uniform reduction by 4 keeps roughly 1/16 of the vertices
-    dc.setReduce(4);
-    dc.setAdaptivity(0.f);
-    const DualContourHostMesh reduced(dc.getMesh(sdf.deviceGrid(), sdf.d_sidecar));
-    EXPECT_LT(reduced.points.size() * 8, full.points.size());
 }// DualContour_Decimation
 
 TEST(TestNanoVDBCUDA, DualContour_BatchMatchesSingleGrids)
 {
     using BuildT = nanovdb::ValueOnIndex;
-    constexpr int L = 7;
+    constexpr int L = nanovdb::tools::cuda::DualContour<BuildT>::DefaultLog2BlockWidth;
     using VBM = nanovdb::tools::cuda::VoxelBlockManager<L>;
     // spheres of different sizes and places, a grid without voxels, and one without a surface
     std::vector<std::unique_ptr<DualContourSdfGrid>> sdfs;

@@ -21,10 +21,10 @@
 #ifndef NANOVDB_MATH_PRIMITIVES_H_HAS_BEEN_INCLUDED
 #define NANOVDB_MATH_PRIMITIVES_H_HAS_BEEN_INCLUDED
 
-#include <nanovdb/util/Util.h> // for __hostdev__
+#include <nanovdb/util/Util.h> // for __hostdev__, NANOVDB_ASSERT
 #include <nanovdb/math/Math.h> // for Vec3f, Vec3i
 
-#include <cstdint> // for uint32_t, uint64_t
+#include <cstdint> // for uint32_t, uint64_t, UINT32_MAX
 
 namespace nanovdb {
 
@@ -34,8 +34,8 @@ namespace math {
 struct Triangle
 {
     Vec3f v[3];
-    __hostdev__ const Vec3f& operator[](int i) const { return v[i]; }
-    __hostdev__       Vec3f& operator[](int i)       { return v[i]; }
+    __hostdev__ const Vec3f& operator[](int i) const { NANOVDB_ASSERT(i >= 0 && i < 3); return v[i]; }
+    __hostdev__       Vec3f& operator[](int i)       { NANOVDB_ASSERT(i >= 0 && i < 3); return v[i]; }
 }; // math::Triangle
 
 /// @brief Non-owning view of an indexed triangle mesh.
@@ -49,7 +49,11 @@ struct TriangleMeshView
     /// @brief The positions of triangle @a t, gathered from its point indices.
     __hostdev__ Triangle triangle(uint32_t t) const
     {
+        NANOVDB_ASSERT(t < triangleCount);
         const Vec3i& tri = triangles[t];
+        NANOVDB_ASSERT(tri[0] >= 0 && uint32_t(tri[0]) < pointCount);
+        NANOVDB_ASSERT(tri[1] >= 0 && uint32_t(tri[1]) < pointCount);
+        NANOVDB_ASSERT(tri[2] >= 0 && uint32_t(tri[2]) < pointCount);
         return Triangle{{points[tri[0]], points[tri[1]], points[tri[2]]}};
     }
 }; // math::TriangleMeshView
@@ -77,7 +81,9 @@ struct TriangleMeshBatchView
     /// @brief Mesh @a i of the batch, as a view over its slices of the arrays.
     __hostdev__ TriangleMeshView mesh(uint32_t i) const
     {
+        NANOVDB_ASSERT(i < meshCount);
         const uint64_t p0 = pointOffsets[i], t0 = triangleOffsets[i];
+        NANOVDB_ASSERT(pointOffsets[i + 1] - p0 <= UINT32_MAX && triangleOffsets[i + 1] - t0 <= UINT32_MAX);
         return TriangleMeshView{points + p0, triangles + t0, uint32_t(pointOffsets[i + 1] - p0),
                                 uint32_t(triangleOffsets[i + 1] - t0)};
     }
