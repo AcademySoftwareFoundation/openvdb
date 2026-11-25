@@ -1022,11 +1022,35 @@ TEST(TestNanoVDBCUDA, voxelsToGridBatchBadOffsets)
         return nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex>(d_voxels, 0, d_offsets, 2, 1.0, stream);
     };
     EXPECT_NO_THROW(buildEmpty({0, 0, 0}));
+    EXPECT_NO_THROW(nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex>(static_cast<const nanovdb::Coord*>(nullptr), 0, d_offsets, 2, 1.0, stream));// no voxels to read
     EXPECT_THROW(buildEmpty({0, 5, 0}), std::invalid_argument);// checked without voxels too
     EXPECT_THROW(nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex>(d_voxels, voxels.size(), static_cast<const uint64_t*>(nullptr), 2, 1.0, stream),
                  std::invalid_argument);// null offsets
     EXPECT_THROW(nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex>(d_voxels, voxels.size(), d_offsets, 0, 1.0, stream),
                  std::invalid_argument);// voxels but no grids
+
+    // Valid offsets from here on, so only the pointer under test is wrong
+    const std::vector<uint64_t> hostOffsets{0, 1, 3};
+    ASSERT_EQ(cudaSuccess, cudaMemcpy(d_offsets, hostOffsets.data(), hostOffsets.size() * sizeof(uint64_t), cudaMemcpyHostToDevice));
+    auto buildFrom = [&](const nanovdb::Coord *v, const uint64_t *o) {
+        return nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex>(v, voxels.size(), o, 2, 1.0, stream);
+    };
+    EXPECT_THROW(buildFrom(nullptr, d_offsets), std::invalid_argument);// null voxels
+    using VoxelSet = std::tuple<const nanovdb::Coord* const, size_t, double>;
+    EXPECT_THROW(nanovdb::tools::cuda::voxelsToGrid<nanovdb::ValueOnIndex>(std::vector<VoxelSet>{{d_voxels, 1, 1.0}, {nullptr, 2, 1.0}}),
+                 std::invalid_argument);// null voxel set
+
+    // Pageable host memory is accepted only where the device can read it (HMM or ATS)
+    int device = 0, pageableAccess = 0;
+    ASSERT_EQ(cudaSuccess, cudaGetDevice(&device));
+    ASSERT_EQ(cudaSuccess, cudaDeviceGetAttribute(&pageableAccess, cudaDevAttrPageableMemoryAccess, device));
+    if (pageableAccess) {
+        EXPECT_NO_THROW(buildFrom(d_voxels, hostOffsets.data()));// host offsets
+        EXPECT_NO_THROW(buildFrom(voxels.data(), d_offsets));// host voxels
+    } else {
+        EXPECT_THROW(buildFrom(d_voxels, hostOffsets.data()), std::invalid_argument);// host offsets
+        EXPECT_THROW(buildFrom(voxels.data(), d_offsets), std::invalid_argument);// host voxels
+    }
 }// voxelsToGridBatchBadOffsets
 TEST(TestNanoVDBCUDA, mergePointGridsAligned)
 {

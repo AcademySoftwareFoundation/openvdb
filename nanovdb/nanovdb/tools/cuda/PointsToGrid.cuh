@@ -36,7 +36,7 @@
 #include <cmath> // for std::isfinite
 #include <cstddef> // for std::byte
 #include <stdexcept> // for std::invalid_argument
-#include <type_traits> // for the stream-argument check
+#include <type_traits> // for the stream-argument and pointer-copy checks
 #include <iostream> // for std::cerr
 #include <limits> // for std::numeric_limits
 #include <string> // for std::string, std::to_string
@@ -47,7 +47,7 @@
 #include <nanovdb/cuda/TempPool.h>
 #include <nanovdb/GridHandle.h>
 #include <nanovdb/cuda/HandleStorage.h>
-#include <nanovdb/cuda/GridHandle.cuh> // for merging the per-set grids in the point-set overloads
+#include <nanovdb/cuda/GridHandle.cuh> // for merging per-set grids and making empty handles
 #include <nanovdb/tools/cuda/GridChecksum.cuh>
 #include <nanovdb/util/cuda/Timer.h>
 #include <nanovdb/util/cuda/Util.h>
@@ -151,10 +151,13 @@ voxelsToGrid(const PtrT dGridVoxels,
 
 //-------------------------------------------------------------------------------------------------------
 
-/// @brief Generates one NanoGrid per voxel set, all sets built together in one pass (see the
-///        batched overload below), into one buffer in set order.
+/// @brief Generates one NanoGrid per voxel set into one buffer, in set order. The sets are built
+///        together in one pass (see the batched overload below), except Point grids, which are
+///        built one set at a time and merged.
 /// @note An empty @c pointSet yields an empty handle, and a set without points an empty grid.
-/// @throw std::invalid_argument if any set's voxel size is not positive and finite
+/// @throw std::invalid_argument if any set's voxel size is not positive and finite. Unless BuildT is Point, also if
+///        the sets hold more than 2^32-1 voxels in total, or a raw pointer to a set with voxels is null or not
+///        device-accessible memory
 template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::Buffer<std::byte>, typename ResourceT = nanovdb::cuda::DeviceResource>
 nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
 voxelsToGrid(const std::vector<std::tuple<const PtrT, size_t, double>> &pointSet,
@@ -165,7 +168,8 @@ voxelsToGrid(const std::vector<std::tuple<const PtrT, size_t, double>> &pointSet
 
 /// @brief Generates @c gridCount NanoGrids from one list of voxel coordinates on the device, in one pass:
 ///        grid g holds the voxels dGridVoxels[d_offsets[g]] up to dGridVoxels[d_offsets[g+1]-1]. The grids
-///        share one buffer, in order, and the build blocks the host twice however many grids it makes.
+///        share one buffer, in order, and the build waits on the stream a fixed number of times, however many
+///        grids it makes.
 /// @tparam BuildT Template type of the returned grids; Point grids are not supported
 /// @tparam PtrT Template type to a raw or fancy-pointer of voxel coordinates in index space
 /// @param dGridVoxels Raw or fancy pointer to the list of voxel coordinates on the device
@@ -176,7 +180,8 @@ voxelsToGrid(const std::vector<std::tuple<const PtrT, size_t, double>> &pointSet
 /// @param buffer Instance of the device buffer used for memory allocation
 /// @return Returns a handle with @c gridCount grids of type NanoGrid<BuildT>
 /// @note A grid without voxels is a valid empty grid, and @c gridCount == 0 with @c voxelCount == 0 yields an empty handle.
-/// @throw std::invalid_argument if the voxel size is not positive and finite, or the offsets are not as described
+/// @throw std::invalid_argument if the voxel size is not positive and finite, @c voxelCount exceeds 2^32-1, the offsets
+///        are not as described, or @c d_offsets (or a raw @c dGridVoxels holding voxels) is null or not device-accessible memory
 template<typename BuildT, typename PtrT, typename BufferT = nanovdb::cuda::Buffer<std::byte>, typename ResourceT = nanovdb::cuda::DeviceResource>
 nanovdb::cuda::detail::PrototypeFormResult<BufferT, GridHandle<BufferT>>
 voxelsToGrid(const PtrT dGridVoxels,
@@ -243,11 +248,13 @@ pointsToGrid(const std::vector<std::tuple<const PtrT,size_t,double,PointType>> &
              cudaStream_t stream,
              ResourceT resource = nanovdb::cuda::default_resource<ResourceT>());
 
-/// @brief Resource form of voxelsToGrid over a voxel set: one grid per set,
-///        built together into one handle; see the single-set resource form of
-///        voxelsToGrid above.
+/// @brief Resource form of voxelsToGrid over a voxel set: one grid per set in
+///        one handle, built as the prototype form above builds them; see the
+///        single-set resource form of voxelsToGrid above.
 /// @note An empty @c pointSet yields an empty handle, and a set without points an empty grid.
-/// @throw std::invalid_argument if any set's voxel size is not positive and finite
+/// @throw std::invalid_argument if any set's voxel size is not positive and finite. Unless BuildT is Point, also if
+///        the sets hold more than 2^32-1 voxels in total, or a raw pointer to a set with voxels is null or not
+///        device-accessible memory
 template<typename BuildT, typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
 typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
 voxelsToGrid(const std::vector<std::tuple<const PtrT, size_t, double>> &pointSet,
@@ -255,7 +262,8 @@ voxelsToGrid(const std::vector<std::tuple<const PtrT, size_t, double>> &pointSet
              ResourceT resource = nanovdb::cuda::default_resource<ResourceT>());
 
 /// @brief Resource form of the batched voxelsToGrid; see the prototype form above.
-/// @throw std::invalid_argument if the voxel size is not positive and finite, or the offsets are not as described
+/// @throw std::invalid_argument if the voxel size is not positive and finite, @c voxelCount exceeds 2^32-1, the offsets
+///        are not as described, or @c d_offsets (or a raw @c dGridVoxels holding voxels) is null or not device-accessible memory
 template<typename BuildT, typename PtrT, typename ResourceT = nanovdb::cuda::DeviceResource>
 typename util::enable_if<(nanovdb::cuda::is_resource<ResourceT>::value || nanovdb::cuda::is_async_resource<ResourceT>::value), GridHandle<nanovdb::cuda::Buffer<std::byte, ResourceT>>>::type
 voxelsToGrid(const PtrT dGridVoxels,
@@ -440,8 +448,12 @@ struct PointsToGridData {
 
 namespace detail {
 
+/// @brief Threads per block of the PointsToGrid and VoxelsToGridBatch kernels
+inline constexpr unsigned int kThreadsPerBlock = 128;// measured faster than 256 for PointsToGrid
+
 /// @brief Argument checks for the PointsToGrid constructors (map, voxel size,
-///        density target) and the pointsToGrid free functions (point count).
+///        density target), the pointsToGrid free functions (point count) and
+///        the batched voxel builds (grid count, device pointers).
 inline double checkVoxelSize(double voxelSize, const char* tool)
 {
     if (!(voxelSize > 0.0) || !std::isfinite(voxelSize))
@@ -462,6 +474,25 @@ inline void checkPointCount(int pointCount, const char* tool)
 inline void checkMaxPointsPerVoxel(int maxPointsPerVoxel, const char* tool)
 {
     if (maxPointsPerVoxel <= 0) throw std::invalid_argument(std::string(tool) + ": maximum points per voxel must be positive");
+}
+inline uint32_t checkGridCount(size_t gridCount, const char* tool)
+{
+    if (gridCount == 0 || gridCount > std::numeric_limits<uint32_t>::max())
+        throw std::invalid_argument(std::string(tool) + ": the grid count must be between 1 and 2^32-1");
+    return static_cast<uint32_t>(gridCount);
+}
+/// @note Pageable host memory passes only where the device can read it (HMM or ATS).
+inline void checkDevicePointer(const void* ptr, const char* name, const char* tool)
+{
+    if (ptr == nullptr) throw std::invalid_argument(std::string(tool) + ": the " + name + " are null");
+    cudaPointerAttributes attr;
+    cudaCheck(cudaPointerGetAttributes(&attr, ptr));
+    if (attr.type != cudaMemoryTypeUnregistered) return;
+    int device = 0, pageableAccess = 0;
+    cudaCheck(cudaGetDevice(&device));
+    cudaCheck(cudaDeviceGetAttribute(&pageableAccess, cudaDevAttrPageableMemoryAccess, device));
+    if (!pageableAccess)
+        throw std::invalid_argument(std::string(tool) + ": the " + name + " are not in device-accessible memory");
 }
 
 }// namespace detail
@@ -598,7 +629,7 @@ public:
     maxPointsPerLeaf()  const {return mMaxPointsPerLeaf;}
 
 private:
-    static constexpr unsigned int mNumThreads = 128;// seems faster than the old value of 256!
+    static constexpr unsigned int mNumThreads = detail::kThreadsPerBlock;
     static unsigned int numBlocks(unsigned int n) {return (n + mNumThreads - 1) / mNumThreads;}
 
     template<typename T>
@@ -1671,8 +1702,10 @@ struct SegmentedPtr {
 };
 
 /// @brief Start of every grid's points, voxels and nodes in a batched build: gridCount+1
-///        entries per level, the last one the level's total
+///        entries per level, the last one the level's total. The levels are stored as
+///        RowCount rows of gridCount+1 entries, in Row order.
 struct BatchStarts {
+    enum Row : uint32_t { PointRow = 0, VoxelRow, UpperRow, LowerRow, LeafRow, RowCount };
     const uint64_t *point, *voxel, *upper, *lower, *leaf;
     uint32_t gridCount;
 };
@@ -1803,13 +1836,14 @@ class VoxelsToGridBatch
                   "VoxelsToGridBatch allocates stream-ordered scratch and requires an AsyncResource");
 public:
     /// @param maps One map per output grid
+    /// @throw std::invalid_argument if @a maps is empty or holds more than 2^32-1 maps, or a map is not invertible and finite
     VoxelsToGridBatch(std::vector<Map> maps, cudaStream_t stream = 0, ResourceT& resource = nanovdb::cuda::default_resource<ResourceT>())
         : mStream(stream)
         , mResource(&resource)
-        , mGridCount(static_cast<uint32_t>(maps.size()))
-        , mData(maps.size())
-        , mDeviceDataBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), maps.size(), nanovdb::cuda::noInit)
-        , mStartsBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 5 * (maps.size() + 1), nanovdb::cuda::noInit)
+        , mGridCount(detail::checkGridCount(maps.size(), "VoxelsToGridBatch"))
+        , mData(mGridCount)
+        , mDeviceDataBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), mGridCount, nanovdb::cuda::noInit)
+        , mStartsBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), detail::BatchStarts::RowCount * (uint64_t(mGridCount) + 1u), nanovdb::cuda::noInit)
         , mKeysBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
         , mTileKeysBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
         , mLeafKeysBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
@@ -1818,9 +1852,7 @@ public:
         , mPointsPerVoxelPrefixBuf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
         , mTempDevicePool(resource)
     {
-        if (maps.empty() || maps.size() > std::numeric_limits<uint32_t>::max())
-            throw std::invalid_argument("VoxelsToGridBatch: the grid count must be between 1 and 2^32-1");
-        for (size_t g = 0; g < maps.size(); ++g) {
+        for (uint32_t g = 0; g < mGridCount; ++g) {
             detail::checkMap(maps[g], "VoxelsToGridBatch");
             mData[g] = PointsToGridData<BuildT>{};
             mData[g].map = maps[g];
@@ -1832,17 +1864,18 @@ public:
     /// @param voxelCount total number of voxels
     /// @param d_offsets device array of gridCount+1 non-decreasing offsets, from 0 to @c voxelCount
     /// @param pool prototype buffer whose resource (or create() pool) allocates the output
-    /// @throw std::invalid_argument if the offsets are not as described
+    /// @throw std::invalid_argument if @c voxelCount exceeds 2^32-1, the offsets are not as described, or
+    ///        @c d_offsets (or a raw @c voxels holding voxels) is null or not device-accessible memory
     template<typename PtrT, typename BufferT = nanovdb::cuda::Buffer<std::byte>>
     GridHandle<BufferT> getHandle(const PtrT voxels, size_t voxelCount, const uint64_t *d_offsets, const BufferT &pool = BufferT());
 
 private:
-    static constexpr unsigned int mNumThreads = 128;
+    static constexpr unsigned int mNumThreads = detail::kThreadsPerBlock;
     static unsigned int numBlocks(uint64_t n) {return static_cast<unsigned int>((n + mNumThreads - 1) / mNumThreads);}
 
     template<typename T>
     using BufT = nanovdb::cuda::Buffer<T, nanovdb::cuda::ResourceRef<ResourceT>>;
-    nanovdb::cuda::ResourceRef<ResourceT> ref() { return nanovdb::cuda::detail::borrowInternal(*mResource); }
+    nanovdb::cuda::ResourceRef<ResourceT> ref() const { return nanovdb::cuda::detail::borrowInternal(*mResource); }
     template<typename T>
     static T* at(BufT<T> &buf, uint64_t i) { return buf.empty() ? nullptr : buf.data() + i; }
 
@@ -1856,15 +1889,16 @@ private:
     BufferT getBuffer(const BufferT &pool, std::vector<GridHandleMetaData> &meta);
 
     detail::BatchStarts starts() const {
-        const uint64_t *s = mStartsBuf.data(), n = mGridCount + 1u;
-        return {s, s + n, s + 2*n, s + 3*n, s + 4*n, mGridCount};
+        using Starts = detail::BatchStarts;
+        const uint64_t *s = mStartsBuf.data(), n = uint64_t(mGridCount) + 1u;
+        return {s + Starts::PointRow*n, s + Starts::VoxelRow*n, s + Starts::UpperRow*n, s + Starts::LowerRow*n, s + Starts::LeafRow*n, mGridCount};
     }
 
     cudaStream_t                          mStream{0};
-    ResourceT*                            mResource;// non-owning
+    ResourceT* const                      mResource;// non-owning
     uint32_t                              mGridCount;
     std::vector<PointsToGridData<BuildT>> mData;// host copy of the per-grid data
-    std::vector<uint64_t>                 mStarts;// host copy of BatchStarts: point, voxel, upper, lower and leaf rows
+    std::vector<uint64_t>                 mStarts;// host copy of BatchStarts, in BatchStarts::Row order
     BufT<PointsToGridData<BuildT>>        mDeviceDataBuf;
     BufT<uint64_t>                        mStartsBuf, mKeysBuf, mTileKeysBuf, mLeafKeysBuf, mLowerKeysBuf;
     BufT<uint32_t>                        mPointsPerVoxelBuf, mPointsPerVoxelPrefixBuf;
@@ -1883,7 +1917,7 @@ void VoxelsToGridBatch<BuildT, ResourceT>::countNodes(const PtrT voxels, size_t 
     PointsToGridData<BuildT> *d_data = mDeviceDataBuf.data();
 
     std::vector<detail::NodeCounts> counts(gridCount, detail::NodeCounts{0u, 0u, 0u, 0u});
-    std::vector<uint64_t> offsets(gridCount + 1u, 0u);
+    std::vector<uint64_t> offsets(uint64_t(gridCount) + 1u, 0u);
     BufT<uint64_t> keysScratch(mStream, this->ref(), pointCount, nanovdb::cuda::noInit);
     if (pointCount > 0) {
         // The single-grid sorts, by in-tile offset and then stably by tile, followed by a stable
@@ -1938,7 +1972,7 @@ void VoxelsToGridBatch<BuildT, ResourceT>::countNodes(const PtrT voxels, size_t 
                   gridCount, segmentBegin, segmentEnd, detail::SumNodeCounts(), detail::NodeCounts{0u, 0u, 0u, 0u});
         cudaCheck(cudaMemcpyAsync(counts.data(), countsScratch.data(), gridCount * sizeof(detail::NodeCounts), cudaMemcpyDeviceToHost, mStream));
     }
-    cudaCheck(cudaMemcpyAsync(offsets.data(), d_offsets, (gridCount + 1u) * sizeof(uint64_t), cudaMemcpyDeviceToHost, mStream));
+    cudaCheck(cudaMemcpyAsync(offsets.data(), d_offsets, (uint64_t(gridCount) + 1u) * sizeof(uint64_t), cudaMemcpyDeviceToHost, mStream));
     cudaCheck(cudaStreamSynchronize(mStream));
     if (offsets[0] != 0u || offsets[gridCount] != voxelCount)
         throw std::invalid_argument("VoxelsToGridBatch: the offsets must run from 0 to the voxel count");
@@ -1947,9 +1981,11 @@ void VoxelsToGridBatch<BuildT, ResourceT>::countNodes(const PtrT voxels, size_t 
     }
 
     // Starts of every level, from which each grid's data views its ranges
-    const uint64_t n = gridCount + 1u;
-    mStarts.assign(5 * n, 0u);
-    uint64_t *point = mStarts.data(), *voxel = point + n, *upper = voxel + n, *lower = upper + n, *leaf = lower + n;
+    using Starts = detail::BatchStarts;
+    const uint64_t n = uint64_t(gridCount) + 1u;
+    mStarts.assign(Starts::RowCount * n, 0u);
+    uint64_t *rows = mStarts.data(), *point = rows + Starts::PointRow*n, *voxel = rows + Starts::VoxelRow*n,
+             *upper = rows + Starts::UpperRow*n, *lower = rows + Starts::LowerRow*n, *leaf = rows + Starts::LeafRow*n;
     for (uint32_t g = 0; g < gridCount; ++g) {
         point[g + 1] = offsets[g + 1];
         voxel[g + 1] = voxel[g] + counts[g].voxel;
@@ -2027,15 +2063,20 @@ template<typename BuildT, typename ResourceT>
 template<typename PtrT, typename BufferT>
 GridHandle<BufferT> VoxelsToGridBatch<BuildT, ResourceT>::getHandle(const PtrT voxels, size_t voxelCount, const uint64_t *d_offsets, const BufferT &pool)
 {
-    if (d_offsets == nullptr) throw std::invalid_argument("VoxelsToGridBatch: the offsets are null");
+    detail::checkDevicePointer(d_offsets, "offsets", "VoxelsToGridBatch");
+    if constexpr(std::is_pointer<PtrT>::value) {
+        if (voxelCount > 0) detail::checkDevicePointer(voxels, "voxels", "VoxelsToGridBatch");
+    }
     this->countNodes(voxels, voxelCount, d_offsets);
     std::vector<GridHandleMetaData> meta;
     auto buffer = this->getBuffer(pool, meta);
 
+    using Starts = detail::BatchStarts;
     const uint32_t gridCount = mGridCount;
-    const detail::BatchStarts s = this->starts();
-    auto total = [&](int row) { return mStarts[row * (gridCount + 1u) + gridCount]; };// rows as in BatchStarts
-    const uint64_t voxelTotal = total(1), upperCount = total(2), lowerCount = total(3), leafCount = total(4);
+    const Starts s = this->starts();
+    auto total = [&](Starts::Row row) { return mStarts[row * (uint64_t(gridCount) + 1u) + gridCount]; };
+    const uint64_t voxelTotal = total(Starts::VoxelRow), upperCount = total(Starts::UpperRow),
+                   lowerCount = total(Starts::LowerRow), leafCount = total(Starts::LeafRow);
     PointsToGridData<BuildT> *d_data = mDeviceDataBuf.data();
 
     util::cuda::lambdaKernel<<<numBlocks(gridCount), mNumThreads, 0, mStream>>>(gridCount, detail::BuildBatchGridTreeRootFunctor<BuildT, PtrT>(), d_data, s.point, gridCount);
@@ -2089,13 +2130,12 @@ GridHandle<BufferT> VoxelsToGridBatch<BuildT, ResourceT>::getHandle(const PtrT v
 
 namespace detail {
 
-/// @brief Merges the per-set handles built by the point-set overloads,
-///        allocating the result through @c buffer's resource; merging no
-///        handles gives an empty handle over that resource.
+/// @brief Merges per-set handles, allocating the result through @c buffer's
+///        resource; merging no handles gives an empty handle over that resource.
 template<typename BufferT>
 GridHandle<BufferT> mergeBuiltHandles(const std::vector<GridHandle<BufferT>> &handles, const BufferT &buffer, cudaStream_t stream)
 {
-    static_assert(BufferHasDeviceSingle<BufferT>::value, "the point-set overloads build into a single-space device buffer");
+    static_assert(BufferHasDeviceSingle<BufferT>::value, "the merged handle needs a single-space device buffer");
     // explicit template arguments: MSVC cannot deduce the template-template VectorT
     return nanovdb::cuda::mergeGridHandles<BufferT, std::vector>(handles, stream, &buffer);
 }
@@ -2115,12 +2155,16 @@ GridHandle<BufferT> voxelSetsToGrid(const std::vector<std::tuple<const PtrT, siz
         }
         return mergeBuiltHandles(handles, buffer, stream);
     } else {
+        static_assert(std::is_trivially_copyable<PtrT>::value, "voxelsToGrid: voxel-set pointers are copied to the device bytewise");
         if (sets.empty()) return mergeBuiltHandles(std::vector<GridHandle<BufferT>>(), buffer, stream);
         std::vector<Map> maps;
         std::vector<PtrT> ptrs;
         std::vector<uint64_t> offsets(1, 0u);
         for (auto &s : sets) {
             maps.emplace_back(checkVoxelSize(std::get<2>(s), "voxelsToGrid"), Vec3d(0.0));
+            if constexpr(std::is_pointer<PtrT>::value) {
+                if (std::get<1>(s) > 0) checkDevicePointer(std::get<0>(s), "voxels", "voxelsToGrid");
+            }
             ptrs.push_back(std::get<0>(s));
             offsets.push_back(offsets.back() + std::get<1>(s));
         }
