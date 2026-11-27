@@ -230,6 +230,7 @@ void MergeGrids<BuildT, ResourceT>::mergeInternalNodes()
             util::cuda::operatorKernel<Op>
                 <<<mSrcTreeData[i].mNodeCount[1], Op::MaxThreadsPerBlock, 0, mStream>>>
                 (mDeviceSrcGrids[i], mBuilder.deviceProcessedRoot(), upperMasks, lowerMasks);
+            cudaCheckError();
         }
     });
 }// MergeGrids<BuildT, ResourceT>::mergeInternalNodes
@@ -259,6 +260,7 @@ void MergeGrids<BuildT, ResourceT>::mergeLeafNodes()
         util::cuda::operatorKernel<Op>
             <<<dim3(mSrcTreeData[i].mNodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
             (mDeviceSrcGrids[i], static_cast<GridT*>(mBuilder.data()->d_bufferPtr));
+        cudaCheckError();
     }
 
     // Update leaf offsets and prefix sums

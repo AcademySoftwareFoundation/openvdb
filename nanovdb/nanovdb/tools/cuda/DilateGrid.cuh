@@ -67,7 +67,8 @@ public:
     void setChecksum(CheckMode mode = CheckMode::Disable){mBuilder.mChecksum = mode;}
 
     /// @brief Set type of dilation operation
-    /// @param op: NN_FACE=face neighbors, NN_FACE_EDGE=face and edge neibhros, NN_FACE_EDGE_VERTEX=26-connected neighbors
+    /// @param op: NN_FACE=face neighbors, NN_FACE_EDGE_VERTEX=26-connected neighbors. getHandle
+    ///        throws std::invalid_argument for any other value, including NN_FACE_EDGE.
     void setOperation(morphology::NearestNeighbors op) { mOp = op; }
 
     /// @brief Creates a handle to the dilated grid
@@ -116,6 +117,9 @@ template<typename BufferT>
 GridHandle<BufferT>
 DilateGrid<BuildT, ResourceT>::getHandle(const BufferT &pool)
 {
+    if (mOp != morphology::NN_FACE && mOp != morphology::NN_FACE_EDGE_VERTEX)
+        throw std::invalid_argument("DilateGrid supports only the NN_FACE and NN_FACE_EDGE_VERTEX stencils");
+
     // Copy TreeData from GPU -> CPU
     mSrcTreeData = util::cuda::DeviceGridTraits<BuildT>::getTreeData(mDeviceSrcGrid, mStream);
 
@@ -213,21 +217,22 @@ template<typename BuildT, typename ResourceT>
 void DilateGrid<BuildT, ResourceT>::dilateInternalNodes()
 {
     // Computes the upper and lower internal-node masks of the dilated topology. A one-voxel
-    // dilation of a source lower node reaches at most its 27 neighbors, which bounds the rows.
+    // dilation of a source lower node reaches at most itself and its 6 face neighbors
+    // (NN_FACE) or its 26 neighbors (NN_FACE_EDGE_VERTEX), which bounds the rows.
     const auto srcLowerCount = mSrcTreeData.mNodeCount[1];
-    mBuilder.buildInternalMasks(mStream, 27ull * srcLowerCount, [&](Mask<5> *upperMasks, auto lowerMasks) {
+    const uint64_t reach = mOp == morphology::NN_FACE ? 7 : 27;
+    mBuilder.buildInternalMasks(mStream, reach * srcLowerCount, [&](Mask<5> *upperMasks, auto lowerMasks) {
         if (srcLowerCount == 0) return; // Empty grid
         auto launch = [&](auto nn) {
             using Op = util::morphology::cuda::DilateInternalNodesFunctor<BuildT, decltype(nn)::value>;
             util::cuda::operatorKernel<Op>
                 <<<dim3(srcLowerCount, Op::SlicesPerLowerNode, 1), Op::MaxThreadsPerBlock, 0, mStream>>>
                 (mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), upperMasks, lowerMasks);
+            cudaCheckError();
         };
-        if (mOp == morphology::NN_FACE)
+        if (mOp == morphology::NN_FACE)// getHandle admits only NN_FACE and NN_FACE_EDGE_VERTEX
             launch(std::integral_constant<morphology::NearestNeighbors, morphology::NN_FACE>());
-        else if (mOp == morphology::NN_FACE_EDGE)
-            launch(std::integral_constant<morphology::NearestNeighbors, morphology::NN_FACE_EDGE>());
-        else if (mOp == morphology::NN_FACE_EDGE_VERTEX)
+        else
             launch(std::integral_constant<morphology::NearestNeighbors, morphology::NN_FACE_EDGE_VERTEX>());
     });
 }// DilateGrid<BuildT, ResourceT>::dilateInternalNodes
@@ -252,18 +257,17 @@ void DilateGrid<BuildT, ResourceT>::dilateLeafNodes()
     // Dilates the active masks of the source grid (as indicated at the leaf level), into a new grid that
     // has been already topologically dilated to include all necessary leaf nodes.
     if (mBuilder.data()->nodeCount[1]) { // Unless output grid is empty
-        if (mOp == morphology::NN_FACE) {
+        if (mOp == morphology::NN_FACE) {// getHandle admits only NN_FACE and NN_FACE_EDGE_VERTEX
             using Op = util::morphology::cuda::DilateLeafNodesFunctor<BuildT, morphology::NN_FACE>;
             util::cuda::operatorKernel<Op>
                 <<<dim3(mBuilder.data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
                 (mDeviceSrcGrid, static_cast<GridT*>(mBuilder.data()->d_bufferPtr)); }
-        else if (mOp == morphology::NN_FACE_EDGE)
-            throw std::runtime_error("dilateLeafNodes() not implemented for NN_FACE_EDGE stencil");
-        else if (mOp == morphology::NN_FACE_EDGE_VERTEX) {
+        else {
             using Op = util::morphology::cuda::DilateLeafNodesFunctor<BuildT, morphology::NN_FACE_EDGE_VERTEX>;
             util::cuda::operatorKernel<Op>
                 <<<dim3(mBuilder.data()->nodeCount[1],Op::SlicesPerLowerNode,1), Op::MaxThreadsPerBlock, 0, mStream>>>
                 (mDeviceSrcGrid, static_cast<GridT*>(mBuilder.data()->d_bufferPtr)); }
+        cudaCheckError();
     }
 
     // Update leaf offsets and prefix sums

@@ -209,6 +209,7 @@ void PruneGrid<BuildT, ResourceT>::pruneInternalNodes()
         util::cuda::lambdaKernel<<<numBlocks(srcLeafCount), mNumThreads, 0, mStream>>>(
             srcLeafCount, util::morphology::cuda::PruneInternalNodesFunctor<BuildT>(),
             mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), mDeviceSrcLeafMask, upperMasks, lowerMasks);
+        cudaCheckError();
     });
 }// PruneGrid<BuildT, ResourceT>::pruneInternalNodes
 
@@ -235,6 +236,7 @@ void PruneGrid<BuildT, ResourceT>::pruneLeafNodes()
     if (srcLeafCount) { // Unless grid is empty
         util::cuda::lambdaKernel<<<numBlocks(srcLeafCount), mNumThreads, 0, mStream>>>(
             srcLeafCount, util::morphology::cuda::PruneLeafMasksFunctor<BuildT>(), mDeviceSrcGrid, &mBuilder.data()->getGrid(), mDeviceSrcLeafMask);
+        cudaCheckError();
     }
 
     // Update leaf offsets and prefix sums

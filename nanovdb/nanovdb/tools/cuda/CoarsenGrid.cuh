@@ -204,6 +204,7 @@ void CoarsenGrid<BuildT, ResourceT>::coarsenInternalNodes()
         util::cuda::lambdaKernel<<<numBlocks(srcLeafCount), mNumThreads, 0, mStream>>>(
             srcLeafCount, util::morphology::cuda::CoarsenInternalNodesFunctor<BuildT>(),
             mDeviceSrcGrid, mBuilder.deviceProcessedRoot(), upperMasks, lowerMasks);
+        cudaCheckError();
     });
 }// CoarsenGrid<BuildT, ResourceT>::coarsenInternalNodes
 
@@ -230,6 +231,7 @@ void CoarsenGrid<BuildT, ResourceT>::coarsenLeafNodes()
     if (srcLeafCount) { // Unless grid is empty
         util::cuda::lambdaKernel<<<numBlocks(srcLeafCount), mNumThreads, 0, mStream>>>(
             srcLeafCount, util::morphology::cuda::CoarsenLeafMasksFunctor<BuildT>(), mDeviceSrcGrid, &mBuilder.data()->getGrid());
+        cudaCheckError();
     }
 
     // Update leaf offsets and prefix sums

@@ -26,7 +26,7 @@ int main(int argc, char *argv[])
     using GridT = openvdb::FloatGrid;
     using BuildT = nanovdb::ValueOnIndex;
 
-    // Select the type of dilation here. The NN_EDGE case supports leaf dilation too (currently)
+    // Select the type of dilation here: NN_FACE or NN_FACE_EDGE_VERTEX (DilateGrid rejects NN_FACE_EDGE)
     // openvdb::tools::NearestNeighbors nnType = openvdb::tools::NN_FACE_EDGE_VERTEX;
     openvdb::tools::NearestNeighbors nnType = openvdb::tools::NN_FACE;
 

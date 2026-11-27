@@ -70,6 +70,7 @@ struct DilateInternalNodesFunctor
         Mask<5> *upperMasks,
         LowerMasksT lowerMasks)
     {
+        static_assert(isLowerMasksView<LowerMasksT>, "LowerMasksT must be a view from nanovdb/util/cuda/LowerMasks.cuh");
         int tID = threadIdx.x;
         int lowerID = blockIdx.x;
         int sliceID = blockIdx.y;
@@ -367,6 +368,7 @@ struct MergeInternalNodesFunctor
         Mask<5> *upperMasks,
         LowerMasksT lowerMasks)
     {
+        static_assert(isLowerMasksView<LowerMasksT>, "LowerMasksT must be a view from nanovdb/util/cuda/LowerMasks.cuh");
         int tID = threadIdx.x;
         int lowerID = blockIdx.x;
 
@@ -417,6 +419,7 @@ struct PruneInternalNodesFunctor
         Mask<5> *upperMasks,
         LowerMasksT lowerMasks)
     {
+        static_assert(isLowerMasksView<LowerMasksT>, "LowerMasksT must be a view from nanovdb/util/cuda/LowerMasks.cuh");
 
         const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
         const auto& leafMask = srcLeafMask[srcLeafID];
@@ -461,6 +464,7 @@ struct RefineInternalNodesFunctor
         Mask<5> *upperMasks,
         LowerMasksT lowerMasks)
     {
+        static_assert(isLowerMasksView<LowerMasksT>, "LowerMasksT must be a view from nanovdb/util/cuda/LowerMasks.cuh");
 
         const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
         uint64_t octantPresent[2][2][2] = {};
@@ -514,6 +518,7 @@ struct CoarsenInternalNodesFunctor
         Mask<5> *upperMasks,
         LowerMasksT lowerMasks)
     {
+        static_assert(isLowerMasksView<LowerMasksT>, "LowerMasksT must be a view from nanovdb/util/cuda/LowerMasks.cuh");
 
         const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
         if (!srcLeaf.valueMask().isOff()) { // Gratuitous check; leaf should have at least one active voxel

@@ -878,9 +878,9 @@ void MeshToGrid<BuildT, ResourceT>::buildRasterizedRoot()
             tileCount * sizeof(nanovdb::Coord), cudaMemcpyDeviceToHost));
         for (uint32_t t = 0; t < tileCount; ++t)
             *rootPtr->tile(t) = typename RootT::DataType::Tile{RootT::CoordToKey(hostOrigins[t])};
-        mBuilder.uploadProcessedRoot(mStream);
         mUniqueRootOriginsBuffer.destroy(mStream);
     }
+    mBuilder.uploadProcessedRoot(mStream);
 } // MeshToGrid<BuildT, ResourceT>::buildRasterizedRoot
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -898,18 +898,20 @@ struct MarkUpperChildFunctor
     __device__ void operator()(size_t i) const
     {
         const nanovdb::Coord &origin = dPairs[i].origin;
-        const uint64_t tile = util::PtrDiff(dRoot->probeTile(origin), dRoot->tile(0)) / sizeof(typename NanoRoot<BuildT>::Tile);
+        const auto *rootTile = dRoot->probeTile(origin);
+        NANOVDB_ASSERT(rootTile);// buildRasterizedRoot made one tile per unique pair origin
+        const uint64_t tile = util::PtrDiff(rootTile, dRoot->tile(0)) / sizeof(typename NanoRoot<BuildT>::Tile);
         const uint32_t uc = NanoUpper<BuildT>::CoordToOffset(origin);
         if (!dUpperMasks[tile].isOn(uc)) dUpperMasks[tile].setOnAtomic(uc);// most pairs find their bit already set
     }
 };
 
-/// @brief Adds the popcount of upper-mask word @a i to @a *count
+/// @brief One thread per processed tile: adds the popcount of its upper mask to @a *count
 struct CountUpperBitsFunctor
 {
-    __device__ void operator()(size_t i, const uint64_t *words, unsigned long long *count) const
+    __device__ void operator()(size_t t, const Mask<5> *upperMasks, unsigned long long *count) const
     {
-        if (const uint64_t word = words[i]) atomicAdd(count, (unsigned long long)__popcll(word));
+        if (const uint32_t n = upperMasks[t].countOn()) atomicAdd(count, (unsigned long long)n);
     }
 };
 
@@ -922,7 +924,7 @@ uint64_t MeshToGrid<BuildT, ResourceT>::countTouchedUpperChildren()
     // one. Marking them in a 4 KiB upper mask per tile and counting the set bits gives the exact
     // number of lower-mask rows the builder needs, with no per-pair scratch.
     if (mBoxTrianglePairCount == 0) return 0;
-    const uint64_t tileCount = mUniqueRootTileCount;
+    const uint32_t tileCount = static_cast<uint32_t>(mUniqueRootTileCount);
     BufT<Mask<5>> upperMasks(mStream, this->ref(), tileCount, nanovdb::cuda::noInit);
     BufT<unsigned long long> count(mStream, this->ref(), 1, nanovdb::cuda::noInit);
     cudaCheck(cudaMemsetAsync(upperMasks.data(), 0, upperMasks.size_bytes(), mStream));
@@ -930,9 +932,8 @@ uint64_t MeshToGrid<BuildT, ResourceT>::countTouchedUpperChildren()
     util::cuda::lambdaKernel<<<numBlocks(mBoxTrianglePairCount), mNumThreads, 0, mStream>>>(
         mBoxTrianglePairCount,
         topology::detail::MarkUpperChildFunctor<BuildT>{ deviceBoxTrianglePairs(), mBuilder.deviceProcessedRoot(), upperMasks.data() });
-    const uint64_t words = tileCount * Mask<5>::WORD_COUNT;
-    util::cuda::lambdaKernel<<<numBlocks(words), mNumThreads, 0, mStream>>>(
-        words, topology::detail::CountUpperBitsFunctor(), reinterpret_cast<const uint64_t*>(upperMasks.data()), count.data());
+    util::cuda::lambdaKernel<<<numBlocks(tileCount), mNumThreads, 0, mStream>>>(
+        tileCount, topology::detail::CountUpperBitsFunctor(), upperMasks.data(), count.data());
     cudaCheckError();
 
     unsigned long long rows = 0;
@@ -955,7 +956,6 @@ void MeshToGrid<BuildT, ResourceT>::rasterizeInternalNodes()
         );
         cudaCheckError();
     });
-
 } // MeshToGrid<BuildT, ResourceT>::rasterizeInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------

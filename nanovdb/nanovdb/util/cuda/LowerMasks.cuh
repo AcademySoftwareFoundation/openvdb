@@ -34,6 +34,8 @@
 
 #include <nanovdb/NanoVDB.h>
 
+#include <type_traits> // for std::is_base_of_v
+
 #if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 700
 #define NANOVDB_LOWERMASKS_CAN_CLAIM 1
 #include <cooperative_groups.h>
@@ -55,6 +57,9 @@ static constexpr uint32_t OverflowRow  = 0xFFFFFFFDu;
 /// @brief Largest SparseLowerMasks pool, so that every row index stays below the sentinels
 static constexpr uint32_t MaxLowerRows = OverflowRow;
 
+/// @brief Words of the SparseLowerMasks row state: rows claimed so far, then the overflow flag
+static constexpr uint32_t RowStateClaimed = 0, RowStateOverflow = 1, RowStateWords = 2;
+
 /// @brief Write calls shared by the views; Derived supplies row(tile, uc), which returns
 ///        nullptr when the write must be dropped
 template <typename Derived>
@@ -75,6 +80,10 @@ struct LowerMasksWrites
     }
 };
 
+/// @brief True for the views below, the only types the internal-node functors write through
+template <typename T>
+inline constexpr bool isLowerMasksView = std::is_base_of_v<LowerMasksWrites<T>, T>;
+
 /// @brief Mask<5>::SIZE Mask<4> per tile, indexed [tile][uc]. Converts implicitly from the
 ///        Mask<4>(*)[Mask<5>::SIZE] array of TopologyBuilder's deprecated dense path.
 struct DenseLowerMasks : LowerMasksWrites<DenseLowerMasks>
@@ -90,7 +99,8 @@ struct DenseLowerMasks : LowerMasksWrites<DenseLowerMasks>
 
 /// @brief Rows claimed on first touch from a pool of @c capacity zeroed Mask<4>. @c index
 ///        holds one row index per (tile, uc), initialized to UnclaimedRow. A claim past the
-///        pool sets @c *overflow and drops the write.
+///        pool sets @c *overflow and drops the write. @c claimed and @c overflow are the two
+///        words of a zeroed RowStateWords state.
 struct SparseLowerMasks : LowerMasksWrites<SparseLowerMasks>
 {
     uint32_t *index;
@@ -98,6 +108,14 @@ struct SparseLowerMasks : LowerMasksWrites<SparseLowerMasks>
     uint32_t *claimed;// rows handed out so far
     uint32_t *overflow;
     uint32_t  capacity;
+
+    /// @param state RowStateWords zeroed words
+    /// @param capacity at most MaxLowerRows, so that no claimed row collides with a sentinel
+    __hostdev__ SparseLowerMasks(uint32_t *index, Mask<4> *pool, uint32_t *state, uint32_t capacity)
+        : index(index), pool(pool), claimed(state + RowStateClaimed), overflow(state + RowStateOverflow), capacity(capacity)
+    {
+        NANOVDB_ASSERT(state && capacity <= MaxLowerRows && (capacity == 0 || (index && pool)));
+    }
 
     __hostdev__ SparseLowerMasks offsetTiles(uint64_t tileBase) const
     {
