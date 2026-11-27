@@ -15,6 +15,7 @@
 #include <cstddef> // for std::size_t
 
 #include <nanovdb/util/MorphologyHelpers.h>
+#include <nanovdb/util/cuda/LowerMasks.cuh>
 
 #ifndef NANOVDB_UTIL_MORPHOLOGY_CUDA_MORPHOLOGY_CUH_HAS_BEEN_INCLUDED
 #define NANOVDB_UTIL_MORPHOLOGY_CUDA_MORPHOLOGY_CUH_HAS_BEEN_INCLUDED
@@ -50,6 +51,7 @@ struct DilateInternalNodesFunctor
     static constexpr int SlicesPerLowerNode = 8;
     static constexpr int LeafNodesPerSlice = 4096 / SlicesPerLowerNode;
 
+    [[deprecated("Pass a lower-mask view from nanovdb/util/cuda/LowerMasks.cuh")]]
     void __device__
     operator()(
         const NanoGrid<BuildT> *srcGrid,
@@ -57,6 +59,18 @@ struct DilateInternalNodesFunctor
         Mask<5> *upperMasks,
         Mask<4> (*lowerMasks)[Mask<5>::SIZE])
     {
+        (*this)(srcGrid, dilatedRoot, upperMasks, DenseLowerMasks(lowerMasks));
+    }
+
+    template <typename LowerMasksT>
+    void __device__
+    operator()(
+        const NanoGrid<BuildT> *srcGrid,
+        const NanoRoot<BuildT> *dilatedRoot,
+        Mask<5> *upperMasks,
+        LowerMasksT lowerMasks)
+    {
+        static_assert(isLowerMasksView<LowerMasksT>, "LowerMasksT must be a view from nanovdb/util/cuda/LowerMasks.cuh");
         int tID = threadIdx.x;
         int lowerID = blockIdx.x;
         int sliceID = blockIdx.y;
@@ -320,11 +334,9 @@ struct DilateInternalNodesFunctor
                         uint64_t tileChildIndex =
                             util::PtrDiff(dilatedTile, dilatedRoot->tile(0))
                             / sizeof(NanoRoot<BuildT>::Tile); // TODO: consider some faster integer division? or a way to avoid this?
-                        auto& outputUpperMask = upperMasks[tileChildIndex];
-                        outputUpperMask.setOnAtomic(upperChildIndex);
-                        auto& outputLowerMask = lowerMasks[tileChildIndex][upperChildIndex];
-                        util::atomicOr(const_cast<uint64_t*>(&outputLowerMask.words()[threadInWarpID+tOffset]),
-                                       static_cast<uint64_t>(computedWord)); } } } }
+                        upperMasks[tileChildIndex].setOnAtomic(upperChildIndex);
+                        lowerMasks.atomicOrWord(tileChildIndex, upperChildIndex, threadInWarpID+tOffset,
+                                                static_cast<uint64_t>(computedWord)); } } } }
         __syncthreads();
     }
 
@@ -337,6 +349,7 @@ struct MergeInternalNodesFunctor
     static constexpr int MaxThreadsPerBlock = 64;
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
+    [[deprecated("Pass a lower-mask view from nanovdb/util/cuda/LowerMasks.cuh")]]
     void __device__
     operator()(
         const NanoGrid<BuildT> *srcGrid,
@@ -344,6 +357,18 @@ struct MergeInternalNodesFunctor
         Mask<5> *upperMasks,
         Mask<4> (*lowerMasks)[Mask<5>::SIZE])
     {
+        (*this)(srcGrid, mergedRoot, upperMasks, DenseLowerMasks(lowerMasks));
+    }
+
+    template <typename LowerMasksT>
+    void __device__
+    operator()(
+        const NanoGrid<BuildT> *srcGrid,
+        const NanoRoot<BuildT> *mergedRoot,
+        Mask<5> *upperMasks,
+        LowerMasksT lowerMasks)
+    {
+        static_assert(isLowerMasksView<LowerMasksT>, "LowerMasksT must be a view from nanovdb/util/cuda/LowerMasks.cuh");
         int tID = threadIdx.x;
         int lowerID = blockIdx.x;
 
@@ -359,11 +384,9 @@ struct MergeInternalNodesFunctor
             / sizeof(NanoRoot<BuildT>::Tile); // TODO: consider some faster integer division? or a way to avoid this?
         auto upperChildIndex = NanoUpper<BuildT>::CoordToOffset(lower.origin());
 
-        auto& outputUpperMask = upperMasks[tileIndex];
-        auto& outputLowerMask = lowerMasks[tileIndex][upperChildIndex];
-        outputLowerMask.words()[tID] |= valueMask.words()[tID];
+        lowerMasks.orWord(tileIndex, upperChildIndex, tID, valueMask.words()[tID]);
         if (tID == 0)
-            outputUpperMask.setOnAtomic(upperChildIndex);
+            upperMasks[tileIndex].setOnAtomic(upperChildIndex);
         __syncthreads();
     }
 
@@ -373,6 +396,7 @@ template <typename BuildT>
 struct PruneInternalNodesFunctor
 {
     // Intended to be called via nanovdb::util::cuda::lambdaKernel
+    [[deprecated("Pass a lower-mask view from nanovdb/util/cuda/LowerMasks.cuh")]]
     __device__
     void operator()(
         size_t srcLeafID,
@@ -382,6 +406,20 @@ struct PruneInternalNodesFunctor
         Mask<5> *upperMasks,
         Mask<4> (*lowerMasks)[Mask<5>::SIZE])
     {
+        (*this)(srcLeafID, srcGrid, prunedRoot, srcLeafMask, upperMasks, DenseLowerMasks(lowerMasks));
+    }
+
+    template <typename LowerMasksT>
+    __device__
+    void operator()(
+        size_t srcLeafID,
+        const NanoGrid<BuildT>* srcGrid,
+        const NanoRoot<BuildT>* prunedRoot,
+        const Mask<3>* srcLeafMask,
+        Mask<5> *upperMasks,
+        LowerMasksT lowerMasks)
+    {
+        static_assert(isLowerMasksView<LowerMasksT>, "LowerMasksT must be a view from nanovdb/util/cuda/LowerMasks.cuh");
 
         const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
         const auto& leafMask = srcLeafMask[srcLeafID];
@@ -396,10 +434,8 @@ struct PruneInternalNodesFunctor
             uint64_t tileChildIndex =
                 util::PtrDiff(prunedTile, prunedRoot->tile(0))
                 / sizeof(NanoRoot<BuildT>::Tile); // TODO: consider some faster integer division? or a way to avoid
-            auto& outputUpperMask = upperMasks[tileChildIndex];
-            outputUpperMask.setOnAtomic(upperChildIndex);
-            auto& outputLowerMask = lowerMasks[tileChildIndex][upperChildIndex];
-            outputLowerMask.setOnAtomic(lowerChildIndex); }
+            upperMasks[tileChildIndex].setOnAtomic(upperChildIndex);
+            lowerMasks.setOnAtomic(tileChildIndex, upperChildIndex, lowerChildIndex); }
     }
 };
 
@@ -407,6 +443,7 @@ template <typename BuildT>
 struct RefineInternalNodesFunctor
 {
     // Intended to be called via nanovdb::util::cuda::lambdaKernel
+    [[deprecated("Pass a lower-mask view from nanovdb/util/cuda/LowerMasks.cuh")]]
     __device__
     void operator()(
         size_t srcLeafID,
@@ -415,6 +452,19 @@ struct RefineInternalNodesFunctor
         Mask<5> *upperMasks,
         Mask<4> (*lowerMasks)[Mask<5>::SIZE])
     {
+        (*this)(srcLeafID, srcGrid, prunedRoot, upperMasks, DenseLowerMasks(lowerMasks));
+    }
+
+    template <typename LowerMasksT>
+    __device__
+    void operator()(
+        size_t srcLeafID,
+        const NanoGrid<BuildT>* srcGrid,
+        const NanoRoot<BuildT>* prunedRoot,
+        Mask<5> *upperMasks,
+        LowerMasksT lowerMasks)
+    {
+        static_assert(isLowerMasksView<LowerMasksT>, "LowerMasksT must be a view from nanovdb/util/cuda/LowerMasks.cuh");
 
         const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
         uint64_t octantPresent[2][2][2] = {};
@@ -436,10 +486,8 @@ struct RefineInternalNodesFunctor
                 uint64_t tileChildIndex =
                     util::PtrDiff(prunedTile, prunedRoot->tile(0))
                     / sizeof(NanoRoot<BuildT>::Tile); // TODO: consider some faster integer division? or a way to avoid
-                auto& outputUpperMask = upperMasks[tileChildIndex];
-                outputUpperMask.setOnAtomic(upperChildIndex);
-                auto& outputLowerMask = lowerMasks[tileChildIndex][upperChildIndex];
-                outputLowerMask.setOnAtomic(lowerChildIndex);
+                upperMasks[tileChildIndex].setOnAtomic(upperChildIndex);
+                lowerMasks.setOnAtomic(tileChildIndex, upperChildIndex, lowerChildIndex);
             }
         }
     }
@@ -449,6 +497,7 @@ template <typename BuildT>
 struct CoarsenInternalNodesFunctor
 {
     // Intended to be called via nanovdb::util::cuda::lambdaKernel
+    [[deprecated("Pass a lower-mask view from nanovdb/util/cuda/LowerMasks.cuh")]]
     __device__
     void operator()(
         size_t srcLeafID,
@@ -457,6 +506,19 @@ struct CoarsenInternalNodesFunctor
         Mask<5> *upperMasks,
         Mask<4> (*lowerMasks)[Mask<5>::SIZE])
     {
+        (*this)(srcLeafID, srcGrid, prunedRoot, upperMasks, DenseLowerMasks(lowerMasks));
+    }
+
+    template <typename LowerMasksT>
+    __device__
+    void operator()(
+        size_t srcLeafID,
+        const NanoGrid<BuildT>* srcGrid,
+        const NanoRoot<BuildT>* prunedRoot,
+        Mask<5> *upperMasks,
+        LowerMasksT lowerMasks)
+    {
+        static_assert(isLowerMasksView<LowerMasksT>, "LowerMasksT must be a view from nanovdb/util/cuda/LowerMasks.cuh");
 
         const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
         if (!srcLeaf.valueMask().isOff()) { // Gratuitous check; leaf should have at least one active voxel
@@ -467,10 +529,8 @@ struct CoarsenInternalNodesFunctor
             uint64_t tileChildIndex =
                 util::PtrDiff(prunedTile, prunedRoot->tile(0))
                 / sizeof(NanoRoot<BuildT>::Tile); // TODO: consider some faster integer division? or a way to avoid
-            auto& outputUpperMask = upperMasks[tileChildIndex];
-            outputUpperMask.setOnAtomic(upperChildIndex);
-            auto& outputLowerMask = lowerMasks[tileChildIndex][upperChildIndex];
-            outputLowerMask.setOnAtomic(lowerChildIndex);
+            upperMasks[tileChildIndex].setOnAtomic(upperChildIndex);
+            lowerMasks.setOnAtomic(tileChildIndex, upperChildIndex, lowerChildIndex);
         }
     }
 };
