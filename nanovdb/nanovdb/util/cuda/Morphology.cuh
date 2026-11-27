@@ -41,6 +41,44 @@ __device__ inline uint32_t gridOfIndex(const DataT *d_data, uint32_t gridCount, 
     return lo - 1;
 }
 
+/// @brief Marks the leaf at @a origin as a child of its lower node, and that lower node as a
+///        child of its upper node, in the masks of the tile of @a root that holds @a origin.
+///        Both writes are atomic. The tile must exist: a missing tile is a caller bug, which
+///        only debug builds catch. (Refine and prune instead skip targets that may legitimately
+///        be absent.)
+template <typename BuildT, typename LowerMasksT>
+__device__ inline void markLeafInMasks(const NanoRoot<BuildT> *root, Mask<5> *upperMasks, LowerMasksT lowerMasks, const Coord &origin)
+{
+    static_assert(isLowerMasksView<LowerMasksT>, "LowerMasksT must be a view from nanovdb/util/cuda/LowerMasks.cuh");
+    const auto *tile = root->probeTile(origin);
+    NANOVDB_ASSERT(tile);
+    const uint64_t tileIndex = util::PtrDiff(tile, root->tile(0)) / sizeof(typename NanoRoot<BuildT>::Tile);
+    const uint32_t upperChildIndex = NanoUpper<BuildT>::CoordToOffset(origin);
+    upperMasks[tileIndex].setOnAtomic(upperChildIndex);
+    lowerMasks.setOnAtomic(tileIndex, upperChildIndex, NanoLower<BuildT>::CoordToOffset(origin));
+}
+
+/// @brief Atomically ORs @a bits into the value mask of the leaf of @a dstGrid at @a origin.
+///        The leaf must exist: a missing leaf is a caller bug, which only debug builds catch.
+template <typename BuildT>
+__device__ inline void orIntoLeafMask(NanoGrid<BuildT> *dstGrid, const Coord &origin, const Mask<3> &bits)
+{
+    const auto *dstLeaf = dstGrid->tree().root().probeLeaf(origin);
+    NANOVDB_ASSERT(dstLeaf);
+    auto &dstMask = const_cast<Mask<3>&>(dstLeaf->valueMask());
+    for (uint32_t w = 0; w < Mask<3>::WORD_COUNT; ++w)
+        if (const uint64_t word = bits.words()[w]) util::atomicOr(&dstMask.words()[w], word);
+}
+
+/// @brief Origin of target leaf @a leafOffset (see DilationBox) of the leaf at @a origin
+template <typename BuildT>
+__device__ inline Coord boxDilationTarget(const Coord &origin, const Coord &leafOffset)
+{
+    constexpr int dim = int(NanoLeaf<BuildT>::DIM);
+    static_assert(dim == DilationBox::LeafDim, "DilationBox numbers targets in leaf-node widths");
+    return origin.offsetBy(leafOffset[0] * dim, leafOffset[1] * dim, leafOffset[2] * dim);
+}
+
 template<class BuildT, tools::morphology::NearestNeighbors nnType>
 struct DilateInternalNodesFunctor
 {
@@ -342,10 +380,45 @@ struct DilateInternalNodesFunctor
 
 };
 
+/// @brief Internal-node pass of a dilation by a DilationBox, one work item per (source leaf,
+///        target leaf) pair, so that it runs in a launch of its caller's choosing: item
+///        @c itemID is target leaf @c itemID % box.leafOffsetCount() of source leaf
+///        @c itemID / box.leafOffsetCount(), and an empty box has no items. An item whose
+///        target receives voxels marks that leaf in the masks of @a dilatedRoot's tile holding
+///        it, which must exist; the tiles of box.dilate(bbox) for every upper node of
+///        @a srcGrid suffice. Every write is atomic, so the items of several grids may share
+///        a launch.
+template <typename BuildT>
+struct BoxDilateInternalNodesFunctor
+{
+    // Intended to be called via nanovdb::util::cuda::lambdaKernel with
+    // leafCount * box.leafOffsetCount() items
+    template <typename LowerMasksT>
+    __device__
+    void operator()(
+        size_t itemID,
+        const NanoGrid<BuildT> *srcGrid,
+        const NanoRoot<BuildT> *dilatedRoot,
+        const DilationBox &box,
+        Mask<5> *upperMasks,
+        LowerMasksT lowerMasks) const
+    {
+        const uint64_t count = box.leafOffsetCount();
+        NANOVDB_ASSERT(count);
+        if (!count) return;// an empty box has no items
+        const auto &srcLeaf = srcGrid->tree().template getFirstNode<0>()[itemID / count];
+        const Coord leafOffset = box.leafOffset(itemID % count);
+        Mask<3> dilated;
+        if (box.dilateLeafMask(srcLeaf.valueMask(), leafOffset, dilated))
+            markLeafInMasks(dilatedRoot, upperMasks, lowerMasks, boxDilationTarget<BuildT>(srcLeaf.origin(), leafOffset));
+    }
+};
+
 template<class BuildT>
 struct MergeInternalNodesFunctor
 {
-    // Intended to be called via nanovdb::util::cuda::operatorKernel
+    // The block forms are intended to be called via nanovdb::util::cuda::operatorKernel, one
+    // block per source lower node; the per-leaf form via nanovdb::util::cuda::lambdaKernel
     static constexpr int MaxThreadsPerBlock = 64;
     static constexpr int MinBlocksPerMultiprocessor = 1;
 
@@ -388,6 +461,24 @@ struct MergeInternalNodesFunctor
         if (tID == 0)
             upperMasks[tileIndex].setOnAtomic(upperChildIndex);
         __syncthreads();
+    }
+
+    /// @brief Per-leaf form, intended to be called via nanovdb::util::cuda::lambdaKernel with one
+    ///        item per leaf of @a srcGrid: marks the leaf in the masks of @a mergedRoot's tile
+    ///        holding it, which must exist. Unlike the form above, which reads blockIdx and ORs
+    ///        whole lower masks non-atomically, every write is atomic, so the leaves of both
+    ///        inputs of a merge, and of several grids, may share a launch.
+    template <typename LowerMasksT>
+    void __device__
+    operator()(
+        size_t srcLeafID,
+        const NanoGrid<BuildT> *srcGrid,
+        const NanoRoot<BuildT> *mergedRoot,
+        Mask<5> *upperMasks,
+        LowerMasksT lowerMasks) const
+    {
+        const auto &srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
+        markLeafInMasks(mergedRoot, upperMasks, lowerMasks, srcLeaf.origin());
     }
 
 };
@@ -861,6 +952,33 @@ struct DilateLeafNodesFunctor<BuildT, tools::morphology::NN_FACE_EDGE_VERTEX>
 
 };
 
+/// @brief Leaf pass of a dilation by a DilationBox, with the work items of
+///        BoxDilateInternalNodesFunctor: an item ORs the voxels its source leaf contributes to
+///        its target leaf into the leaf of @a dstGrid there. The OR is atomic, so the items of
+///        several grids may share a launch.
+template <typename BuildT>
+struct BoxDilateLeafMasksFunctor
+{
+    // Intended to be called via nanovdb::util::cuda::lambdaKernel with
+    // leafCount * box.leafOffsetCount() items
+    __device__
+    void operator()(
+        size_t itemID,
+        const NanoGrid<BuildT>* srcGrid,
+        NanoGrid<BuildT>* dstGrid,
+        const DilationBox &box) const
+    {
+        const uint64_t count = box.leafOffsetCount();
+        NANOVDB_ASSERT(count);
+        if (!count) return;// an empty box has no items
+        const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[itemID / count];
+        const Coord leafOffset = box.leafOffset(itemID % count);
+        Mask<3> dilated;
+        if (box.dilateLeafMask(srcLeaf.valueMask(), leafOffset, dilated))
+            orIntoLeafMask(dstGrid, boxDilationTarget<BuildT>(srcLeaf.origin(), leafOffset), dilated);
+    }
+};
+
 template<class BuildT>
 struct MergeLeafNodesFunctor
 {
@@ -893,6 +1011,25 @@ struct MergeLeafNodesFunctor
                     dstMask.words()[w] |= srcLeaf.valueMask().words()[w]; }
     }
 
+};
+
+/// @brief Leaf pass of a merge, one work item per source leaf: ORs the leaf's value mask into
+///        the leaf of @a dstGrid at its origin, which must exist. Unlike MergeLeafNodesFunctor,
+///        which reads blockIdx and ORs non-atomically, the OR is atomic, so the leaves of both
+///        inputs of a merge, and of several grids, may share a launch.
+template <typename BuildT>
+struct MergeLeafMasksFunctor
+{
+    // Intended to be called via nanovdb::util::cuda::lambdaKernel
+    __device__
+    void operator()(
+        size_t srcLeafID,
+        const NanoGrid<BuildT>* srcGrid,
+        NanoGrid<BuildT>* dstGrid) const
+    {
+        const auto& srcLeaf = srcGrid->tree().template getFirstNode<0>()[srcLeafID];
+        orIntoLeafMask(dstGrid, srcLeaf.origin(), srcLeaf.valueMask());
+    }
 };
 
 template <typename BuildT>

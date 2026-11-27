@@ -1,0 +1,19 @@
+NanoVDB:
+  API Changes:
+  - The merge and dilation stages in nanovdb/util/cuda/Morphology.cuh gained forms
+    that take their work item as an argument, as the refine, coarsen and prune
+    functors already do, so a caller can run them in a launch of its own choosing,
+    for instance one launch over every grid of a batch. Every write they make is
+    atomic.
+  - Added a per-leaf form of MergeInternalNodesFunctor, and MergeLeafMasksFunctor,
+    which ORs a source leaf into the merged grid. The leaves of both inputs of a
+    merge may share one launch.
+  - Added util::morphology::DilationBox in nanovdb/util/MorphologyHelpers.h: an
+    axis-aligned box [lo, hi] of offsets, of any size, that a dilation adds to every
+    active voxel; the dilated coordinates must fit in int32. It need not contain the
+    origin, and a box with lo > hi on an axis is empty. It enumerates the leaves the dilation of one leaf reaches, dilates a
+    leaf mask into one of them on the host or the device, and dilates a bounding
+    box, from which a caller derives the output's root tiles.
+    DilationBox(Coord(-1), Coord(1)) is NN_FACE_EDGE_VERTEX.
+  - Added BoxDilateInternalNodesFunctor and BoxDilateLeafMasksFunctor, which dilate
+    by a DilationBox with one work item per (source leaf, target leaf) pair.
