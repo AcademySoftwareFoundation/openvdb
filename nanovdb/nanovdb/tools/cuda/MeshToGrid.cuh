@@ -17,6 +17,7 @@
 #define NANOVDB_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <cub/cub.cuh>
+#include <cuda/atomic> // for cuda::atomic_ref
 #include <algorithm>
 #include <cstddef> // for std::size_t
 #include <string> // for std::string
@@ -194,6 +195,8 @@ private:
 
     void rasterizeInternalNodes();
 
+    uint64_t countTouchedUpperChildren();
+
     void processGridTreeRoot();
 
     void rasterizeLeafNodes();
@@ -277,11 +280,6 @@ GridHandle<BufferT> MeshToGrid<BuildT, ResourceT>::getHandle(const BufferT &buff
     // Build rasterized root node (one tile per unique root origin)
     if (mVerbose==1) mTimer.start("Building rasterized root node");
     buildRasterizedRoot();
-    if (mVerbose==1) mTimer.stop();
-
-    // Allocate (zero-filled) upper/lower mask buffers sized from the root tile count
-    if (mVerbose==1) mTimer.start("Allocating internal mask buffers");
-    mBuilder.allocateInternalMaskBuffers(mStream);
     if (mVerbose==1) mTimer.stop();
 
     // Scatter leaf/triangle pair origins into upper/lower topology masks
@@ -881,29 +879,90 @@ void MeshToGrid<BuildT, ResourceT>::buildRasterizedRoot()
             tileCount * sizeof(nanovdb::Coord), cudaMemcpyDeviceToHost));
         for (uint32_t t = 0; t < tileCount; ++t)
             *rootPtr->tile(t) = typename RootT::DataType::Tile{RootT::CoordToKey(hostOrigins[t])};
-        mBuilder.uploadProcessedRoot(mStream);
         mUniqueRootOriginsBuffer.destroy(mStream);
     }
+    mBuilder.uploadProcessedRoot(mStream);
 } // MeshToGrid<BuildT, ResourceT>::buildRasterizedRoot
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace topology::detail {
+
+/// @brief Sets the upper-mask bit of the (processed tile, upper child) a leaf/triangle pair marks
+template <typename BuildT>
+struct MarkUpperChildFunctor
+{
+    const MeshToGridBoxTrianglePair *dPairs;
+    const NanoRoot<BuildT>          *dRoot;
+    Mask<5>                         *dUpperMasks;
+
+    __device__ void operator()(size_t i) const
+    {
+        const nanovdb::Coord &origin = dPairs[i].origin;
+        const auto *rootTile = dRoot->probeTile(origin);
+        NANOVDB_ASSERT(rootTile);// buildRasterizedRoot made one tile per unique pair origin
+        const uint64_t tile = util::PtrDiff(rootTile, dRoot->tile(0)) / sizeof(typename NanoRoot<BuildT>::Tile);
+        const uint32_t uc = NanoUpper<BuildT>::CoordToOffset(origin);
+
+        // Most pairs find their bit already set, so skip the atomic then. Other threads set bits
+        // in the same word, so the check is a relaxed atomic load; bits are only ever set, so a
+        // stale read costs at most a redundant atomic.
+        const uint64_t word = ::cuda::atomic_ref<uint64_t, ::cuda::thread_scope_device>(dUpperMasks[tile].words()[uc >> 6])
+                                  .load(::cuda::std::memory_order_relaxed);
+        if (!(word & (uint64_t(1) << (uc & 63)))) dUpperMasks[tile].setOnAtomic(uc);
+    }
+};
+
+/// @brief One thread per processed tile: adds the popcount of its upper mask to @a *count
+struct CountUpperBitsFunctor
+{
+    __device__ void operator()(size_t t, const Mask<5> *upperMasks, unsigned long long *count) const
+    {
+        if (const uint32_t n = upperMasks[t].countOn()) atomicAdd(count, (unsigned long long)n);
+    }
+};
+
+} // namespace topology::detail
+
+template<typename BuildT, typename ResourceT>
+uint64_t MeshToGrid<BuildT, ResourceT>::countTouchedUpperChildren()
+{
+    // The rasterizer marks one (tile, upper child) per leaf/triangle pair, but many pairs share
+    // one. Marking them in a 4 KiB upper mask per tile and counting the set bits gives the exact
+    // number of lower-mask rows the builder needs, with no per-pair scratch.
+    if (mBoxTrianglePairCount == 0) return 0;
+    const uint32_t tileCount = static_cast<uint32_t>(mUniqueRootTileCount);
+    BufT<Mask<5>> upperMasks(mStream, this->ref(), tileCount, nanovdb::cuda::noInit);
+    BufT<unsigned long long> count(mStream, this->ref(), 1, nanovdb::cuda::noInit);
+    cudaCheck(cudaMemsetAsync(upperMasks.data(), 0, upperMasks.size_bytes(), mStream));
+    cudaCheck(cudaMemsetAsync(count.data(), 0, count.size_bytes(), mStream));
+    util::cuda::lambdaKernel<<<numBlocks(mBoxTrianglePairCount), mNumThreads, 0, mStream>>>(
+        mBoxTrianglePairCount,
+        topology::detail::MarkUpperChildFunctor<BuildT>{ deviceBoxTrianglePairs(), mBuilder.deviceProcessedRoot(), upperMasks.data() });
+    util::cuda::lambdaKernel<<<numBlocks(tileCount), mNumThreads, 0, mStream>>>(
+        tileCount, topology::detail::CountUpperBitsFunctor(), upperMasks.data(), count.data());
+    cudaCheckError();
+
+    unsigned long long rows = 0;
+    cudaCheck(cudaMemcpyAsync(&rows, count.data(), sizeof(rows), cudaMemcpyDeviceToHost, mStream));
+    cudaCheck(cudaStreamSynchronize(mStream));
+    return uint64_t(rows);
+} // MeshToGrid<BuildT, ResourceT>::countTouchedUpperChildren
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT, typename ResourceT>
 void MeshToGrid<BuildT, ResourceT>::rasterizeInternalNodes()
 {
-    if (mBoxTrianglePairCount == 0) return;
-
-    using RasterizerT = util::rasterization::cuda::RasterizeInternalNodesFunctor<BuildT, BoxTrianglePair>;
-
-    auto *dUpperMasks = mBuilder.deviceUpperMasks();
-    auto *dLowerMasks = mBuilder.deviceLowerMasks();
-
-    util::cuda::lambdaKernel<<<numBlocks(mBoxTrianglePairCount), mNumThreads, 0, mStream>>>(
-        mBoxTrianglePairCount,
-        RasterizerT{ deviceBoxTrianglePairs(), mBuilder.deviceProcessedRoot(), dUpperMasks, dLowerMasks }
-    );
-    cudaCheckError();
-
+    mBuilder.buildInternalMasks(mStream, countTouchedUpperChildren(), [&](Mask<5> *upperMasks, auto lowerMasks) {
+        if (mBoxTrianglePairCount == 0) return;
+        using RasterizerT = util::rasterization::cuda::RasterizeInternalNodesFunctor<BuildT, BoxTrianglePair, decltype(lowerMasks)>;
+        util::cuda::lambdaKernel<<<numBlocks(mBoxTrianglePairCount), mNumThreads, 0, mStream>>>(
+            mBoxTrianglePairCount,
+            RasterizerT{ deviceBoxTrianglePairs(), mBuilder.deviceProcessedRoot(), upperMasks, lowerMasks }
+        );
+        cudaCheckError();
+    });
 } // MeshToGrid<BuildT, ResourceT>::rasterizeInternalNodes
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1096,10 +1155,6 @@ MeshToGrid<BuildT, ResourceT>::getHandleAndUDF(const GridBufferT& buffer, const 
 
     if (mVerbose==1) mTimer.start("Building rasterized root node");
     buildRasterizedRoot();
-    if (mVerbose==1) mTimer.stop();
-
-    if (mVerbose==1) mTimer.start("Allocating internal mask buffers");
-    mBuilder.allocateInternalMaskBuffers(mStream);
     if (mVerbose==1) mTimer.stop();
 
     if (mVerbose==1) mTimer.start("Rasterizing internal nodes");

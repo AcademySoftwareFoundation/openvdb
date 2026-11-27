@@ -1122,7 +1122,7 @@ Construct from a device grid pointer, get a new handle:
 auto* idxGrid = devH.deviceGrid<nanovdb::ValueOnIndex>();
 nanovdb::tools::cuda::DilateGrid<nanovdb::ValueOnIndex> dilater(idxGrid);
 dilater.setOperation(nanovdb::tools::morphology::NN_FACE_EDGE_VERTEX);
-// NN_FACE (6) | NN_FACE_EDGE (18) | NN_FACE_EDGE_VERTEX (26-connected)
+// NN_FACE (6) | NN_FACE_EDGE_VERTEX (26-connected); NN_FACE_EDGE is not implemented
 auto dilatedH = dilater.getHandle(nanovdb::cuda::Buffer<std::byte>());
 ```
 

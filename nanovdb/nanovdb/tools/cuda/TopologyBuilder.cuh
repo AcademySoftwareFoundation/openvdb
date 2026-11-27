@@ -30,11 +30,15 @@
 #include <nanovdb/util/cuda/Morphology.cuh>
 #include <nanovdb/cuda/HandleStorage.h>
 #include <nanovdb/cuda/PinnedResource.h> // for the pinned host staging of the processed roots and builder parameters
+#include <cub/cub.cuh> // for cub::WarpScan, cub::DeviceScan
 
 #include <cstddef> // for std::byte, std::size_t
 #include <cstring> // for std::memset
 #include <map> // for the processed tile maps
-#include <stdexcept> // for std::runtime_error
+#include <algorithm> // for std::min
+#include <stdexcept> // for std::runtime_error, std::logic_error
+#include <string> // for the mask-accessor error messages
+#include <type_traits> // for std::is_invocable_v
 #include <utility> // for std::exchange, std::swap
 #include <vector> // for the tile counts handed to allocateProcessedRoots and the per-grid byte offsets
 
@@ -132,7 +136,7 @@ public:
 }// namespace topology::detail
 
 /// @brief Shared middle of the CUDA topology tools: given speculative root tiles and the
-///        densified child masks a consumer fills in, it counts nodes, allocates the output and
+///        child masks a consumer fills in, it counts nodes, allocates the output and
 ///        writes every node except the leaf value masks. Builds one grid, or B grids into one
 ///        buffer laid out back to back (see the file comment).
 ///
@@ -143,9 +147,11 @@ public:
 ///   builder.allocateProcessedRoots(tileCounts);            // or allocateProcessedRootTiles(tileCount) for one grid
 ///   for (g...) topology::detail::packProcessedRoot(tiles[g], builder.hostProcessedRoot(g));
 ///   builder.uploadProcessedRoot(stream);
-///   // 2. densified child masks, filled by the consumer's *InternalNodesFunctor
-///   builder.allocateInternalMaskBuffers(stream);
-///   ...  launch with (deviceProcessedRoot(g), deviceUpperMasks() + data(g)->tileBase, deviceLowerMasks() + data(g)->tileBase)
+///   // 2. child masks, filled by the consumer's *InternalNodesFunctor; maxRows bounds the
+///   //    (tile, upper child) pairs the functors touch over the batch
+///   builder.buildInternalMasks(stream, maxRows, [&](Mask<5> *upperMasks, auto lowerMasks) {
+///       ...  launch with (deviceProcessedRoot(g), upperMasks + data(g)->tileBase, lowerMasks.offsetTiles(data(g)->tileBase))
+///   });
 ///   // 3. node counts: enqueued; getBuffer waits for them before sizing the output
 ///   builder.countNodes(stream);
 ///   // 4. output buffer and every node except the leaf value masks
@@ -165,10 +171,12 @@ public:
 /// one method that blocks the host, because it sizes the output from data(g)->nodeCount; it
 /// waits on an event countNodes records, so no work queued on the stream after countNodes is
 /// waited for. A caller that reads data(g)->nodeCount or nodeCount(level) before getBuffer
-/// must call waitForNodeCounts() (or synchronize the stream) first. countNodes writes only
+/// must call waitForNodeCounts() first; a stream synchronize lands the counts but skips the
+/// maxRows check below. waitForNodeCounts, and so getBuffer, throws if the functors touched
+/// more (tile, upper child) pairs than maxRows. countNodes writes only
 /// the node counts and node bases of data(g); every other field is the caller's to set until
 /// getBuffer uploads data(g). The processed roots and mask buffers are released by
-/// processLowerNodes; deviceProcessedRoot() and the mask pointers are invalid after it.
+/// processLowerNodes; deviceProcessedRoot() is invalid after it, and the mask accessors throw.
 /// data(g) exists once the processed roots are allocated. Every copy into or out of the
 /// pinned host staging records the same event, and the root allocation waits on it before
 /// reusing the block, so the next build may start before the previous one has drained.
@@ -214,6 +222,11 @@ public:
         , mUpperOffsets(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
         , mLowerOffsets(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
         , mLeafOffsets(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
+        , mWordPrefix(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
+        , mRowIndex(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
+        , mRowState(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
+        , mRowKeys(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
+        , mRowOf(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
         , mVoxelOffsets(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
         , mLowerParents(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
         , mLeafParents(stream, nanovdb::cuda::detail::borrowInternal(resource), 0, nanovdb::cuda::noInit)
@@ -229,16 +242,63 @@ public:
     TopologyBuilder& operator=(TopologyBuilder&&) = default;
 
     /// @brief Allocates and zeroes the densified upper and lower child masks for every processed
-    ///        tile in the batch; the consumer's *InternalNodesFunctor fills them
-    void allocateInternalMaskBuffers(cudaStream_t stream);
+    ///        tile in the batch (16 MiB per tile); the consumer's *InternalNodesFunctor fills them
+    /// @throw std::logic_error before uploadProcessedRoot
+    [[deprecated("Use buildInternalMasks, which stores lower masks only for the upper-node children the functors touch")]]
+    void allocateInternalMaskBuffers(cudaStream_t stream) { allocateDenseMasks(stream); }
+
+    /// @brief maxRows for buildInternalMasks and allocateLowerMasks when no bound is known
+    static constexpr uint64_t UnknownMaxRows = ~uint64_t(0);
+
+    /// @brief Fills the upper and lower child masks through @a launch, which the builder calls
+    ///        once as launch(Mask<5>* upperMasks, util::morphology::cuda::SparseLowerMasks lowerMasks)
+    ///        to launch the consumer's internal-node functors (not at all when the batch has no
+    ///        processed tiles). A lower mask is stored only for each (tile, upper child) the
+    ///        functors touch.
+    /// @param maxRows upper bound on the (tile, upper child) pairs the functors touch over the
+    ///        whole batch. UnknownMaxRows reserves a row for every pair of every tile. Either is
+    ///        capped at util::morphology::cuda::MaxLowerRows. A bound the functors exceed makes
+    ///        waitForNodeCounts (and so getBuffer) throw.
+    /// @throw std::logic_error before uploadProcessedRoot
+    /// @throw std::runtime_error on a device below compute capability 7.0
+    template <typename LaunchT>
+    void buildInternalMasks(cudaStream_t stream, uint64_t maxRows, LaunchT &&launch)
+    {
+        static_assert(std::is_invocable_v<LaunchT&, Mask<5>*, util::morphology::cuda::SparseLowerMasks>,
+                      "buildInternalMasks: launch must be callable as launch(Mask<5>*, SparseLowerMasks)");
+        allocateLowerMasks(stream, maxRows);
+        if (mTileTotal) launch(deviceUpperMasks(), lowerMasks());
+    }
+
+    /// @brief Allocates and zeroes the upper masks and a pool of @a maxRows lower masks, capped
+    ///        as in buildInternalMasks, for callers that launch the functors themselves with
+    ///        deviceUpperMasks() and lowerMasks()
+    /// @throw std::logic_error before uploadProcessedRoot
+    /// @throw std::runtime_error on a device below compute capability 7.0
+    void allocateLowerMasks(cudaStream_t stream, uint64_t maxRows);
+
+    /// @brief The view of the lower masks allocateLowerMasks reserved
+    /// @throw std::logic_error unless allocateLowerMasks (or buildInternalMasks) set up this build
+    util::morphology::cuda::SparseLowerMasks lowerMasks()
+    {
+        requireMode(LowerMaskMode::Sparse, "lowerMasks", "allocateLowerMasks");
+        return {mRowIndex.data(), mLowerMasks.data(), mRowState.data(), mRowCapacity};
+    }
 
     /// @brief Enumerates the nodes of every grid from the child masks and copies each grid's node
     ///        counts and node bases into data(g). The copy is asynchronous; getBuffer waits for
     ///        it, and any other host read of the counts must follow waitForNodeCounts()
+    /// @throw std::logic_error unless a mask allocator set up this build
     void countNodes(cudaStream_t stream);
 
-    /// @brief Blocks the host until the node counts countNodes enqueued have landed in data(g)
-    void waitForNodeCounts() { mStagingDone.synchronize(); }
+    /// @brief Blocks the host until the node counts countNodes enqueued have landed in data(g);
+    ///        throws if the internal-node functors marked more rows than buildInternalMasks' bound
+    void waitForNodeCounts()
+    {
+        mStagingDone.synchronize();
+        if (mMode == LowerMaskMode::Sparse && *hostRowOverflow())
+            throw std::runtime_error("TopologyBuilder: the internal-node functors marked more lower-node rows than the maxRows bound");
+    }
 
     /// @brief Waits for the node counts countNodes produced, allocates one device buffer for all
     ///        grids sized from them on the host, lays the grids out back to back and uploads data(g)
@@ -253,8 +313,8 @@ public:
     /// @brief Links each surviving processed tile to its upper node in the grid's root table
     void processUpperNodes(cudaStream_t stream);
 
-    /// @brief Writes the upper and lower child masks and the leaf preambles from the densified
-    ///        masks, then releases the processed roots and the mask buffers
+    /// @brief Writes the upper and lower child masks and the leaf preambles from the dense mask
+    ///        arrays or the sparse rows, then releases the processed roots and the mask buffers
     void processLowerNodes(cudaStream_t stream);
 
     /// @brief Computes each leaf's prefix sums and value offset (restarting at 1 in every grid);
@@ -268,7 +328,7 @@ public:
     ///        whole batch share one lookup table and need no host round trip
     void postProcessGridTree(cudaStream_t stream);
 
-    HostStagingT                 mHostStaging; // one pinned block, so every transfer is asynchronous and one cudaMallocHost serves a build: the processed roots back to back, then the per-grid parameters, then the tile bases; grown on demand by the root allocation, never shrunk
+    HostStagingT                 mHostStaging; // one pinned block, so every transfer is asynchronous and one cudaMallocHost serves a build: the processed roots back to back, then the per-grid parameters, then the tile bases, then the row overflow flag; grown on demand by the root allocation, never shrunk
     uint64_t                     mRootBytes{0}; // bytes of processed roots at the start of mHostStaging; 0 before the roots are allocated and after processLowerNodes releases them
     uint64_t                     mHostDataOffset{0}; // byte offset of the per-grid parameters in mHostStaging
     uint64_t                     mTileBasesOffset{0}; // byte offset of the gridCount()+1 tile bases countNodes uploads
@@ -279,6 +339,11 @@ public:
     BufT<uint32_t>               mUpperOffsets;
     BufT<uint32_t>               mLowerOffsets;
     BufT<uint32_t>               mLeafOffsets;
+    BufT<uint32_t>               mWordPrefix; // sparse masks: exclusive scan of the upper-mask word popcounts, UpperMaskWords per tile plus the total
+    BufT<uint32_t>               mRowIndex; // sparse masks: pool row of every (tile, upper child)
+    BufT<uint32_t>               mRowState; // sparse masks: rows claimed so far, overflow flag
+    BufT<uint64_t>               mRowKeys; // sparse masks: tile * Mask<5>::SIZE + upper child, by lower-node index
+    BufT<uint32_t>               mRowOf; // sparse masks: pool row by lower-node index
     BufT<uint64_t>               mVoxelOffsets;
     BufT<uint32_t>               mLowerParents;
     BufT<uint32_t>               mLeafParents;
@@ -343,10 +408,10 @@ public:
     void uploadProcessedRoot(cudaStream_t stream)
     {
         updateTileLayout();
-        if (mDeviceRoot.size() < mRootBytes)
-            mDeviceRoot = ScratchT(stream, nanovdb::cuda::detail::borrowInternal(*mResource), mRootBytes, nanovdb::cuda::noInit);
+        if (mDeviceRoot.size() < mRootBytes) mDeviceRoot = allocateScratch<std::byte>(stream, mRootBytes, "processed roots");
         cudaCheck(cudaMemcpyAsync(mDeviceRoot.data(), mHostStaging.data(), mRootBytes, cudaMemcpyHostToDevice, stream));
         mStagingDone.record(stream);
+        mRootsUploaded = true;
     }
 
     /// @brief Copies the builder parameters of every grid to the device, allocating through
@@ -354,21 +419,28 @@ public:
     void uploadData(cudaStream_t stream)
     {
         if (mDeviceData.size() != gridCount())
-            mDeviceData = BufT<Data>(stream, nanovdb::cuda::detail::borrowInternal(*mResource), gridCount(), nanovdb::cuda::noInit);
+            mDeviceData = allocateScratch<Data>(stream, gridCount(), "builder parameters");
         cudaCheck(cudaMemcpyAsync(mDeviceData.data(), data(0), gridCount() * sizeof(Data), cudaMemcpyHostToDevice, stream));
         mStagingDone.record(stream);
     }
-    Mask<5>* deviceUpperMasks() { return mUpperMasks.data(); }
-    /// @brief The densified lower masks: one row of Mask<5>::SIZE Mask<4> per upper node,
-    ///        indexed [upper node][lower node offset]. The row shape is fixed here, beside the
-    ///        allocation that defines it, so consumers never re-derive the stride.
-    Mask<4> (*deviceLowerMasks())[Mask<5>::SIZE] { return reinterpret_cast<Mask<4>(*)[Mask<5>::SIZE]>(mLowerMasks.data()); }
+    /// @brief The upper masks of this build, one Mask<5> per processed tile; nullptr when the
+    ///        batch has no processed tiles
+    /// @throw std::logic_error unless a mask allocator set up this build
+    Mask<5>* deviceUpperMasks() { requireMasks("deviceUpperMasks"); return mUpperMasks.data(); }
+    /// @brief The dense lower masks: one row of Mask<5>::SIZE Mask<4> per upper node, indexed
+    ///        [upper node][lower node offset]. The private dense* helpers fix the row shape, so
+    ///        consumers never re-derive the stride.
+    /// @throw std::logic_error unless allocateInternalMaskBuffers set up this build
+    [[deprecated("Use buildInternalMasks, which stores lower masks only for the upper-node children the functors touch")]]
+    Mask<4> (*deviceLowerMasks())[Mask<5>::SIZE] { requireMode(LowerMaskMode::Dense, "deviceLowerMasks", "allocateInternalMaskBuffers"); return denseLowerMasks(); }
     //@{
     /// @brief The lower and leaf node offsets viewed one row of Mask<5>::SIZE per upper node,
-    ///        indexed [upper node][lower node offset]; the row shape is fixed here, beside the
-    ///        allocation that defines it, so consumers never re-derive the stride
-    uint32_t (*lowerOffsetRows())[Mask<5>::SIZE] { return reinterpret_cast<uint32_t(*)[Mask<5>::SIZE]>(mLowerOffsets.data()); }
-    uint32_t (*leafOffsetRows())[Mask<5>::SIZE] { return reinterpret_cast<uint32_t(*)[Mask<5>::SIZE]>(mLeafOffsets.data()); }
+    ///        indexed [upper node][lower node offset]; the private dense* helpers fix the row shape
+    /// @throw std::logic_error unless allocateInternalMaskBuffers set up this build
+    [[deprecated("Use buildInternalMasks, which stores lower masks only for the upper-node children the functors touch")]]
+    uint32_t (*lowerOffsetRows())[Mask<5>::SIZE] { requireMode(LowerMaskMode::Dense, "lowerOffsetRows", "allocateInternalMaskBuffers"); return denseLowerOffsets(); }
+    [[deprecated("Use buildInternalMasks, which stores lower masks only for the upper-node children the functors touch")]]
+    uint32_t (*leafOffsetRows())[Mask<5>::SIZE] { requireMode(LowerMaskMode::Dense, "leafOffsetRows", "allocateInternalMaskBuffers"); return denseLeafOffsets(); }
     //@}
     /// @brief A borrowing reference to the builder's resource, for consumers
     ///        allocating sibling scratch from the same instance.
@@ -404,7 +476,7 @@ private:
         mRootBytes       = rootBytes;
         mHostDataOffset  = (rootBytes + A - 1) & ~(A - 1);
         mTileBasesOffset = mHostDataOffset + uint64_t(count) * sizeof(Data);
-        const uint64_t bytes = mTileBasesOffset + uint64_t(count + 1) * sizeof(uint32_t);
+        const uint64_t bytes = mTileBasesOffset + (uint64_t(count) + 1 + 1) * sizeof(uint32_t);// count+1 tile bases, then the row overflow flag
         if (mHostStaging.size() < bytes) mHostStaging = HostStagingT(bytes, nanovdb::cuda::noInit);
         mGridCount = count;
         std::memset(data(0), 0, count * sizeof(Data));
@@ -412,10 +484,75 @@ private:
             data(g)->gridIndex = g;
             data(g)->gridCount = count;
         }
+        *hostRowOverflow() = 0;
         mTileTotal = 0;
+        mRootsUploaded = false;
+        mMode = LowerMaskMode::None;
     }
 
     uint32_t* hostTileBases() { return util::PtrAdd<uint32_t>(mHostStaging.data(), mTileBasesOffset); }
+    uint32_t* hostRowOverflow() { return hostTileBases() + (gridCount() + 1); }// after the gridCount()+1 tile bases
+
+    void allocateDenseMasks(cudaStream_t stream);
+    /// @brief How the lower masks of the current build are stored; None until a mask allocator
+    ///        runs, and again once processLowerNodes releases the masks or a new build starts
+    enum class LowerMaskMode { None, Dense, Sparse };
+    /// @brief The dense accessors index T × Mask<5>::SIZE rows, which buildInternalMasks does not
+    ///        allocate; lowerMasks() views the sparse rows, which allocateInternalMaskBuffers does not
+    void requireMode(LowerMaskMode mode, const char *accessor, const char *allocator) const
+    {
+        if (mMode != mode)
+            throw std::logic_error(std::string("TopologyBuilder::") + accessor + " is only valid after " + allocator + " in the current build");
+    }
+    void requireMasks(const char *caller) const
+    {
+        if (mMode == LowerMaskMode::None)
+            throw std::logic_error(std::string("TopologyBuilder::") + caller + " requires buildInternalMasks, allocateLowerMasks or allocateInternalMaskBuffers first");
+    }
+    /// @brief Sparse lower masks claim rows with compute capability 7.0 features (see LowerMasks.cuh)
+    static void requireClaimCapableDevice()
+    {
+        int device = 0, major = 0;
+        cudaCheck(cudaGetDevice(&device));
+        cudaCheck(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+        if (major < util::morphology::cuda::SparseLowerMasksMinMajor)
+            throw std::runtime_error("TopologyBuilder::buildInternalMasks, and so the CUDA topology tools, require compute capability 7.0 or newer");
+    }
+    /// @brief Both mask allocators run after uploadProcessedRoot, which fixes the tile count they size from
+    void requireRootsUploaded(const char *allocator) const
+    {
+        if (!mRootsUploaded)
+            throw std::logic_error(std::string("TopologyBuilder::") + allocator + " requires uploadProcessedRoot first");
+    }
+    /// @brief Frees the mask buffers and the sparse row scratch of the current build, including
+    ///        what a build that threw on row overflow left behind
+    void releaseMasks(cudaStream_t stream)
+    {
+        mUpperMasks.destroy(stream);
+        mLowerMasks.destroy(stream);
+        mRowIndex.destroy(stream);
+        mRowState.destroy(stream);
+        mWordPrefix.destroy(stream);
+        mRowKeys.destroy(stream);
+        mRowOf.destroy(stream);
+    }
+    /// @brief @a count T from the builder's resource
+    /// @throw std::runtime_error if the resource returns no memory for a non-zero count
+    template <typename T>
+    BufT<T> allocateScratch(cudaStream_t stream, std::size_t count, const char *what)
+    {
+        BufT<T> buffer(stream, this->ref(), count, nanovdb::cuda::noInit);
+        if (count && buffer.data() == nullptr)
+            throw std::runtime_error(std::string("TopologyBuilder: failed to allocate the ") + what + " on device");
+        return buffer;
+    }
+
+    Mask<4> (*denseLowerMasks())[Mask<5>::SIZE] { return reinterpret_cast<Mask<4>(*)[Mask<5>::SIZE]>(mLowerMasks.data()); }
+    uint32_t (*denseLowerOffsets())[Mask<5>::SIZE] { return reinterpret_cast<uint32_t(*)[Mask<5>::SIZE]>(mLowerOffsets.data()); }
+    uint32_t (*denseLeafOffsets())[Mask<5>::SIZE] { return reinterpret_cast<uint32_t(*)[Mask<5>::SIZE]>(mLeafOffsets.data()); }
+    void rankLowerNodes(cudaStream_t stream);
+    void countNodesSparse(cudaStream_t stream);
+    void processLowerRows(cudaStream_t stream);
 
     /// @brief Reads every grid's tile count from its processed root and assigns the grids
     ///        consecutive tile ranges; called once, by uploadProcessedRoot
@@ -432,6 +569,9 @@ private:
     }
 
     uint32_t                          mTileTotal{0};// processed tiles over the whole batch, fixed by uploadProcessedRoot (0 after a reset)
+    bool                              mRootsUploaded{false};// uploadProcessedRoot has fixed mTileTotal for the current build
+    LowerMaskMode                     mMode{LowerMaskMode::None};
+    uint32_t                          mRowCapacity{0};// sparse masks: Mask<4> rows in the pool
     ResourceT*                        mResource;// non-owning; all device scratch routes through this instance
     nanovdb::cuda::TempPool<ResourceT> mTempDevicePool;
 };// tools::cuda::TopologyBuilder<BuildT, ResourceT>
@@ -456,8 +596,11 @@ private:
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 template<typename BuildT, typename ResourceT>
-void TopologyBuilder<BuildT, ResourceT>::allocateInternalMaskBuffers(cudaStream_t stream)
+void TopologyBuilder<BuildT, ResourceT>::allocateDenseMasks(cudaStream_t stream)
 {
+    requireRootsUploaded("allocateInternalMaskBuffers");
+    mMode = LowerMaskMode::Dense;
+    releaseMasks(stream);
     const uint32_t tileTotal = mTileTotal;
     if (tileTotal == 0) return; // Processing empty grid(s); nothing to allocate
 
@@ -466,13 +609,268 @@ void TopologyBuilder<BuildT, ResourceT>::allocateInternalMaskBuffers(cudaStream_
     // (b) Mask<5>::SIZE Mask<4> per tile, as if every upper node had a full set of 32^3 lower children
     const uint64_t upperMaskCount = tileTotal;
     const uint64_t lowerMaskCount = upperMaskCount * Mask<5>::SIZE;
-    mUpperMasks = UpperMaskBufT(stream, this->ref(), upperMaskCount, nanovdb::cuda::noInit);
-    if (mUpperMasks.data() == nullptr) throw std::runtime_error("Failed to allocate upper mask buffer on device");
+    mUpperMasks = allocateScratch<Mask<5>>(stream, upperMaskCount, "upper masks");
     cudaCheck(cudaMemsetAsync(mUpperMasks.data(), 0, mUpperMasks.size_bytes(), stream));
-    mLowerMasks = LowerMaskBufT(stream, this->ref(), lowerMaskCount, nanovdb::cuda::noInit);
-    if (mLowerMasks.data() == nullptr) throw std::runtime_error("Failed to allocate lower mask buffer on device");
+    mLowerMasks = allocateScratch<Mask<4>>(stream, lowerMaskCount, "lower masks");
     cudaCheck(cudaMemsetAsync(mLowerMasks.data(), 0, mLowerMasks.size_bytes(), stream));
-}// TopologyBuilder<BuildT, ResourceT>::allocateInternalMaskBuffers
+}// TopologyBuilder<BuildT, ResourceT>::allocateDenseMasks
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+namespace topology::detail {
+
+/// @brief Pool row holding the lower mask of lower node @a lowerID, or nullptr for a marked
+///        upper child whose functors never wrote its lower mask
+__device__ inline const Mask<4>* lowerRow(const Mask<4> *pool, const uint32_t *rowOf, uint32_t capacity, uint32_t lowerID)
+{
+    const uint32_t row = rowOf[lowerID];
+    return row < capacity ? pool + row : nullptr;
+}
+
+/// @brief One thread per upper-mask word: writes the key (tile * Mask<5>::SIZE + upper child)
+///        and the pool row of every set bit at its rank, which is its lower-node index
+struct EmitRowKeysFunctor
+{
+    __device__ void operator()(size_t i, const Mask<5> *upperMasks, const uint32_t *wordPrefix, uint32_t capacity,
+                               uint64_t *rowKeys, const uint32_t *rowIndex, uint32_t *rowOf, uint32_t *overflow)
+    {
+        const uint64_t tile = i / util::morphology::cuda::UpperMaskWords;
+        const uint32_t w = uint32_t(i % util::morphology::cuda::UpperMaskWords);
+        uint64_t word = upperMasks[tile].words()[w];
+        uint32_t r = wordPrefix[i];
+        for (; word; word &= word - 1, ++r) {
+            const uint64_t key = tile * Mask<5>::SIZE + (w << 6) + uint32_t(__ffsll(static_cast<long long>(word)) - 1);
+            if (r >= capacity) { atomicExch(overflow, 1u); return; }
+            rowKeys[r] = key;
+            rowOf[r] = rowIndex[key];
+        }
+    }
+};
+
+/// @brief Warps per block of the one-warp-per-lower-node kernels
+static constexpr uint32_t RowWarpsPerBlock = 8, RowThreadsPerBlock = RowWarpsPerBlock * 32;
+
+/// @brief One warp per lower node: its leaf count. Launched with RowThreadsPerBlock threads.
+static __global__ void __launch_bounds__(RowThreadsPerBlock)
+countRowLeavesKernel(const Mask<4> *pool, const uint32_t *rowOf, uint32_t capacity, const uint32_t *lowerTotal, uint32_t *leafCounts)
+{
+    NANOVDB_ASSERT(blockDim.x == RowThreadsPerBlock);
+    // Warps stride over the lower nodes the functors produced, read on the device and capped
+    // at the pool (an overflowed build has more); leafCounts past them stay zero from the
+    // caller's memset
+    const uint32_t lane = threadIdx.x & 31, warps = gridDim.x * RowWarpsPerBlock, total = min(*lowerTotal, capacity);
+    for (uint64_t lowerID = uint64_t(blockIdx.x) * RowWarpsPerBlock + (threadIdx.x >> 5); lowerID < total; lowerID += warps) {
+        uint32_t count = 0;
+        if (const Mask<4> *row = lowerRow(pool, rowOf, capacity, uint32_t(lowerID)))
+            count = __popcll(row->words()[2 * lane]) + __popcll(row->words()[2 * lane + 1]);
+        for (int offset = 16; offset; offset >>= 1) count += __shfl_down_sync(0xFFFFFFFFu, count, offset);
+        if (lane == 0) leafCounts[lowerID] = count;
+    }
+}
+
+/// @brief One thread per processed tile: 1 if the tile holds at least one lower node
+struct TileHasRowsFunctor
+{
+    __device__ void operator()(size_t t, const uint32_t *wordPrefix, uint32_t *counts)
+    {
+        counts[t] = wordPrefix[(t + 1) * util::morphology::cuda::UpperMaskWords] > wordPrefix[t * util::morphology::cuda::UpperMaskWords] ? 1 : 0;
+    }
+};
+
+/// @brief One thread per upper-mask word: its popcount
+struct UpperWordCountsFunctor
+{
+    __device__ void operator()(size_t i, const uint64_t *upperWords, uint32_t *counts) { counts[i] = uint32_t(__popcll(upperWords[i])); }
+};
+
+/// @brief Reads each grid's node counts and bases from the sparse offsets, at the
+///        boundaries of that grid's processed tiles
+template <typename BuildT>
+struct GatherSparseNodeCountsFunctor
+{
+    __device__
+    void operator()(size_t g, const uint32_t *tileBases, uint32_t *counts, const uint32_t *upperOffsets,
+                    const uint32_t *wordPrefix, const uint32_t *leafOffsets, uint32_t capacity) {
+        const uint32_t t0 = tileBases[g], t1 = tileBases[g + 1];
+        const uint32_t lower0 = wordPrefix[uint64_t(t0) * util::morphology::cuda::UpperMaskWords], lower1 = wordPrefix[uint64_t(t1) * util::morphology::cuda::UpperMaskWords];
+        const uint32_t leaf0 = leafOffsets[min(lower0, capacity)], leaf1 = leafOffsets[min(lower1, capacity)];
+        uint32_t *c = counts + g * TopologyBuilderData<BuildT>::CountFieldCount;
+        c[0] = leaf1 - leaf0;
+        c[1] = lower1 - lower0;
+        c[2] = upperOffsets[t1] - upperOffsets[t0];
+        c[3] = upperOffsets[t0];
+        c[4] = lower0;
+        c[5] = leaf0;
+    }
+};
+
+/// @brief One warp per lower node: links it into its upper node and writes its child mask
+///        and its leaves' preambles, as ProcessLowerNodesFunctor does for the dense masks.
+///        Launched with RowThreadsPerBlock threads.
+template <typename BuildT>
+__global__ void __launch_bounds__(RowThreadsPerBlock)
+processLowerRowsKernel(const uint64_t *rowKeys, const Mask<4> *pool, const uint32_t *rowOf, uint32_t capacity,
+                                       uint32_t lowerTotal, const uint32_t *upperOffsets, const uint32_t *leafOffsets,
+                                       const TopologyBuilderData<BuildT> *d_data, uint32_t gridCount,
+                                       uint32_t *lowerParents, uint32_t *leafParents)
+{
+    NANOVDB_ASSERT(blockDim.x == RowThreadsPerBlock);
+    using DataT = TopologyBuilderData<BuildT>;
+    using WarpScan = cub::WarpScan<uint32_t>;
+    __shared__ typename WarpScan::TempStorage tempStorage[RowWarpsPerBlock];
+    const uint32_t lane = threadIdx.x & 31, warp = threadIdx.x >> 5, lowerID = blockIdx.x * RowWarpsPerBlock + warp;
+    if (lowerID >= lowerTotal) return;// whole warps exit together
+
+    const uint64_t key = rowKeys[lowerID];
+    const uint32_t tile = uint32_t(key / Mask<5>::SIZE), jj = uint32_t(key % Mask<5>::SIZE);
+    const DataT &d = d_data[gridOfIndex(d_data, gridCount, tile, &DataT::tileBase)];
+    const auto &dstTree = d.getGrid().tree();
+    const uint32_t localUpperID = upperOffsets[tile] - d.upperBase, localLowerID = lowerID - d.lowerBase;
+
+    const auto upperOrigin = dstTree.root().tile(localUpperID)->origin();
+    auto &upper = const_cast<NanoUpper<BuildT>&>(dstTree.template getFirstNode<2>()[localUpperID]);
+    auto &lower = const_cast<NanoLower<BuildT>&>(dstTree.template getFirstNode<1>()[localLowerID]);
+    const auto lowerOrigin = upperOrigin + (NanoUpper<BuildT>::OffsetToLocalCoord(jj) << NanoUpper<BuildT>::ChildNodeType::TOTAL);
+    if (lane == 0) {
+        const_cast<Mask<5>&>(upper.childMask()).setOnAtomic(jj);
+        upper.setChild(jj, &lower);
+        lowerParents[lowerID] = localUpperID;
+        lower.mBBox = CoordBBox(); // To be further updated after the leaf-level operation is complete
+        lower.mFlags = (uint64_t)GridFlags::HasBBox;
+    }
+
+    const Mask<4> *row = lowerRow(pool, rowOf, capacity, lowerID);
+    const uint64_t words[2] = {row ? row->words()[2 * lane] : 0, row ? row->words()[2 * lane + 1] : 0};
+    lower.mChildMask.words()[2 * lane    ] = words[0];
+    lower.mChildMask.words()[2 * lane + 1] = words[1];
+    uint32_t prefixSum = __popcll(words[0]) + __popcll(words[1]);
+    WarpScan(tempStorage[warp]).ExclusiveSum(prefixSum, prefixSum);
+    for (int i = 0; i < 2; ++i) {
+        for (uint64_t word = words[i]; word; word &= word - 1) {
+            const int kk = ((2 * lane + i) << 6) + (__ffsll(static_cast<long long>(word)) - 1);
+            const uint32_t leafID = leafOffsets[lowerID] + prefixSum++;
+            auto &leaf = const_cast<NanoLeaf<BuildT>&>(dstTree.template getFirstNode<0>()[leafID - d.leafBase]);
+            lower.setChild(kk, &leaf);
+            leafParents[leafID] = localLowerID;
+            leaf.mBBoxMin = lowerOrigin + (NanoLower<BuildT>::OffsetToLocalCoord(kk) << NanoLower<BuildT>::ChildNodeType::TOTAL);
+            leaf.mFlags = (uint64_t)GridFlags::HasBBox;
+        }
+    }
+}
+
+}// namespace topology::detail
+
+template<typename BuildT, typename ResourceT>
+void TopologyBuilder<BuildT, ResourceT>::allocateLowerMasks(cudaStream_t stream, uint64_t maxRows)
+{
+    requireRootsUploaded("allocateLowerMasks");
+    requireClaimCapableDevice();
+    mMode = LowerMaskMode::Sparse;
+    releaseMasks(stream);
+    const uint64_t slots = uint64_t(mTileTotal) * Mask<5>::SIZE;
+    mRowCapacity = uint32_t(std::min<uint64_t>({maxRows, slots, util::morphology::cuda::MaxLowerRows}));
+    mRowState = allocateScratch<uint32_t>(stream, util::morphology::cuda::RowStateWords, "lower mask row state");
+    cudaCheck(cudaMemsetAsync(mRowState.data(), 0, mRowState.size_bytes(), stream));
+    if (mTileTotal == 0) return; // Processing empty grid(s); nothing else to allocate
+    mUpperMasks = allocateScratch<Mask<5>>(stream, mTileTotal, "upper masks");
+    cudaCheck(cudaMemsetAsync(mUpperMasks.data(), 0, mUpperMasks.size_bytes(), stream));
+    mRowIndex = allocateScratch<uint32_t>(stream, slots, "lower mask row index");
+    static_assert(util::morphology::cuda::UnclaimedRow == 0xFFFFFFFFu, "the row index memset fills every byte with 0xFF");
+    cudaCheck(cudaMemsetAsync(mRowIndex.data(), 0xFF, mRowIndex.size_bytes(), stream));
+    if (mRowCapacity == 0) return; // maxRows of 0: every claim overflows
+    mLowerMasks = allocateScratch<Mask<4>>(stream, mRowCapacity, "lower mask pool");
+    cudaCheck(cudaMemsetAsync(mLowerMasks.data(), 0, mLowerMasks.size_bytes(), stream));
+}// TopologyBuilder<BuildT, ResourceT>::allocateLowerMasks
+
+/// @brief Ranks every set upper-mask bit in output order: mWordPrefix holds the exclusive
+///        scan of the upper-mask word popcounts, so a bit's rank is its lower-node index
+template<typename BuildT, typename ResourceT>
+void TopologyBuilder<BuildT, ResourceT>::rankLowerNodes(cudaStream_t stream)
+{
+    const std::size_t words = std::size_t(mTileTotal) * util::morphology::cuda::UpperMaskWords;
+    BufT<uint32_t> wordCounts = allocateScratch<uint32_t>(stream, words, "upper mask word counts");
+    util::cuda::lambdaKernel<<<numBlocks(words), mNumThreads, 0, stream>>>(words,
+        topology::detail::UpperWordCountsFunctor(), reinterpret_cast<const uint64_t*>(mUpperMasks.data()), wordCounts.data());
+    cudaCheckError();
+    mWordPrefix = allocateScratch<uint32_t>(stream, words + 1, "upper mask word prefix");
+    cudaCheck(cudaMemsetAsync(mWordPrefix.data(), 0, sizeof(uint32_t), stream));
+    CALL_CUBS(DeviceScan::InclusiveSum, wordCounts.data(), mWordPrefix.data() + 1, words);
+}// TopologyBuilder<BuildT, ResourceT>::rankLowerNodes
+
+//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+template<typename BuildT, typename ResourceT>
+void TopologyBuilder<BuildT, ResourceT>::countNodesSparse(cudaStream_t stream)
+{
+    const uint32_t tileCount = mTileTotal;
+    const uint32_t capacity = mRowCapacity;
+    rankLowerNodes(stream);
+    const std::size_t words = std::size_t(tileCount) * util::morphology::cuda::UpperMaskWords;
+    const uint32_t *lowerTotal = mWordPrefix.data() + words;// device-side, ahead of the readback
+
+    // Lower-node keys and pool rows in output order
+    mRowKeys = allocateScratch<uint64_t>(stream, capacity, "lower node keys");
+    mRowOf = allocateScratch<uint32_t>(stream, capacity, "lower node rows");
+    util::cuda::lambdaKernel<<<numBlocks(words), mNumThreads, 0, stream>>>(words, topology::detail::EmitRowKeysFunctor(),
+        mUpperMasks.data(), mWordPrefix.data(), capacity, mRowKeys.data(), mRowIndex.data(), mRowOf.data(), mRowState.data() + util::morphology::cuda::RowStateOverflow);
+    cudaCheckError();
+
+    // Leaves per lower node, and their exclusive scan
+    BufT<uint32_t> leafCounts = allocateScratch<uint32_t>(stream, capacity, "leaf counts");
+    if (capacity) {
+        cudaCheck(cudaMemsetAsync(leafCounts.data(), 0, leafCounts.size_bytes(), stream));
+        using topology::detail::RowWarpsPerBlock, topology::detail::RowThreadsPerBlock;
+        const unsigned int blocks = unsigned(std::min<uint64_t>((uint64_t(capacity) + RowWarpsPerBlock - 1) / RowWarpsPerBlock, 1u << 16));
+        topology::detail::countRowLeavesKernel<<<blocks, RowThreadsPerBlock, 0, stream>>>(
+            mLowerMasks.data(), mRowOf.data(), capacity, lowerTotal, leafCounts.data());
+        cudaCheckError();
+    }
+    mLeafOffsets = allocateScratch<uint32_t>(stream, std::size_t(capacity) + 1, "leaf offsets");
+    cudaCheck(cudaMemsetAsync(mLeafOffsets.data(), 0, sizeof(uint32_t), stream));
+    if (capacity) { CALL_CUBS(DeviceScan::InclusiveSum, leafCounts.data(), mLeafOffsets.data() + 1, capacity); }
+
+    // Tiles that hold at least one lower node become upper nodes
+    BufT<uint32_t> upperCounts = allocateScratch<uint32_t>(stream, tileCount, "upper counts");
+    util::cuda::lambdaKernel<<<numBlocks(tileCount), mNumThreads, 0, stream>>>(tileCount,
+        topology::detail::TileHasRowsFunctor(), mWordPrefix.data(), upperCounts.data());
+    cudaCheckError();
+    mUpperOffsets = allocateScratch<uint32_t>(stream, std::size_t(tileCount) + 1, "upper offsets");
+    cudaCheck(cudaMemsetAsync(mUpperOffsets.data(), 0, sizeof(uint32_t), stream));
+    CALL_CUBS(DeviceScan::InclusiveSum, upperCounts.data(), mUpperOffsets.data() + 1, tileCount);
+
+    // Per-grid counts and bases, and the overflow flag, back to the host
+    uint32_t *hostBases = hostTileBases();
+    for (uint32_t g = 0; g < gridCount(); ++g) hostBases[g] = data(g)->tileBase;
+    hostBases[gridCount()] = tileCount;
+    BufT<uint32_t> tileBases = allocateScratch<uint32_t>(stream, gridCount() + 1, "tile bases");
+    BufT<uint32_t> counts = allocateScratch<uint32_t>(stream, std::size_t(gridCount()) * Data::CountFieldCount, "node counts");
+    cudaCheck(cudaMemcpyAsync(tileBases.data(), hostBases, (gridCount() + 1) * sizeof(uint32_t), cudaMemcpyHostToDevice, stream));
+    util::cuda::lambdaKernel<<<numBlocks(gridCount()), mNumThreads, 0, stream>>>(
+        gridCount(), topology::detail::GatherSparseNodeCountsFunctor<BuildT>(), tileBases.data(), counts.data(),
+        mUpperOffsets.data(), mWordPrefix.data(), mLeafOffsets.data(), capacity);
+    cudaCheckError();
+    constexpr std::size_t rowBytes = Data::CountFieldCount * sizeof(uint32_t);
+    cudaCheck(cudaMemcpy2DAsync(data(0)->nodeCount, sizeof(Data), counts.data(), rowBytes, rowBytes, gridCount(), cudaMemcpyDeviceToHost, stream));
+    cudaCheck(cudaMemcpyAsync(hostRowOverflow(), mRowState.data() + util::morphology::cuda::RowStateOverflow, sizeof(uint32_t), cudaMemcpyDeviceToHost, stream));
+    mStagingDone.record(stream);
+}// TopologyBuilder<BuildT, ResourceT>::countNodesSparse
+
+template<typename BuildT, typename ResourceT>
+void TopologyBuilder<BuildT, ResourceT>::processLowerRows(cudaStream_t stream)
+{
+    const uint32_t lowerTotal = totalNodeCount(1);
+    mLowerParents = allocateScratch<uint32_t>(stream, lowerTotal, "lower node parents");
+    mLeafParents = allocateScratch<uint32_t>(stream, totalNodeCount(0), "leaf node parents");
+    if (lowerTotal) {
+        using topology::detail::RowWarpsPerBlock, topology::detail::RowThreadsPerBlock;
+        topology::detail::processLowerRowsKernel<BuildT>
+            <<<unsigned((uint64_t(lowerTotal) + RowWarpsPerBlock - 1) / RowWarpsPerBlock), RowThreadsPerBlock, 0, stream>>>(
+            mRowKeys.data(), mLowerMasks.data(), mRowOf.data(), mRowCapacity,
+            lowerTotal, mUpperOffsets.data(), mLeafOffsets.data(), deviceData(), gridCount(),
+            mLowerParents.data(), mLeafParents.data());
+        cudaCheckError();
+    }
+}// TopologyBuilder<BuildT, ResourceT>::processLowerRows
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -507,6 +905,7 @@ struct GatherNodeCountsFunctor
 template<typename BuildT, typename ResourceT>
 void TopologyBuilder<BuildT, ResourceT>::countNodes(cudaStream_t stream)
 {
+    requireMasks("countNodes");
     const uint32_t processedTileCount = mTileTotal;
     if (processedTileCount == 0) { // Processing empty grid(s); zero nodes at all levels
         for (uint32_t g = 0; g < gridCount(); ++g) {
@@ -517,6 +916,7 @@ void TopologyBuilder<BuildT, ResourceT>::countNodes(cudaStream_t stream)
         mStagingDone.record(stream);
         return;
     }
+    if (mMode == LowerMaskMode::Sparse) return countNodesSparse(stream);
 
     // Computes prefix sums of (a) non-empty lower nodes, (b) counts of their leaf children,
     // and (c) count of the speculatively updated root tiles that have actually been used.
@@ -525,9 +925,9 @@ void TopologyBuilder<BuildT, ResourceT>::countNodes(cudaStream_t stream)
     // counts are the differences at its tile boundaries.
     std::size_t size = std::size_t(processedTileCount)*Mask<5>::SIZE;
 
-    BufT<uint32_t> upperCountsBuffer = BufT<uint32_t>(stream, this->ref(), processedTileCount, nanovdb::cuda::noInit);
-    BufT<uint32_t> lowerCountsBuffer = BufT<uint32_t>(stream, this->ref(), size, nanovdb::cuda::noInit);
-    BufT<uint32_t> leafCountsBuffer = BufT<uint32_t>(stream, this->ref(), size, nanovdb::cuda::noInit);
+    BufT<uint32_t> upperCountsBuffer = allocateScratch<uint32_t>(stream, processedTileCount, "upper counts");
+    BufT<uint32_t> lowerCountsBuffer = allocateScratch<uint32_t>(stream, size, "lower counts");
+    BufT<uint32_t> leafCountsBuffer = allocateScratch<uint32_t>(stream, size, "leaf counts");
 
     using CountType = uint32_t (*)[Mask<5>::SIZE];
     auto lowerCounts = reinterpret_cast<CountType>(lowerCountsBuffer.data());
@@ -536,11 +936,11 @@ void TopologyBuilder<BuildT, ResourceT>::countNodes(cudaStream_t stream)
     using Op = util::morphology::cuda::EnumerateNodesFunctor;
     util::cuda::operatorKernel<Op>
         <<<dim3(processedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock, 0, stream>>>
-        (deviceUpperMasks(), deviceLowerMasks(), lowerCounts, leafCounts);
+        (deviceUpperMasks(), denseLowerMasks(), lowerCounts, leafCounts);
 
-    mUpperOffsets = BufT<uint32_t>(stream, this->ref(), processedTileCount+1, nanovdb::cuda::noInit);
-    mLowerOffsets = BufT<uint32_t>(stream, this->ref(), size+1, nanovdb::cuda::noInit);
-    mLeafOffsets = BufT<uint32_t>(stream, this->ref(), size+1, nanovdb::cuda::noInit);
+    mUpperOffsets = allocateScratch<uint32_t>(stream, processedTileCount+1, "upper offsets");
+    mLowerOffsets = allocateScratch<uint32_t>(stream, size+1, "lower offsets");
+    mLeafOffsets = allocateScratch<uint32_t>(stream, size+1, "leaf offsets");
 
     cudaCheck(cudaMemsetAsync(mLowerOffsets.data(), 0, sizeof(uint32_t), stream));
     CALL_CUBS(DeviceScan::InclusiveSum,
@@ -558,7 +958,7 @@ void TopologyBuilder<BuildT, ResourceT>::countNodes(cudaStream_t stream)
         processedTileCount,
         [] __device__(size_t tileID, CountType lowerOffsets, uint32_t* upperCounts)
             { upperCounts[tileID] = (lowerOffsets[tileID+1][0] > lowerOffsets[tileID][0]) ? 1 : 0; },
-        lowerOffsetRows(),
+        denseLowerOffsets(),
         upperCountsBuffer.data());
 
     cudaCheck(cudaMemsetAsync( mUpperOffsets.data(), 0, sizeof(uint32_t), stream));
@@ -576,8 +976,8 @@ void TopologyBuilder<BuildT, ResourceT>::countNodes(cudaStream_t stream)
     uint32_t *hostBases = hostTileBases();
     for (uint32_t g = 0; g < gridCount(); ++g) hostBases[g] = data(g)->tileBase;
     hostBases[gridCount()] = processedTileCount;
-    BufT<uint32_t> tileBases(stream, this->ref(), gridCount() + 1, nanovdb::cuda::noInit);
-    BufT<uint32_t> counts(stream, this->ref(), std::size_t(gridCount()) * Data::CountFieldCount, nanovdb::cuda::noInit);
+    BufT<uint32_t> tileBases = allocateScratch<uint32_t>(stream, gridCount() + 1, "tile bases");
+    BufT<uint32_t> counts = allocateScratch<uint32_t>(stream, std::size_t(gridCount()) * Data::CountFieldCount, "node counts");
     cudaCheck(cudaMemcpyAsync(tileBases.data(), hostBases, (gridCount() + 1) * sizeof(uint32_t), cudaMemcpyHostToDevice, stream));
     util::cuda::lambdaKernel<<<numBlocks(gridCount()), mNumThreads, 0, stream>>>(
         gridCount(), topology::detail::GatherNodeCountsFunctor<BuildT>(), tileBases.data(), counts.data(),
@@ -835,24 +1235,26 @@ inline void TopologyBuilder<BuildT, ResourceT>::processUpperNodes(cudaStream_t s
 template<typename BuildT, typename ResourceT>
 inline void TopologyBuilder<BuildT, ResourceT>::processLowerNodes(cudaStream_t stream)
 {
-    // Fill out the contents of all newly allocated lower nodes (using the densified upper/lower mask arrays)
+    // Fill out the contents of all newly allocated lower nodes (from the dense mask arrays, or the sparse rows via processLowerRows)
     // Also fill in the preamble (most of LeafData) for their leaf children
     const uint32_t processedTileCount = mTileTotal;
 
-    if (processedTileCount) { // Unless output grid is empty
+    if (processedTileCount && mMode == LowerMaskMode::Sparse) {
+        processLowerRows(stream);
+    } else if (processedTileCount) { // Unless output grid is empty
         std::size_t lowerCount = totalNodeCount(1);
-        mLowerParents = BufT<uint32_t>(stream, this->ref(), lowerCount, nanovdb::cuda::noInit);
+        mLowerParents = allocateScratch<uint32_t>(stream, lowerCount, "lower node parents");
         std::size_t leafCount = totalNodeCount(0);
-        mLeafParents = BufT<uint32_t>(stream, this->ref(), leafCount, nanovdb::cuda::noInit);
+        mLeafParents = allocateScratch<uint32_t>(stream, leafCount, "leaf node parents");
 
         using Op = util::morphology::cuda::ProcessLowerNodesFunctor<BuildT>;
         util::cuda::operatorKernel<Op>
             <<<dim3(processedTileCount, Op::SlicesPerUpperNode, 1), Op::MaxThreadsPerBlock, 0, stream>>>(
                 deviceUpperMasks(),
-                deviceLowerMasks(),
+                denseLowerMasks(),
                 mUpperOffsets.data(),
-                lowerOffsetRows(),
-                leafOffsetRows(),
+                denseLowerOffsets(),
+                denseLeafOffsets(),
                 deviceData(),
                 gridCount(),
                 mLowerParents.data(),
@@ -862,9 +1264,10 @@ inline void TopologyBuilder<BuildT, ResourceT>::processLowerNodes(cudaStream_t s
     }
 
     mRootBytes = 0;// the processed roots are released; the pinned block itself stays for reuse
+    mRootsUploaded = false;
     mDeviceRoot.destroy(stream);
-    mUpperMasks.destroy(stream);
-    mLowerMasks.destroy(stream);
+    releaseMasks(stream);
+    mMode = LowerMaskMode::None;
     mLowerOffsets.destroy(stream);
     mLeafOffsets.destroy(stream);
 }// TopologyBuilder<BuildT, ResourceT>::processLowerNodes
@@ -908,7 +1311,7 @@ inline void TopologyBuilder<BuildT, ResourceT>::processLeafOffsets(cudaStream_t 
 {
     std::size_t leafCount = totalNodeCount(0);
     if (leafCount) { // Unless output grid is empty
-        mVoxelOffsets = BufT<uint64_t>(stream, this->ref(), leafCount+1, nanovdb::cuda::noInit);
+        mVoxelOffsets = allocateScratch<uint64_t>(stream, leafCount+1, "voxel offsets");
         cudaCheck(cudaMemsetAsync(mVoxelOffsets.data(), 0, sizeof(uint64_t), stream));
         util::cuda::lambdaKernel<<<numBlocks(leafCount), mNumThreads, 0, stream>>>(
             leafCount, topology::detail::UpdateLeafVoxelCountsAndPrefixSumFunctor<BuildT>(), deviceData(), gridCount(), mVoxelOffsets.data()+1);

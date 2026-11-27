@@ -11,6 +11,10 @@
 #include <vector>
 #include <limits.h> // CHAR_BIT
 #include <algorithm> // for std::is_sorted
+#include <array> // for the target leaves of the DilationBox test
+#include <map> // for the expected leaf masks of the DilationBox test
+#include <random> // for std::mt19937, std::bernoulli_distribution
+#include <set> // for the target leaves of the DilationBox test
 #include <cmath>
 #include <cstdlib>
 #include <iomanip> // for std::setw, std::setfill
@@ -33,6 +37,7 @@
 #include <nanovdb/NodeManager.h>
 #include <nanovdb/util/Timer.h>
 #include <nanovdb/tools/VoxelBlockManager.h>
+#include <nanovdb/util/MorphologyHelpers.h>
 #include <nanovdb/math/HalfLite.h>
 
 #if !defined(_MSC_VER) // does not compile in msvc c++ due to zero-sized arrays.
@@ -10583,6 +10588,69 @@ TEST_F(TestNanoVDB, GridHandleRejectsMalformedHostChain)
     EXPECT_THROW(forge([](nanovdb::GridData& d) { d.mMagic = 0; }), std::runtime_error);// corrupted magic
     EXPECT_THROW(forge([](nanovdb::GridData& d) { d.mGridCount = 2; d.mGridSize = sizeof(nanovdb::GridData) + 1; }), std::runtime_error);// a second header read from an unaligned offset into grid bytes: rejected as invalid, never dereferenced in place
 }// GridHandleRejectsMalformedHostChain
+
+// DilationBox::dilateLeafMask against a voxel-by-voxel dilation of random leaf masks, for boxes
+// with and without the origin, one-sided, asymmetric, as wide as a leaf, wider than a leaf, and
+// empty; and the target leaves it enumerates against the leaves the voxels land in.
+TEST_F(TestNanoVDB, DilationBox_LeafMasks)
+{
+    using nanovdb::Coord;
+    using nanovdb::util::morphology::DilationBox;
+    const std::vector<DilationBox> boxes = {
+        {Coord(-1), Coord(1)}, {Coord(0), Coord(1)}, {Coord(-1), Coord(0)}, {Coord(0), Coord(0)},
+        {Coord(-2, 0, -8), Coord(3, 8, 1)}, {Coord(-8), Coord(8)}, {Coord(2, -5, 8), Coord(5, -3, 8)},
+        {Coord(-12, 0, 3), Coord(9, 17, 3)}, {Coord(-30, -9, 16), Coord(-17, 9, 20)}, {Coord(1, 0, 0), Coord(0, 0, 0)}};
+    EXPECT_EQ(DilationBox(Coord(-1), Coord(1)).leafOffsetCount(), 27u);
+    EXPECT_EQ(DilationBox(Coord(0), Coord(1)).leafOffsetCount(), 8u);
+    EXPECT_EQ(DilationBox(Coord(0), Coord(0)).leafOffsetCount(), 1u);
+    EXPECT_EQ(DilationBox(Coord(8), Coord(8)).leafOffsetCount(), 1u);// all voxels leave the source leaf
+    EXPECT_EQ(DilationBox(Coord(-9), Coord(9)).leafOffsetCount(), 125u);
+    EXPECT_TRUE(DilationBox(Coord(0, 1, 0), Coord(0)).empty());
+    EXPECT_EQ(DilationBox(Coord(0, 1, 0), Coord(0)).leafOffsetCount(), 0u);
+    EXPECT_EQ(DilationBox(Coord(-1), Coord(1)).dilate(nanovdb::CoordBBox(Coord(0), Coord(7))),
+              nanovdb::CoordBBox(Coord(-1), Coord(8)));
+    EXPECT_TRUE(DilationBox(Coord(1), Coord(2)).dilate(nanovdb::CoordBBox()).empty());// no overflow on the empty sentinels
+    EXPECT_TRUE(DilationBox(Coord(1), Coord(0)).dilate(nanovdb::CoordBBox(Coord(0), Coord(7))).empty());
+
+    std::mt19937 rng(7);
+    auto floorDiv8 = [](int v) { return v >= 0 ? v / 8 : -((-v + 7) / 8); };
+    for (const auto &box : boxes) {
+        std::set<std::array<int, 3>> offsets;// every target the box enumerates, once each
+        for (uint32_t i = 0; i < box.leafOffsetCount(); ++i) {
+            const Coord d = box.leafOffset(i);
+            EXPECT_TRUE(offsets.insert({d[0], d[1], d[2]}).second);
+        }
+        for (const double density : {0.02, 0.3, 1.0}) {
+            std::bernoulli_distribution on(density);
+            nanovdb::Mask<3> src;
+            for (uint32_t n = 0; n < nanovdb::Mask<3>::SIZE; ++n) if (on(rng)) src.setOn(n);
+            // Voxel by voxel: local voxel (x, y, z) at offset 64 x + 8 y + z lands at (x, y, z) + o
+            std::map<std::array<int, 3>, nanovdb::Mask<3>> expected;
+            for (uint32_t n = 0; n < nanovdb::Mask<3>::SIZE; ++n) {
+                if (!src.isOn(n)) continue;
+                const int x = int(n >> 6), y = int((n >> 3) & 7), z = int(n & 7);
+                for (int ox = box.lo[0]; ox <= box.hi[0]; ++ox)
+                for (int oy = box.lo[1]; oy <= box.hi[1]; ++oy)
+                for (int oz = box.lo[2]; oz <= box.hi[2]; ++oz) {
+                    const int t[3] = {x + ox, y + oy, z + oz};
+                    int d[3], l[3];
+                    for (int a = 0; a < 3; ++a) { d[a] = floorDiv8(t[a]); l[a] = t[a] - 8 * d[a]; }
+                    expected[{d[0], d[1], d[2]}].setOn(uint32_t(l[0] << 6 | l[1] << 3 | l[2]));
+                }
+            }
+            for (const auto &e : expected) EXPECT_TRUE(offsets.count(e.first)) << "an unlisted target receives voxels";
+            for (uint32_t i = 0; i < box.leafOffsetCount(); ++i) {
+                const Coord d = box.leafOffset(i);
+                nanovdb::Mask<3> got;
+                const bool any = box.dilateLeafMask(src, d, got);
+                const auto it = expected.find({d[0], d[1], d[2]});
+                const nanovdb::Mask<3> want = it == expected.end() ? nanovdb::Mask<3>() : it->second;
+                EXPECT_EQ(any, !want.isOff());
+                EXPECT_TRUE(got == want) << "box " << box.lo << " " << box.hi << ", target " << d << ", density " << density;
+            }
+        }
+    }
+}// DilationBox_LeafMasks
 
 int main(int argc, char** argv)
 {
