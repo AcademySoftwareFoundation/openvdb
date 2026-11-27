@@ -902,7 +902,12 @@ struct MarkUpperChildFunctor
         NANOVDB_ASSERT(rootTile);// buildRasterizedRoot made one tile per unique pair origin
         const uint64_t tile = util::PtrDiff(rootTile, dRoot->tile(0)) / sizeof(typename NanoRoot<BuildT>::Tile);
         const uint32_t uc = NanoUpper<BuildT>::CoordToOffset(origin);
-        if (!dUpperMasks[tile].isOn(uc)) dUpperMasks[tile].setOnAtomic(uc);// most pairs find their bit already set
+
+        // Most pairs find their bit already set, so skip the atomic then. Other threads set bits
+        // in the same word, so the check is a volatile (relaxed) load; bits are only ever set,
+        // so a stale read costs at most a redundant atomic.
+        const volatile uint64_t &word = dUpperMasks[tile].words()[uc >> 6];
+        if (!(word & (uint64_t(1) << (uc & 63)))) dUpperMasks[tile].setOnAtomic(uc);
     }
 };
 
