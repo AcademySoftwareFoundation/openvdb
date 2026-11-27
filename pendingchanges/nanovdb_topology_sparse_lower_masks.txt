@@ -22,7 +22,9 @@ NanoVDB:
     countNodes and deviceUpperMasks throw it unless any mask allocator did, and both
     mask allocators throw it before uploadProcessedRoot. Kernels that
     write through SparseLowerMasks, and so the CUDA topology tools, require compute
-    capability 7.0 or newer; the deprecated dense path does not.
+    capability 7.0 or newer: buildInternalMasks and allocateLowerMasks throw
+    std::runtime_error on an older device, while builds that also target older
+    architectures still compile. The deprecated dense path has no such requirement.
   - The internal-node functors in nanovdb/util/cuda/Morphology.cuh (refine, coarsen,
     dilate, prune and merge) take any lower-mask view from the new header
     nanovdb/util/cuda/LowerMasks.cuh. RasterizeInternalNodesFunctor takes the view

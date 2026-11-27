@@ -23,7 +23,9 @@
 
     Claiming rows needs labeled coalesced groups, __nanosleep and independent thread scheduling, so a
     kernel that writes through SparseLowerMasks requires compute capability 7.0 or newer.
-    DenseLowerMasks, and so the deprecated dense path, has no such requirement.
+    TopologyBuilder::allocateLowerMasks throws on an older device, and for older targets the claim
+    compiles to a trap, so builds that also target them still compile. DenseLowerMasks, and so the
+    deprecated dense path, has no such requirement.
 
     \warning The header file contains cuda device code so be sure
              to only include it in .cu files (or other .cuh files)
@@ -34,8 +36,11 @@
 
 #include <nanovdb/NanoVDB.h>
 
+#include <cuda/atomic> // for cuda::atomic_ref
+#include <cstdint> // for std::uintptr_t
 #include <type_traits> // for std::is_base_of_v
 
+// 700 is SparseLowerMasksMinMajor * 100
 #if !defined(__CUDA_ARCH__) || __CUDA_ARCH__ >= 700
 #define NANOVDB_LOWERMASKS_CAN_CLAIM 1
 #include <cooperative_groups.h>
@@ -44,6 +49,9 @@
 #endif
 
 namespace nanovdb::util::morphology::cuda {
+
+/// @brief Lowest compute capability (major version) whose kernels can claim SparseLowerMasks rows
+static constexpr int SparseLowerMasksMinMajor = 7;
 
 /// @brief Upper-mask words per processed tile
 static constexpr uint32_t UpperMaskWords = Mask<5>::WORD_COUNT;
@@ -124,37 +132,42 @@ struct SparseLowerMasks : LowerMasksWrites<SparseLowerMasks>
         return v;
     }
 
-    /// @note A template only so that the compute capability check below fires in kernels
-    ///       that write through this view, not in every file that includes the header
-    template <int Unused = 0>
     __device__ Mask<4>* row(uint64_t tile, uint32_t uc) const
     {
 #if NANOVDB_LOWERMASKS_CAN_CLAIM
         uint32_t *slot = index + tile * Mask<5>::SIZE + uc;
-        uint32_t r = *reinterpret_cast<volatile uint32_t*>(slot);
+        uint32_t r = loadSlot(slot);
         if (r == UnclaimedRow || r == ClaimingRow) {
             // The lanes that reach here together for the same slot elect one leader to claim
-            // it, so a row costs one claim per warp: the documented coalesced-group pattern
+            // it, so a row costs one claim per warp: the documented coalesced-group pattern.
+            // The label is the slot's address as an integer, which every CUDA 12 release accepts.
             namespace cg = cooperative_groups;
-            const cg::coalesced_group peers = cg::labeled_partition(cg::coalesced_threads(), slot);
+            const auto label = static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(slot));
+            const cg::coalesced_group peers = cg::labeled_partition(cg::coalesced_threads(), label);
             if (peers.thread_rank() == 0) r = claim(slot);
             r = peers.shfl(r, 0);
         }
         return r < capacity ? pool + r : nullptr;
 #else
-        static_assert(Unused != 0, "SparseLowerMasks, and the CUDA topology tools that write through it, require compute capability 7.0 or newer");
+        __trap();// TopologyBuilder::allocateLowerMasks refuses these devices, so this never runs
         return nullptr;
 #endif
     }
 
 #if NANOVDB_LOWERMASKS_CAN_CLAIM
 private:
+    /// @brief Relaxed load of a slot other warps may be claiming
+    __device__ static uint32_t loadSlot(uint32_t *slot)
+    {
+        return ::cuda::atomic_ref<uint32_t, ::cuda::thread_scope_device>(*slot).load(::cuda::std::memory_order_relaxed);
+    }
+
     /// @brief Pool row of @a slot, claiming one if the slot is unclaimed. The claimant never
     ///        waits between its CAS and its store, so a lane waiting on another warp's claim
     ///        is released once independent thread scheduling runs that claimant.
     __device__ uint32_t claim(uint32_t *slot) const
     {
-        uint32_t r = *reinterpret_cast<volatile uint32_t*>(slot);
+        uint32_t r = loadSlot(slot);
         if (r == UnclaimedRow) {
             if (atomicCAS(slot, UnclaimedRow, ClaimingRow) == UnclaimedRow) {
                 r = atomicAdd(claimed, 1u);
@@ -170,7 +183,7 @@ private:
         }
         while (r == ClaimingRow) {
             __nanosleep(32);
-            r = *reinterpret_cast<volatile uint32_t*>(slot);
+            r = loadSlot(slot);
         }
         __threadfence();
         return r;

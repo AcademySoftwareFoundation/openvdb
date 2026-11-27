@@ -260,6 +260,7 @@ public:
     ///        capped at util::morphology::cuda::MaxLowerRows. A bound the functors exceed makes
     ///        waitForNodeCounts (and so getBuffer) throw.
     /// @throw std::logic_error before uploadProcessedRoot
+    /// @throw std::runtime_error on a device below compute capability 7.0
     template <typename LaunchT>
     void buildInternalMasks(cudaStream_t stream, uint64_t maxRows, LaunchT &&launch)
     {
@@ -273,6 +274,7 @@ public:
     ///        as in buildInternalMasks, for callers that launch the functors themselves with
     ///        deviceUpperMasks() and lowerMasks()
     /// @throw std::logic_error before uploadProcessedRoot
+    /// @throw std::runtime_error on a device below compute capability 7.0
     void allocateLowerMasks(cudaStream_t stream, uint64_t maxRows);
 
     /// @brief The view of the lower masks allocateLowerMasks reserved
@@ -506,6 +508,15 @@ private:
     {
         if (mMode == LowerMaskMode::None)
             throw std::logic_error(std::string("TopologyBuilder::") + caller + " requires buildInternalMasks, allocateLowerMasks or allocateInternalMaskBuffers first");
+    }
+    /// @brief Sparse lower masks claim rows with compute capability 7.0 features (see LowerMasks.cuh)
+    static void requireClaimCapableDevice()
+    {
+        int device = 0, major = 0;
+        cudaCheck(cudaGetDevice(&device));
+        cudaCheck(cudaDeviceGetAttribute(&major, cudaDevAttrComputeCapabilityMajor, device));
+        if (major < util::morphology::cuda::SparseLowerMasksMinMajor)
+            throw std::runtime_error("TopologyBuilder::buildInternalMasks, and so the CUDA topology tools, require compute capability 7.0 or newer");
     }
     /// @brief Both mask allocators run after uploadProcessedRoot, which fixes the tile count they size from
     void requireRootsUploaded(const char *allocator) const
@@ -753,6 +764,7 @@ template<typename BuildT, typename ResourceT>
 void TopologyBuilder<BuildT, ResourceT>::allocateLowerMasks(cudaStream_t stream, uint64_t maxRows)
 {
     requireRootsUploaded("allocateLowerMasks");
+    requireClaimCapableDevice();
     mMode = LowerMaskMode::Sparse;
     releaseMasks(stream);
     const uint64_t slots = uint64_t(mTileTotal) * Mask<5>::SIZE;
@@ -802,7 +814,6 @@ void TopologyBuilder<BuildT, ResourceT>::countNodesSparse(cudaStream_t stream)
     util::cuda::lambdaKernel<<<numBlocks(words), mNumThreads, 0, stream>>>(words, topology::detail::EmitRowKeysFunctor(),
         mUpperMasks.data(), mWordPrefix.data(), capacity, mRowKeys.data(), mRowIndex.data(), mRowOf.data(), mRowState.data() + util::morphology::cuda::RowStateOverflow);
     cudaCheckError();
-    mRowIndex.destroy(stream);
 
     // Leaves per lower node, and their exclusive scan
     BufT<uint32_t> leafCounts = allocateScratch<uint32_t>(stream, capacity, "leaf counts");

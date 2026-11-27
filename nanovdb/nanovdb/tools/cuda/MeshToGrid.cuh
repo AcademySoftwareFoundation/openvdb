@@ -17,6 +17,7 @@
 #define NANOVDB_TOOLS_CUDA_MESHTOGRID_CUH_HAS_BEEN_INCLUDED
 
 #include <cub/cub.cuh>
+#include <cuda/atomic> // for cuda::atomic_ref
 #include <algorithm>
 #include <cstddef> // for std::size_t
 #include <string> // for std::string
@@ -904,9 +905,10 @@ struct MarkUpperChildFunctor
         const uint32_t uc = NanoUpper<BuildT>::CoordToOffset(origin);
 
         // Most pairs find their bit already set, so skip the atomic then. Other threads set bits
-        // in the same word, so the check is a volatile (relaxed) load; bits are only ever set,
-        // so a stale read costs at most a redundant atomic.
-        const volatile uint64_t &word = dUpperMasks[tile].words()[uc >> 6];
+        // in the same word, so the check is a relaxed atomic load; bits are only ever set, so a
+        // stale read costs at most a redundant atomic.
+        const uint64_t word = ::cuda::atomic_ref<uint64_t, ::cuda::thread_scope_device>(dUpperMasks[tile].words()[uc >> 6])
+                                  .load(::cuda::std::memory_order_relaxed);
         if (!(word & (uint64_t(1) << (uc & 63)))) dUpperMasks[tile].setOnAtomic(uc);
     }
 };
