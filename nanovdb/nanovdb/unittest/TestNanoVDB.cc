@@ -10514,6 +10514,65 @@ TEST_F(TestNanoVDB, VoxelBlockManagerCompatible)
     EXPECT_EQ((leafVoxels + 127) / 128, fogVbm.blockCount());
 }// VoxelBlockManagerCompatible
 
+TEST_F(TestNanoVDB, CreateNanoGridDropsEmptyLeafs)
+{
+    // A grid whose voxels were deactivated without pruning has leaf nodes without any
+    // active value. When such a grid is converted to a ValueOnIndex grid without tiles,
+    // those leaf nodes index nothing and are dropped from the destination grid, i.e. the
+    // child bit is cleared in the parent internal node and the leaf is not included in
+    // the destination node count. This makes the destination grid compatible with the
+    // VoxelBlockManager, which requires every leaf to hold at least one active value.
+    using SrcGridT = nanovdb::tools::build::Grid<float>;
+    SrcGridT srcGrid(0.0f);
+    auto srcAcc = srcGrid.getAccessor();
+    srcAcc.setValue(nanovdb::Coord(0, 0, 0), 1.0f);// leaf 0, one active value
+    srcAcc.setValue(nanovdb::Coord(100, 0, 0), 1.0f);// leaf 1, deactivated below
+    srcAcc.setValue(nanovdb::Coord(200, 0, 0), 1.0f);// leaf 2, one active value
+    ASSERT_EQ(3u, srcGrid.tree().nodeCount()[0]);
+    // Deactivate the voxel of leaf 1 without pruning, i.e. the leaf node is left empty.
+    nanovdb::tools::build::NodeManager<SrcGridT> srcMgr(srcGrid);
+    auto &srcLeaf = srcMgr.leaf(1);
+    srcLeaf.mValueMask.setOff(srcLeaf.CoordToOffset(nanovdb::Coord(100, 0, 0)));
+    ASSERT_EQ(0u, srcLeaf.mValueMask.countOn());
+
+    auto handle = nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::ValueOnIndex>(srcGrid, 0u, false, false);
+    auto *grid = handle.grid<nanovdb::ValueOnIndex>();
+    ASSERT_TRUE(grid);
+    ASSERT_TRUE(grid->isSequential());
+
+    // The empty leaf node is dropped, the two remaining leaf nodes are kept.
+    EXPECT_EQ(2u, grid->tree().nodeCount(0));
+    EXPECT_EQ(2u, grid->activeVoxelCount());
+    EXPECT_EQ(1u + 2u, grid->valueCount());// background and two active values
+
+    // Every leaf of the destination grid holds at least one active value and the
+    // leaves tile the value indices without gaps, i.e. the grid is VBM compatible.
+    EXPECT_TRUE(nanovdb::tools::isVoxelBlockManagerCompatible(grid));
+
+    const auto *leaves = grid->tree().getFirstNode<0>();
+    for (uint32_t i = 0; i < grid->tree().nodeCount(0); ++i) {
+        EXPECT_GT(leaves[i].data()->valueCount(), 0u);
+    }
+    EXPECT_EQ(1u, leaves[0].data()->firstOffset());
+    EXPECT_EQ(2u, leaves[1].data()->firstOffset());
+
+    // The parent internal node no longer refers to the dropped leaf.
+    auto idxAcc = grid->getAccessor();
+    EXPECT_FALSE(idxAcc.probeLeaf(nanovdb::Coord(100, 0, 0)));
+    EXPECT_TRUE(idxAcc.probeLeaf(nanovdb::Coord(0, 0, 0)));
+    EXPECT_TRUE(idxAcc.probeLeaf(nanovdb::Coord(200, 0, 0)));
+
+    // The active values are unchanged.
+    EXPECT_EQ(1u, idxAcc.getValue(nanovdb::Coord(0, 0, 0)));
+    EXPECT_EQ(2u, idxAcc.getValue(nanovdb::Coord(200, 0, 0)));
+
+    // A ValueIndex grid indexes all 512 values of every leaf, so no leaf is dropped.
+    auto idxHandle = nanovdb::tools::createNanoGrid<SrcGridT, nanovdb::ValueIndex>(srcGrid, 0u, false, false);
+    auto *idxGrid = idxHandle.grid<nanovdb::ValueIndex>();
+    ASSERT_TRUE(idxGrid);
+    EXPECT_EQ(3u, idxGrid->tree().nodeCount(0));
+}// CreateNanoGridDropsEmptyLeafs
+
 TEST_F(TestNanoVDB, VoxelBlockManagerTail)
 {
     // A handle with more blocks than the voxels need: the extra blocks get the sentinel

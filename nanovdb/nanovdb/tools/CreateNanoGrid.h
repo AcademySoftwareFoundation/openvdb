@@ -785,6 +785,8 @@ private:
     CheckMode                mChecksum;
     bool                     mDitherOn, mIncludeStats, mIncludeTiles;
     std::vector<uint64_t>    mValIdx[3];// store id of first value in node
+    std::vector<int32_t>     mLeafMap;// maps a source leaf node index to the destination leaf node index, or -1 if the leaf was dropped
+    uint32_t                 mDstLeafCount{0};// number of leaf nodes in the destination grid
 }; // CreateNanoGrid
 
 template <typename DstT, typename SrcT>
@@ -1175,6 +1177,10 @@ CreateNanoGrid<SrcGridT>::countValues()
     if constexpr(BuildTraits<DstBuildT>::is_onindex) {
         util::forEach(1, mValIdx[0].size(), 8, [&](const util::Range1D& r) {
             for (auto i = r.begin(); i != r.end(); ++i) {
+                if (!mLeafMap.empty() && mLeafMap[static_cast<size_t>(i-1)] < 0) {
+                    mValIdx[0][i] = 0u;// a dropped leaf node does not index any value
+                    continue;
+                }
                 mValIdx[0][i] = stats;
                 mValIdx[0][i] += mSrcNodeAcc.template node<0>(static_cast<uint32_t>(i-1)).getValueMask().countOn();
             }
@@ -1192,8 +1198,29 @@ template <typename DstBuildT>
 inline typename util::enable_if<BuildTraits<DstBuildT>::is_index>::type
 CreateNanoGrid<SrcGridT>::preProcess(uint32_t channels)
 {
+    const uint32_t srcLeafCount = mSrcNodeAcc.nodeCount(0);
+    mLeafMap.clear();
+    mDstLeafCount = srcLeafCount;
+    if constexpr(BuildTraits<DstBuildT>::is_onindex) {
+        if (!mIncludeTiles) {
+            // A ValueOnIndex grid without tiles only indexes the active values of its leaf nodes,
+            // so a leaf node without any active value indexes nothing. Such a leaf node is dropped
+            // from the destination grid, i.e. the child bit is cleared in the parent internal node
+            // and the leaf is not included in the destination node count. Otherwise the leaf node
+            // would violate the VoxelBlockManager precondition that every leaf holds at least one
+            // active value.
+            mLeafMap.resize(srcLeafCount, -1);
+            uint32_t dstIndex = 0;
+            for (uint32_t i = 0; i < srcLeafCount; ++i) {
+                const auto &srcLeaf = mSrcNodeAcc.template node<0>(i);
+                if (srcLeaf.getValueMask().countOn() == 0u) continue;// empty leaf, drop it
+                mLeafMap[i] = static_cast<int32_t>(dstIndex++);
+            }
+            mDstLeafCount = dstIndex;
+        }
+    }
     const uint64_t valueCount = this->template countValues<DstBuildT>();
-    mLeafNodeSize = mSrcNodeAcc.nodeCount(0)*NanoLeaf<DstBuildT>::DataType::memUsage();
+    mLeafNodeSize = uint64_t(mDstLeafCount)*NanoLeaf<DstBuildT>::DataType::memUsage();
 
     size_t order = mBlindMetaData.size();
     char str[16];
@@ -1267,9 +1294,11 @@ CreateNanoGrid<SrcGridT>::processLeafs()
 
     util::forEach(0, mSrcNodeAcc.nodeCount(0), 8, [&](const util::Range1D& r) {
         const uint8_t flags  = mIncludeStats ? 16u : 0u;// 4th bit indicates stats
-        DstDataT *dstLeaf = this->template dstNode<DstBuildT,0>(r.begin());// fixed size
-        for (auto i = r.begin(); i != r.end(); ++i, ++dstLeaf) {
+        for (auto i = r.begin(); i != r.end(); ++i) {
             auto &srcLeaf = mSrcNodeAcc.template node<0>(static_cast<uint32_t>(i));
+            const int32_t dstIndex = mLeafMap.empty() ? static_cast<int32_t>(i) : mLeafMap[static_cast<size_t>(i)];
+            if (dstIndex < 0) continue;// empty leaf node was dropped
+            DstDataT *dstLeaf = this->template dstNode<DstBuildT,0>(static_cast<uint64_t>(dstIndex));// fixed size
             dstLeaf->mBBoxMin = srcLeaf.origin(); // copy origin of node
             dstLeaf->mBBoxDif[0] = dstLeaf->mBBoxDif[1] = dstLeaf->mBBoxDif[2] = 0u;
             dstLeaf->mFlags = flags;
@@ -1592,7 +1621,19 @@ CreateNanoGrid<SrcGridT>::processInternalNodes()
             for (auto it = srcNode.cbeginChildAll(); it; ++it) {
                 SrcValueT value;
                 if (it.probeChild(value)) {
-                    DstChildT *dstChild = this->template dstNode<DstBuildT,LEVEL-1>(childID++);// might be Leaf<FpN>
+                    // Only the lower internal nodes (LEVEL == 1) refer to leaf nodes, so only they
+                    // are subject to the leaf node mapping. The upper internal nodes (LEVEL == 2)
+                    // refer to lower internal nodes, which are never dropped.
+                    const int32_t dstIndex = (LEVEL == 1 && !mLeafMap.empty())
+                        ? mLeafMap[static_cast<size_t>(childID)]
+                        : static_cast<int32_t>(childID);
+                    ++childID;
+                    if (dstIndex < 0) {// the child leaf node was dropped, i.e. it had no active value
+                        dstNode->mChildMask.setOff(it.pos());// clear the child bit in the parent node
+                        dstNode->setValue(it.pos(), uint64_t(0));// the slot now refers to the background value
+                        continue;
+                    }
+                    DstChildT *dstChild = this->template dstNode<DstBuildT,LEVEL-1>(static_cast<uint64_t>(dstIndex));// might be Leaf<FpN>
                     dstNode->setChild(it.pos(), dstChild);
                 } else {
                     uint64_t m = 0u;
@@ -1694,13 +1735,14 @@ template <typename DstBuildT>
 void CreateNanoGrid<SrcGridT>::processTree()
 {
     const uint64_t nodeCount[3] = {mSrcNodeAcc.nodeCount(0), mSrcNodeAcc.nodeCount(1), mSrcNodeAcc.nodeCount(2)};
+    const uint64_t dstLeafCount = mDstLeafCount ? mDstLeafCount : nodeCount[0];
     auto *dstTree = this->template dstTree<DstBuildT>();
     dstTree->setRoot( this->template dstRoot<DstBuildT>() );
     dstTree->setFirstNode(nodeCount[2] ? this->template dstNode<DstBuildT, 2>(0) : nullptr);
     dstTree->setFirstNode(nodeCount[1] ? this->template dstNode<DstBuildT, 1>(0) : nullptr);
-    dstTree->setFirstNode(nodeCount[0] ? this->template dstNode<DstBuildT, 0>(0) : nullptr);
+    dstTree->setFirstNode(dstLeafCount ? this->template dstNode<DstBuildT, 0>(0) : nullptr);
 
-    dstTree->mNodeCount[0] = static_cast<uint32_t>(nodeCount[0]);
+    dstTree->mNodeCount[0] = static_cast<uint32_t>(dstLeafCount);
     dstTree->mNodeCount[1] = static_cast<uint32_t>(nodeCount[1]);
     dstTree->mNodeCount[2] = static_cast<uint32_t>(nodeCount[2]);
 
@@ -1912,6 +1954,7 @@ CreateNanoGrid<SrcGridT>::copyValues(SrcValueT *buffer)
     }
     util::forEach(0, mSrcNodeAcc.nodeCount(0), 4, [&](const util::Range1D& r) {
         for (auto i = r.begin(); i!=r.end(); ++i) {
+            if (!mLeafMap.empty() && mLeafMap[static_cast<size_t>(i)] < 0) continue;// dropped leaf node, it indexes no value
             copyNodeValues(mSrcNodeAcc.template node<0>(static_cast<uint32_t>(i)), buffer + mValIdx[0][i]);
         }
     });

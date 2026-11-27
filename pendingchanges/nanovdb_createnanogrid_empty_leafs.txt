@@ -1,0 +1,10 @@
+NanoVDB:
+  Fixes:
+  - tools::createNanoGrid dropped no leaf node when it converted a grid to a
+    ValueOnIndex grid with includeStats and includeTiles off. A source leaf node
+    without any active value indexes nothing, but it was kept in the destination
+    grid, which broke the VoxelBlockManager precondition that every leaf node
+    holds at least one active value. Such a leaf node is now skipped: the child bit
+    is cleared in the parent internal node and the leaf node is left out of the
+    destination node count, so a single createNanoGrid(..., 0u, false, false) call
+    yields a VoxelBlockManager-compatible grid from any index or value grid.
