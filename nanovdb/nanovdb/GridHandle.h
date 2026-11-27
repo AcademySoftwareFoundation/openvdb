@@ -18,7 +18,9 @@
 
 #include <fstream> // for std::ifstream
 #include <iostream> // for std::cerr/cout
-#include <cstring> // for std::memcpy
+#include <cstring> // for std::memcpy, std::memchr
+#include <type_traits> // for std::is_unsigned, std::is_trivially_copyable
+#include <limits> // for std::numeric_limits
 #include <stdexcept> // for std::runtime_error
 #include <string> // for std::to_string
 #include <vector>
@@ -104,6 +106,104 @@ inline void validateGridLayout(const std::vector<GridHandleMetaData>& meta, uint
         if (!(meta[i].gridType < GridType::End))
             throw std::runtime_error("GridHandle::adopt: invalid grid type" + where());
         offset += meta[i].size;
+    }
+}
+
+/// @brief Read exactly @a bytes from @a is into @a dst, or throw @a error
+inline void readBytes(std::istream& is, void* dst, uint64_t bytes, const char* error)
+{
+    if (!is.read(static_cast<char*>(dst), std::streamsize(bytes))) throw std::runtime_error(error);
+}
+
+/// @brief Read one trivially copyable value from @a is, or throw @a error
+template<typename T>
+inline void readValue(std::istream& is, T& value, const char* error)
+{
+    static_assert(std::is_trivially_copyable<T>::value, "raw stream reads need a trivially copyable type");
+    readBytes(is, &value, sizeof(T), error);
+}
+
+/// @brief Add a grid size read from a stream to a running byte count
+/// @throw std::runtime_error if the sum wraps around
+template<typename SizeT>
+inline void addGridSize(SizeT& total, SizeT gridSize)
+{
+    static_assert(std::is_unsigned<SizeT>::value, "addGridSize relies on unsigned wrap-around to detect overflow");
+    const SizeT sum = total + gridSize;// unsigned wrap-around is well defined
+    if (sum < total) throw std::runtime_error("Grid sizes in stream overflow a byte count");
+    total = sum;
+}
+
+/// @brief Return the end position of @a is, or -1 if the stream cannot report it.
+///        Measuring seeks, which discards a file stream's read buffer, so readers
+///        measure once and pass the result on.
+inline std::streampos streamEnd(std::istream& is)
+{
+    const std::streampos pos = is.tellg();
+    if (pos == std::streampos(-1)) return pos;
+    is.seekg(0, std::ios_base::end);
+    const std::streampos end = is.tellg();
+    is.clear();
+    is.seekg(pos);
+    return end;
+}
+
+/// @brief Return the bytes left in @a is before @a end, or the largest uint64_t
+///        if either position is unknown
+inline uint64_t remainingBytes(std::istream& is, std::streampos end)
+{
+    const std::streampos pos = is.tellg();
+    if (pos == std::streampos(-1) || end == std::streampos(-1)) return std::numeric_limits<uint64_t>::max();
+    return end > pos ? uint64_t(end - pos) : 0u;
+}
+
+/// @brief Return the bytes left in @a is after its current position, or the
+///        largest uint64_t if the stream cannot report its position
+inline uint64_t remainingBytes(std::istream& is)
+{
+    return remainingBytes(is, streamEnd(is));
+}
+
+/// @brief Throw @a error unless @a is holds at least @a bytes after its current position.
+///        Sizes read from a stream are checked this way before they size an allocation.
+inline void checkRemaining(std::istream& is, uint64_t bytes, const char* error)
+{
+    if (bytes > remainingBytes(is)) throw std::runtime_error(error);
+}
+
+/// @brief Return @a is to @a start after a raw-buffer probe that found no raw grid
+/// @throw std::runtime_error if the probe consumed bytes from a stream that cannot report its position
+inline void rewindProbe(std::istream& is, std::streampos start)
+{
+    const std::streamsize consumed = is.gcount();
+    is.clear();// a stream shorter than GridData is left failed, which would block the rewind
+    if (start != std::streampos(-1)) {
+        is.seekg(start);
+    } else if (consumed > 0) {
+        throw std::runtime_error("GridHandle::read: cannot rewind a stream that does not report its position");
+    }
+}
+
+/// @brief Throw unless the size of a raw grid header covers the header
+inline void checkRawGridSize(const GridData& data)
+{
+    if (data.mGridSize < sizeof(GridData))
+        throw std::runtime_error("GridHandle::read: grid size is smaller than a grid header");
+}
+
+/// @brief Throw unless the header span that tools::updateGridCount checksums lies
+///        inside the first @a bytes of the grid at @a grid
+inline void checkGridHead(const void* grid, uint64_t bytes)
+{
+    if (bytes < sizeof(GridData) + sizeof(TreeData))
+        throw std::runtime_error("Grid is smaller than its grid and tree headers");
+
+    // up to v32.6.0 the end of the checksummed head comes from offsets that are grid data
+    const GridData* data = static_cast<const GridData*>(grid);
+    if (!data->mChecksum.isEmpty()) {
+        const uint64_t headSize = tools::crc32HeadSize(data);
+        if (headSize < sizeof(GridData) + sizeof(TreeData) || headSize > bytes)
+            throw std::runtime_error("Grid head checksum extends past the grid");
     }
 }
 
@@ -326,8 +426,9 @@ public:
 
     //@{
     /// @brief Return true if this handle is empty, i.e. has no allocated memory
-    bool empty()   const { return mBuffer.size() == 0; }
-    bool isEmpty() const { return mBuffer.size() == 0; }
+    bool empty() const { return mBuffer.size() == 0; }
+    /// @deprecated Use GridHandle::empty, the spelling cuda::Buffer and the standard containers use.
+    [[deprecated("Use GridHandle::empty instead.")]] bool isEmpty() const { return this->empty(); }
     //@}
 
     /// @brief Return true if this handle is not empty, i.e. contains at least one grid
@@ -589,20 +690,23 @@ void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
                   "GridHandle::read requires a host-accessible buffer: read into a host-readable handle, then cuda::copyTo");
     const std::streampos start = is.tellg();// remember where the raw buffer begins
     GridData data;
-    is.read((char*)&data, sizeof(GridData));
-    if (data.isValid()) {
-        uint64_t size = data.mGridSize, sum = 0u;
-        while(data.mGridIndex + 1u < data.mGridCount) {// loop over remaining raw grids in stream
+    if (is.read(reinterpret_cast<char*>(&data), sizeof(GridData)) && data.isValid()) {
+        const char* truncated = "GridHandle::read: stream is shorter than its raw grid sizes";
+        uint64_t size = 0u;
+        while (true) {// loop over raw grids in stream
+            detail::checkRawGridSize(data);
+            detail::addGridSize(size, data.mGridSize);
+            if (data.mGridIndex + 1u >= data.mGridCount) break;
             is.seekg(data.mGridSize - sizeof(GridData), std::ios::cur);// skip grid
-            is.read((char*)&data, sizeof(GridData));
-            sum += data.mGridSize;
+            detail::readValue(is, data, truncated);
         }
-        auto buffer = detail::createHostStorage(size + sum, pool);
         is.seekg(start);// rewind to the start of the raw buffer
-        is.read((char*)(buffer.data()), buffer.size());
+        detail::checkRemaining(is, size, truncated);
+        auto buffer = detail::createHostStorage(size, pool);
+        detail::readBytes(is, buffer.data(), buffer.size(), truncated);
         *this = GridHandle(std::move(buffer));
     } else {
-        is.seekg(-sizeof(GridData), std::ios::cur);// rewind
+        detail::rewindProbe(is, start);
         throw std::logic_error("This stream does not contain a valid raw grid buffer");
     }
 }// void GridHandle<BufferT>::read(std::istream& is, const BufferT& pool)
@@ -612,21 +716,30 @@ void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool
 {
     static_assert(!(BufferIsDeviceOnly<BufferT>::value),
                   "GridHandle::read requires a host-accessible buffer: read into a host-readable handle, then cuda::copyTo");
+    const std::streampos start = is.tellg();
     GridData data;
-    is.read((char*)&data, sizeof(GridData));
-    if (data.isValid()) {
+    if (is.read(reinterpret_cast<char*>(&data), sizeof(GridData)) && data.isValid()) {
         if (n>=data.mGridCount) throw std::runtime_error("stream does not contain a #" + std::to_string(n) + " grid");
-        while(data.mGridIndex != n) {
+        const char* truncated = "GridHandle::read: stream is shorter than its raw grid size";
+        detail::checkRawGridSize(data);
+
+        // visit at most the grid count of the first header, so data after the chain is never read
+        for (uint32_t i = 0, count = data.mGridCount; data.mGridIndex != n;) {
+            if (++i >= count) throw std::runtime_error("GridHandle::read: no raw grid in the chain has index " + std::to_string(n));
             is.seekg(data.mGridSize - sizeof(GridData), std::ios::cur);// skip grid
-            is.read((char*)&data, sizeof(GridData));
+            detail::readValue(is, data, truncated);
+            detail::checkRawGridSize(data);
         }
-        auto buffer = detail::createHostStorage(data.mGridSize, pool);
         is.seekg(-sizeof(GridData), std::ios::cur);// rewind
-        is.read((char*)(buffer.data()), data.mGridSize);
-        tools::updateGridCount((GridData*)buffer.data(), 0u, 1u);
+        detail::checkRemaining(is, data.mGridSize, truncated);
+        auto buffer = detail::createHostStorage(data.mGridSize, pool);
+        void* grid = buffer.data();
+        detail::readBytes(is, grid, data.mGridSize, truncated);
+        detail::checkGridHead(grid, data.mGridSize);
+        tools::updateGridCount(static_cast<GridData*>(grid), 0u, 1u);
         *this = GridHandle(std::move(buffer));
     } else {
-        is.seekg(-sizeof(GridData), std::ios::cur);// rewind sizeof(GridData) bytes to undo initial read
+        detail::rewindProbe(is, start);
         throw std::logic_error("This file does not contain a valid raw buffer");
     }
 }// void GridHandle<BufferT>::read(std::istream& is, uint32_t n, const BufferT& pool)
@@ -637,20 +750,35 @@ void GridHandle<BufferT>::read(std::istream& is, const std::string &gridName, co
     static_assert(!(BufferIsDeviceOnly<BufferT>::value),
                   "GridHandle::read requires a host-accessible buffer: read into a host-readable handle, then cuda::copyTo");
     static const std::streamsize byteSize = sizeof(GridData);
+    const std::streampos start = is.tellg();
     GridData data;
-    is.read((char*)&data, byteSize);
-    is.seekg(-byteSize, std::ios::cur);// rewind
-    if (data.isValid()) {
-        uint32_t n = 0;
-        while(data.mGridName != gridName && n++ < data.mGridCount) {
+    const bool isRaw = is.read(reinterpret_cast<char*>(&data), byteSize) && data.isValid();
+    detail::rewindProbe(is, start);
+    if (isRaw) {
+        const char* truncated = "GridHandle::read: stream is shorter than its raw grid size";
+        auto nameIs = [&]{// the name comes from the stream, so bound it before comparing
+            const void* end = std::memchr(data.mGridName, '\0', GridData::MaxNameSize);
+            return end && gridName == data.mGridName;
+        };
+
+        // visit at most the grid count of the first header, so data after the chain is never matched
+        for (uint32_t i = 0, count = data.mGridCount; !nameIs();) {
+            detail::checkRawGridSize(data);
+            if (++i >= count) {// every grid was visited, so check the last one is complete before reporting a miss
+                detail::checkRemaining(is, data.mGridSize, truncated);
+                throw std::runtime_error("No raw grid named \""+gridName+"\"");
+            }
             is.seekg(data.mGridSize, std::ios::cur);// skip grid
-            is.read((char*)&data, byteSize);// read sizeof(GridData) bytes
+            detail::readValue(is, data, truncated);
             is.seekg(-byteSize, std::ios::cur);// rewind
         }
-        if (n>data.mGridCount) throw std::runtime_error("No raw grid named \""+gridName+"\"");
+        detail::checkRawGridSize(data);
+        detail::checkRemaining(is, data.mGridSize, truncated);
         auto buffer = detail::createHostStorage(data.mGridSize, pool);
-        is.read((char*)(buffer.data()), data.mGridSize);
-        tools::updateGridCount((GridData*)buffer.data(), 0u, 1u);
+        void* grid = buffer.data();
+        detail::readBytes(is, grid, data.mGridSize, truncated);
+        detail::checkGridHead(grid, data.mGridSize);
+        tools::updateGridCount(static_cast<GridData*>(grid), 0u, 1u);
         *this = GridHandle(std::move(buffer));
     } else {
         throw std::logic_error("This file does not contain a valid raw buffer");

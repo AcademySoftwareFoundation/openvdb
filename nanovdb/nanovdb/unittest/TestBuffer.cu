@@ -982,7 +982,7 @@ TEST(TestBuffer, GridHandleSingleSpaceParsesMetaOnDevice)
     EXPECT_EQ(nanovdb::GridType::Float, handle.gridType(0));
     EXPECT_EQ(host.gridSize(0), handle.gridSize(0));
     EXPECT_EQ(host.bufferSize(), handle.bufferSize());
-    EXPECT_FALSE(handle.isEmpty());
+    EXPECT_FALSE(handle.empty());
     EXPECT_FALSE(handle.isPadded());
     EXPECT_EQ(devPtr, handle.deviceData());          // single space: deviceData is the buffer
     EXPECT_NE(handle.deviceGrid<float>(), nullptr);  // typed device accessor works
@@ -1010,7 +1010,7 @@ TEST(TestBuffer, GridHandleSingleSpaceMetaScratchUsesResource)
         handle.reset();// free #2: the grid bytes, through the same resource
         ASSERT_EQ(cudaSuccess, cudaStreamSynchronize(0));
         EXPECT_EQ(2, counters.deallocs);
-        EXPECT_TRUE(handle.isEmpty());
+        EXPECT_TRUE(handle.empty());
     }
     EXPECT_EQ(counters.allocs, counters.deallocs);
 }
@@ -1071,6 +1071,16 @@ TEST(TestBuffer, GridHandlePinnedHostReadable)
     EXPECT_EQ(1u, readBack.gridCount());
     EXPECT_NE(readBack.grid<float>(), nullptr);
     EXPECT_EQ(0, std::memcmp(readBack.data(), handle.data(), handle.bufferSize()));
+
+    // the single-grid raw readers allocate through the same resource
+    std::istringstream byIndex(ss.str()), byName(ss.str());
+    nanovdb::GridHandle<BufT> readIndex, readName;
+    readIndex.read(byIndex, 0u);
+    readName.read(byName, std::string("sphere"));
+    ASSERT_NE(readIndex.grid<float>(), nullptr);
+    ASSERT_NE(readName.grid<float>(), nullptr);
+    EXPECT_EQ(std::string("sphere"), readIndex.grid<float>()->gridName());
+    EXPECT_EQ(std::string("sphere"), readName.grid<float>()->gridName());
 }
 
 TEST(TestBuffer, GridHandlePinnedAsyncResource)
@@ -1224,7 +1234,7 @@ TEST(TestBuffer, GridHandleCopyToProtoResource)
 
     nanovdb::GridHandle<nanovdb::HostBuffer> empty;
     auto out = nanovdb::cuda::copyTo<nanovdb::cuda::Buffer<std::byte, nanovdb::cuda::DeviceResource>>(empty, cudaStream_t(0));
-    EXPECT_TRUE(out.isEmpty());// empty in, empty out for default-constructible targets
+    EXPECT_TRUE(out.empty());// empty in, empty out for default-constructible targets
 }
 
 TEST(TestBuffer, GridHandleSingleSpaceEmptyAndInvalid)
@@ -1237,10 +1247,10 @@ TEST(TestBuffer, GridHandleSingleSpaceEmptyAndInvalid)
         nanovdb::GridHandle<BufT> handle{BufT(cudaStream_t(0), res, 0, nanovdb::cuda::noInit)};
         EXPECT_EQ(0u, handle.gridCount());
         EXPECT_EQ(nullptr, handle.deviceData());
-        EXPECT_TRUE(handle.isEmpty());
+        EXPECT_TRUE(handle.empty());
         EXPECT_FALSE(handle.isPadded());
         auto copy = handle.copy<BufT>();// copying an empty handle is a no-op
-        EXPECT_TRUE(copy.isEmpty());
+        EXPECT_TRUE(copy.empty());
         EXPECT_EQ(0, counters.allocs);
     }
 

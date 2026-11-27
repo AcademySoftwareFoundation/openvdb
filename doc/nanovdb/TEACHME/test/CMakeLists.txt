@@ -33,6 +33,18 @@ set(BLOSC_INCLUDE_ROOT "${REPO_ROOT}/ext/blosc/openvdb/ext/blosc")
 
 message(STATUS "NanoVDB include root: ${NANOVDB_INCLUDE_ROOT}")
 
+# NanoVDB's CUDA headers need a newer CCCL than the CUDA toolkit may bundle,
+# so fetch the release NanoVDB pins in nanovdb/nanovdb/CMakeLists.txt.
+file(STRINGS "${NANOVDB_INCLUDE_ROOT}/nanovdb/CMakeLists.txt" _cccl_tag_line
+     REGEX "set\\(NANOVDB_CCCL_TAG ")
+string(REGEX MATCH "\"(v[0-9.]+)\"" _ "${_cccl_tag_line}")
+set(_cccl_tag "${CMAKE_MATCH_1}")
+if(NOT _cccl_tag)
+  message(FATAL_ERROR "Could not read NANOVDB_CCCL_TAG from nanovdb/nanovdb/CMakeLists.txt")
+endif()
+include("${REPO_ROOT}/cmake/CPM.cmake")
+CPMAddPackage(NAME CCCL GITHUB_REPOSITORY nvidia/cccl GIT_TAG ${_cccl_tag})
+
 # Generated TUs + manifest live in ${GEN_DIR} (passed in, defaults to ./gen).
 if(NOT DEFINED GEN_DIR)
   set(GEN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/gen")
@@ -67,6 +79,7 @@ if(_core_srcs)
   add_library(teachme_blocks OBJECT ${_core_srcs})
   target_include_directories(teachme_blocks PRIVATE
     "${NANOVDB_INCLUDE_ROOT}" "${BLOSC_INCLUDE_ROOT}" "${GEN_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
+  target_link_libraries(teachme_blocks PRIVATE CCCL::CCCL)
   list(LENGTH _core_srcs _n_core)
   message(STATUS "teachme_blocks: ${_n_core} core TU(s)")
 endif()
@@ -80,7 +93,7 @@ if(_ovdb_srcs)
     target_include_directories(teachme_blocks_openvdb PRIVATE
       "${NANOVDB_INCLUDE_ROOT}" "${OPENVDB_INCLUDE_ROOT}" "${BLOSC_INCLUDE_ROOT}"
       "${GEN_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}")
-    target_link_libraries(teachme_blocks_openvdb PRIVATE OpenVDB::openvdb)
+    target_link_libraries(teachme_blocks_openvdb PRIVATE OpenVDB::openvdb CCCL::CCCL)
     list(LENGTH _ovdb_srcs _n_ovdb)
     message(STATUS "teachme_blocks_openvdb: ${_n_ovdb} OpenVDB TU(s)")
   else()

@@ -85,7 +85,8 @@ if(@NANOVDB_USE_CUDA@)
   elseif(_nanovdb_cccl_version VERSION_LESS "@MINIMUM_CCCL_VERSION@")
     set(CMAKE_MODULE_PATH ${_nanovdb_original_module_path})
     set(NanoVDB_NOT_FOUND_MESSAGE
-      "NanoVDB requires CCCL @MINIMUM_CCCL_VERSION@ or newer, but found ${_nanovdb_cccl_version}.")
+      "NanoVDB requires CCCL @MINIMUM_CCCL_VERSION@ or newer, but found ${_nanovdb_cccl_version}. "
+      "Set CCCL_DIR to a newer CCCL.")
     set(NanoVDB_FOUND FALSE)
     unset(_nanovdb_cccl_version)
     return()
